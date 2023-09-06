@@ -18,6 +18,7 @@ if __name__ == "__main__":
         print(f"Total number of users: {len(sizes)}")
         sizes = np.array(sizes)
         print(f"Total number of reviews: {sizes.sum()}")
+        sizes = np.log(sizes)
         for metric in ("LogLoss", "RMSE", "RMSE(bins)"):
             print(f"metric: {metric}")
 

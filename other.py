@@ -180,10 +180,35 @@ class HLR(nn.Module):
 
     def forward(self, x):
         dp = self.fc(x)
-        return 2 ** dp, None
+        return 2**dp, None
 
     def forgetting_curve(self, t, s):
         return 0.5 ** (t / s)
+
+
+def sm2(history):
+    ivl = 0
+    ef = 2.5
+    reps = 0
+    for delta_t, rating in history:
+        delta_t = delta_t.item()
+        rating = rating.item() + 1
+        if rating > 2:
+            if reps == 0:
+                ivl = 1
+                reps = 1
+            elif reps == 1:
+                ivl = 6
+                reps = 2
+            else:
+                ivl = ivl * ef
+                reps += 1
+        else:
+            ivl = 1
+            reps = 0
+        ef = max(1.3, ef + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)))
+        ivl = max(1, round(ivl + 0.01))
+    return ivl
 
 
 def lineToTensor(line: str) -> Tensor:
@@ -484,6 +509,54 @@ class Collection:
             return stabilities.tolist()
 
 
+def process_untrainable(file):
+    model_name = "SM2"
+    dataset = pd.read_csv(
+        file,
+        sep="\t",
+        dtype={"r_history": str, "t_history": str},
+        keep_default_na=False,
+    )
+    dataset = dataset[
+        (dataset["i"] > 1)
+        & (dataset["delta_t"] > 0)
+        & (dataset["t_history"].str.count(",0") == 0)
+    ]
+    dataset["tensor"] = dataset.progress_apply(
+        lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]),
+        axis=1,
+    )
+    testsets = []
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    dataset.sort_values(by=["review_time"], inplace=True)
+    for _, test_index in tscv.split(dataset):
+        test_set = dataset.iloc[test_index].copy()
+        testsets.append(test_set)
+
+    p = []
+    y = []
+
+    for i, testset in enumerate(testsets):
+        testset["stability"] = testset['tensor'].map(sm2)
+        testset["p"] = np.exp(np.log(0.9) * testset['delta_t'] / testset['stability'])
+        p.extend(testset["p"].tolist())
+        y.extend(testset["y"].tolist())
+
+    rmse_raw = mean_squared_error(y, p, squared=False)
+    logloss = log_loss(y, p)
+    rmse_bins = cross_comparison(
+        pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
+    )[0]
+    result = {
+        model_name: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
+        "user": file.stem.split("-")[1],
+        "size": len(y),
+    }
+    # save as json
+    Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
+    with open(f"result/{model_name}/{file.stem}.json", "w") as f:
+        json.dump(result, f, indent=4)
+
 def process(file, model_name):
     dataset = pd.read_csv(
         file,
@@ -590,5 +663,7 @@ if __name__ == "__main__":
                 process(file, "LSTM")
             if file.stem not in map(lambda x: x.stem, Path("result/HLR").iterdir()):
                 process(file, "HLR")
+            if file.stem not in map(lambda x: x.stem, Path("result/SM2").iterdir()):
+                process_untrainable(file)
         except Exception as e:
             print(e)

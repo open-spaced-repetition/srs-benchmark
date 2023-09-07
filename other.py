@@ -13,7 +13,7 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
 from tqdm.auto import tqdm
 import warnings
-from utils import cross_comparsion
+from utils import cross_comparison
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -509,7 +509,7 @@ def process(file, model_name):
 
     rmse_raw = mean_squared_error(y, p, squared=False)
     logloss = log_loss(y, p)
-    rmse_bins = cross_comparsion(
+    rmse_bins = cross_comparison(
         pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
     )[0]
     result = {

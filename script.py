@@ -13,7 +13,7 @@ from fsrs_optimizer import (
     lineToTensor,
     power_forgetting_curve,
 )
-from .utils import cross_comparsion
+from .utils import cross_comparison
 
 def predict(w_list, testsets):
     p = []
@@ -77,7 +77,7 @@ def process(file):
 
     rmse_raw = mean_squared_error(y, p, squared=False)
     logloss = log_loss(y, p)
-    rmse_bins = cross_comparsion(pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS")[
+    rmse_bins = cross_comparison(pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS")[
         0
     ]
     result = {

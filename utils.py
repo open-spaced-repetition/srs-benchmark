@@ -2,16 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 
-def cross_comparsion(revlogs, algoA, algoB):
+def cross_comparison(revlogs, algoA, algoB):
     if algoA != algoB:
-        cross_comparison = revlogs[[f"R ({algoA})", f"R ({algoB})", "y"]].copy()
+        cross_comparison_record = revlogs[[f"R ({algoA})", f"R ({algoB})", "y"]].copy()
         bin_algo = (
             algoA,
             algoB,
         )
         pair_algo = [(algoA, algoB), (algoB, algoA)]
     else:
-        cross_comparison = revlogs[[f"R ({algoA})", "y"]].copy()
+        cross_comparison_record = revlogs[[f"R ({algoA})", "y"]].copy()
         bin_algo = (algoA,)
         pair_algo = [(algoA, algoA)]
 
@@ -22,10 +22,10 @@ def cross_comparsion(revlogs, algoA, algoB):
         ).round(3)
 
     for algo in bin_algo:
-        cross_comparison[f"{algo}_B-W"] = (
-            cross_comparison[f"R ({algo})"] - cross_comparison["y"]
+        cross_comparison_record[f"{algo}_B-W"] = (
+            cross_comparison_record[f"R ({algo})"] - cross_comparison_record["y"]
         )
-        cross_comparison[f"{algo}_bin"] = cross_comparison[f"R ({algo})"].map(get_bin)
+        cross_comparison_record[f"{algo}_bin"] = cross_comparison_record[f"R ({algo})"].map(get_bin)
 
     fig = plt.figure(figsize=(6, 6))
     ax = fig.gca()
@@ -34,7 +34,7 @@ def cross_comparsion(revlogs, algoA, algoB):
     universal_metric_list = []
 
     for algoA, algoB in pair_algo:
-        cross_comparison_group = cross_comparison.groupby(by=f"{algoA}_bin").agg(
+        cross_comparison_group = cross_comparison_record.groupby(by=f"{algoA}_bin").agg(
             {"y": ["mean"], f"{algoB}_B-W": ["mean"], f"R ({algoB})": ["mean", "count"]}
         )
         universal_metric = mean_squared_error(

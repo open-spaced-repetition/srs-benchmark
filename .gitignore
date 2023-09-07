@@ -137,3 +137,5 @@ dmypy.json
 
 # private
 collection/
+*.csv
+*.ipynb

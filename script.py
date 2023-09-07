@@ -13,7 +13,7 @@ from fsrs_optimizer import (
     lineToTensor,
     power_forgetting_curve,
 )
-from .utils import cross_comparison
+from utils import cross_comparison
 
 def predict(w_list, testsets):
     p = []

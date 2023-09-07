@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 if __name__ == "__main__":
-    for model in ('FSRSv4', 'FSRSv3', 'LSTM'):
+    for model in ('FSRSv4', 'FSRSv3', 'LSTM', 'HLR'):
         print(f"Model: {model}")
         m = []
         sizes = []

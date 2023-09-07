@@ -168,6 +168,24 @@ class RNN(nn.Module):
         return 0.9 ** (t / s)
 
 
+class HLR(nn.Module):
+    def __init__(self, state_dict=None):
+        super().__init__()
+        self.n_input = 2
+        self.n_out = 1
+        self.fc = nn.Linear(self.n_input, self.n_out)
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
+
+    def forward(self, x):
+        dp = self.fc(x)
+        return 2 ** dp, None
+
+    def forgetting_curve(self, t, s):
+        return 0.5 ** (t / s)
+
+
 def lineToTensor(line: str) -> Tensor:
     ivl = line[0].split(",")
     response = line[1].split(",")
@@ -275,7 +293,7 @@ class Trainer:
     ) -> None:
         self.model = MODEL
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
-        self.clipper = MODEL.clipper if not isinstance(MODEL, RNN) else None
+        self.clipper = MODEL.clipper if isinstance(MODEL, FSRS3) else None
         self.batch_size = batch_size
         self.build_dataset(train_set, test_set)
         self.n_epoch = n_epoch
@@ -318,25 +336,6 @@ class Trainer:
     def train(self, verbose: bool = True):
         best_loss = np.inf
 
-        if isinstance(self.model, RNN):
-            for k in range(self.n_epoch):
-                weighted_loss = self.eval()
-                for i, batch in enumerate(self.train_data_loader):
-                    self.model.train()
-                    self.optimizer.zero_grad()
-                    sequences, delta_ts, labels, seq_lens = batch
-                    real_batch_size = seq_lens.shape[0]
-                    outputs, _ = self.model(sequences)
-                    stabilities = outputs[
-                        seq_lens - 1, torch.arange(real_batch_size), 0
-                    ]
-                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
-                    loss = self.loss_fn(retentions, labels).sum()
-                    loss.backward()
-                    self.optimizer.step()
-                    self.scheduler.step()
-            return self.model.state_dict()
-
         if isinstance(self.model, FSRS3):
             for k in range(self.n_epoch):
                 for i, batch in enumerate(self.pre_train_data_loader):
@@ -353,6 +352,30 @@ class Trainer:
                     loss.backward()
                     self.optimizer.step()
                     self.model.apply(self.clipper)
+        else:
+            for k in range(self.n_epoch):
+                weighted_loss = self.eval()
+                for i, batch in enumerate(self.train_data_loader):
+                    self.model.train()
+                    self.optimizer.zero_grad()
+                    sequences, delta_ts, labels, seq_lens = batch
+                    real_batch_size = seq_lens.shape[0]
+                    if isinstance(self.model, HLR):
+                        outputs, _ = self.model(sequences.transpose(0, 1))
+                    else:
+                        outputs, _ = self.model(sequences)
+                    if isinstance(self.model, HLR):
+                        stabilities = outputs.squeeze()
+                    else:
+                        stabilities = outputs[
+                            seq_lens - 1, torch.arange(real_batch_size), 0
+                        ]
+                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
+                    loss = self.loss_fn(retentions, labels).sum()
+                    loss.backward()
+                    self.optimizer.step()
+                    self.scheduler.step()
+            return self.model.state_dict()
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
@@ -371,8 +394,14 @@ class Trainer:
                 self.train_set.seq_len,
             )
             real_batch_size = seq_lens.shape[0]
-            outputs, _ = self.model(sequences.transpose(0, 1))
-            stabilities = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
+            if isinstance(self.model, HLR):
+                outputs, _ = self.model(sequences)
+            else:
+                outputs, _ = self.model(sequences.transpose(0, 1))
+            if isinstance(self.model, HLR):
+                stabilities = outputs.squeeze()
+            else:
+                stabilities = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
             retentions = self.model.forgetting_curve(delta_ts, stabilities)
             tran_loss = self.loss_fn(retentions, labels).mean()
             self.avg_train_losses.append(tran_loss)
@@ -384,21 +413,27 @@ class Trainer:
                 self.test_set.seq_len,
             )
             real_batch_size = seq_lens.shape[0]
-            outputs, _ = self.model(sequences.transpose(0, 1))
-            stabilities = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
+
+            if isinstance(self.model, HLR):
+                outputs, _ = self.model(sequences)
+                stabilities = outputs.squeeze()
+            else:
+                outputs, _ = self.model(sequences.transpose(0, 1))
+                stabilities = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
+
             retentions = self.model.forgetting_curve(delta_ts, stabilities)
             test_loss = self.loss_fn(retentions, labels).mean()
             self.avg_eval_losses.append(test_loss)
 
-            if isinstance(self.model, RNN):
-                w = self.model.state_dict()
-            else:
+            if isinstance(self.model, FSRS3):
                 w = list(
                     map(
                         lambda x: round(float(x), 4),
                         dict(self.model.named_parameters())["w"].data,
                     )
                 )
+            else:
+                w = self.model.state_dict()
 
             weighted_loss = (
                 tran_loss * len(self.train_set) + test_loss * len(self.test_set)
@@ -438,12 +473,11 @@ class Collection:
     def batch_predict(self, dataset):
         fast_dataset = RevlogDataset(dataset)
         with torch.no_grad():
-            outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
-            if isinstance(self.model, RNN):
-                stabilities = outputs[
-                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset))
-                ].transpose(0, 1)[0]
+            if isinstance(self.model, HLR):
+                outputs, _ = self.model(fast_dataset.x_train)
+                stabilities = outputs.squeeze()
             else:
+                outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
                 stabilities, _ = outputs[
                     fast_dataset.seq_len - 1, torch.arange(len(fast_dataset))
                 ].transpose(0, 1)
@@ -466,15 +500,30 @@ def process(file, model_name):
         model = RNN
     elif model_name == "FSRSv3":
         model = FSRS3
+    elif model_name == "HLR":
+        model = HLR
 
     if model == RNN:
         dataset["tensor"] = dataset.progress_apply(
             lambda x: lineToTensorRNN(list(zip([x["t_history"]], [x["r_history"]]))[0]),
             axis=1,
         )
-    else:
+    elif model == FSRS3:
         dataset["tensor"] = dataset.progress_apply(
             lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]),
+            axis=1,
+        )
+    elif model == HLR:
+        dataset["wrong"] = dataset["r_history"].str.count("1")
+        dataset["right"] = (
+            dataset["r_history"].str.count("2")
+            + dataset["r_history"].str.count("3")
+            + dataset["r_history"].str.count("4")
+        )
+        dataset["tensor"] = dataset.progress_apply(
+            lambda x: torch.tensor(
+                [np.sqrt(x["right"]), np.sqrt(x["wrong"])], dtype=torch.float32
+            ),
             axis=1,
         )
     w_list = []
@@ -539,5 +588,7 @@ if __name__ == "__main__":
                 process(file, "FSRSv3")
             if file.stem not in map(lambda x: x.stem, Path("result/LSTM").iterdir()):
                 process(file, "LSTM")
+            if file.stem not in map(lambda x: x.stem, Path("result/HLR").iterdir()):
+                process(file, "HLR")
         except Exception as e:
             print(e)

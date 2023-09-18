@@ -63,3 +63,9 @@ Total number of reviews for evaluation: 4,632,965
 | LSTM | 0.5788 | 0.3752 | 0.1385 |
 | SM2 | 0.8847 | 0.4131 | 0.2185 |
 | HLR | 2.5175 | 0.5574 | 0.4141 |
+
+## Comparisons with SuperMemo 15/16/17
+
+Please go to:
+- [fsrs-vs-sm15](https://github.com/open-spaced-repetition/fsrs-vs-sm15)
+- [fsrs-vs-sm17](https://github.com/open-spaced-repetition/fsrs-vs-sm17)

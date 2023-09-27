@@ -16,6 +16,7 @@ from fsrs_optimizer import (
 from utils import cross_comparison
 import os
 import torch
+import concurrent.futures
 
 def predict(w_list, testsets):
     p = []
@@ -50,6 +51,9 @@ def convert_to_items(df): # -> list[FsrsItem]
     return result_list
 
 def process(file):
+    rust = os.environ.get("FSRS_RS")
+    if rust:
+        print(file)
     dataset = pd.read_csv(
         file,
         sep="\t",
@@ -61,14 +65,14 @@ def process(file):
         & (dataset["delta_t"] > 0)
         & (dataset["t_history"].str.count(",0") == 0)
     ]
-    dataset["tensor"] = dataset.progress_apply(
+    apply = dataset.apply if rust else dataset.progress_apply
+    dataset["tensor"] = apply(
         lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]), axis=1
     )
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
     dataset.sort_values(by=["review_time"], inplace=True)
-    rust = os.environ.get("FSRS_RS")
     if rust:
         path = "FSRS-rs"
     else:
@@ -86,7 +90,7 @@ def process(file):
         if rust:
             try:
                 items = convert_to_items(train_set[train_set["i"] >= 2])
-                weights = c.compute_weights_from_items(items)
+                weights = backend.compute_weights_from_items(items)
                 w_list.append(weights)
             except Exception as e:
                 print(e)
@@ -134,19 +138,30 @@ if __name__ == "__main__":
     rust = os.environ.get("FSRS_RS")
     if rust:
         path = "FSRS-rs"
-        import anki.collection
-        c = anki.collection.Collection("/tmp/foo.anki2")
+        from anki._backend import RustBackend
+        backend = RustBackend()
+
     else:
         path = "FSRSv4"
 
+    unprocessed_files = []
     for file in Path("./dataset").iterdir():
-        plt.close("all")
         if file.suffix != ".tsv":
             continue
         if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
             continue
-        print(f"Processing {file.name}...")
-        try:
-            process(file)
-        except Exception as e:
-            print(e)
+        unprocessed_files.append(file)
+
+    if rust:
+        num_threads = int(os.environ.get("THREADS", "8"))
+        with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
+            results = list(executor.map(process, unprocessed_files))
+
+    else:
+        for file in unprocessed_files:
+            plt.close("all")
+            print(f"Processing {file.name}...")
+            try:
+                process(file)
+            except Exception as e:
+                print(e)

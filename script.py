@@ -84,12 +84,10 @@ def process(file):
         )
         testsets.append(test_set)
         if rust:
-            from anki.collection import Collection
-            c = Collection("/tmp/foo.anki2")
             try:
                 items = convert_to_items(train_set[train_set["i"] >= 2])
                 weights = c.compute_weights_from_items(items)
-                w_list.append(torch.tensor(weights, dtype=torch.float32))
+                w_list.append(weights)
             except Exception as e:
                 print(e)
                 return
@@ -136,6 +134,8 @@ if __name__ == "__main__":
     rust = os.environ.get("FSRS_RS")
     if rust:
         path = "FSRS-rs"
+        from anki.collection import Collection
+        c = Collection("/tmp/foo.anki2")
     else:
         path = "FSRSv4"
 

@@ -134,8 +134,8 @@ if __name__ == "__main__":
     rust = os.environ.get("FSRS_RS")
     if rust:
         path = "FSRS-rs"
-        from anki.collection import Collection
-        c = Collection("/tmp/foo.anki2")
+        import anki.collection
+        c = anki.collection.Collection("/tmp/foo.anki2")
     else:
         path = "FSRSv4"
 

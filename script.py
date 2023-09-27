@@ -40,8 +40,8 @@ def convert_to_items(df): # -> list[FsrsItem]
     def accumulate(group):
         items = []
         for _, row in group.iterrows():
-            t_history = [int(t) for t in row['t_history'].split(",")]
-            r_history = [int(t) for t in row['r_history'].split(",")]
+            t_history = [int(t) for t in row['t_history'].split(",")] + [row['delta_t']]
+            r_history = [int(t) for t in row['r_history'].split(",")] + [row['review_rating']]
             items.append(FsrsItem(reviews = [FsrsReview(delta_t = x[0], rating = x[1]) for x in zip(t_history, r_history)]))
         return items
 
@@ -87,7 +87,8 @@ def process(file):
             from anki.collection import Collection
             c = Collection("/tmp/foo.anki2")
             try:
-                weights = c.compute_weights_from_items(convert_to_items(train_set))
+                items = convert_to_items(train_set[train_set["i"] >= 2])
+                weights = c.compute_weights_from_items(items)
                 w_list.append(torch.tensor(weights, dtype=torch.float32))
             except Exception as e:
                 print(e)

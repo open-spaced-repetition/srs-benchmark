@@ -1,0 +1,4 @@
+pandas
+matplotlib
+scikit-learn
+fsrs-optimizer

@@ -6,6 +6,7 @@ if __name__ == "__main__":
     for model in ('FSRS-rs', 'FSRSv4', 'FSRSv3', 'LSTM', 'HLR', 'SM2'):
         print(f"Model: {model}")
         m = []
+        weights = []
         sizes = []
         result_dir = pathlib.Path(f"./result/{model}")
         result_files = result_dir.glob("*.json")
@@ -14,6 +15,8 @@ if __name__ == "__main__":
                 result = json.load(f)
                 m.append(result[model])
                 sizes.append(result["size"])
+                if "weights" in result:
+                    weights.append(result["weights"])
 
         print(f"Total number of users: {len(sizes)}")
         sizes = np.array(sizes)
@@ -26,3 +29,5 @@ if __name__ == "__main__":
 
             print(f"{model} mean: {np.average(FSRSv4_metrics, weights=sizes):.4f}")
 
+        if len(weights) > 0:
+            print(f"weights: {np.average(weights, axis=0, weights=sizes).round(4).tolist()}")

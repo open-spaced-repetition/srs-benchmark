@@ -1,6 +1,5 @@
 import json
 import pandas as pd
-import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
@@ -15,8 +14,28 @@ from fsrs_optimizer import (
 )
 from utils import cross_comparison
 import os
-import torch
 import concurrent.futures
+
+
+model = FSRS
+optimizer = Optimizer()
+lr: float = 4e-2
+n_epoch: int = 5
+n_splits: int = 5
+batch_size: int = 512
+verbose: bool = False
+
+
+rust = os.environ.get("FSRS_RS")
+if rust:
+    path = "FSRS-rs"
+    from anki._backend import RustBackend
+
+    backend = RustBackend()
+
+else:
+    path = "FSRSv4"
+
 
 def predict(w_list, testsets):
     p = []
@@ -35,20 +54,37 @@ def predict(w_list, testsets):
 
     return p, y
 
-def convert_to_items(df): # -> list[FsrsItem]
+
+def convert_to_items(df):  # -> list[FsrsItem]
     from anki.collection import FsrsItem, FsrsReview
 
     def accumulate(group):
         items = []
         for _, row in group.iterrows():
-            t_history = [int(t) for t in row['t_history'].split(",")] + [row['delta_t']]
-            r_history = [int(t) for t in row['r_history'].split(",")] + [row['review_rating']]
-            items.append(FsrsItem(reviews = [FsrsReview(delta_t = x[0], rating = x[1]) for x in zip(t_history, r_history)]))
+            t_history = [int(t) for t in row["t_history"].split(",")] + [row["delta_t"]]
+            r_history = [int(t) for t in row["r_history"].split(",")] + [
+                row["review_rating"]
+            ]
+            items.append(
+                FsrsItem(
+                    reviews=[
+                        FsrsReview(delta_t=x[0], rating=x[1])
+                        for x in zip(t_history, r_history)
+                    ]
+                )
+            )
         return items
 
-    result_list = sum(df.sort_values(by=['card_id', 'review_time']).groupby('card_id').apply(accumulate).tolist(), [])
+    result_list = sum(
+        df.sort_values(by=["card_id", "review_time"])
+        .groupby("card_id")
+        .apply(accumulate)
+        .tolist(),
+        [],
+    )
 
     return result_list
+
 
 def process(file):
     rust = os.environ.get("FSRS_RS")
@@ -116,9 +152,10 @@ def process(file):
         0
     ]
     result = {
-        "FSRSv4": {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
+        path: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
         "user": file.stem.split("-")[1],
         "size": len(y),
+        "weights": list(map(lambda x: round(x, 4), w_list[-1])),
     }
     # save as json
     Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
@@ -127,34 +164,19 @@ def process(file):
 
 
 if __name__ == "__main__":
-    model = FSRS
-    optimizer = Optimizer()
-    lr: float = 4e-2
-    n_epoch: int = 5
-    n_splits: int = 5
-    batch_size: int = 512
-    verbose: bool = False
-
-    rust = os.environ.get("FSRS_RS")
-    if rust:
-        path = "FSRS-rs"
-        from anki._backend import RustBackend
-        backend = RustBackend()
-
-    else:
-        path = "FSRSv4"
-
     unprocessed_files = []
     for file in Path("./dataset").iterdir():
         if file.suffix != ".tsv":
             continue
-        if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
-            continue
+        # if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
+        #     continue
         unprocessed_files.append(file)
 
     if rust:
         num_threads = int(os.environ.get("THREADS", "8"))
-        with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=num_threads
+        ) as executor:
             results = list(executor.map(process, unprocessed_files))
 
     else:

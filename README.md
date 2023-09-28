@@ -66,7 +66,7 @@ Total number of reviews for evaluation: 4,632,965
 | SM2 | 0.8847 | 0.4131 | 0.2185 |
 | HLR | 2.5175 | 0.5574 | 0.4141 |
 
-## Weights
+## Average Weights (weighted by ln(number of reviews))
 
 FSRS v4:
 

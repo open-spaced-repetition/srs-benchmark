@@ -87,6 +87,7 @@ def convert_to_items(df):  # -> list[FsrsItem]
 
 
 def process(file):
+    plt.close("all")
     rust = os.environ.get("FSRS_RS")
     if rust:
         print(file)
@@ -123,26 +124,26 @@ def process(file):
             .reset_index()
         )
         testsets.append(test_set)
-        if rust:
-            try:
-                items = convert_to_items(train_set[train_set["i"] >= 2])
-                weights = backend.compute_weights_from_items(items)
-                w_list.append(weights)
-            except Exception as e:
-                print(e)
-                return
-        else:
-            optimizer.define_model()
-            _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
-            trainer = Trainer(
-                train_set,
-                test_set,
-                optimizer.init_w,
-                n_epoch=n_epoch,
-                lr=lr,
-                batch_size=batch_size,
-            )
-            w_list.append(trainer.train(verbose=verbose))
+        try:
+            if rust:
+                    items = convert_to_items(train_set[train_set["i"] >= 2])
+                    weights = backend.compute_weights_from_items(items)
+                    w_list.append(weights)
+            else:
+                optimizer.define_model()
+                _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
+                trainer = Trainer(
+                    train_set,
+                    test_set,
+                    optimizer.init_w,
+                    n_epoch=n_epoch,
+                    lr=lr,
+                    batch_size=batch_size,
+                )
+                w_list.append(trainer.train(verbose=verbose))
+        except Exception as e:
+            print(e)
+            return
 
     p, y = predict(w_list, testsets)
 
@@ -168,22 +169,10 @@ if __name__ == "__main__":
     for file in Path("./dataset").iterdir():
         if file.suffix != ".tsv":
             continue
-        # if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
-        #     continue
+        if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
+            continue
         unprocessed_files.append(file)
 
-    if rust:
-        num_threads = int(os.environ.get("THREADS", "8"))
-        with concurrent.futures.ProcessPoolExecutor(
-            max_workers=num_threads
-        ) as executor:
-            results = list(executor.map(process, unprocessed_files))
-
-    else:
-        for file in unprocessed_files:
-            plt.close("all")
-            print(f"Processing {file.name}...")
-            try:
-                process(file)
-            except Exception as e:
-                print(e)
+    num_threads = int(os.environ.get("THREADS", "8"))
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
+        results = list(executor.map(process, unprocessed_files))

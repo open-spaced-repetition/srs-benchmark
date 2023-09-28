@@ -30,4 +30,4 @@ if __name__ == "__main__":
             print(f"{model} mean: {np.average(FSRSv4_metrics, weights=sizes):.4f}")
 
         if len(weights) > 0:
-            print(f"weights: {np.average(weights, axis=0, weights=sizes).round(4).tolist()}")
+            print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")

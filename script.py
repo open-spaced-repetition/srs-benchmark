@@ -172,6 +172,8 @@ if __name__ == "__main__":
         if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
             continue
         unprocessed_files.append(file)
+    
+    unprocessed_files.sort(key=lambda x: os.path.getsize(x), reverse=True)
 
     num_threads = int(os.environ.get("THREADS", "8"))
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:

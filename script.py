@@ -4,6 +4,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
+# for local development
+# import os
+# import sys
+# sys.path.insert(0, os.path.abspath('../fsrs-optimizer/src/fsrs_optimizer/'))
 from fsrs_optimizer import (
     Optimizer,
     Trainer,

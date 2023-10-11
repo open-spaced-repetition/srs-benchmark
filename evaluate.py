@@ -25,9 +25,10 @@ if __name__ == "__main__":
         for metric in ("LogLoss", "RMSE", "RMSE(bins)"):
             print(f"metric: {metric}")
 
-            FSRSv4_metrics = np.array([item[metric] for item in m])
+            metrics = np.array([item[metric] for item in m])
+            print(metrics)
 
-            print(f"{model} mean: {np.average(FSRSv4_metrics, weights=sizes):.4f}")
+            print(f"{model} mean: {np.average(metrics, weights=sizes):.4f}")
 
         if len(weights) > 0:
             print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")

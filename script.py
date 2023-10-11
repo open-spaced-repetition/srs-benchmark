@@ -1,13 +1,15 @@
+import os
 import json
 import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
+
 # for local development
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('../fsrs-optimizer/src/fsrs_optimizer/'))
+import sys
+
+sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 from fsrs_optimizer import (
     Optimizer,
     Trainer,
@@ -17,7 +19,6 @@ from fsrs_optimizer import (
     power_forgetting_curve,
 )
 from utils import cross_comparison
-import os
 import concurrent.futures
 
 
@@ -101,10 +102,10 @@ def process(file):
         dtype={"r_history": str, "t_history": str},
         keep_default_na=False,
     )
+    # dataset["first_rating"] = dataset.groupby("card_id")["r_history"].transform("first").map(lambda x: x[0])
     dataset = dataset[
         (dataset["i"] > 1)
         & (dataset["delta_t"] > 0)
-        & (dataset["t_history"].str.count(",0") == 0)
     ]
     apply = dataset.apply if rust else dataset.progress_apply
     dataset["tensor"] = apply(
@@ -121,8 +122,10 @@ def process(file):
     for train_index, test_index in tscv.split(dataset):
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
+        # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
         optimizer.S0_dataset_group = (
             train_set[train_set["i"] == 2]
+            # .groupby(by=["first_rating", "delta_t"], group_keys=False)
             .groupby(by=["r_history", "delta_t"], group_keys=False)
             .agg({"y": ["mean", "count"]})
             .reset_index()
@@ -130,9 +133,9 @@ def process(file):
         testsets.append(test_set)
         try:
             if rust:
-                    items = convert_to_items(train_set[train_set["i"] >= 2])
-                    weights = backend.compute_weights_from_items(items)
-                    w_list.append(weights)
+                items = convert_to_items(train_set[train_set["i"] >= 2])
+                weights = backend.compute_weights_from_items(items)
+                w_list.append(weights)
             else:
                 optimizer.define_model()
                 _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
@@ -170,13 +173,14 @@ def process(file):
 
 if __name__ == "__main__":
     unprocessed_files = []
-    for file in Path("./dataset").iterdir():
+    dataset_path = "../fsrs-dataset/v4"
+    for file in Path(dataset_path).iterdir():
         if file.suffix != ".tsv":
             continue
         if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
             continue
         unprocessed_files.append(file)
-    
+
     unprocessed_files.sort(key=lambda x: os.path.getsize(x), reverse=True)
 
     num_threads = int(os.environ.get("THREADS", "8"))

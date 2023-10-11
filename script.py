@@ -171,7 +171,7 @@ def process(file):
 
 if __name__ == "__main__":
     unprocessed_files = []
-    dataset_path = "../fsrs-dataset/v4"
+    dataset_path = "./dataset"
     for file in Path(dataset_path).iterdir():
         if file.suffix != ".tsv":
             continue

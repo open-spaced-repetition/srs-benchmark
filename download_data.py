@@ -9,6 +9,7 @@ if __name__ == "__main__":
         repo_type="dataset",
         allow_patterns=["v4/*.tsv"],
         local_dir="./dataset",
+        local_dir_use_symlinks=False,
     )
     for file in pathlib.Path("./dataset/v4").iterdir():
         if file.suffix == ".tsv":

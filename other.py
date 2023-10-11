@@ -537,8 +537,8 @@ def process_untrainable(file):
     y = []
 
     for i, testset in enumerate(testsets):
-        testset["stability"] = testset['tensor'].map(sm2)
-        testset["p"] = np.exp(np.log(0.9) * testset['delta_t'] / testset['stability'])
+        testset["stability"] = testset["tensor"].map(sm2)
+        testset["p"] = np.exp(np.log(0.9) * testset["delta_t"] / testset["stability"])
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
@@ -556,6 +556,7 @@ def process_untrainable(file):
     Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
     with open(f"result/{model_name}/{file.stem}.json", "w") as f:
         json.dump(result, f, indent=4)
+
 
 def process(file, model_name):
     dataset = pd.read_csv(

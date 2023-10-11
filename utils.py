@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 
+
 def cross_comparison(revlogs, algoA, algoB):
     if algoA != algoB:
         cross_comparison_record = revlogs[[f"R ({algoA})", f"R ({algoB})", "y"]].copy()
@@ -25,7 +26,9 @@ def cross_comparison(revlogs, algoA, algoB):
         cross_comparison_record[f"{algo}_B-W"] = (
             cross_comparison_record[f"R ({algo})"] - cross_comparison_record["y"]
         )
-        cross_comparison_record[f"{algo}_bin"] = cross_comparison_record[f"R ({algo})"].map(get_bin)
+        cross_comparison_record[f"{algo}_bin"] = cross_comparison_record[
+            f"R ({algo})"
+        ].map(get_bin)
 
     fig = plt.figure(figsize=(6, 6))
     ax = fig.gca()

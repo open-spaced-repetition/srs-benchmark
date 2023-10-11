@@ -1,14 +1,15 @@
 from pathlib import Path
 import pandas as pd
 import os
+import sys
 import hashlib
 import json
 import pytz
 
-# for local development
-import sys
+if os.environ.get("DEV_MODE"):
+    # for local development
+    sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
-sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 import fsrs_optimizer
 
 

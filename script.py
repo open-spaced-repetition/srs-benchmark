@@ -1,15 +1,18 @@
 import os
+import sys
 import json
 import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
+from utils import cross_comparison
+import concurrent.futures
 
-# for local development
-import sys
+if os.environ.get("DEV_MODE"):
+    # for local development
+    sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
-sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 from fsrs_optimizer import (
     Optimizer,
     Trainer,
@@ -18,8 +21,6 @@ from fsrs_optimizer import (
     lineToTensor,
     power_forgetting_curve,
 )
-from utils import cross_comparison
-import concurrent.futures
 
 
 model = FSRS
@@ -103,10 +104,7 @@ def process(file):
         keep_default_na=False,
     )
     # dataset["first_rating"] = dataset.groupby("card_id")["r_history"].transform("first").map(lambda x: x[0])
-    dataset = dataset[
-        (dataset["i"] > 1)
-        & (dataset["delta_t"] > 0)
-    ]
+    dataset = dataset[(dataset["i"] > 1) & (dataset["delta_t"] > 0)]
     apply = dataset.apply if rust else dataset.progress_apply
     dataset["tensor"] = apply(
         lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]), axis=1

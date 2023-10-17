@@ -3,15 +3,16 @@ import pathlib
 
 
 if __name__ == "__main__":
+    dataset = "v4"
     pathlib.Path("./dataset").mkdir(parents=True, exist_ok=True)
     snapshot_download(
         repo_id="open-spaced-repetition/fsrs-dataset",
         repo_type="dataset",
-        allow_patterns=["v4/*.tsv"],
+        allow_patterns=[f"{dataset}/*.tsv"],
         local_dir="./dataset",
         local_dir_use_symlinks=False,
     )
-    for file in pathlib.Path("./dataset/v4").iterdir():
+    for file in pathlib.Path(f"./dataset/{dataset}").iterdir():
         if file.suffix == ".tsv":
             file.rename(f"./dataset/{file.stem}.tsv")
-    pathlib.Path("./dataset/v4").rmdir()
+    pathlib.Path(f"./dataset/{dataset}").rmdir()

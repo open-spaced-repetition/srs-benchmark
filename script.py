@@ -43,20 +43,29 @@ else:
     path = "FSRSv4"
 
 
-def predict(w_list, testsets):
+def predict(w_list, testsets, last_rating=None):
     p = []
     y = []
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
+        tmp = (
+            testset[
+                testset["r_history"].str.endswith(last_rating) & (testset["i"] > 2)
+            ].copy()
+            if last_rating
+            else testset.copy()
+        )
+        if tmp.empty:
+            continue
         my_collection = Collection(w)
-        stabilities, difficulties = my_collection.batch_predict(testset)
+        stabilities, difficulties = my_collection.batch_predict(tmp)
         stabilities = map(lambda x: round(x, 2), stabilities)
         difficulties = map(lambda x: round(x, 2), difficulties)
-        testset["stability"] = list(stabilities)
-        testset["difficulty"] = list(difficulties)
-        testset["p"] = power_forgetting_curve(testset["delta_t"], testset["stability"])
-        p.extend(testset["p"].tolist())
-        y.extend(testset["y"].tolist())
+        tmp["stability"] = list(stabilities)
+        tmp["difficulty"] = list(difficulties)
+        tmp["p"] = power_forgetting_curve(tmp["delta_t"], tmp["stability"])
+        p.extend(tmp["p"].tolist())
+        y.extend(tmp["y"].tolist())
 
     return p, y
 
@@ -157,10 +166,27 @@ def process(file):
     rmse_bins = cross_comparison(pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS")[
         0
     ]
+    size = len(y)
+
+    rmse_bins_ratings = {}
+    for last_rating in ("1", "2", "3", "4"):
+        p, y = predict(w_list, testsets, last_rating=last_rating)
+        if len(p) == 0:
+            continue
+        rmse_rating = cross_comparison(
+            pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS"
+        )[0]
+        rmse_bins_ratings[last_rating] = rmse_rating
+
     result = {
-        path: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
+        path: {
+            "RMSE": rmse_raw,
+            "LogLoss": logloss,
+            "RMSE(bins)": rmse_bins,
+            "RMSE(bins)Ratings": rmse_bins_ratings,
+        },
         "user": file.stem.split("-")[1],
-        "size": len(y),
+        "size": size,
         "weights": list(map(lambda x: round(x, 4), w_list[-1])),
     }
     # save as json

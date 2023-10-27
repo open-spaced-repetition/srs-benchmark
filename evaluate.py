@@ -33,7 +33,7 @@ if __name__ == "__main__":
         try:
             rmse_bin_again = np.array([item["RMSE(bins)Ratings"]["1"] for item in m])
             print(f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}")
-            # FSRSv4 mean (RMSE(bins)Ratings[again]): 0.0981
+            # FSRSv4 mean (RMSE(bins)Ratings[again]): 0.0983
         except KeyError:
             continue
 

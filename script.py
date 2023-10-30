@@ -43,9 +43,11 @@ else:
     path = "FSRSv4"
 
 
-def predict(w_list, testsets, last_rating=None):
+def predict(w_list, testsets, last_rating=None, file=None):
     p = []
     y = []
+    if file:
+        save_tmp = []
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         tmp = (
@@ -66,6 +68,13 @@ def predict(w_list, testsets, last_rating=None):
         tmp["p"] = power_forgetting_curve(tmp["delta_t"], tmp["stability"])
         p.extend(tmp["p"].tolist())
         y.extend(tmp["y"].tolist())
+        if file:
+            save_tmp.append(tmp)
+
+    if file:
+        save_tmp = pd.concat(save_tmp)
+        del save_tmp["tensor"]
+        save_tmp.to_csv(f"evaluation/{path}/{file.stem}.tsv", sep="\t", index=False)
 
     return p, y
 
@@ -159,7 +168,7 @@ def process(file):
             print(e)
             return
 
-    p, y = predict(w_list, testsets)
+    p, y = predict(w_list, testsets, file=file)
 
     rmse_raw = mean_squared_error(y, p, squared=False)
     logloss = log_loss(y, p)
@@ -198,6 +207,7 @@ def process(file):
 if __name__ == "__main__":
     unprocessed_files = []
     dataset_path = "./dataset"
+    Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     for file in Path(dataset_path).iterdir():
         if file.suffix != ".tsv":
             continue

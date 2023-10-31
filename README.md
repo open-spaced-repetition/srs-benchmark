@@ -8,7 +8,7 @@ FSRS benchmark is a tool to test how well different algorithms do at predicting 
 
 ## Dataset
 
-The dataset for the FSRS benchmark comes from 72 people who use Anki, a flashcard app. In total, there are 6,240,084 times people reviewed flashcards. The dataset includes over 6 million review records. You can find the dataset in huggingface datasets: https://huggingface.co/datasets/open_spaced_repetition/fsrs_benchmark. To download the dataset, you can run the script `download_data.py`.
+The dataset for the FSRS benchmark comes from 71 people who use Anki, a flashcard app. In total, there are 6,239,827 times people reviewed flashcards. You can find the dataset in huggingface datasets: https://huggingface.co/datasets/open-spaced-repetition/fsrs-dataset. To download the dataset, you can run the script `download_data.py`.
 
 The data has been filtered to focus on long-term study patterns. For example, if a person reviewed the same flashcard multiple times in one day, only the first review is kept in the dataset. If you're curious about the nitty-gritty details of how the data was prepared, you can check out the code in the file named `build_dataset.py`.
 
@@ -46,6 +46,8 @@ For all the nerdy details about FSRS, there's a wiki page you can check: [The Al
 Total number of users: 71
 
 Total number of reviews for evaluation: 4,632,965
+
+> 1,606,862 reviews are only used for training.
 
 ### Weighted by number of reviews
 

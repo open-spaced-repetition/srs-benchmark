@@ -53,8 +53,8 @@ Total number of reviews for evaluation: 4,632,965
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
-| FSRS v4 | 0.3872 | 0.3346 | 0.0454 |
-| FSRS rs | 0.3920 | 0.3361 | 0.0495 |
+| FSRS v4 | 0.3873 | 0.3347 | 0.0457 |
+| FSRS rs | 0.3925 | 0.3362 | 0.0501 |
 | LSTM | 0.4199 | 0.3425 | 0.0662 |
 | FSRS v3 | 0.4890 | 0.3633 | 0.1204 |
 | SM2 | 0.7317 | 0.4066 | 0.2079 |
@@ -65,7 +65,7 @@ Total number of reviews for evaluation: 4,632,965
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
 | FSRS v4 | 0.3819 | 0.3311 | 0.0543 |
-| FSRS rs | 0.3859 | 0.3326 | 0.0582 |
+| FSRS rs | 0.3858 | 0.3326 | 0.0582 |
 | FSRS v3 | 0.5132 | 0.3670 | 0.1326 |
 | LSTM | 0.5788 | 0.3752 | 0.1385 |
 | SM2 | 0.8847 | 0.4131 | 0.2185 |

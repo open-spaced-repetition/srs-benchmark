@@ -3,8 +3,10 @@ import numpy as np
 from typing import List, Optional
 from pathlib import Path
 import matplotlib.pyplot as plt
+import concurrent.futures
 import torch
 import json
+import os
 from torch import nn
 from torch import Tensor
 from torch.utils.data import Dataset, DataLoader, Sampler
@@ -18,6 +20,13 @@ from utils import cross_comparison
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
 tqdm.pandas()
+
+
+lr: float = 4e-2
+n_epoch: int = 5
+n_splits: int = 5
+batch_size: int = 512
+verbose: bool = False
 
 
 class FSRS3WeightClipper:
@@ -387,11 +396,9 @@ class Trainer:
                     real_batch_size = seq_lens.shape[0]
                     if isinstance(self.model, HLR):
                         outputs, _ = self.model(sequences.transpose(0, 1))
-                    else:
-                        outputs, _ = self.model(sequences)
-                    if isinstance(self.model, HLR):
                         stabilities = outputs.squeeze()
                     else:
+                        outputs, _ = self.model(sequences)
                         stabilities = outputs[
                             seq_lens - 1, torch.arange(real_batch_size), 0
                         ]
@@ -421,11 +428,9 @@ class Trainer:
             real_batch_size = seq_lens.shape[0]
             if isinstance(self.model, HLR):
                 outputs, _ = self.model(sequences)
-            else:
-                outputs, _ = self.model(sequences.transpose(0, 1))
-            if isinstance(self.model, HLR):
                 stabilities = outputs.squeeze()
             else:
+                outputs, _ = self.model(sequences.transpose(0, 1))
                 stabilities = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
             retentions = self.model.forgetting_curve(delta_ts, stabilities)
             tran_loss = self.loss_fn(retentions, labels).mean()
@@ -503,9 +508,9 @@ class Collection:
                 stabilities = outputs.squeeze()
             else:
                 outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
-                stabilities, _ = outputs[
-                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset))
-                ].transpose(0, 1)
+                stabilities = outputs[
+                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
+                ]
             return stabilities.tolist()
 
 
@@ -517,11 +522,7 @@ def process_untrainable(file):
         dtype={"r_history": str, "t_history": str},
         keep_default_na=False,
     )
-    dataset = dataset[
-        (dataset["i"] > 1)
-        & (dataset["delta_t"] > 0)
-        & (dataset["t_history"].str.count(",0") == 0)
-    ]
+    dataset = dataset[(dataset["i"] > 1) & (dataset["delta_t"] > 0)]
     dataset["tensor"] = dataset.progress_apply(
         lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]),
         axis=1,
@@ -558,18 +559,15 @@ def process_untrainable(file):
         json.dump(result, f, indent=4)
 
 
-def process(file, model_name):
+def process(args):
+    file, model_name = args
     dataset = pd.read_csv(
         file,
         sep="\t",
         dtype={"r_history": str, "t_history": str},
         keep_default_na=False,
     )
-    dataset = dataset[
-        (dataset["i"] > 1)
-        & (dataset["delta_t"] > 0)
-        & (dataset["t_history"].str.count(",0") == 0)
-    ]
+    dataset = dataset[(dataset["i"] > 1) & (dataset["delta_t"] > 0)]
     if model_name == "LSTM":
         model = RNN
     elif model_name == "FSRSv3":
@@ -647,24 +645,19 @@ def process(file, model_name):
 
 
 if __name__ == "__main__":
-    lr: float = 4e-2
-    n_epoch: int = 5
-    n_splits: int = 5
-    batch_size: int = 512
-    verbose: bool = False
-    for file in Path("./dataset").iterdir():
-        plt.close("all")
+    unprocessed_files = []
+    dataset_path = "./dataset"
+    model = os.environ.get("MODEL", "FSRSv3")
+    Path(f"evaluation/{model}").mkdir(parents=True, exist_ok=True)
+    for file in Path(dataset_path).iterdir():
         if file.suffix != ".tsv":
             continue
-        print(f"Processing {file.name}...")
-        try:
-            if file.stem not in map(lambda x: x.stem, Path("result/FSRSv3").iterdir()):
-                process(file, "FSRSv3")
-            if file.stem not in map(lambda x: x.stem, Path("result/LSTM").iterdir()):
-                process(file, "LSTM")
-            if file.stem not in map(lambda x: x.stem, Path("result/HLR").iterdir()):
-                process(file, "HLR")
-            if file.stem not in map(lambda x: x.stem, Path("result/SM2").iterdir()):
-                process_untrainable(file)
-        except Exception as e:
-            print(e)
+        if file.stem in map(lambda x: x.stem, Path(f"result/{model}").iterdir()):
+            continue
+        unprocessed_files.append((file, model))
+
+    unprocessed_files.sort(key=lambda x: os.path.getsize(x[0]), reverse=True)
+
+    num_threads = int(os.environ.get("THREADS", "8"))
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
+        results = list(executor.map(process, unprocessed_files))

@@ -59,6 +59,7 @@ Total number of reviews for evaluation: 4,632,965
 | LSTM | 0.4193 | 0.3424 | 0.0662 |
 | FSRS v3 | 0.4890 | 0.3633 | 0.1204 |
 | SM2 | 0.7317 | 0.4066 | 0.2079 |
+| Ebisu v3 | 0.7796 | 0.4910 | 0.3371 |
 | HLR | 0.7951 | 0.4113 | 0.2094 |
 
 ### Weighted by ln(number of reviews)
@@ -71,6 +72,7 @@ Total number of reviews for evaluation: 4,632,965
 | LSTM short-term | 0.5917 | 0.3709 | 0.1302 |
 | LSTM | 0.5934 | 0.3755 | 0.1382 |
 | SM2 | 0.8847 | 0.4131 | 0.2185 |
+| Ebisu v3 | 0.8680 | 0.4861 | 0.3354 |
 | HLR | 2.5175 | 0.5574 | 0.4141 |
 
 ## Median Weights

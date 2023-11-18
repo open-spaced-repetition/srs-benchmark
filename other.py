@@ -16,6 +16,9 @@ from sklearn.metrics import mean_squared_error, log_loss
 from tqdm.auto import tqdm
 import warnings
 from utils import cross_comparison
+import ebisu
+import numpy as np
+from datetime import datetime, timedelta
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -218,6 +221,47 @@ def sm2(history):
         ef = max(1.3, ef + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)))
         ivl = max(1, round(ivl + 0.01))
     return ivl
+
+
+def stability2halflife(s):
+    return s * np.log(0.5) / np.log(0.9) * 24
+
+
+def halflife2stability(h):
+    return h / 24 / np.log(0.5) * np.log(0.9)
+
+
+def ebisu_algo(history):
+    date0 = datetime(2017, 4, 19, 22, 0, 0)
+    defaultModel = ebisu.initModel(
+        stability2halflife(1), 10e3, initialAlphaBeta=3.0, firstWeight=0.5
+    )
+    item = dict(factID=1, model=defaultModel, lastTest=date0)
+    oneHour = timedelta(hours=1)
+    now = date0
+    for delta_t, rating in history:
+        t = delta_t.item()
+        if t == 0:
+            t = 1/24
+        r = 0 if rating.item() == 1 else 1
+        now += timedelta(days=t)
+        p_recall = ebisu.predictRecall(
+            item["model"], (now - item["lastTest"]) / oneHour
+        )
+
+        try:
+            newModel = ebisu.updateRecall(
+                item["model"], r, 1, (now - item["lastTest"]) / oneHour
+            )
+        except Exception as e:
+            print(e)
+            print(history)
+            print(item)
+        # print("New model for fact #1:", newModel)
+        item["model"] = newModel
+        item["lastTest"] = now
+    meanHalflife = ebisu.modelToPercentileDecay(item["model"])
+    return halflife2stability(meanHalflife)
 
 
 def lineToTensor(line: str) -> Tensor:
@@ -514,8 +558,8 @@ class Collection:
             return stabilities.tolist()
 
 
-def process_untrainable(file):
-    model_name = "SM2"
+def process_untrainable(args):
+    file, model_name = args
     dataset = pd.read_csv(
         file,
         sep="\t",
@@ -538,7 +582,7 @@ def process_untrainable(file):
     y = []
 
     for i, testset in enumerate(testsets):
-        testset["stability"] = testset["tensor"].map(sm2)
+        testset["stability"] = testset["tensor"].map(sm2 if model_name == "SM2" else ebisu_algo)
         testset["p"] = np.exp(np.log(0.9) * testset["delta_t"] / testset["stability"])
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
@@ -660,4 +704,7 @@ if __name__ == "__main__":
 
     num_threads = int(os.environ.get("THREADS", "8"))
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-        results = list(executor.map(process, unprocessed_files))
+        if model in ("Ebisu", "SM2"):
+            results = list(executor.map(process_untrainable, unprocessed_files))
+        else:
+            results = list(executor.map(process, unprocessed_files))

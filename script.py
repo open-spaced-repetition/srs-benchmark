@@ -42,6 +42,7 @@ if rust:
 else:
     path = "FSRSv4"
 
+dry_run = os.environ.get("DRY_RUN", False)
 
 def predict(w_list, testsets, last_rating=None, file=None):
     p = []
@@ -154,6 +155,9 @@ def process(file):
                 w_list.append(weights)
             else:
                 optimizer.define_model()
+                if dry_run:
+                    w_list.append(optimizer.init_w)
+                    continue
                 _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
                 trainer = Trainer(
                     train_set,

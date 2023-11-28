@@ -41,8 +41,8 @@ def cross_comparison(revlogs, algoA, algoB):
             {"y": ["mean"], f"{algoB}_B-W": ["mean"], f"R ({algoB})": ["mean", "count"]}
         )
         universal_metric = mean_squared_error(
-            cross_comparison_group["y", "mean"],
-            cross_comparison_group[f"R ({algoB})", "mean"],
+            y_true=cross_comparison_group["y", "mean"],
+            y_pred=cross_comparison_group[f"R ({algoB})", "mean"],
             sample_weight=cross_comparison_group[f"R ({algoB})", "count"],
             squared=False,
         )

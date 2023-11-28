@@ -188,8 +188,8 @@ def process(file):
 
     p, y = predict(w_list, testsets, file=file)
 
-    rmse_raw = mean_squared_error(y, p, squared=False)
-    logloss = log_loss(y, p)
+    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
+    logloss = log_loss(y_true=y, y_pred=p)
     rmse_bins = cross_comparison(pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS")[
         0
     ]

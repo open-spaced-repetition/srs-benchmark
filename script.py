@@ -8,6 +8,8 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
 from utils import cross_comparison
 import concurrent.futures
+from itertools import accumulate
+import torch
 
 if os.environ.get("DEV_MODE"):
     # for local development
@@ -18,7 +20,6 @@ from fsrs_optimizer import (
     Trainer,
     FSRS,
     Collection,
-    lineToTensor,
     power_forgetting_curve,
 )
 
@@ -71,7 +72,7 @@ def predict(w_list, testsets, last_rating=None, file=None):
         if file:
             save_tmp.append(tmp)
 
-    if file:
+    if False and file:
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
         save_tmp.to_csv(f"evaluation/{path}/{file.stem}.tsv", sep="\t", index=False)
@@ -110,27 +111,44 @@ def convert_to_items(df):  # -> list[FsrsItem]
     return result_list
 
 
+def cum_concat(x):
+    return list(accumulate(x))
+
+
+def create_time_series(df):
+    df = df[df["delta_t"] != 0].copy()
+    df["i"] = df.groupby("card_id").cumcount() + 1
+    t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    r_history = df.groupby("card_id", group_keys=False)["rating"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    df["r_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+    ]
+    df["t_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+    ]
+    df["tensor"] = [
+        torch.tensor((t_item[:-1], r_item[:-1])).transpose(0, 1)
+        for t_sublist, r_sublist in zip(t_history, r_history)
+        for t_item, r_item in zip(t_sublist, r_sublist)
+    ]
+    df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    return df[df["delta_t"] > 0].sort_values(by=["review_th"])
+
+
 def process(file):
     plt.close("all")
     rust = os.environ.get("FSRS_RS")
     if rust:
         print(file)
-    dataset = pd.read_csv(
-        file,
-        sep="\t",
-        dtype={"r_history": str, "t_history": str},
-        keep_default_na=False,
-    )
-    # dataset["first_rating"] = dataset.groupby("card_id")["r_history"].transform("first").map(lambda x: x[0])
-    dataset = dataset[(dataset["i"] > 1) & (dataset["delta_t"] > 0)]
-    apply = dataset.apply if rust else dataset.progress_apply
-    dataset["tensor"] = apply(
-        lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]), axis=1
-    )
+    dataset = pd.read_csv(file)
+    dataset = create_time_series(dataset)
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
-    dataset.sort_values(by=["review_time"], inplace=True)
     if rust:
         path = "FSRS-rs"
     else:
@@ -194,7 +212,7 @@ def process(file):
             "RMSE(bins)": rmse_bins,
             "RMSE(bins)Ratings": rmse_bins_ratings,
         },
-        "user": file.stem.split("-")[1],
+        "user": int(file.stem),
         "size": size,
         "weights": list(map(lambda x: round(x, 4), w_list[-1])),
     }
@@ -209,14 +227,14 @@ if __name__ == "__main__":
     dataset_path = "./dataset"
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     for file in Path(dataset_path).iterdir():
-        if file.suffix != ".tsv":
+        if file.suffix != ".csv":
             continue
         if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
             continue
         unprocessed_files.append(file)
 
-    unprocessed_files.sort(key=lambda x: os.path.getsize(x), reverse=True)
+    unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
-    num_threads = int(os.environ.get("THREADS", "8"))
+    num_threads = int(os.environ.get("THREADS", "4"))
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
         results = list(executor.map(process, unprocessed_files))

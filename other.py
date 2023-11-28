@@ -16,6 +16,7 @@ from sklearn.metrics import mean_squared_error, log_loss
 from tqdm.auto import tqdm
 import warnings
 from utils import cross_comparison
+from itertools import accumulate
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -516,20 +517,10 @@ class Collection:
 
 def process_untrainable(file):
     model_name = "SM2"
-    dataset = pd.read_csv(
-        file,
-        sep="\t",
-        dtype={"r_history": str, "t_history": str},
-        keep_default_na=False,
-    )
-    dataset = dataset[(dataset["i"] > 1) & (dataset["delta_t"] > 0)]
-    dataset["tensor"] = dataset.progress_apply(
-        lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]),
-        axis=1,
-    )
+    dataset = pd.read_csv(file)
+    dataset = create_features(dataset)
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
-    dataset.sort_values(by=["review_time"], inplace=True)
     for _, test_index in tscv.split(dataset):
         test_set = dataset.iloc[test_index].copy()
         testsets.append(test_set)
@@ -543,14 +534,14 @@ def process_untrainable(file):
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
-    rmse_raw = mean_squared_error(y, p, squared=False)
-    logloss = log_loss(y, p)
+    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
+    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = cross_comparison(
         pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
     )[0]
     result = {
         model_name: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
-        "user": file.stem.split("-")[1],
+        "user": int(file.stem),
         "size": len(y),
     }
     # save as json
@@ -559,15 +550,64 @@ def process_untrainable(file):
         json.dump(result, f, indent=4)
 
 
-def process(args):
-    file, model_name = args
-    dataset = pd.read_csv(
-        file,
-        sep="\t",
-        dtype={"r_history": str, "t_history": str},
-        keep_default_na=False,
+def cum_concat(x):
+    return list(accumulate(x))
+
+
+def create_features(df, model_name="FSRSv3"):
+    df = df[df["delta_t"] != 0].copy()
+    df["i"] = df.groupby("card_id").cumcount() + 1
+    t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
+        lambda x: cum_concat([[i] for i in x])
     )
-    dataset = dataset[(dataset["i"] > 1) & (dataset["delta_t"] > 0)]
+    r_history = df.groupby("card_id", group_keys=False)["rating"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    df["r_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+    ]
+    df["t_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+    ]
+    if model_name == "FSRSv3":
+        df["tensor"] = [
+            torch.tensor((t_item[:-1], r_item[:-1])).transpose(0, 1)
+            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_item, r_item in zip(t_sublist, r_sublist)
+        ]
+    elif model_name == "LSTM":
+        df["tensor"] = [
+            torch.tensor(
+                [t_item[:-1]]
+                + [[int(item == i) for item in r_item[:-1]] for i in range(1, 5)],
+                dtype=torch.float32,
+            ).transpose(0, 1)
+            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_item, r_item in zip(t_sublist, r_sublist)
+        ]
+    elif model_name == "HLR":
+        df["tensor"] = [
+            torch.tensor(
+                [
+                    np.sqrt(r_item.count(2) + r_item.count(3) + r_item.count(4)),
+                    np.sqrt(r_item.count(1)),
+                ],
+                dtype=torch.float32,
+            )
+            for r_sublist in r_history
+            for r_item in r_sublist
+        ]
+    df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    return df[df["delta_t"] > 0].sort_values(by=["review_th"])
+
+
+def process(args):
+    plt.close("all")
+    file, model_name = args
+    if model_name == "SM2":
+        process_untrainable(file)
+        return
+    dataset = pd.read_csv(file)
     if model_name == "LSTM":
         model = RNN
     elif model_name == "FSRSv3":
@@ -575,33 +615,10 @@ def process(args):
     elif model_name == "HLR":
         model = HLR
 
-    if model == RNN:
-        dataset["tensor"] = dataset.progress_apply(
-            lambda x: lineToTensorRNN(list(zip([x["t_history"]], [x["r_history"]]))[0]),
-            axis=1,
-        )
-    elif model == FSRS3:
-        dataset["tensor"] = dataset.progress_apply(
-            lambda x: lineToTensor(list(zip([x["t_history"]], [x["r_history"]]))[0]),
-            axis=1,
-        )
-    elif model == HLR:
-        dataset["wrong"] = dataset["r_history"].str.count("1")
-        dataset["right"] = (
-            dataset["r_history"].str.count("2")
-            + dataset["r_history"].str.count("3")
-            + dataset["r_history"].str.count("4")
-        )
-        dataset["tensor"] = dataset.progress_apply(
-            lambda x: torch.tensor(
-                [np.sqrt(x["right"]), np.sqrt(x["wrong"])], dtype=torch.float32
-            ),
-            axis=1,
-        )
+    dataset = create_features(dataset, model_name)
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
-    dataset.sort_values(by=["review_time"], inplace=True)
     for train_index, test_index in tscv.split(dataset):
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
@@ -628,14 +645,14 @@ def process(args):
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
-    rmse_raw = mean_squared_error(y, p, squared=False)
-    logloss = log_loss(y, p)
+    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
+    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = cross_comparison(
         pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
     )[0]
     result = {
         model_name: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
-        "user": file.stem.split("-")[1],
+        "user": int(file.stem),
         "size": len(y),
     }
     # save as json
@@ -650,13 +667,13 @@ if __name__ == "__main__":
     model = os.environ.get("MODEL", "FSRSv3")
     Path(f"evaluation/{model}").mkdir(parents=True, exist_ok=True)
     for file in Path(dataset_path).iterdir():
-        if file.suffix != ".tsv":
+        if file.suffix != ".csv":
             continue
         if file.stem in map(lambda x: x.stem, Path(f"result/{model}").iterdir()):
             continue
         unprocessed_files.append((file, model))
 
-    unprocessed_files.sort(key=lambda x: os.path.getsize(x[0]), reverse=True)
+    unprocessed_files.sort(key=lambda x: int(x[0].stem), reverse=False)
 
     num_threads = int(os.environ.get("THREADS", "8"))
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:

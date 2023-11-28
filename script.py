@@ -86,9 +86,9 @@ def convert_to_items(df):  # -> list[FsrsItem]
     def accumulate(group):
         items = []
         for _, row in group.iterrows():
-            t_history = [int(t) for t in row["t_history"].split(",")] + [row["delta_t"]]
+            t_history = [max(0, int(t)) for t in row["t_history"].split(",")] + [row["delta_t"]]
             r_history = [int(t) for t in row["r_history"].split(",")] + [
-                row["review_rating"]
+                row["rating"]
             ]
             items.append(
                 FsrsItem(
@@ -101,7 +101,7 @@ def convert_to_items(df):  # -> list[FsrsItem]
         return items
 
     result_list = sum(
-        df.sort_values(by=["card_id", "review_time"])
+        df.sort_values(by=["card_id", "review_th"])
         .groupby("card_id")
         .apply(accumulate)
         .tolist(),
@@ -189,7 +189,7 @@ def process(file):
     p, y = predict(w_list, testsets, file=file)
 
     rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
-    logloss = log_loss(y_true=y, y_pred=p)
+    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = cross_comparison(pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS")[
         0
     ]
@@ -235,6 +235,6 @@ if __name__ == "__main__":
 
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
-    num_threads = int(os.environ.get("THREADS", "4"))
+    num_threads = int(os.environ.get("THREADS", "8"))
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
         results = list(executor.map(process, unprocessed_files))

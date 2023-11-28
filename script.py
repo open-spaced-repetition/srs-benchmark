@@ -146,6 +146,8 @@ def process(file):
         print(file)
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
+    if dataset.empty:
+        return
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)

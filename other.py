@@ -616,6 +616,8 @@ def process(args):
         model = HLR
 
     dataset = create_features(dataset, model_name)
+    if dataset.empty:
+        return
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)

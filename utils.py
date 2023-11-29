@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 
 
-def cross_comparison(revlogs, algoA, algoB):
+def cross_comparison(revlogs, algoA, algoB, graph=False):
     if algoA != algoB:
         cross_comparison_record = revlogs[[f"R ({algoA})", f"R ({algoB})", "y"]].copy()
         bin_algo = (
@@ -30,9 +30,10 @@ def cross_comparison(revlogs, algoA, algoB):
             f"R ({algo})"
         ].map(get_bin)
 
-    fig = plt.figure(figsize=(6, 6))
-    ax = fig.gca()
-    ax.axhline(y=0.0, color="black", linestyle="-")
+    if graph:
+        fig = plt.figure(figsize=(6, 6))
+        ax = fig.gca()
+        ax.axhline(y=0.0, color="black", linestyle="-")
 
     universal_metric_list = []
 
@@ -50,25 +51,25 @@ def cross_comparison(revlogs, algoA, algoB):
             cross_comparison_group[f"R ({algoB})", "count"]
             / cross_comparison_group[f"R ({algoB})", "count"].sum()
         )
-        ax.scatter(
-            cross_comparison_group.index,
-            cross_comparison_group[f"{algoB}_B-W", "mean"],
-            s=cross_comparison_group[f"R ({algoB})", "percent"] * 1024,
-            alpha=0.5,
-        )
-        ax.plot(
-            cross_comparison_group[f"{algoB}_B-W", "mean"],
-            label=f"{algoB} by {algoA}, UM={universal_metric:.4f}",
-        )
+        if graph:
+            ax.scatter(
+                cross_comparison_group.index,
+                cross_comparison_group[f"{algoB}_B-W", "mean"],
+                s=cross_comparison_group[f"R ({algoB})", "percent"] * 1024,
+                alpha=0.5,
+            )
+            ax.plot(
+                cross_comparison_group[f"{algoB}_B-W", "mean"],
+                label=f"{algoB} by {algoA}, UM={universal_metric:.4f}",
+            )
         universal_metric_list.append(universal_metric)
-
-    ax.legend(loc="lower center")
-    ax.grid(linestyle="--")
-    ax.set_title(f"{algoA} vs {algoB}")
-    ax.set_xlabel("Predicted R")
-    ax.set_ylabel("B-W Metric")
-    ax.set_xlim(0, 1)
-    ax.set_xticks(np.arange(0, 1.1, 0.1))
-    fig.show()
-
+    if graph:
+        ax.legend(loc="lower center")
+        ax.grid(linestyle="--")
+        ax.set_title(f"{algoA} vs {algoB}")
+        ax.set_xlabel("Predicted R")
+        ax.set_ylabel("B-W Metric")
+        ax.set_xlim(0, 1)
+        ax.set_xticks(np.arange(0, 1.1, 0.1))
+        fig.show()
     return universal_metric_list

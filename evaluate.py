@@ -35,7 +35,7 @@ if __name__ == "__main__":
             print(f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}")
             # FSRSv4 mean (RMSE(bins)Ratings[again]): 0.0983
         except KeyError:
-            continue
+            pass
 
         if len(weights) > 0:
             print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")

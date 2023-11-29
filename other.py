@@ -555,7 +555,7 @@ def cum_concat(x):
 
 
 def create_features(df, model_name="FSRSv3"):
-    df = df[df["delta_t"] != 0].copy()
+    df = df[(df["delta_t"] != 0) & (df["rating"].isin([1, 2, 3, 4]))].copy()
     df["i"] = df.groupby("card_id").cumcount() + 1
     t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[i] for i in x])

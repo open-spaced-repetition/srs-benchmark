@@ -146,7 +146,7 @@ def process(file):
         print(file)
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
-    if dataset.empty:
+    if dataset.shape[0] < 6:
         return
     w_list = []
     testsets = []

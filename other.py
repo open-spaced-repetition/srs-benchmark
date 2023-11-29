@@ -616,7 +616,7 @@ def process(args):
         model = HLR
 
     dataset = create_features(dataset, model_name)
-    if dataset.empty:
+    if dataset.shape[0] < 6:
         return
     w_list = []
     testsets = []

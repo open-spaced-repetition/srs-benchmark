@@ -127,6 +127,14 @@ class FSRS3(nn.Module):
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[5] * init + (1 - self.w[5]) * current
 
+    def state_dict(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
 
 n_input = 5
 n_hidden = 8
@@ -533,7 +541,9 @@ def process_untrainable(file):
     for i, testset in enumerate(testsets):
         testset["stability"] = testset["tensor"].map(sm2)
         try:
-            testset["p"] = np.exp(np.log(0.9) * testset["delta_t"] / testset["stability"])
+            testset["p"] = np.exp(
+                np.log(0.9) * testset["delta_t"] / testset["stability"]
+            )
         except Exception as e:
             print(file)
             print(e)
@@ -630,6 +640,7 @@ def process(args):
     for train_index, test_index in tscv.split(dataset):
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
+        testsets.append(test_set)
         try:
             trainer = Trainer(
                 model(),
@@ -639,12 +650,11 @@ def process(args):
                 lr=lr,
                 batch_size=batch_size,
             )
+            w_list.append(trainer.train(verbose=verbose))
         except Exception as e:
             print(file)
             print(e)
-            return
-        w_list.append(trainer.train(verbose=verbose))
-        testsets.append(test_set)
+            w_list.append(model().state_dict())
 
     p = []
     y = []
@@ -679,10 +689,9 @@ if __name__ == "__main__":
     dataset_path = "./dataset"
     model = os.environ.get("MODEL", "FSRSv3")
     Path(f"evaluation/{model}").mkdir(parents=True, exist_ok=True)
-    for file in Path(dataset_path).iterdir():
-        if file.suffix != ".csv":
-            continue
-        if file.stem in map(lambda x: x.stem, Path(f"result/{model}").iterdir()):
+    processed_files = list(map(lambda x: x.stem, Path(f"result/{model}").iterdir()))
+    for file in Path(dataset_path).glob("*.csv"):
+        if file.stem in processed_files:
             continue
         unprocessed_files.append((file, model))
 

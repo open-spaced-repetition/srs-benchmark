@@ -8,9 +8,7 @@ FSRS benchmark is a tool to test how well different algorithms do at predicting 
 
 ## Dataset
 
-The dataset for the FSRS benchmark comes from 71 people who use Anki, a flashcard app. In total, there are 6,239,827 times people reviewed flashcards. You can find the dataset in huggingface datasets: https://huggingface.co/datasets/open-spaced-repetition/fsrs-dataset. To download the dataset, you can run the script `download_data.py`.
-
-The data has been filtered to focus on long-term study patterns. For example, if a person reviewed the same flashcard multiple times in one day, only the first review is kept in the dataset. If you're curious about the nitty-gritty details of how the data was prepared, you can check out the code in the file named `build_dataset.py`.
+The dataset for the FSRS benchmark comes from 20k people who use Anki, a flashcard app. In total, there are 1.5B times people reviewed flashcards.
 
 ## Evaluation
 
@@ -43,56 +41,52 @@ For all the nerdy details about FSRS, there's a wiki page you can check: [The Al
 
 ## Result
 
-Total number of users: 71
+Total number of users: 19995
 
-Total number of reviews for evaluation: 4,632,965
-
-> 1,606,862 reviews are only used for training.
+Total number of reviews for evaluation: 738,221,150
 
 ### Weighted by number of reviews
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
-| FSRS v4 | 0.3873 | 0.3347 | 0.0457 |
-| FSRS rs | 0.3916 | 0.3358 | 0.0484 |
-| LSTM short-term | 0.4145 | 0.3391 | 0.0619 |
-| LSTM | 0.4193 | 0.3424 | 0.0662 |
-| FSRS v3 | 0.4890 | 0.3633 | 0.1204 |
-| SM2 | 0.7317 | 0.4066 | 0.2079 |
-| HLR | 0.7951 | 0.4113 | 0.2094 |
+| FSRS v4 | 0.3360 | 0.3002 | 0.0590 |
+| FSRS rs | 0.3404 | 0.3018 | 0.0628 |
+| LSTM | 0.4000 | 0.3123 | 0.0859 |
+| FSRS v3 | 0.4286 | 0.3226 | 0.1074 |
+| SM2 | 0.6339 | 0.3592 | 0.1799 |
+| HLR | 0.8175 | 0.3790 | 0.2094 |
 
 ### Weighted by ln(number of reviews)
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
-| FSRS v4 | 0.3819 | 0.3311 | 0.0543 |
-| FSRS rs | 0.3859 | 0.3327 | 0.0584 |
-| FSRS v3 | 0.5132 | 0.3670 | 0.1326 |
-| LSTM short-term | 0.5917 | 0.3709 | 0.1302 |
-| LSTM | 0.5934 | 0.3755 | 0.1382 |
-| SM2 | 0.8847 | 0.4131 | 0.2185 |
-| HLR | 2.5175 | 0.5574 | 0.4141 |
+| FSRS v4 | 0.3658 | 0.3141 | 0.0820 |
+| FSRS rs | 0.3705 | 0.3161 | 0.0860 |
+| FSRS v3 | 0.5201 | 0.3471 | 0.1425 |
+| LSTM | 0.5645 | 0.3562 | 0.1536 |
+| SM2 | 0.8702 | 0.3954 | 0.2240 |
+| HLR | 2.3669 | 0.5393 | 0.4096 |
 
 ## Median Weights
 
 FSRS v4:
 
 ```
-0.3904, 0.9717, 2.3, 11.0667,
-4.9804, 1.1958, 0.9834, 0.0074,
-1.5884, 0.1617, 1.0601,
-2.2097, 0.0476, 0.3442, 1.3127,
-0.1989, 2.7928
+0.6782, 1.6906, 4.4709, 15.0409,
+4.9446, 1.061, 0.8755, 0.0463,
+1.5593, 0.1358, 0.9936,
+2.1665, 0.0678, 0.3402, 1.2838,
+0.2579, 2.7197
 ```
 
 FSRS rs:
 
 ```
-0.3824, 0.9, 2.1198, 11.145,
-4.932, 1.0635, 0.9308, 0.0277,
-1.5699, 0.1507, 0.9919,
-2.2192, 0.054, 0.336, 1.3307,
-0.2637, 2.8731
+0.5888, 1.4616, 3.8226, 14.1364,
+4.9214, 1.0325, 0.8731, 0.0613,
+1.57, 0.1395, 0.988,
+2.212, 0.0658, 0.3439, 1.3098,
+0.2837, 2.7766
 ```
 
 ## Comparisons with SuperMemo 15/16/17

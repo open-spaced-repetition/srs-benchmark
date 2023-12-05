@@ -67,7 +67,7 @@ Total number of reviews for evaluation: 738,221,150
 | SM2 | 0.8702 | 0.3954 | 0.2240 |
 | HLR | 2.3669 | 0.5393 | 0.4096 |
 
-## Median Weights
+## Median Parameters
 
 FSRS v4:
 

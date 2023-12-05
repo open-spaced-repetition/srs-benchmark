@@ -217,8 +217,8 @@ def sm2(history):
             ivl = 1
             reps = 0
         ef = max(1.3, ef + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)))
-        ivl = max(1, round(ivl + 0.01))
-    return ivl
+        ivl = min(max(1, round(ivl + 0.01)), 36500)
+    return float(ivl)
 
 
 def lineToTensor(line: str) -> Tensor:
@@ -519,6 +519,8 @@ def process_untrainable(file):
     model_name = "SM2"
     dataset = pd.read_csv(file)
     dataset = create_features(dataset)
+    if dataset.shape[0] < 6:
+        return
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
     for _, test_index in tscv.split(dataset):
@@ -530,7 +532,11 @@ def process_untrainable(file):
 
     for i, testset in enumerate(testsets):
         testset["stability"] = testset["tensor"].map(sm2)
-        testset["p"] = np.exp(np.log(0.9) * testset["delta_t"] / testset["stability"])
+        try:
+            testset["p"] = np.exp(np.log(0.9) * testset["delta_t"] / testset["stability"])
+        except Exception as e:
+            print(file)
+            print(e)
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
@@ -624,14 +630,19 @@ def process(args):
     for train_index, test_index in tscv.split(dataset):
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
-        trainer = Trainer(
-            model(),
-            train_set,
-            test_set,
-            n_epoch=n_epoch,
-            lr=lr,
-            batch_size=batch_size,
-        )
+        try:
+            trainer = Trainer(
+                model(),
+                train_set,
+                test_set,
+                n_epoch=n_epoch,
+                lr=lr,
+                batch_size=batch_size,
+            )
+        except Exception as e:
+            print(file)
+            print(e)
+            return
         w_list.append(trainer.train(verbose=verbose))
         testsets.append(test_set)
 

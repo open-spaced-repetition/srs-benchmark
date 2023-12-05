@@ -186,7 +186,7 @@ def process(file):
                 w_list.append(trainer.train(verbose=verbose))
         except Exception as e:
             print(e)
-            return
+            w_list.append(optimizer.init_w)
 
     p, y = predict(w_list, testsets, file=file)
 
@@ -228,10 +228,9 @@ if __name__ == "__main__":
     unprocessed_files = []
     dataset_path = "./dataset"
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
-    for file in Path(dataset_path).iterdir():
-        if file.suffix != ".csv":
-            continue
-        if file.stem in map(lambda x: x.stem, Path(f"result/{path}").iterdir()):
+    processed_files = list(map(lambda x: x.stem, Path(f"result/{path}").iterdir()))
+    for file in Path(dataset_path).glob("*.csv"):
+        if file.stem in processed_files:
             continue
         unprocessed_files.append(file)
 

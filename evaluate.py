@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 if __name__ == "__main__":
-    for model in ("FSRS-rs", "FSRSv4", "FSRSv3", "LSTM", "HLR", "SM2"):
+    for model in ("FSRS-rs", "FSRSv4", "FSRSv4-dry-run", "FSRSv3", "LSTM", "HLR", "SM2"):
         print(f"Model: {model}")
         m = []
         weights = []

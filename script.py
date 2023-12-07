@@ -32,6 +32,7 @@ n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
 
+dry_run = os.environ.get("DRY_RUN")
 
 rust = os.environ.get("FSRS_RS")
 if rust:
@@ -42,6 +43,8 @@ if rust:
 
 else:
     path = "FSRSv4"
+    if dry_run:
+        path += "-dry-run"
 
 
 def predict(w_list, testsets, last_rating=None, file=None):
@@ -86,10 +89,10 @@ def convert_to_items(df):  # -> list[FsrsItem]
     def accumulate(group):
         items = []
         for _, row in group.iterrows():
-            t_history = [max(0, int(t)) for t in row["t_history"].split(",")] + [row["delta_t"]]
-            r_history = [int(t) for t in row["r_history"].split(",")] + [
-                row["rating"]
+            t_history = [max(0, int(t)) for t in row["t_history"].split(",")] + [
+                row["delta_t"]
             ]
+            r_history = [int(t) for t in row["r_history"].split(",")] + [row["rating"]]
             items.append(
                 FsrsItem(
                     reviews=[
@@ -151,13 +154,33 @@ def process(file):
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
-    if rust:
-        path = "FSRS-rs"
-    else:
-        path = "FSRSv4"
     for train_index, test_index in tscv.split(dataset):
-        train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
+        testsets.append(test_set)
+        if dry_run:
+            w_list.append(
+                [
+                    0.5888,
+                    1.4616,
+                    3.8226,
+                    14.1364,
+                    4.9214,
+                    1.0325,
+                    0.8731,
+                    0.0613,
+                    1.57,
+                    0.1395,
+                    0.988,
+                    2.212,
+                    0.0658,
+                    0.3439,
+                    1.3098,
+                    0.2837,
+                    2.7766,
+                ]
+            )
+            continue
+        train_set = dataset.iloc[train_index].copy()
         # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
         optimizer.S0_dataset_group = (
             train_set[train_set["i"] == 2]
@@ -166,7 +189,6 @@ def process(file):
             .agg({"y": ["mean", "count"]})
             .reset_index()
         )
-        testsets.append(test_set)
         try:
             if rust:
                 items = convert_to_items(train_set[train_set["i"] >= 2])
@@ -227,6 +249,7 @@ def process(file):
 if __name__ == "__main__":
     unprocessed_files = []
     dataset_path = "./dataset"
+    Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     processed_files = list(map(lambda x: x.stem, Path(f"result/{path}").iterdir()))
     for file in Path(dataset_path).glob("*.csv"):

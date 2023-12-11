@@ -134,9 +134,9 @@ def KDE(a, weights):
 
 def best_mode(a, weights):
     modes = []
-    modes.append(HRM(a).round(4))
-    modes.append(HSM(a).round(4))
-    modes.append(KDE(a, weights).round(4))
+    modes.append(HRM(a))
+    modes.append(HSM(a))
+    modes.append(KDE(a, weights))
     modes.sort()
     # return the mean of the two closest ones
     if modes[1] - modes[0] < modes[2] - modes[1]:

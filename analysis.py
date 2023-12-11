@@ -8,8 +8,6 @@ def HSM(a):
     array = np.sort(np.asarray(a))
 
     def iteration(a):
-        array = np.sort(np.asarray(a))
-
         j = -1
         w_min = array[-1] - array[0]
         n = len(array)

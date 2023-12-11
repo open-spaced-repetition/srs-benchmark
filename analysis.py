@@ -153,12 +153,13 @@ if __name__ == "__main__":
     result_files = result_dir.glob("*.json")
     weights = []
     sizes = []
+    n_params = 17
     defaults = [0.4, 0.9, 2.3, 10.9, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61]
     # if you used other default parameters, please replace the ones above
     for result_file in result_files:
         with open(result_file, "r") as f:
             result = json.load(f)
-            for i in range(17):
+            for i in range(n_params):
                 if result["weights"][i] == defaults[i]:
                     # remove users who have parameters that are equal to their default values
                     break
@@ -170,7 +171,7 @@ if __name__ == "__main__":
     sizes = np.sqrt(np.array(sizes))
     print(weights.shape)
     pathlib.Path("./plots").mkdir(parents=True, exist_ok=True)
-    for i in range(17):
+    for i in range(n_params):
         plt.hist(weights[:, i], bins=100, log=True)
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])

@@ -9,12 +9,12 @@ def HSM(a):
 
     def iteration(a):
         j = -1
-        w_min = array[-1] - array[0]
-        n = len(array)
+        w_min = a[-1] - a[0]
+        n = len(a)
         N = (n - 1) // 2 + 1
 
         for i in range(n-N):
-            w = array[i+N-1] - array[i]
+            w = a[i+N-1] - a[i]
             if w < w_min:
                 w_min = w
                 j = i

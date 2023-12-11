@@ -170,6 +170,7 @@ if __name__ == "__main__":
                 sizes.append(result["size"])
     
     weights = np.array(weights)
+    sizes = np.sqrt(np.array(sizes))
     print(weights.shape)
     pathlib.Path("./plots").mkdir(parents=True, exist_ok=True)
     for i in range(17):

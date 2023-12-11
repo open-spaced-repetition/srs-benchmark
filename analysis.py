@@ -116,8 +116,7 @@ def HRM(v):
             else:
                 return v[1]
         else:
-            new_v = iteration(v)
-            v = new_v
+            v = iteration(v)
 
 def KDE(a, weights):
     xmin = np.min(a)

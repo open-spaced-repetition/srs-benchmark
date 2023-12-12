@@ -10,7 +10,7 @@ def mode_of_three(data):
     epsilon = 1e-8
     # this is just to avoid division by 0
     weights = np.ones(3)
-    const = 1.35
+    const = 1.6
     if data[1] - data[0] < data[2] - data[1]:
         shortest_distance = np.maximum(data[1] - data[0], epsilon)
         u = (data[2] - data[1]) / shortest_distance

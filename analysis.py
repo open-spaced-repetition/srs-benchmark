@@ -142,7 +142,6 @@ def best_mode(a, weights):
     modes.append(HRM(a))
     modes.append(HSM(a))
     modes.append(KDE(a, weights))
-    print(modes)
     modes.sort()
     # return the mean of the two closest ones
     if modes[1] - modes[0] < modes[2] - modes[1]:

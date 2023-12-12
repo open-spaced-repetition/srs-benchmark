@@ -20,7 +20,7 @@ def mode_of_three(data):
     elif data[1] - data[0] > data[2] - data[1]:
         shortest_distance = np.maximum(data[2] - data[1], epsilon)
         u = (data[1] - data[0]) / shortest_distance
-        weights[0] = np.where(u  < const, 1, (const / u) ** 2)
+        weights[0] = np.where(u < const, 1, (const / u) ** 2)
         return (data[0] * weights[0] + data[1] * weights[1] + data[2] * weights[2]) / np.sum(weights)
         # distance-weighted average, the furthest datapoint is assigned a low weight if it's far away from the other two 
     else:

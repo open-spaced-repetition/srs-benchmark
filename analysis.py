@@ -4,6 +4,7 @@ import json
 import pathlib
 from KDEpy import FFTKDE
 
+
 def HSM(a):
     array = np.sort(np.asarray(a))
 
@@ -13,13 +14,13 @@ def HSM(a):
         n = len(a)
         N = (n - 1) // 2 + 1
 
-        for i in range(n-N):
-            w = a[i+N-1] - a[i]
-            if w < w_min:
+        for i in range(n - N):
+            w = a[i + N - 1] - a[i]
+            if w <= w_min:
                 w_min = w
                 j = i
 
-        return a[j:j+N]
+        return a[j : j + N]
 
     while True:
         if array[-1] == array[0]:
@@ -37,6 +38,7 @@ def HSM(a):
                 return array[1]
         else:
             array = iteration(array)
+
 
 # this one is very slow
 def HRM(v):
@@ -78,15 +80,17 @@ def HRM(v):
         Vmax = v[0]
         for IJi in IJ:
             if (IJi[-1] - IJi[0]) == w_prime:
-                if (IJi[0] < Vmin): Vmin = IJi[0]
-                if (IJi[-1] > Vmax): Vmax = IJi[-1]
+                if IJi[0] < Vmin:
+                    Vmin = IJi[0]
+                if IJi[-1] > Vmax:
+                    Vmax = IJi[-1]
 
         min_index = np.argmax(v == Vmin)
         v_back = v[::-1]
         max_index = len(v) - np.argmax(v_back == Vmax) - 1
         N_prime_prime = max_index - min_index + 1
 
-        v = v[min_index:max_index + 1]
+        v = v[min_index : max_index + 1]
 
         if N == N_prime_prime:
             # this should not happen for continous data, but regardless we need to have a case for it
@@ -118,6 +122,7 @@ def HRM(v):
         else:
             v = iteration(v)
 
+
 def KDE(a, weights):
     xmin = np.min(a)
     xmax = np.max(a)
@@ -126,16 +131,18 @@ def KDE(a, weights):
     xmin -= dx
     xmax += dx
     x = np.linspace(xmin, xmax, resolution + 2)
-    estimator = FFTKDE(kernel='gaussian', bw='ISJ')
+    estimator = FFTKDE(kernel="gaussian", bw="ISJ")
     y = estimator.fit(a, weights).evaluate(x)
     kde_mode = x[np.argmax(y)]
     return kde_mode
+
 
 def best_mode(a, weights):
     modes = []
     modes.append(HRM(a))
     modes.append(HSM(a))
     modes.append(KDE(a, weights))
+    print(modes)
     modes.sort()
     # return the mean of the two closest ones
     if modes[1] - modes[0] < modes[2] - modes[1]:
@@ -146,7 +153,6 @@ def best_mode(a, weights):
         return modes[1]
 
 
-
 if __name__ == "__main__":
     model = "FSRS-rs"
     result_dir = pathlib.Path(f"./result/{model}")
@@ -154,34 +160,71 @@ if __name__ == "__main__":
     weights = []
     sizes = []
     n_params = 17
-    defaults = [0.4, 0.9, 2.3, 10.9, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61]
+    defaults = [
+        0.4,
+        0.9,
+        2.3,
+        10.9,
+        4.93,
+        0.94,
+        0.86,
+        0.01,
+        1.49,
+        0.14,
+        0.94,
+        2.18,
+        0.05,
+        0.34,
+        1.26,
+        0.29,
+        2.61,
+    ]
     # if you used other default parameters, please replace the ones above
     for result_file in result_files:
         with open(result_file, "r") as f:
             result = json.load(f)
             for i in range(n_params):
-                if result["weights"][i] == defaults[i]:
-                    # remove users who have parameters that are equal to their default values
+                if abs(result["weights"][i] - defaults[i]) <= 1e-4:
+                    # remove users who have parameters that are close to the default
                     break
             else:
                 weights.append(result["weights"])
                 sizes.append(result["size"])
-    
+
     weights = np.array(weights)
     sizes = np.sqrt(np.array(sizes))
     print(weights.shape)
     pathlib.Path("./plots").mkdir(parents=True, exist_ok=True)
     for i in range(n_params):
-        plt.hist(weights[:, i], bins=100, log=True)
+        plt.hist(weights[:, i], bins=128, log=True)
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])
         mode = best_mode(weights[:, i], sizes)
-        plt.axvline(median, color='orange', linestyle='dashed', linewidth=2, label=f'Median: {median:.2f}')
-        plt.axvline(mean, color='red', linestyle='dashed', linewidth=2, label=f'Mean: {mean:.2f}')
-        plt.axvline(mode, color='purple', linestyle='dashed', linewidth=2, label=f'Mode: {mode:.2f}')
-        plt.xlabel('Weight')
-        plt.ylabel('Frequency (log scale)')
+        plt.ylim(ymin=1)
+        plt.axvline(
+            median,
+            color="orange",
+            linestyle="dashed",
+            linewidth=2,
+            label=f"Median: {median:.2f}",
+        )
+        plt.axvline(
+            mean,
+            color="red",
+            linestyle="dashed",
+            linewidth=2,
+            label=f"Mean: {mean:.2f}",
+        )
+        plt.axvline(
+            mode,
+            color="purple",
+            linestyle="dashed",
+            linewidth=2,
+            label=f"Mode: {mode:.2f}",
+        )
+        plt.xlabel("Weight")
+        plt.ylabel("Frequency (log scale)")
         plt.legend()
-        plt.title(f'w[{i}]')
+        plt.title(f"w[{i}]")
         plt.savefig(f"./plots/w[{i}].png")
         plt.clf()

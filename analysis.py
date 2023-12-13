@@ -4,6 +4,7 @@ import json
 import pathlib
 from KDEpy import FFTKDE
 
+
 def mode_of_three(data):
     assert len(data) == 3
     data = np.sort(np.asarray(data))
@@ -16,15 +17,16 @@ def mode_of_three(data):
         u = (data[2] - data[1]) / shortest_distance
         weights[2] = np.where(u < const, 1, (const / u) ** 2)
         return np.dot(data, weights) / np.sum(weights)
-        # distance-weighted average, the furthest datapoint is assigned a low weight if it's far away from the other two 
+        # distance-weighted average, the furthest datapoint is assigned a low weight if it's far away from the other two
     elif data[1] - data[0] > data[2] - data[1]:
         shortest_distance = np.maximum(data[2] - data[1], epsilon)
         u = (data[1] - data[0]) / shortest_distance
         weights[0] = np.where(u < const, 1, (const / u) ** 2)
         return np.dot(data, weights) / np.sum(weights)
-        # distance-weighted average, the furthest datapoint is assigned a low weight if it's far away from the other two 
+        # distance-weighted average, the furthest datapoint is assigned a low weight if it's far away from the other two
     else:
         return data[1]
+
 
 def HSM(a):
     array = np.sort(np.asarray(a))
@@ -144,6 +146,7 @@ def KDE(a, weights):
     y = estimator.fit(a, weights).evaluate(x)
     kde_mode = x[np.argmax(y)]
     return kde_mode
+
 
 def best_mode(a, weights):
     modes = []

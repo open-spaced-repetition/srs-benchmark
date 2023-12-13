@@ -39,7 +39,7 @@ def HSM(a):
 
         for i in range(n - N):
             w = a[i + N - 1] - a[i]
-            if w <= w_min:
+            if w < w_min:
                 w_min = w
                 j = i
 

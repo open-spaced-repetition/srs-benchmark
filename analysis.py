@@ -5,6 +5,29 @@ import pathlib
 from KDEpy import FFTKDE
 
 
+def mode_of_three(data):
+    assert len(data) == 3
+    data = np.sort(np.asarray(data))
+    epsilon = 1e-8
+    # this is just to avoid division by 0
+    weights = np.ones(3)
+    const = 1.2
+    if data[1] - data[0] < data[2] - data[1]:
+        shortest_distance = np.maximum(data[1] - data[0], epsilon)
+        u = (data[2] - data[1]) / shortest_distance
+        weights[2] = np.where(u < const, 1, (const / u) ** 2)
+        return np.dot(data, weights) / np.sum(weights)
+        # distance-weighted average, the furthest datapoint is assigned a low weight if it's far away from the other two
+    elif data[1] - data[0] > data[2] - data[1]:
+        shortest_distance = np.maximum(data[2] - data[1], epsilon)
+        u = (data[1] - data[0]) / shortest_distance
+        weights[0] = np.where(u < const, 1, (const / u) ** 2)
+        return np.dot(data, weights) / np.sum(weights)
+        # distance-weighted average, the furthest datapoint is assigned a low weight if it's far away from the other two
+    else:
+        return data[1]
+
+
 def HSM(a):
     array = np.sort(np.asarray(a))
 
@@ -29,13 +52,7 @@ def HSM(a):
         elif len(array) == 1 or len(array) == 2:
             return np.mean(array)
         elif len(array) == 3:
-            # if there are 3 values, return the mean of the two closest ones
-            if array[1] - array[0] < array[2] - array[1]:
-                return (array[1] + array[0]) / 2
-            elif array[1] - array[0] > array[2] - array[1]:
-                return (array[2] + array[1]) / 2
-            else:
-                return array[1]
+            return mode_of_three(array)
         else:
             array = iteration(array)
 
@@ -112,13 +129,7 @@ def HRM(v):
             # if there are 1 or 2 values, return their mean
             return np.mean(v)
         elif len(v) == 3:
-            # if there are 3 values, return the mean of the two closest ones
-            if v[1] - v[0] < v[2] - v[1]:
-                return (v[1] + v[0]) / 2
-            elif v[1] - v[0] > v[2] - v[1]:
-                return (v[2] + v[1]) / 2
-            else:
-                return v[1]
+            return mode_of_three(v)
         else:
             v = iteration(v)
 
@@ -143,13 +154,7 @@ def best_mode(a, weights):
     modes.append(HSM(a))
     modes.append(KDE(a, weights))
     modes.sort()
-    # return the mean of the two closest ones
-    if modes[1] - modes[0] < modes[2] - modes[1]:
-        return (modes[1] + modes[0]) / 2
-    elif modes[1] - modes[0] > modes[2] - modes[1]:
-        return (modes[2] + modes[1]) / 2
-    else:
-        return modes[1]
+    return mode_of_three(modes)
 
 
 if __name__ == "__main__":

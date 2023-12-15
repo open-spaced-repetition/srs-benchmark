@@ -153,7 +153,6 @@ def best_mode(a, weights):
     modes.append(HRM(a))
     modes.append(HSM(a))
     modes.append(KDE(a, weights))
-    modes.sort()
     return mode_of_three(modes)
 
 

@@ -15,8 +15,8 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
 from tqdm.auto import tqdm
 import warnings
+from script import cum_concat, remove_non_continuous_rows, remove_outliers
 from utils import cross_comparison
-from itertools import accumulate
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -566,10 +566,6 @@ def process_untrainable(file):
         json.dump(result, f, indent=4)
 
 
-def cum_concat(x):
-    return list(accumulate(x))
-
-
 def create_features(df, model_name="FSRSv3"):
     df = df[(df["delta_t"] != 0) & (df["rating"].isin([1, 2, 3, 4]))].copy()
     df["i"] = df.groupby("card_id").cumcount() + 1
@@ -614,6 +610,15 @@ def create_features(df, model_name="FSRSv3"):
             for r_item in r_sublist
         ]
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    df[df["i"] == 2] = (
+        df[df["i"] == 2]
+        .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)
+        .apply(remove_outliers)
+    )
+    df.dropna(inplace=True)
+    df = df.groupby("card_id", as_index=False, group_keys=False).progress_apply(
+        remove_non_continuous_rows
+    )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
@@ -689,6 +694,7 @@ if __name__ == "__main__":
     dataset_path = "./dataset"
     model = os.environ.get("MODEL", "FSRSv3")
     Path(f"evaluation/{model}").mkdir(parents=True, exist_ok=True)
+    Path(f"result/{model}").mkdir(parents=True, exist_ok=True)
     processed_files = list(map(lambda x: x.stem, Path(f"result/{model}").iterdir()))
     for file in Path(dataset_path).glob("*.csv"):
         if file.stem in processed_files:

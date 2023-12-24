@@ -42,7 +42,7 @@ if rust:
     backend = RustBackend()
 
 else:
-    path = "FSRSv4"
+    path = "FSRS-4.5"
     if dry_run:
         path += "-dry-run"
 
@@ -96,7 +96,7 @@ def convert_to_items(df):  # -> list[FsrsItem]
             items.append(
                 FsrsItem(
                     reviews=[
-                        FsrsReview(delta_t=x[0], rating=x[1])
+                        FsrsReview(delta_t=int(x[0]), rating=int(x[1]))
                         for x in zip(t_history, r_history)
                     ]
                 )
@@ -139,7 +139,53 @@ def create_time_series(df):
         for t_item, r_item in zip(t_sublist, r_sublist)
     ]
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    df[df["i"] == 2] = (
+        df[df["i"] == 2]
+        .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)
+        .apply(remove_outliers)
+    )
+    df.dropna(inplace=True)
+    df = df.groupby("card_id", as_index=False, group_keys=False).progress_apply(
+        remove_non_continuous_rows
+    )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
+
+
+def remove_outliers(group: pd.DataFrame) -> pd.DataFrame:
+    grouped_group = (
+        group.groupby(by=["r_history", "delta_t"], group_keys=False)
+        .agg({"y": ["mean", "count"]})
+        .reset_index()
+    )
+    sort_index = grouped_group.sort_values(
+        by=[("y", "count"), "delta_t"], ascending=[True, False]
+    ).index
+
+    total = sum(grouped_group[("y", "count")])
+    has_been_removed = 0
+    for i in sort_index:
+        count = grouped_group.loc[i, ("y", "count")]
+        if has_been_removed + count >= total * 0.05:
+            break
+        has_been_removed += count
+    group = group[
+        group["delta_t"].isin(
+            grouped_group[
+                (grouped_group[("y", "count")] >= count)
+                & (grouped_group[("y", "mean")] < 1)
+            ]["delta_t"]
+        )
+    ]
+    return group
+
+
+def remove_non_continuous_rows(group):
+    discontinuity = group["i"].diff().fillna(1).ne(1)
+    if not discontinuity.any():
+        return group
+    else:
+        first_non_continuous_index = discontinuity.idxmax()
+        return group.loc[: first_non_continuous_index - 1]
 
 
 def process(file):
@@ -155,47 +201,27 @@ def process(file):
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
     for train_index, test_index in tscv.split(dataset):
+        optimizer.define_model()
         test_set = dataset.iloc[test_index].copy()
         testsets.append(test_set)
         if dry_run:
-            w_list.append(
-                [
-                    0.5888,
-                    1.4616,
-                    3.8226,
-                    14.1364,
-                    4.9214,
-                    1.0325,
-                    0.8731,
-                    0.0613,
-                    1.57,
-                    0.1395,
-                    0.988,
-                    2.212,
-                    0.0658,
-                    0.3439,
-                    1.3098,
-                    0.2837,
-                    2.7766,
-                ]
-            )
+            w_list.append(optimizer.init_w)
             continue
         train_set = dataset.iloc[train_index].copy()
         # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
-        optimizer.S0_dataset_group = (
-            train_set[train_set["i"] == 2]
-            # .groupby(by=["first_rating", "delta_t"], group_keys=False)
-            .groupby(by=["r_history", "delta_t"], group_keys=False)
-            .agg({"y": ["mean", "count"]})
-            .reset_index()
-        )
         try:
             if rust:
                 items = convert_to_items(train_set[train_set["i"] >= 2])
                 weights = backend.compute_weights_from_items(items)
                 w_list.append(weights)
             else:
-                optimizer.define_model()
+                optimizer.S0_dataset_group = (
+                    train_set[train_set["i"] == 2]
+                    # .groupby(by=["first_rating", "delta_t"], group_keys=False)
+                    .groupby(by=["r_history", "delta_t"], group_keys=False)
+                    .agg({"y": ["mean", "count"]})
+                    .reset_index()
+                )
                 _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
                 trainer = Trainer(
                     train_set,

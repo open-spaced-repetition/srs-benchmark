@@ -157,30 +157,30 @@ def best_mode(a, weights):
 
 
 if __name__ == "__main__":
-    model = "FSRS-rs"
+    model = "FSRS-4.5"
     result_dir = pathlib.Path(f"./result/{model}")
     result_files = result_dir.glob("*.json")
     weights = []
     sizes = []
     n_params = 17
     defaults = [
-        0.4,
-        0.9,
-        2.3,
-        10.9,
-        4.93,
-        0.94,
-        0.86,
-        0.01,
-        1.49,
+        0.27,
+        0.74,
+        1.3,
+        5.52,
+        5.1,
+        1.02,
+        0.78,
+        0.06,
+        1.57,
         0.14,
         0.94,
-        2.18,
-        0.05,
-        0.34,
-        1.26,
-        0.29,
-        2.61,
+        2.16,
+        0.06,
+        0.31,
+        1.34,
+        0.21,
+        2.69,
     ]
     # if you used other default parameters, please replace the ones above
     for result_file in result_files:

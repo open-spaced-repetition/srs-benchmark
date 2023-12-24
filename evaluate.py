@@ -3,7 +3,16 @@ import json
 import numpy as np
 
 if __name__ == "__main__":
-    for model in ("FSRS-rs", "FSRSv4", "FSRSv4-dry-run", "FSRSv3", "LSTM", "HLR", "SM2"):
+    for model in (
+        "FSRS-4.5",
+        "FSRS-rs",
+        "FSRSv4",
+        "FSRS-4.5-dry-run",
+        "SM2",
+        "FSRSv3",
+        "LSTM",
+        "HLR",
+    ):
         print(f"Model: {model}")
         m = []
         weights = []
@@ -32,7 +41,9 @@ if __name__ == "__main__":
 
         try:
             rmse_bin_again = np.array([item["RMSE(bins)Ratings"]["1"] for item in m])
-            print(f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}")
+            print(
+                f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}"
+            )
             # FSRSv4 mean (RMSE(bins)Ratings[again]): 0.0983
         except KeyError:
             pass

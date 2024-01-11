@@ -46,13 +46,13 @@ Total number of users: 19854
 
 Total number of reviews for evaluation: 697,851,710
 
-The following tables represent the weighted means and the 99% confidence intervals.
+The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**.
 
 ### Weighted by number of reviews
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
-| FSRS-4.5 | 0.3299±0.0056 | 0.2988±0.0035 | 0.0442±0.0011 |
+| **FSRS-4.5** | **0.3299±0.0056** | **0.2988±0.0035** | **0.0442±0.0011** |
 | FSRS rs | 0.3346±0.0056 | 0.3007±0.0035 | 0.0486±0.0015 |
 | FSRS v4 | 0.3355±0.0055 | 0.3011±0.0036 | 0.0533±0.0015 |
 | FSRS-4.5 (default parameters) | 0.3586±0.0062 | 0.3101±0.0035 | 0.0755±0.0020 |
@@ -65,7 +65,7 @@ The following tables represent the weighted means and the 99% confidence interva
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
-| FSRS-4.5 | 0.3579±0.0031 | 0.3139±0.0018 | 0.0651±0.0008 |
+| **FSRS-4.5** | **0.3579±0.0031** | **0.3139±0.0018** | **0.0651±0.0008** |
 | FSRS rs | 0.3621±0.0031 | 0.3157±0.0019 | 0.0689±0.0009 |
 | FSRS v4 | 0.3676±0.0032 | 0.3172±0.0019 | 0.0763±0.0010 |
 | FSRS-4.5 (default parameters) | 0.3856±0.0034 | 0.3257±0.0018 | 0.0947±0.0011 |

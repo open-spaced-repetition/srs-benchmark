@@ -46,6 +46,8 @@ Total number of users: 19854
 
 Total number of reviews for evaluation: 697,851,710
 
+The values in the tables below are weighted means and their respective 99% confidence intervals.
+
 ### Weighted by number of reviews
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |

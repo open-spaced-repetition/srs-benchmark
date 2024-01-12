@@ -44,13 +44,13 @@ if __name__ == "__main__":
             values = np.array([item[metric] for item in m])
             identifiers = [i for i in range(len(values))]
             dict_x_w = {identifier: (value, weight) for identifier, (value, weight) in enumerate(zip(values, sizes))}
-            CI_99_bootstrap = scipy.stats.bootstrap((identifiers,), statistic=weighted_mean, confidence_level=0.99, axis=0, method='percentile')
+            CI_99_bootstrap = scipy.stats.bootstrap((identifiers,), statistic=weighted_mean, confidence_level=0.99, axis=0, method='BCa')
             low = list(CI_99_bootstrap.confidence_interval)[0]
             high = list(CI_99_bootstrap.confidence_interval)[1]
             print(f"{model} mean (n_reviews): {np.average(values, weights=sizes):.4f}")
             print(f"99% CI of {metric} (n_reviews), bootstrapping (scipy): {(high - low) / 2:.4f}")
             dict_x_w = {identifier: (value, np.log(weight)) for identifier, (value, weight) in enumerate(zip(values, sizes))}
-            CI_99_bootstrap = scipy.stats.bootstrap((identifiers,), statistic=weighted_mean, confidence_level=0.99, axis=0, method='percentile')
+            CI_99_bootstrap = scipy.stats.bootstrap((identifiers,), statistic=weighted_mean, confidence_level=0.99, axis=0, method='BCa')
             low = list(CI_99_bootstrap.confidence_interval)[0]
             high = list(CI_99_bootstrap.confidence_interval)[1]
             print(f"{model} mean (ln(n_reviews)): {np.average(values, weights=np.log(sizes)):.4f}")

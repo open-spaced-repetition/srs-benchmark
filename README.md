@@ -26,7 +26,7 @@ We use three metrics in the FSRS benchmark to evaluate how well these algorithms
 - Root Mean Square Error (RMSE): Adopted from established metric in the SuperMemo, RMSE provides a holistic measure of model prediction errors. The metric assesses the average magnitude of the differences between predicted and actual recall probabilities, thereby indicating the algorithm's reliability in general terms.
 - Weighted Root Mean Square Error in Bins (RMSE(bins)): This is a bespoke metric engineered for the FSRS benchmark. In this approach, predictions and actual recall events are grouped into bins according to the predicted probabilities of recall. Within each bin, the RMSE between the average predicted probability and the average actual recall rate is calculated. These RMSE values are then weighted according to the sample size in each bin, providing a nuanced understanding of model performance across different probability ranges.
 
-If you are unsure what number to look at, look at RMSE (bins). That value can be interpreted as "the average difference between the predicted probability of recalling a card and the measured probability". For example, if RMSE (bins) = 0.05, it means that that algorithm is, on average, wrong by 5% when predicting the probability of recall.
+Smaller is better. If you are unsure what number to look at, look at RMSE (bins). That value can be interpreted as "the average difference between the predicted probability of recalling a card and the measured probability". For example, if RMSE (bins)=0.05, it means that that algorithm is, on average, wrong by 5% when predicting the probability of recall.
 
 ### Models
 
@@ -46,13 +46,13 @@ Total number of users: 19854
 
 Total number of reviews for evaluation: 697,851,710
 
-The following tables represent the weighted means and the 99% confidence intervals.
+The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**.
 
 ### Weighted by number of reviews
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
-| FSRS-4.5 | 0.3299±0.0056 | 0.2988±0.0035 | 0.0442±0.0011 |
+| **FSRS-4.5** | **0.3299±0.0056** | **0.2988±0.0035** | **0.0442±0.0011** |
 | FSRS rs | 0.3346±0.0056 | 0.3007±0.0035 | 0.0486±0.0015 |
 | FSRS v4 | 0.3355±0.0055 | 0.3011±0.0036 | 0.0533±0.0015 |
 | FSRS-4.5 (default parameters) | 0.3586±0.0062 | 0.3101±0.0035 | 0.0755±0.0020 |
@@ -65,7 +65,7 @@ The following tables represent the weighted means and the 99% confidence interva
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
 | --- | --- | --- | --- |
-| FSRS-4.5 | 0.3579±0.0031 | 0.3139±0.0018 | 0.0651±0.0008 |
+| **FSRS-4.5** | **0.3579±0.0031** | **0.3139±0.0018** | **0.0651±0.0008** |
 | FSRS rs | 0.3621±0.0031 | 0.3157±0.0019 | 0.0689±0.0009 |
 | FSRS v4 | 0.3676±0.0032 | 0.3172±0.0019 | 0.0763±0.0010 |
 | FSRS-4.5 (default parameters) | 0.3856±0.0034 | 0.3257±0.0018 | 0.0947±0.0011 |

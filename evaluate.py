@@ -25,7 +25,7 @@ def sigdig(value, CI):
                 return int(digit)
 
     n_lead_zeros_CI = num_lead_zeros(CI)
-    CI_sigdigs = min(len(str(CI)[2 + n_lead_zeros_CI:]), 2)  # assumes CI<1
+    CI_sigdigs = min(len(str(CI)[2 + n_lead_zeros_CI:]), 2)
     decimals = n_lead_zeros_CI + CI_sigdigs
     rounded_CI = round(CI, decimals)
     first_sigdig_CI = first_nonzero_digit(rounded_CI)

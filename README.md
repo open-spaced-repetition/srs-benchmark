@@ -61,7 +61,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | SM2 | 0.56±0.014 | 0.353±0.0040 | 0.167±0.0032 |
 | HLR | 0.77±0.020 | 0.377±0.0046 | 0.205±0.0048 |
 
-![Figure_1](https://github.com/open-spaced-repetition/fsrs-benchmark/assets/83031600/35d22f19-62eb-46de-afad-f7bd155480fe)
+![figure1](https://github.com/Expertium/fsrs-benchmark/assets/83031600/f3bba2ca-a7a8-4a99-b931-01afc5a65966)
 
 ### Weighted by ln(number of reviews)
 
@@ -76,7 +76,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | SM2 | 0.73±0.013 | 0.382±0.0022 | 0.201±0.0019 |
 | HLR | 2.26±0.047 | 0.537±0.0032 | 0.404±0.0040 |
 
-![Figure_2](https://github.com/Expertium/fsrs-benchmark/assets/83031600/f2da3345-359c-4de4-85f9-69cf27f93883)
+![figure2](https://github.com/Expertium/fsrs-benchmark/assets/83031600/d96584f8-0515-4e78-bf52-0b55901b67f3)
 
 ## Median Parameters
 

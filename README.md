@@ -76,7 +76,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | SM2 | 0.73±0.013 | 0.382±0.0022 | 0.201±0.0019 |
 | HLR | 2.26±0.047 | 0.537±0.0032 | 0.404±0.0040 |
 
-![Figure_2](https://github.com/open-spaced-repetition/fsrs-benchmark/assets/83031600/6b18853d-4644-4ced-a1d2-6c6c2cb06b93)
+![Figure_2](https://github.com/Expertium/fsrs-benchmark/assets/83031600/f2da3345-359c-4de4-85f9-69cf27f93883)
 
 ## Median Parameters
 

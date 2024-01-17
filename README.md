@@ -46,7 +46,8 @@ Total number of users: 19854
 
 Total number of reviews for evaluation: 697,851,710
 
-The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The graphs below the tables show the RMSE (bins) of different models, weighted by the number of reviews and by the logarithm of the number of reviews, respectively.
+The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. 
+The graphs below the tables show the mean RMSE (bins) of different models, weighted by the number of reviews and by the logarithm of the number of reviews, respectively.
 
 ### Weighted by number of reviews
 

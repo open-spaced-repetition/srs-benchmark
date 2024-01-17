@@ -46,7 +46,7 @@ Total number of users: 19854
 
 Total number of reviews for evaluation: 697,851,710
 
-The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**.
+The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The graphs below the tables show the RMSE (bins) of different models, weighted by the number of reviews and by the logarithm of the number of reviews, respectively.
 
 ### Weighted by number of reviews
 
@@ -61,6 +61,8 @@ The following tables represent the weighted means and the 99% confidence interva
 | SM2 | 0.56±0.014 | 0.353±0.0040 | 0.167±0.0032 |
 | HLR | 0.77±0.020 | 0.377±0.0046 | 0.205±0.0048 |
 
+![Figure_1](https://github.com/open-spaced-repetition/fsrs-benchmark/assets/83031600/35d22f19-62eb-46de-afad-f7bd155480fe)
+
 ### Weighted by ln(number of reviews)
 
 | Algorithm | Log Loss | RMSE | RMSE(bins) |
@@ -73,6 +75,8 @@ The following tables represent the weighted means and the 99% confidence interva
 | LSTM | 0.55±0.009 | 0.357±0.0022 | 0.147±0.0020 |
 | SM2 | 0.73±0.013 | 0.382±0.0022 | 0.201±0.0019 |
 | HLR | 2.26±0.047 | 0.537±0.0032 | 0.404±0.0040 |
+
+![Figure_2](https://github.com/open-spaced-repetition/fsrs-benchmark/assets/83031600/6b18853d-4644-4ced-a1d2-6c6c2cb06b93)
 
 ## Median Parameters
 

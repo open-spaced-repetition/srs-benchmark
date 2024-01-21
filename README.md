@@ -35,7 +35,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. Our implementation includes 489 parameters.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).
-- SM2: the algorithm used by SuperMemo, the first spaced repetition software. It's a classic in the field of spaced repetition, and it's still popular today. [Anki's default algorithm is based on SM2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html).
+- SM-2: the algorithm used by SuperMemo, the first spaced repetition software. It's a classic in the field of spaced repetition, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html).
 
 For all the nerdy details about FSRS, there's a wiki page you can read: [The Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm).
 
@@ -57,7 +57,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.36±0.006 | 0.076±0.0021 |
 | LSTM | 0.39±0.007 | 0.079±0.0019 |
 | FSRS v3 | 0.41±0.008 | 0.100±0.0026 |
-| SM2 | 0.56±0.014 | 0.167±0.0032 |
+| SM-2 | 0.56±0.014 | 0.167±0.0032 |
 | HLR | 0.77±0.020 | 0.205±0.0048 |
 
 ### Weighted by ln(number of reviews)
@@ -70,7 +70,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.386±0.0034 | 0.095±0.0011 |
 | FSRS v3 | 0.49±0.006 | 0.129±0.0015 |
 | LSTM | 0.55±0.009 | 0.147±0.0020 |
-| SM2 | 0.73±0.013 | 0.201±0.0019 |
+| SM-2 | 0.73±0.013 | 0.201±0.0019 |
 | HLR | 2.26±0.047 | 0.404±0.0040 |
 
 The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE (bins) of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-4.5 outperforms all other algorithms; the bottom row is red because HLR performs worse than any other algorithm.
@@ -78,7 +78,7 @@ The image below shows the p-values obtained by running the Wilcoxon signed-rank 
 All p-values are extremely small, many orders of magnitude smaller than 0.01. Of course, p-values this low beg the question, "Do they even make sense?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the log10(p-value) rather than the p-value itself, to avoid the limitations of floating point numbers. So it's an approximation of an approximation. Wilcoxon also relies on the assumption that the distribution of _pairwise differences_ between data points is symmetrical (even if the data itself doesn't follow a symmetrical distribution). But most importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE (bins) depends on the number of reviews.
 Overall, these p-values make sense on the qualitative level, in other words, we can be sure that all of our algorithms perform differently and that no two algorithms perform exactly the same.
 
-![Wilcoxon, 19854 collections](https://github.com/Expertium/fsrs-benchmark/assets/83031600/0484b290-33df-4b0a-8348-d4407215cf04)
+![Wilcoxon, 19854 collections](https://github.com/Expertium/fsrs-benchmark/assets/83031600/a5bb0942-3a50-4d2c-8d6d-3518e0c21ee1)
 
 ## Median Parameters
 

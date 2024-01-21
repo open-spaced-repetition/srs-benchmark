@@ -37,13 +37,13 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can check out the paper [here](https://github.com/duolingo/halflife-regression).
 - SM2: the algorithm used by SuperMemo, the first spaced repetition software. It's a classic in the field of spaced repetition, and it's still popular today. [Anki's default algorithm is based on SM2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html).
 
-For all the nerdy details about FSRS, there's a wiki page you can check: [The Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm)
+For all the nerdy details about FSRS, there's a wiki page you can check: [The Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm).
 
 ## Result
 
-Total number of users: 19854
+Total number of users: 19,854.
 
-Total number of reviews for evaluation: 697,851,710
+Total number of reviews for evaluation: 697,851,710.
 
 The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**.
 

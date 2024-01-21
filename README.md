@@ -20,10 +20,10 @@ Note: TimeSeriesSplit will remove the first split from evaluation. This is becau
 
 ### Metrics
 
-We use three metrics in the FSRS benchmark to evaluate how well these algorithms work: Log Loss, RMSE, and a custom RMSE that we call RMSE(bins).
+We use two metrics in the FSRS benchmark to evaluate how well these algorithms work: Log Loss, and a custom RMSE that we call RMSE (bins).
 
-- Logarithmic Loss (Log Loss): Utilized primarily for its applicability in binary classification problems, logloss serves as a measure of the discrepancies between predicted probabilities of recall and actual recall events. It quantifies how well the algorithm approximates the true recall probabilities, making it an important metric for model evaluation in spaced repetition systems.
-- Weighted Root Mean Square Error in Bins (RMSE(bins)): This is a metric engineered for the FSRS benchmark. In this approach, predictions and actual recall events are grouped into bins according to the predicted probabilities of recall. Within each bin, the RMSE between the average predicted probability and the average actual recall rate is calculated. These RMSE values are then weighted according to the sample size in each bin, providing a nuanced understanding of model performance across different probability ranges.
+- Log Loss (also known as Binary Cross Entropy): Utilized primarily for its applicability in binary classification problems, logloss serves as a measure of the discrepancies between predicted probabilities of recall and actual recall events. It quantifies how well the algorithm approximates the true recall probabilities, making it an important metric for model evaluation in spaced repetition systems.
+- Weighted Root Mean Square Error in Bins (RMSE (bins)): This is a metric engineered for the FSRS benchmark. In this approach, predictions and actual recall events are grouped into bins according to the predicted probabilities of recall. Within each bin, the RMSE between the average predicted probability and the average actual recall rate is calculated. These RMSE values are then weighted according to the sample size in each bin, providing a nuanced understanding of model performance across different probability ranges.
 
 Smaller is better. If you are unsure what metric to look at, look at RMSE (bins). That value can be interpreted as "the average difference between the predicted probability of recalling a card and the measured probability". For example, if RMSE (bins)=0.05, it means that that algorithm is, on average, wrong by 5% when predicting the probability of recall.
 
@@ -49,7 +49,7 @@ The following tables represent the weighted means and the 99% confidence interva
 
 ### Weighted by number of reviews
 
-| Algorithm | Log Loss | RMSE(bins) |
+| Algorithm | Log Loss | RMSE (bins) |
 | --- | --- | --- |
 | **FSRS-4.5** | **0.33±0.006** | **0.044±0.0011** |
 | FSRS rs | 0.33±0.006 | 0.049±0.0015 |
@@ -62,7 +62,7 @@ The following tables represent the weighted means and the 99% confidence interva
 
 ### Weighted by ln(number of reviews)
 
-| Algorithm | Log Loss | RMSE(bins) |
+| Algorithm | Log Loss | RMSE (bins) |
 | --- | --- | --- |
 | **FSRS-4.5** | **0.358±0.0031** | **0.065±0.0008** |
 | FSRS rs | 0.362±0.0030 | 0.069±0.0009 |

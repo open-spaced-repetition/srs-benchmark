@@ -2,77 +2,83 @@
 
 ## Introduction
 
-Spaced repetition algorithms are computer programs designed to help people schedule reviews of flashcards. A good spaced repetition algorithm helps you remember things more efficiently. Instead of cramming all at once, it spreads out your study sessions over time. To make this efficient, these algorithms try to understand how your memory works. They aim to predict when you're likely to forget something so they can schedule a review just in time.
+Spaced repetition algorithms are computer programs designed to help people schedule reviews of flashcards. A good spaced repetition algorithm helps you remember things more efficiently. Instead of cramming all at once, it spreads out your study sessions over time. To make this efficient, these algorithms try to understand how your memory works. They aim to predict when you're likely to forget something, so they can schedule a review just in time.
 
-FSRS benchmark is a tool to test how well different algorithms do at predicting your memory. It compares several algorithms to see which ones give the most accurate predictions.
+This benchmark is a tool to test how well different algorithms do at predicting your memory. It compares several algorithms to see which ones give the most accurate predictions.
 
 ## Dataset
 
-The dataset for the FSRS benchmark comes from 20k people who use Anki, a flashcard app. In total, there are 1.5B times people reviewed flashcards.
+The dataset for the FSRS benchmark comes from 20 thousand people who use Anki, a flashcard app. In total, this dataset contains information about ~1.5 billion reviews of flashcards. If you would like to obtain the full dataset, please contact [Damien Elmes](https://github.com/dae), the main Anki developer.
 
 ## Evaluation
 
 ### Data Split
 
-In the FSRS benchmark, we use a tool called TimeSeriesSplit. This is part of the sklearn library used for machine learning. The tool helps us split the data by time—older stuff is used for training, and newer stuff for testing. That way, we don't accidentally cheat by giving the algorithm future info it shouldn't have. In practice, we use past study sessions to predict future ones. This makes TimeSeriesSplit a good fit for our benchmark.
+In the FSRS benchmark, we use a tool called TimeSeriesSplit. This is part of the [sklearn](https://scikit-learn.org/) library used for machine learning. The tool helps us split the data by time—older reviews are used for training and newer reviews for testing. That way, we don't accidentally cheat by giving the algorithm future information it shouldn't have. In practice, we use past study sessions to predict future ones. This makes TimeSeriesSplit a good fit for our benchmark.
 
 Note: TimeSeriesSplit will remove the first split from evaluation. This is because the first split is used for training, and we don't want to evaluate the algorithm on the same data it was trained on.
 
 ### Metrics
 
-We use three metrics in the FSRS benchmark to evaluate how well these algorithms work: Log Loss, RMSE, and a custom RMSE that we call RMSE(bins).
+We use two metrics in the FSRS benchmark to evaluate how well these algorithms work: log loss and a custom RMSE that we call RMSE (bins).
 
-- Logarithmic Loss (Log Loss): Utilized primarily for its applicability in binary classification problems, log_loss serves as a measure of the discrepancies between predicted probabilities of recall and actual recall events. It quantifies how well the algorithm approximates the true recall probabilities, making it a critical metric for model evaluation in spaced repetition systems.
-- Root Mean Square Error (RMSE): Adopted from established metric in the SuperMemo, RMSE provides a holistic measure of model prediction errors. The metric assesses the average magnitude of the differences between predicted and actual recall probabilities, thereby indicating the algorithm's reliability in general terms.
-- Weighted Root Mean Square Error in Bins (RMSE(bins)): This is a bespoke metric engineered for the FSRS benchmark. In this approach, predictions and actual recall events are grouped into bins according to the predicted probabilities of recall. Within each bin, the RMSE between the average predicted probability and the average actual recall rate is calculated. These RMSE values are then weighted according to the sample size in each bin, providing a nuanced understanding of model performance across different probability ranges.
+- Log Loss (also known as Binary Cross Entropy): Utilized primarily for its applicability in binary classification problems, log loss serves as a measure of the discrepancies between predicted probabilities of recall and review outcomes (1 or 0). It quantifies how well the algorithm approximates the true recall probabilities, making it an important metric for model evaluation in spaced repetition systems.
+- Weighted Root Mean Square Error in Bins (RMSE (bins)): This is a metric engineered for the FSRS benchmark. In this approach, predictions and review outcomes are grouped into bins according to the predicted probabilities of recall. Within each bin, the squared difference between the average predicted probability of recall and the average recall rate is calculated. These values are then weighted according to the sample size in each bin, and then the final weighted root mean square error is calculated. This metric provides a nuanced understanding of model performance across different probability ranges.
 
-Smaller is better. If you are unsure what number to look at, look at RMSE (bins). That value can be interpreted as "the average difference between the predicted probability of recalling a card and the measured probability". For example, if RMSE (bins)=0.05, it means that that algorithm is, on average, wrong by 5% when predicting the probability of recall.
+Smaller is better. If you are unsure what metric to look at, look at RMSE (bins). That value can be interpreted as "the average difference between the predicted probability of recalling a card and the measured probability". For example, if RMSE (bins)=0.05, it means that that algorithm is, on average, wrong by 5% when predicting the probability of recall.
 
 ### Models
 
 - FSRS v3: the first version of the FSRS algorithm that people actually used.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
-- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of forgetting curve is changed.
+- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. Our implementation includes 489 parameters.
-- HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can check out the paper [here](https://github.com/duolingo/halflife-regression).
-- SM2: the algorithm used by SuperMemo, the first spaced repetition software. It's a classic in the field of spaced repetition, and it's still popular today. [Anki's default algorithm is based on SM2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html).
+- HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).
+- SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it.
 
-For all the nerdy details about FSRS, there's a wiki page you can check: [The Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm)
+For more details about the FSRS algorithm, read this wiki page: [The Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm).
 
 ## Result
 
-Total number of users: 19854
+Total number of users: 19,854.
 
-Total number of reviews for evaluation: 697,851,710
+Total number of reviews for evaluation: 697,851,710.
 
 The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**.
 
 ### Weighted by number of reviews
 
-| Algorithm | Log Loss | RMSE | RMSE(bins) |
-| --- | --- | --- | --- |
-| **FSRS-4.5** | **0.33±0.006** | **0.299±0.0035** | **0.044±0.0011** |
-| FSRS rs | 0.33±0.006 | 0.301±0.0035 | 0.049±0.0015 |
-| FSRS v4 | 0.34±0.006 | 0.301±0.0036 | 0.053±0.0015 |
-| FSRS-4.5 (default parameters) | 0.36±0.006 | 0.310±0.0036 | 0.076±0.0021 |
-| LSTM | 0.39±0.007 | 0.312±0.0037 | 0.079±0.0019 |
-| FSRS v3 | 0.41±0.008 | 0.321±0.0039 | 0.100±0.0026 |
-| SM2 | 0.56±0.014 | 0.353±0.0040 | 0.167±0.0032 |
-| HLR | 0.77±0.020 | 0.377±0.0046 | 0.205±0.0048 |
+| Algorithm | Log Loss | RMSE (bins) |
+| --- | --- | --- |
+| **FSRS-4.5** | **0.33±0.006** | **0.044±0.0011** |
+| FSRS rs | 0.33±0.006 | 0.049±0.0015 |
+| FSRS v4 | 0.34±0.006 | 0.053±0.0015 |
+| FSRS-4.5 (default parameters) | 0.36±0.006 | 0.076±0.0021 |
+| LSTM | 0.39±0.007 | 0.079±0.0019 |
+| FSRS v3 | 0.41±0.008 | 0.100±0.0026 |
+| SM-2 | 0.56±0.014 | 0.167±0.0032 |
+| HLR | 0.77±0.020 | 0.205±0.0048 |
 
 ### Weighted by ln(number of reviews)
 
-| Algorithm | Log Loss | RMSE | RMSE(bins) |
-| --- | --- | --- | --- |
-| **FSRS-4.5** | **0.358±0.0031** | **0.314±0.0019** | **0.065±0.0008** |
-| FSRS rs | 0.362±0.0030 | 0.316±0.0019 | 0.069±0.0009 |
+| Algorithm | Log Loss | RMSE (bins) |
+| --- | --- | --- |
+| **FSRS-4.5** | **0.358±0.0031** | **0.065±0.0008** |
+| FSRS rs | 0.362±0.0030 | 0.069±0.0009 |
 | FSRS v4 | 0.368±0.0033 | 0.317±0.0019 | 0.076±0.0010 |
-| FSRS-4.5 (default parameters) | 0.386±0.0034 | 0.326±0.0019 | 0.095±0.0011 |
-| FSRS v3 | 0.49±0.006 | 0.343±0.0020 | 0.129±0.0015 |
-| LSTM | 0.55±0.009 | 0.357±0.0022 | 0.147±0.0020 |
-| SM2 | 0.73±0.013 | 0.382±0.0022 | 0.201±0.0019 |
-| HLR | 2.26±0.047 | 0.537±0.0032 | 0.404±0.0040 |
+| FSRS-4.5 (default parameters) | 0.386±0.0034 | 0.095±0.0011 |
+| FSRS v3 | 0.49±0.006 | 0.129±0.0015 |
+| LSTM | 0.55±0.009 | 0.147±0.0020 |
+| SM-2 | 0.73±0.013 | 0.201±0.0019 |
+| HLR | 2.26±0.047 | 0.404±0.0040 |
+
+The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE (bins) of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-4.5 outperforms all other algorithms; the bottom row is red because HLR performs worse than any other algorithm.
+
+All p-values are extremely small, many orders of magnitude smaller than 0.01. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the log10(p-value) rather than the p-value itself, to avoid the limitations of floating point numbers. So it's an approximation of an approximation. Wilcoxon also relies on the assumption that the distribution of _pairwise differences_ between data points is symmetrical (even if the data itself doesn't follow a symmetrical distribution). But most importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE (bins) depends on the number of reviews.
+Overall, these p-values can be trusted on a qualitative (but not quantitative) level, in other words, we can be sure that all of our algorithms perform differently and that no two algorithms perform exactly the same.
+
+![Wilcoxon, 19854 collections](./plots/Wilcoxon-19854-collections.png)
 
 ## Median Parameters
 

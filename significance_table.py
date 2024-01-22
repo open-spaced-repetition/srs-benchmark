@@ -213,7 +213,7 @@ if __name__ == "__main__":
         fontsize=24,
         pad=30,
     )
-    cmap = matplotlib.colors.ListedColormap(["red", "#2db300"])
+    cmap = matplotlib.colors.ListedColormap(["red", "#989a98", "#2db300"])
     plt.imshow(color_wilcox, interpolation="none", vmin=0, cmap=cmap)
 
     for i in range(n):

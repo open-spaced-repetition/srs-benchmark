@@ -163,10 +163,14 @@ if __name__ == "__main__":
             if i == j:
                 wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f"{models2[i]}, RMSE (bins)"]
-                df2 = df[f"{models2[j]}, RMSE (bins)"]
-                result = logp_wilcox(df1[:n_collections], df2[:n_collections])
-                wilcox[i][j] = result[0]
+                df1 = df[f'{models2[i]}, RMSE (bins)']
+                df2 = df[f'{models2[j]}, RMSE (bins)']
+                if n_collections > 50:
+                    result = logp_wilcox(df1[:n_collections], df2[:n_collections])[0]
+                else:
+                    # use the exact result for small n
+                    result = np.log10(stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue)
+                wilcox[i][j] = result
 
     color_wilcox = [[-1 for i in range(n)] for j in range(n)]
     for i in range(n):
@@ -174,13 +178,24 @@ if __name__ == "__main__":
             if i == j:
                 color_wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f"{models2[i]}, RMSE (bins)"]
-                df2 = df[f"{models2[j]}, RMSE (bins)"]
-                result = logp_wilcox(df1[:n_collections], df2[:n_collections])
-                if result[1] == 0:
-                    color_wilcox[i][j] = 0
+                df1 = df[f'{models2[i]}, RMSE (bins)']
+                df2 = df[f'{models2[j]}, RMSE (bins)']
+                # we'll need the second value returned by my function to determine the color
+                approx = logp_wilcox(df1[:n_collections], df2[:n_collections])
+                if n_collections > 50:
+                    result = approx[0]
                 else:
-                    color_wilcox[i][j] = 1
+                    # use the exact result for small n
+                    result = np.log10(stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue)
+
+                if np.power(10, result) > 0.01:
+                    # color for insignificant p-values
+                    color_wilcox[i][j] = 0.5
+                else:
+                    if approx[1] == 0:
+                        color_wilcox[i][j] = 0
+                    else:
+                        color_wilcox[i][j] = 1
 
     # small changes to labels
     index_4_5 = models2.index("FSRS-4.5-dry-run")
@@ -206,18 +221,22 @@ if __name__ == "__main__":
             if math.isnan(wilcox[i][j]):
                 pass
             else:
+                if 10 ** wilcox[i][j] > 0.01:
+                    string = f'{10 ** wilcox[i][j]:.3f}'
+                else:
+                    string = format(wilcox[i][j], 0)
                 text = ax.text(
                     j,
                     i,
-                    format(wilcox[i][j], 0),
+                    string,
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=13,
+                    fontsize=9.5,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models2, fontsize=12)
-    ax.set_yticks(np.arange(n), labels=models2, fontsize=12)
+    ax.set_xticks(np.arange(n), labels=models2, fontsize=9.5)
+    ax.set_yticks(np.arange(n), labels=models2, fontsize=9.5)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")

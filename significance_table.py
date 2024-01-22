@@ -234,7 +234,7 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=16,
+                    fontsize=9.5,
                 )
 
     ax.set_xticks(np.arange(n), labels=models2, fontsize=9.5)

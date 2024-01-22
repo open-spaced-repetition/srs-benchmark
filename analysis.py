@@ -4,6 +4,39 @@ import json
 import pathlib
 from KDEpy import FFTKDE
 
+def chen_rule(data, weights=None):
+    # https://www.hindawi.com/journals/jps/2015/242683/
+    data = np.asarray(data)
+    if weights is None:
+        weights = np.ones_like(data)
+    else:
+        weights = np.asarray(weights)
+
+    def weighted_percentile(data, weights, q):
+        # q must be between 0 and 1
+        ix = np.argsort(data)
+        data = data[ix]  # sort data
+        weights = weights[ix]  # sort weights
+        C = 1
+        # 0 = 'weibull'
+        # 1/3 = 'median_unbiased'
+        # 3/8 = 'normal_unbiased'
+        # 1/2 = 'hazen'
+        # 1 = 'linear'
+        cdf = (np.cumsum(weights) - C * weights) / (np.sum(weights) + (1 - 2 * C) * weights)  # 'like' a CDF function
+        return np.interp(q, cdf, data)  # when all weights are equal to 1, this is equivalent to using 'linear' in np.percentile
+
+    std = np.sqrt(np.cov(data, aweights=weights))
+    IQR = (weighted_percentile(data, weights, q=0.75) - weighted_percentile(data, weights, q=0.25)) / 1.3489795003921634
+    scale = min(IQR, std)
+    mean = np.average(data, weights=weights)
+    n = len(data)
+    if mean != 0 and scale > 0:
+        cv = (1 + 1/(4 * n)) * scale / mean  # corrected for small sample size
+        h = ((4 * (2 + cv ** 2)) ** (1/5)) * scale * (n ** (-2/5))
+        return h
+    else:
+        raise Exception("Chen's rule failed")
 
 def mode_of_three(data):
     assert len(data) == 3
@@ -142,7 +175,7 @@ def KDE(a, weights):
     xmin -= dx
     xmax += dx
     x = np.linspace(xmin, xmax, resolution + 2)
-    estimator = FFTKDE(kernel="gaussian", bw="ISJ")
+    estimator = FFTKDE(kernel="gaussian", bw=chen_rule(a, weights))
     y = estimator.fit(a, weights).evaluate(x)
     kde_mode = x[np.argmax(y)]
     return kde_mode

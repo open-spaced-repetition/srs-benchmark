@@ -245,5 +245,5 @@ if __name__ == "__main__":
     for location in ["left", "right", "top", "bottom"]:
         ax.spines[location].set_linewidth(2)
     title = f"Wilcoxon-{n_collections}-collections"
-    plt.savefig(f"./plots/{title}.png")
+    plt.savefig(f"./plots/{title}.png", bbox_inches='tight')
     # plt.show()

@@ -66,7 +66,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | --- | --- | --- |
 | **FSRS-4.5** | **0.358±0.0031** | **0.065±0.0008** |
 | FSRS rs | 0.362±0.0030 | 0.069±0.0009 |
-| FSRS v4 | 0.368±0.0033 | 0.317±0.0019 | 0.076±0.0010 |
+| FSRS v4 | 0.368±0.0033 | 0.076±0.0010 |
 | FSRS-4.5 (default parameters) | 0.386±0.0034 | 0.095±0.0011 |
 | FSRS v3 | 0.49±0.006 | 0.129±0.0015 |
 | LSTM | 0.55±0.009 | 0.147±0.0020 |

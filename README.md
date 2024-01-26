@@ -55,7 +55,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS rs | 0.33±0.006 | 0.049±0.0015 |
 | FSRS v4 | 0.33±0.006 | 0.052±0.0014 |
 | FSRS v3 | 0.36±0.007 | 0.068±0.0016 |
-| FSRS-4.5 (default parameters) | 0.36±0.006 | 0.076±0.0021 |
+| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0019 |
 | LSTM | 0.39±0.007 | 0.079±0.0019 |
 | SM-2 | 0.56±0.014 | 0.167±0.0032 |
 | HLR | 0.77±0.020 | 0.205±0.0048 |
@@ -67,7 +67,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** |
 | FSRS rs | 0.362±0.0030 | 0.069±0.0009 |
 | FSRS v4 | 0.354±0.0033 | 0.074±0.0009 |
-| FSRS-4.5 (default parameters) | 0.386±0.0034 | 0.095±0.0011 |
+| FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 |
 | FSRS v3 | 0.416±0.0043 | 0.104±0.0014 |
 | LSTM | 0.55±0.009 | 0.147±0.0020 |
 | SM-2 | 0.73±0.013 | 0.201±0.0019 |

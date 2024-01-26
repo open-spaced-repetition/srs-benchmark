@@ -513,13 +513,12 @@ class HLR(nn.Module):
         return 0.5 ** (t / s)
 
 
-def sm2(history):
+def sm2(r_history):
     ivl = 0
     ef = 2.5
     reps = 0
-    for delta_t, rating in history:
-        delta_t = delta_t.item()
-        rating = rating.item() + 1
+    for rating in r_history.split(","):
+        rating = int(rating) + 1
         if rating > 2:
             if reps == 0:
                 ivl = 1
@@ -651,7 +650,11 @@ class Trainer:
         self.batch_size = batch_size
         self.build_dataset(train_set, test_set)
         self.n_epoch = n_epoch
-        self.batch_nums = self.next_train_data_loader.batch_sampler.batch_nums if isinstance(MODEL, FSRS4) else self.train_data_loader.batch_sampler.batch_nums
+        self.batch_nums = (
+            self.next_train_data_loader.batch_sampler.batch_nums
+            if isinstance(MODEL, FSRS4)
+            else self.train_data_loader.batch_sampler.batch_nums
+        )
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=self.batch_nums * n_epoch
         )
@@ -867,7 +870,7 @@ class Collection:
 def process_untrainable(file):
     model_name = "SM2"
     dataset = pd.read_csv(file)
-    dataset = create_features(dataset)
+    dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
         return
     testsets = []
@@ -880,7 +883,7 @@ def process_untrainable(file):
     y = []
 
     for i, testset in enumerate(testsets):
-        testset["stability"] = testset["tensor"].map(sm2)
+        testset["stability"] = testset["r_history"].map(sm2)
         try:
             testset["p"] = np.exp(
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
@@ -891,20 +894,8 @@ def process_untrainable(file):
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
-    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
-    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-    rmse_bins = cross_comparison(
-        pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
-    )[0]
-    result = {
-        model_name: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
-        "user": int(file.stem),
-        "size": len(y),
-    }
-    # save as json
-    Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
-    with open(f"result/{model_name}/{file.stem}.json", "w") as f:
-        json.dump(result, f, indent=4)
+
+    evaluate(y, p, model_name, file)
 
 
 def create_features(df, model_name="FSRSv3"):
@@ -1021,6 +1012,10 @@ def process(args):
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
+    evaluate(y, p, model_name, file)
+
+
+def evaluate(y, p, model_name, file):
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )

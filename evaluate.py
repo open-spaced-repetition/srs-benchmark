@@ -80,10 +80,10 @@ if __name__ == "__main__":
         "FSRS-rs",
         "FSRSv4",
         "FSRS-4.5-dry-run",
-        "SM2",
         "FSRSv3",
         "LSTM",
         "HLR",
+        "SM2",
     ):
         print(f"Model: {model}")
         m = []

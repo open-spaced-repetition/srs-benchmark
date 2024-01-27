@@ -58,7 +58,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0019 |
 | LSTM | 0.37±0.007 | 0.075±0.0017 |
 | SM-2 | 0.54±0.012 | 0.170±0.0031 |
-| HLR | 0.77±0.020 | 0.205±0.0048 |
+| HLR | 0.70±0.017 | 0.193±0.0046 |
 
 ### Weighted by ln(number of reviews)
 
@@ -71,7 +71,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS v3 | 0.416±0.0043 | 0.104±0.0014 |
 | LSTM | 0.50±0.007 | 0.137±0.0018 |
 | SM-2 | 0.68±0.011 | 0.210±0.0020 |
-| HLR | 2.26±0.047 | 0.404±0.0040 |
+| HLR | 2.03±0.045 | 0.391±0.0040 |
 
 The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE (bins) of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-4.5 outperforms all other algorithms; the bottom row is red because HLR performs worse than any other algorithm.
 

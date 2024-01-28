@@ -78,7 +78,7 @@ The image below shows the p-values obtained by running the Wilcoxon signed-rank 
 All p-values are extremely small, many orders of magnitude smaller than 0.01. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the log10(p-value) rather than the p-value itself, to avoid the limitations of floating point numbers. So it's an approximation of an approximation. But more importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE (bins) depends on the number of reviews.
 Overall, these p-values can be trusted on a qualitative (but not quantitative) level, in other words, we can be sure that all of our algorithms perform differently and that no two algorithms perform exactly the same.
 
-![Wilcoxon, 19854 collections](./plots/Wilcoxon-19854-collections.png)
+![Wilcoxon, 19854 collections](./plots/Wilcoxon-19990-collections.png)
 
 ## Median Parameters
 

@@ -52,7 +52,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | Algorithm | Log Loss | RMSE (bins) |
 | --- | --- | --- |
 | **FSRS-4.5** | **0.32±0.006** | **0.043±0.0010** |
-| FSRS rs | 0.33±0.006 | 0.049±0.0015 |
+| FSRS rs | 0.33±0.006 | 0.046±0.0011 |
 | FSRS v4 | 0.33±0.006 | 0.052±0.0014 |
 | FSRS v3 | 0.36±0.007 | 0.068±0.0016 |
 | FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0019 |
@@ -65,7 +65,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | Algorithm | Log Loss | RMSE (bins) |
 | --- | --- | --- |
 | **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** |
-| FSRS rs | 0.362±0.0030 | 0.069±0.0009 |
+| FSRS rs | 0.350±0.0031 | 0.066±0.0008 |
 | FSRS v4 | 0.354±0.0033 | 0.074±0.0009 |
 | FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 |
 | FSRS v3 | 0.416±0.0043 | 0.104±0.0014 |
@@ -107,3 +107,54 @@ FSRS rs:
 Please go to:
 - [fsrs-vs-sm15](https://github.com/open-spaced-repetition/fsrs-vs-sm15)
 - [fsrs-vs-sm17](https://github.com/open-spaced-repetition/fsrs-vs-sm17)
+
+
+## Run the benchmark
+
+### Requirements
+
+Dataset (tiny): https://github.com/open-spaced-repetition/fsrs-benchmark/issues/28#issuecomment-1876196288
+
+Dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Commands
+
+FSRS-4.5:
+
+```bash
+python script.py
+```
+
+FSRS-4.5 with default parameters:
+
+```bash
+DRY_RUN=1 python script.py
+```
+
+FSRS-rs:
+
+```bash
+FSRS_RS=1 FSRS_NO_OUTLIER=1 PYTHONPATH=~/Codes/anki/out/pylib:~/Codes/anki/pylib python script.py
+```
+
+> Please change the `PYTHONPATH` variable to the path of your Anki source code.
+
+FSRSv4/FSRSv3/HLR/LSTM/SM2:
+
+```bash
+MODEL=FSRSv4 python other.py
+```
+
+> Please change the `MODEL` variable to `FSRSv3`, `HLR`, `LSTM`, or `SM2` to run the corresponding model.
+
+Dev model in fsrs-optimizer:
+
+```bash
+DEV_MODE=1 python script.py
+```
+
+> Please place the fsrs-optimizer repository in the same directory as this repository.

@@ -14,6 +14,8 @@ from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_se
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
 from tqdm.auto import tqdm
+from scipy.optimize import minimize
+from statsmodels.nonparametric.smoothers_lowess import lowess
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers
 from utils import cross_comparison
@@ -136,6 +138,282 @@ class FSRS3(nn.Module):
         )
 
 
+class FSRS4WeightClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data
+            w[4] = w[4].clamp(1, 10)
+            w[5] = w[5].clamp(0.1, 5)
+            w[6] = w[6].clamp(0.1, 5)
+            w[7] = w[7].clamp(0, 0.5)
+            w[8] = w[8].clamp(0, 3)
+            w[9] = w[9].clamp(0.1, 0.8)
+            w[10] = w[10].clamp(0.01, 2.5)
+            w[11] = w[11].clamp(0.5, 5)
+            w[12] = w[12].clamp(0.01, 0.2)
+            w[13] = w[13].clamp(0.01, 0.9)
+            w[14] = w[14].clamp(0.01, 2)
+            w[15] = w[15].clamp(0, 1)
+            w[16] = w[16].clamp(1, 4)
+            module.w.data = w
+
+
+class FSRS4(nn.Module):
+    init_w = [
+        0.4,
+        0.9,
+        2.3,
+        10.9,
+        4.93,
+        0.94,
+        0.86,
+        0.01,
+        1.49,
+        0.14,
+        0.94,
+        2.18,
+        0.05,
+        0.34,
+        1.26,
+        0.29,
+        2.61,
+    ]
+    clipper = FSRS4WeightClipper()
+
+    def __init__(self, w: List[float] = init_w):
+        super(FSRS4, self).__init__()
+        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def forgetting_curve(self, t, s):
+        return (1 + t / (9 * s)) ** -1
+
+    def stability_after_success(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> Tensor:
+        hard_penalty = torch.where(rating == 2, self.w[15], 1)
+        easy_bonus = torch.where(rating == 4, self.w[16], 1)
+        new_s = state[:, 0] * (
+            1
+            + torch.exp(self.w[8])
+            * (11 - state[:, 1])
+            * torch.pow(state[:, 0], -self.w[9])
+            * (torch.exp((1 - r) * self.w[10]) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
+        return new_s
+
+    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
+        new_s = (
+            self.w[11]
+            * torch.pow(state[:, 1], -self.w[12])
+            * (torch.pow(state[:, 0] + 1, self.w[13]) - 1)
+            * torch.exp((1 - r) * self.w[14])
+        )
+        return new_s
+
+    def step(self, X: Tensor, state: Tensor) -> Tensor:
+        """
+        :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
+        :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
+        :return state:
+        """
+        if torch.equal(state, torch.zeros_like(state)):
+            keys = torch.tensor([1, 2, 3, 4])
+            keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
+            # first learn, init memory states
+            new_s = torch.ones_like(state[:, 0])
+            new_s[index[0]] = self.w[index[1]]
+            new_d = self.w[4] - self.w[5] * (X[:, 1] - 3)
+            new_d = new_d.clamp(1, 10)
+        else:
+            r = self.forgetting_curve(X[:, 0], state[:, 0])
+            condition = X[:, 1] > 1
+            new_s = torch.where(
+                condition,
+                self.stability_after_success(state, r, X[:, 1]),
+                self.stability_after_failure(state, r),
+            )
+            new_d = state[:, 1] - self.w[6] * (X[:, 1] - 3)
+            new_d = self.mean_reversion(self.w[4], new_d)
+            new_d = new_d.clamp(1, 10)
+        new_s = new_s.clamp(0.1, 36500)
+        return torch.stack([new_s, new_d], dim=1)
+
+    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> Tensor:
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+        return self.w[7] * init + (1 - self.w[7]) * current
+
+    def state_dict(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+    def pretrain(self, train_set):
+        S0_dataset_group = (
+            train_set[train_set["i"] == 2]
+            .groupby(by=["r_history", "delta_t"], group_keys=False)
+            .agg({"y": ["mean", "count"]})
+            .reset_index()
+        )
+        rating_stability = {}
+        rating_count = {}
+        average_recall = train_set["y"].mean()
+        r_s0_default = {str(i): self.init_w[i - 1] for i in range(1, 5)}
+
+        for first_rating in ("1", "2", "3", "4"):
+            group = S0_dataset_group[S0_dataset_group["r_history"] == first_rating]
+            if group.empty:
+                tqdm.write(
+                    f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
+                )
+                continue
+            delta_t = group["delta_t"]
+            recall = (group["y"]["mean"] * group["y"]["count"] + average_recall * 1) / (
+                group["y"]["count"] + 1
+            )
+            count = group["y"]["count"]
+            total_count = sum(count)
+
+            init_s0 = r_s0_default[first_rating]
+
+            def loss(stability):
+                y_pred = self.forgetting_curve(delta_t, stability)
+                logloss = sum(
+                    -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
+                    * count
+                    / total_count
+                )
+                l1 = np.abs(stability - init_s0) / total_count / 16
+                return logloss + l1
+
+            res = minimize(
+                loss,
+                x0=init_s0,
+                bounds=((0.1, 365),),
+                options={"maxiter": int(np.sqrt(total_count))},
+            )
+            params = res.x
+            stability = params[0]
+            rating_stability[int(first_rating)] = stability
+            rating_count[int(first_rating)] = sum(count)
+
+        for small_rating, big_rating in (
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (1, 3),
+            (2, 4),
+            (1, 4),
+        ):
+            if small_rating in rating_stability and big_rating in rating_stability:
+                if rating_stability[small_rating] > rating_stability[big_rating]:
+                    if rating_count[small_rating] > rating_count[big_rating]:
+                        rating_stability[big_rating] = rating_stability[small_rating]
+                    else:
+                        rating_stability[small_rating] = rating_stability[big_rating]
+
+        w1 = 3 / 5
+        w2 = 3 / 5
+
+        if len(rating_stability) == 0:
+            raise Exception("Not enough data for pretraining!")
+        elif len(rating_stability) == 1:
+            rating = list(rating_stability.keys())[0]
+            factor = rating_stability[rating] / r_s0_default[str(rating)]
+            init_s0 = list(map(lambda x: x * factor, r_s0_default.values()))
+        elif len(rating_stability) == 2:
+            if 1 not in rating_stability and 2 not in rating_stability:
+                rating_stability[2] = np.power(
+                    rating_stability[3], 1 / (1 - w2)
+                ) * np.power(rating_stability[4], 1 - 1 / (1 - w2))
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+            elif 1 not in rating_stability and 3 not in rating_stability:
+                rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
+                    rating_stability[4], w2
+                )
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+            elif 1 not in rating_stability and 4 not in rating_stability:
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+            elif 2 not in rating_stability and 3 not in rating_stability:
+                rating_stability[2] = np.power(
+                    rating_stability[1], w1 / (w1 + w2 - w1 * w2)
+                ) * np.power(rating_stability[4], 1 - w1 / (w1 + w2 - w1 * w2))
+                rating_stability[3] = np.power(
+                    rating_stability[1], 1 - w2 / (w1 + w2 - w1 * w2)
+                ) * np.power(rating_stability[4], w2 / (w1 + w2 - w1 * w2))
+            elif 2 not in rating_stability and 4 not in rating_stability:
+                rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
+                    rating_stability[3], 1 - w1
+                )
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+            elif 3 not in rating_stability and 4 not in rating_stability:
+                rating_stability[3] = np.power(
+                    rating_stability[1], 1 - 1 / (1 - w1)
+                ) * np.power(rating_stability[2], 1 / (1 - w1))
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+            init_s0 = [
+                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+            ]
+        elif len(rating_stability) == 3:
+            if 1 not in rating_stability:
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+            elif 2 not in rating_stability:
+                rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
+                    rating_stability[3], 1 - w1
+                )
+            elif 3 not in rating_stability:
+                rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
+                    rating_stability[4], w2
+                )
+            elif 4 not in rating_stability:
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+            init_s0 = [
+                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+            ]
+        elif len(rating_stability) == 4:
+            init_s0 = [
+                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+            ]
+
+        self.w.data[0:4] = Tensor(list(map(lambda x: max(min(100, x), 0.01), init_s0)))
+
+
 n_input = 5
 n_hidden = 8
 n_output = 1
@@ -235,13 +513,12 @@ class HLR(nn.Module):
         return 0.5 ** (t / s)
 
 
-def sm2(history):
+def sm2(r_history):
     ivl = 0
     ef = 2.5
     reps = 0
-    for delta_t, rating in history:
-        delta_t = delta_t.item()
-        rating = rating.item() + 1
+    for rating in r_history.split(","):
+        rating = int(rating) + 1
         if rating > 2:
             if reps == 0:
                 ivl = 1
@@ -366,12 +643,18 @@ class Trainer:
         batch_size: int = 256,
     ) -> None:
         self.model = MODEL
+        if isinstance(MODEL, FSRS4):
+            self.model.pretrain(train_set)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
-        self.clipper = MODEL.clipper if isinstance(MODEL, FSRS3) else None
+        self.clipper = MODEL.clipper if isinstance(MODEL, (FSRS3, FSRS4)) else None
         self.batch_size = batch_size
         self.build_dataset(train_set, test_set)
         self.n_epoch = n_epoch
-        self.batch_nums = self.next_train_data_loader.batch_sampler.batch_nums
+        self.batch_nums = (
+            self.next_train_data_loader.batch_sampler.batch_nums
+            if isinstance(MODEL, FSRS4)
+            else self.train_data_loader.batch_sampler.batch_nums
+        )
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=self.batch_nums * n_epoch
         )
@@ -412,7 +695,11 @@ class Trainer:
 
         if isinstance(self.model, FSRS3):
             for k in range(self.n_epoch):
-                for i, batch in enumerate(self.pre_train_data_loader):
+                weighted_loss, w = self.eval()
+                if weighted_loss < best_loss:
+                    best_loss = weighted_loss
+                    best_w = w
+                for i, batch in enumerate(self.train_data_loader):
                     self.model.train()
                     self.optimizer.zero_grad()
                     sequences, delta_ts, labels, seq_lens = batch
@@ -425,10 +712,43 @@ class Trainer:
                     loss = self.loss_fn(retentions, labels).sum()
                     loss.backward()
                     self.optimizer.step()
+                    self.scheduler.step()
                     self.model.apply(self.clipper)
+            weighted_loss, w = self.eval()
+            if weighted_loss < best_loss:
+                best_loss = weighted_loss
+                best_w = w
+            return best_w
+        elif isinstance(self.model, FSRS4):
+            for k in range(self.n_epoch):
+                weighted_loss, w = self.eval()
+                if weighted_loss < best_loss:
+                    best_loss = weighted_loss
+                    best_w = w
+                for i, batch in enumerate(self.next_train_data_loader):
+                    self.model.train()
+                    self.optimizer.zero_grad()
+                    sequences, delta_ts, labels, seq_lens = batch
+                    real_batch_size = seq_lens.shape[0]
+                    outputs, _ = self.model(sequences)
+                    stabilities = outputs[
+                        seq_lens - 1, torch.arange(real_batch_size), 0
+                    ]
+                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
+                    loss = self.loss_fn(retentions, labels).sum()
+                    loss.backward()
+                    for param in self.model.parameters():
+                        param.grad[:4] = torch.zeros(4)
+                    self.optimizer.step()
+                    self.scheduler.step()
+                    self.model.apply(self.clipper)
+            weighted_loss, w = self.eval()
+            if weighted_loss < best_loss:
+                best_loss = weighted_loss
+                best_w = w
+            return best_w
         else:
             for k in range(self.n_epoch):
-                weighted_loss = self.eval()
                 for i, batch in enumerate(self.train_data_loader):
                     self.model.train()
                     self.optimizer.zero_grad()
@@ -448,13 +768,6 @@ class Trainer:
                     self.optimizer.step()
                     self.scheduler.step()
             return self.model.state_dict()
-
-        weighted_loss, w = self.eval()
-        if weighted_loss < best_loss:
-            best_loss = weighted_loss
-            best_w = w
-
-        return best_w
 
     def eval(self):
         self.model.eval()
@@ -495,7 +808,7 @@ class Trainer:
             test_loss = self.loss_fn(retentions, labels).mean()
             self.avg_eval_losses.append(test_loss)
 
-            if isinstance(self.model, FSRS3):
+            if isinstance(self.model, (FSRS3, FSRS4)):
                 w = list(
                     map(
                         lambda x: round(float(x), 4),
@@ -557,7 +870,7 @@ class Collection:
 def process_untrainable(file):
     model_name = "SM2"
     dataset = pd.read_csv(file)
-    dataset = create_features(dataset)
+    dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
         return
     testsets = []
@@ -570,7 +883,7 @@ def process_untrainable(file):
     y = []
 
     for i, testset in enumerate(testsets):
-        testset["stability"] = testset["tensor"].map(sm2)
+        testset["stability"] = testset["r_history"].map(sm2)
         try:
             testset["p"] = np.exp(
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
@@ -581,20 +894,8 @@ def process_untrainable(file):
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
-    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
-    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-    rmse_bins = cross_comparison(
-        pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
-    )[0]
-    result = {
-        model_name: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
-        "user": int(file.stem),
-        "size": len(y),
-    }
-    # save as json
-    Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
-    with open(f"result/{model_name}/{file.stem}.json", "w") as f:
-        json.dump(result, f, indent=4)
+
+    evaluate(y, p, model_name, file)
 
 
 def create_features(df, model_name="FSRSv3"):
@@ -612,7 +913,7 @@ def create_features(df, model_name="FSRSv3"):
     df["t_history"] = [
         ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
     ]
-    if model_name == "FSRSv3":
+    if model_name.startswith("FSRS"):
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1])).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)
@@ -641,11 +942,14 @@ def create_features(df, model_name="FSRSv3"):
             for r_item in r_sublist
         ]
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    df[df["i"] == 2] = (
+    filtered_dataset = (
         df[df["i"] == 2]
         .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)
         .apply(remove_outliers)
     )
+    if filtered_dataset.empty:
+        return pd.DataFrame()
+    df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)
     df = df.groupby("card_id", as_index=False, group_keys=False).progress_apply(
         remove_non_continuous_rows
@@ -664,6 +968,8 @@ def process(args):
         model = RNN
     elif model_name == "FSRSv3":
         model = FSRS3
+    elif model_name == "FSRSv4":
+        model = FSRS4
     elif model_name == "HLR":
         model = HLR
     elif model_name == "Transformer":
@@ -706,13 +1012,26 @@ def process(args):
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
+    evaluate(y, p, model_name, file)
+
+
+def evaluate(y, p, model_name, file):
+    p_calibrated = lowess(
+        y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
+    )
+    ici = np.mean(np.abs(p_calibrated - p))
     rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = cross_comparison(
         pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
     )[0]
     result = {
-        model_name: {"RMSE": rmse_raw, "LogLoss": logloss, "RMSE(bins)": rmse_bins},
+        model_name: {
+            "RMSE": rmse_raw,
+            "LogLoss": logloss,
+            "RMSE(bins)": rmse_bins,
+            "ICI": ici,
+        },
         "user": int(file.stem),
         "size": len(y),
     }

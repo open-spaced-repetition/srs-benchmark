@@ -1,11 +1,13 @@
 import os
 import sys
 import json
+import numpy as np
 import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
+from statsmodels.nonparametric.smoothers_lowess import lowess
 from utils import cross_comparison
 import concurrent.futures
 from itertools import accumulate
@@ -21,6 +23,8 @@ from fsrs_optimizer import (
     FSRS,
     Collection,
     power_forgetting_curve,
+    remove_outliers,
+    remove_non_continuous_rows,
 )
 
 
@@ -139,11 +143,14 @@ def create_time_series(df):
         for t_item, r_item in zip(t_sublist, r_sublist)
     ]
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    df[df["i"] == 2] = (
+    filtered_dataset = (
         df[df["i"] == 2]
         .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)
         .apply(remove_outliers)
     )
+    if filtered_dataset.empty:
+        return pd.DataFrame()
+    df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)
     df = df.groupby("card_id", as_index=False, group_keys=False).progress_apply(
         remove_non_continuous_rows
@@ -151,48 +158,10 @@ def create_time_series(df):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
-def remove_outliers(group: pd.DataFrame) -> pd.DataFrame:
-    grouped_group = (
-        group.groupby(by=["r_history", "delta_t"], group_keys=False)
-        .agg({"y": ["mean", "count"]})
-        .reset_index()
-    )
-    sort_index = grouped_group.sort_values(
-        by=[("y", "count"), "delta_t"], ascending=[True, False]
-    ).index
-
-    total = sum(grouped_group[("y", "count")])
-    has_been_removed = 0
-    for i in sort_index:
-        count = grouped_group.loc[i, ("y", "count")]
-        if has_been_removed + count >= total * 0.05:
-            break
-        has_been_removed += count
-    group = group[
-        group["delta_t"].isin(
-            grouped_group[
-                (grouped_group[("y", "count")] >= count)
-                & (grouped_group[("y", "mean")] < 1)
-            ]["delta_t"]
-        )
-    ]
-    return group
-
-
-def remove_non_continuous_rows(group):
-    discontinuity = group["i"].diff().fillna(1).ne(1)
-    if not discontinuity.any():
-        return group
-    else:
-        first_non_continuous_index = discontinuity.idxmax()
-        return group.loc[: first_non_continuous_index - 1]
-
-
 def process(file):
     plt.close("all")
     rust = os.environ.get("FSRS_RS")
-    if rust:
-        print(file)
+    print(file)
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
@@ -237,7 +206,10 @@ def process(file):
             w_list.append(optimizer.init_w)
 
     p, y = predict(w_list, testsets, file=file)
-
+    p_calibrated = lowess(
+        y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
+    )
+    ici = np.mean(np.abs(p_calibrated - p))
     rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = cross_comparison(pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS")[
@@ -260,6 +232,7 @@ def process(file):
             "RMSE": rmse_raw,
             "LogLoss": logloss,
             "RMSE(bins)": rmse_bins,
+            "ICI": ici,
             "RMSE(bins)Ratings": rmse_bins_ratings,
         },
         "user": int(file.stem),

@@ -38,20 +38,20 @@ def process_revlog(revlog):
     last_learn_start = (
         df[df["is_learn_start"]].groupby("card_id")["sequence_group"].last()
     )
-    df["last_learn_start"] = df["card_id"].map(last_learn_start).fillna(0).astype(int)
+    df["last_learn_start"] = df["card_id"].map(last_learn_start).fillna(0).astype("int64")
     df["mask"] = df["last_learn_start"] <= df["sequence_group"]
     df = df[df["mask"] == True]
     df = df.groupby("card_id").filter(lambda group: group["review_state"].iloc[0] == 0)
 
-    df["review_time"] = df["review_time"].astype(int)
+    df["review_time"] = df["review_time"].astype("int64")
     df["relative_day"] = df["review_time"].apply(
         lambda x: int((x / 1000 - entries.next_day_at) / 86400)
     )
-    df["delta_t"] = df["relative_day"].diff().fillna(0).astype(int)
+    df["delta_t"] = df["relative_day"].diff().fillna(0).astype("int64")
     df["i"] = df.groupby("card_id").cumcount() + 1
     df.loc[df["i"] == 1, "delta_t"] = -1
     df["card_id"] = pd.factorize(df["card_id"])[0]
-    df["review_th"] = df["review_time"].rank(method="dense").astype(int)
+    df["review_th"] = df["review_time"].rank(method="dense").astype("int64")
     df.drop(
         columns=[
             "review_time",

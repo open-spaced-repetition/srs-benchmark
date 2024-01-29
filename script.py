@@ -37,7 +37,7 @@ batch_size: int = 512
 verbose: bool = False
 
 dry_run = os.environ.get("DRY_RUN")
-
+only_pretrain = os.environ.get("PRETRAIN")
 rust = os.environ.get("FSRS_RS")
 if rust:
     path = "FSRS-rs"
@@ -49,6 +49,8 @@ else:
     path = "FSRS-4.5"
     if dry_run:
         path += "-dry-run"
+    if only_pretrain:
+        path += "-pretrain"
 
 
 def predict(w_list, testsets, last_rating=None, file=None):
@@ -160,7 +162,6 @@ def create_time_series(df):
 
 def process(file):
     plt.close("all")
-    rust = os.environ.get("FSRS_RS")
     print(file)
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
@@ -192,15 +193,18 @@ def process(file):
                     .reset_index()
                 )
                 _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
-                trainer = Trainer(
-                    train_set,
-                    test_set,
-                    optimizer.init_w,
-                    n_epoch=n_epoch,
-                    lr=lr,
-                    batch_size=batch_size,
-                )
-                w_list.append(trainer.train(verbose=verbose))
+                if only_pretrain:
+                    w_list.append(optimizer.init_w)
+                else:
+                    trainer = Trainer(
+                        train_set,
+                        test_set,
+                        optimizer.init_w,
+                        n_epoch=n_epoch,
+                        lr=lr,
+                        batch_size=batch_size,
+                    )
+                    w_list.append(trainer.train(verbose=verbose))
         except Exception as e:
             print(e)
             w_list.append(optimizer.init_w)

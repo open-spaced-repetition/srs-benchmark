@@ -79,6 +79,7 @@ if __name__ == "__main__":
         "FSRS-4.5",
         "FSRS-rs",
         "FSRSv4",
+        "FSRS-4.5-pretrain",
         "FSRS-4.5-dry-run",
         "FSRSv3",
         "LSTM",

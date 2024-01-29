@@ -106,16 +106,17 @@ def format(exponent, n):
 
 
 if __name__ == "__main__":
-    models = (
+    models = [
         "FSRS-4.5",
         "FSRS-rs",
         "FSRSv4",
+        "FSRS-4.5-pretrain",
         "FSRS-4.5-dry-run",
         "FSRSv3",
         "LSTM",
         "SM2",
         "HLR",
-    )
+    ]
     csv_name = f"{len(models)} models.csv"
     print(f"Number of tests={(len(models)-1) ** 2}")
     df = pd.DataFrame()
@@ -148,22 +149,15 @@ if __name__ == "__main__":
 
     n_collections = len(df)
     print(n_collections)
-    models2 = []
-    for i in range(len(models)):
-        if models[i] == "FSRSv4_old_big":
-            models2.append("FSRSv4")
-        else:
-            models2.append(models[i])
-
-    n = len(models2)
+    n = len(models)
     wilcox = [[-1 for i in range(n)] for j in range(n)]
     for i in range(n):
         for j in range(n):
             if i == j:
                 wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f'{models2[i]}, RMSE (bins)']
-                df2 = df[f'{models2[j]}, RMSE (bins)']
+                df1 = df[f'{models[i]}, RMSE (bins)']
+                df2 = df[f'{models[j]}, RMSE (bins)']
                 if n_collections > 50:
                     result = logp_wilcox(df1[:n_collections], df2[:n_collections])[0]
                 else:
@@ -177,8 +171,8 @@ if __name__ == "__main__":
             if i == j:
                 color_wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f'{models2[i]}, RMSE (bins)']
-                df2 = df[f'{models2[j]}, RMSE (bins)']
+                df1 = df[f'{models[i]}, RMSE (bins)']
+                df2 = df[f'{models[j]}, RMSE (bins)']
                 # we'll need the second value returned by my function to determine the color
                 approx = logp_wilcox(df1[:n_collections], df2[:n_collections])
                 if n_collections > 50:
@@ -197,14 +191,16 @@ if __name__ == "__main__":
                         color_wilcox[i][j] = 1
 
     # small changes to labels
-    index_4_5 = models2.index("FSRS-4.5-dry-run")
-    index_v4 = models2.index("FSRSv4")
-    index_v3 = models2.index("FSRSv3")
-    index_sm2 = models2.index("SM2")
-    models2[index_4_5] = "FSRS-4.5 \n def. \n param."
-    models2[index_v4] = "FSRS v4"
-    models2[index_v3] = "FSRS v3"
-    models2[index_sm2] = "SM-2"
+    index_4_5_dry_run = models.index("FSRS-4.5-dry-run")
+    index_4_5_pretrain = models.index("FSRS-4.5-pretrain")
+    index_v4 = models.index("FSRSv4")
+    index_v3 = models.index("FSRSv3")
+    index_sm2 = models.index("SM2")
+    models[index_4_5_dry_run] = "FSRS-4.5 \n def. \n param."
+    models[index_4_5_pretrain] = "FSRS-4.5 \n pretrain"
+    models[index_v4] = "FSRS v4"
+    models[index_v3] = "FSRS v3"
+    models[index_sm2] = "SM-2"
 
     fig, ax = plt.subplots(figsize=(10, 9), dpi=150)
     ax.set_title(
@@ -236,8 +232,8 @@ if __name__ == "__main__":
                     fontsize=12.5,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models2, fontsize=12.5)
-    ax.set_yticks(np.arange(n), labels=models2, fontsize=12.5)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=12)
+    ax.set_yticks(np.arange(n), labels=models, fontsize=12)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")

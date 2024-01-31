@@ -24,6 +24,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
 tqdm.pandas()
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 lr: float = 4e-2
 n_epoch: int = 5
@@ -56,6 +57,7 @@ class FSRS3WeightClipper:
 
 
 class FSRS3(nn.Module):
+    # 13 params
     init_w = [1, 1, 5, -0.5, -0.5, 0.2, 1.4, -0.2, 0.8, 2, -0.2, 0.2, 1]
     clipper = FSRS3WeightClipper()
 
@@ -162,6 +164,7 @@ class FSRS4WeightClipper:
 
 
 class FSRS4(nn.Module):
+    # 17 params
     init_w = [
         0.4,
         0.9,
@@ -422,6 +425,7 @@ network = "LSTM"
 
 
 class RNN(nn.Module):
+    # 489 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
         self.n_input = n_input
@@ -465,6 +469,7 @@ class RNN(nn.Module):
 
 
 class Transformer(nn.Module):
+    # 622 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
         self.n_input = n_input
@@ -474,21 +479,20 @@ class Transformer(nn.Module):
         self.transformer = nn.Transformer(
             d_model=n_input,
             nhead=n_input,
-            num_encoder_layers=n_layers * 2,
-            num_decoder_layers=0,
+            num_encoder_layers=n_layers,
+            num_decoder_layers=n_layers,
             dim_feedforward=n_hidden,
-            dropout=0,
         )
         self.fc = nn.Linear(n_input, n_output)
 
         if state_dict is not None:
             self.load_state_dict(state_dict)
 
-    def forward(self, x):
-        output = self.transformer.encoder(x)
-        output = output.mean(dim=0)
+    def forward(self, src):
+        tgt = torch.zeros(1, src.shape[1], n_input).to(device=device)
+        output = self.transformer(src, tgt)
         output = self.fc(output)
-        output = torch.exp(output).repeat(x.shape[0], 1, 1)
+        output = torch.exp(output).repeat(src.shape[0], 1, 1)
         return output, None
 
     def forgetting_curve(self, t, s):
@@ -496,6 +500,7 @@ class Transformer(nn.Module):
 
 
 class HLR(nn.Module):
+    # 3 params
     def __init__(self, state_dict=None):
         super().__init__()
         self.n_input = 2
@@ -563,12 +568,12 @@ class RevlogDataset(Dataset):
             raise ValueError("Training data is inadequate.")
         self.x_train = pad_sequence(
             dataframe["tensor"].to_list(), batch_first=True, padding_value=0
-        )
-        self.t_train = torch.tensor(dataframe["delta_t"].values, dtype=torch.int)
-        self.y_train = torch.tensor(dataframe["y"].values, dtype=torch.float)
+        ).to(device=device)
+        self.t_train = torch.tensor(dataframe["delta_t"].values, dtype=torch.int).to(device=device)
+        self.y_train = torch.tensor(dataframe["y"].values, dtype=torch.float).to(device=device)
         self.seq_len = torch.tensor(
             dataframe["tensor"].map(len).values, dtype=torch.long
-        )
+        ).to(device=device)
 
     def __getitem__(self, idx):
         return (
@@ -586,7 +591,7 @@ class RevlogSampler(Sampler[List[int]]):
     def __init__(self, data_source: RevlogDataset, batch_size: int):
         self.data_source = data_source
         self.batch_size = batch_size
-        lengths = np.array(data_source.seq_len)
+        lengths = np.array(data_source.seq_len.cpu())
         indices = np.argsort(lengths)
         full_batches, remainder = divmod(indices.size, self.batch_size)
         if full_batches > 0:
@@ -620,15 +625,14 @@ def collate_fn(batch):
     sequences, delta_ts, labels, seq_lens = zip(*batch)
     sequences_packed = pack_padded_sequence(
         torch.stack(sequences, dim=1),
-        lengths=torch.stack(seq_lens),
+        lengths=torch.stack(seq_lens).cpu(),
         batch_first=False,
         enforce_sorted=False,
     )
     sequences_padded, length = pad_packed_sequence(sequences_packed, batch_first=False)
-    sequences_padded = torch.as_tensor(sequences_padded)
-    seq_lens = torch.as_tensor(length)
-    delta_ts = torch.as_tensor(delta_ts)
-    labels = torch.as_tensor(labels)
+    seq_lens = torch.as_tensor(length).to(device=device)
+    delta_ts = torch.as_tensor(delta_ts).to(device=device)
+    labels = torch.as_tensor(labels).to(device=device)
     return sequences_padded, delta_ts, labels, seq_lens
 
 
@@ -642,7 +646,7 @@ class Trainer:
         lr: float = 1e-2,
         batch_size: int = 256,
     ) -> None:
-        self.model = MODEL
+        self.model = MODEL.to(device=device)
         if isinstance(MODEL, FSRS4):
             self.model.pretrain(train_set)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
@@ -692,82 +696,43 @@ class Trainer:
 
     def train(self, verbose: bool = True):
         best_loss = np.inf
-
-        if isinstance(self.model, FSRS3):
-            for k in range(self.n_epoch):
-                weighted_loss, w = self.eval()
-                if weighted_loss < best_loss:
-                    best_loss = weighted_loss
-                    best_w = w
-                for i, batch in enumerate(self.train_data_loader):
-                    self.model.train()
-                    self.optimizer.zero_grad()
-                    sequences, delta_ts, labels, seq_lens = batch
-                    real_batch_size = seq_lens.shape[0]
-                    outputs, _ = self.model(sequences)
-                    stabilities = outputs[
-                        seq_lens - 1, torch.arange(real_batch_size), 0
-                    ]
-                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
-                    loss = self.loss_fn(retentions, labels).sum()
-                    loss.backward()
-                    self.optimizer.step()
-                    self.scheduler.step()
-                    self.model.apply(self.clipper)
+        for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
             if weighted_loss < best_loss:
                 best_loss = weighted_loss
                 best_w = w
-            return best_w
-        elif isinstance(self.model, FSRS4):
-            for k in range(self.n_epoch):
-                weighted_loss, w = self.eval()
-                if weighted_loss < best_loss:
-                    best_loss = weighted_loss
-                    best_w = w
-                for i, batch in enumerate(self.next_train_data_loader):
-                    self.model.train()
-                    self.optimizer.zero_grad()
-                    sequences, delta_ts, labels, seq_lens = batch
-                    real_batch_size = seq_lens.shape[0]
+            for i, batch in enumerate(
+                self.train_data_loader
+                if not isinstance(self.model, FSRS4)
+                else self.next_train_data_loader # FSRS4 has two training stages
+            ):
+                self.model.train()
+                self.optimizer.zero_grad()
+                sequences, delta_ts, labels, seq_lens = batch
+                real_batch_size = seq_lens.shape[0]
+                if isinstance(self.model, HLR):
+                    outputs, _ = self.model(sequences.transpose(0, 1))
+                    stabilities = outputs.squeeze()
+                else:
                     outputs, _ = self.model(sequences)
                     stabilities = outputs[
                         seq_lens - 1, torch.arange(real_batch_size), 0
                     ]
-                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
-                    loss = self.loss_fn(retentions, labels).sum()
-                    loss.backward()
+                retentions = self.model.forgetting_curve(delta_ts, stabilities)
+                loss = self.loss_fn(retentions, labels).sum()
+                if isinstance(self.model, FSRS4): # the initial stability is not trainable
                     for param in self.model.parameters():
                         param.grad[:4] = torch.zeros(4)
-                    self.optimizer.step()
-                    self.scheduler.step()
+                loss.backward()
+                self.optimizer.step()
+                self.scheduler.step()
+                if self.clipper:
                     self.model.apply(self.clipper)
-            weighted_loss, w = self.eval()
-            if weighted_loss < best_loss:
-                best_loss = weighted_loss
-                best_w = w
-            return best_w
-        else:
-            for k in range(self.n_epoch):
-                for i, batch in enumerate(self.train_data_loader):
-                    self.model.train()
-                    self.optimizer.zero_grad()
-                    sequences, delta_ts, labels, seq_lens = batch
-                    real_batch_size = seq_lens.shape[0]
-                    if isinstance(self.model, HLR):
-                        outputs, _ = self.model(sequences.transpose(0, 1))
-                        stabilities = outputs.squeeze()
-                    else:
-                        outputs, _ = self.model(sequences)
-                        stabilities = outputs[
-                            seq_lens - 1, torch.arange(real_batch_size), 0
-                        ]
-                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
-                    loss = self.loss_fn(retentions, labels).sum()
-                    loss.backward()
-                    self.optimizer.step()
-                    self.scheduler.step()
-            return self.model.state_dict()
+        weighted_loss, w = self.eval()
+        if weighted_loss < best_loss:
+            best_loss = weighted_loss
+            best_w = w
+        return best_w
 
     def eval(self):
         self.model.eval()
@@ -864,7 +829,7 @@ class Collection:
                 stabilities = outputs[
                     fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
                 ]
-            return stabilities.tolist()
+            return stabilities.cpu().tolist()
 
 
 def process_untrainable(file):
@@ -893,7 +858,6 @@ def process_untrainable(file):
             print(e)
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
-
 
     evaluate(y, p, model_name, file)
 

@@ -13,7 +13,9 @@ import concurrent.futures
 from itertools import accumulate
 import torch
 
-if os.environ.get("DEV_MODE"):
+dev_mode = os.environ.get("DEV_MODE")
+
+if dev_mode:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
@@ -51,6 +53,8 @@ else:
         path += "-dry-run"
     if only_pretrain:
         path += "-pretrain"
+    if dev_mode:
+        path += "-dev"
 
 
 def predict(w_list, testsets, last_rating=None, file=None):

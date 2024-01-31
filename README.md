@@ -31,7 +31,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 
 - FSRS v3: the first version of the FSRS algorithm that people actually used.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
-- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
+- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed. This benchmark also includes FSRS-4.5 with default parameters (which have been obtained by running FSRS-4.5 on all 20 thousand collections) and FSRS-4.5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. Our implementation includes 489 parameters.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).

@@ -236,7 +236,7 @@ if __name__ == "__main__":
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])
         mode = best_mode(weights[:, i], sizes)
-        plt.ylim(ymin=1)
+        plt.ylim(ymin=0.1)
         plt.axvline(
             median,
             color="orange",

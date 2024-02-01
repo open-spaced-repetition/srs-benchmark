@@ -75,7 +75,11 @@ def weighted_avg_and_std(values, weights):
 
 
 if __name__ == "__main__":
+    common_set = set(
+        map(lambda x: x.stem, pathlib.Path(f"./result/FSRS-4.5-dev").glob("*.json"))
+    ) if pathlib.Path("./result/FSRS-4.5-dev").exists() else None
     for model in (
+        "FSRS-4.5-dev",
         "FSRS-4.5",
         "FSRS-rs",
         "FSRSv4",
@@ -93,13 +97,16 @@ if __name__ == "__main__":
         result_dir = pathlib.Path(f"./result/{model}")
         result_files = result_dir.glob("*.json")
         for result_file in result_files:
+            if common_set and result_file.stem not in common_set:
+                continue
             with open(result_file, "r") as f:
                 result = json.load(f)
                 m.append(result[model])
                 sizes.append(result["size"])
                 if "weights" in result:
                     weights.append(result["weights"])
-
+        if len(sizes) == 0:
+            continue
         print(f"Total number of users: {len(sizes)}")
         sizes = np.array(sizes)
         print(f"Total number of reviews: {sizes.sum()}")
@@ -116,17 +123,15 @@ if __name__ == "__main__":
                 CI = confidence_interval(metrics, size)
                 rounded_mean, rounded_CI = sigdig(wmean, CI)
                 print(f"{model} {metric}: {rounded_mean}±{rounded_CI}")
-
-                try:
-                    rmse_bin_again = np.array(
-                        [item["RMSE(bins)Ratings"]["1"] for item in m]
-                    )
-                    print(
-                        f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}"
-                    )
-                    # FSRSv4 mean (RMSE(bins)Ratings[again]): 0.0983
-                except KeyError:
-                    pass
+                # try:
+                #     rmse_bin_again = np.array(
+                #         [item["RMSE(bins)Ratings"]["1"] for item in m]
+                #     )
+                #     print(
+                #         f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}"
+                #     )
+                # except KeyError:
+                #     pass
             print()
 
         if len(weights) > 0:

@@ -31,7 +31,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 
 - FSRS v3: the first version of the FSRS algorithm that people actually used.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
-- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
+- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed. This benchmark also includes FSRS-4.5 with default parameters (which have been obtained by running FSRS-4.5 on all 20 thousand collections) and FSRS-4.5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. Our implementation includes 489 parameters.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).
@@ -77,7 +77,7 @@ The following tables represent the weighted means and the 99% confidence interva
 
 The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE (bins) of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-4.5 outperforms all other algorithms; the bottom row is red because HLR performs worse than any other algorithm.
 
-All p-values are extremely small, many orders of magnitude smaller than 0.01. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the log10(p-value) rather than the p-value itself, to avoid the limitations of floating point numbers. So it's an approximation of an approximation. But more importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE (bins) depends on the number of reviews.
+All p-values are extremely small, many orders of magnitude smaller than 0.01. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the log10(p-value) rather than the p-value itself, to avoid the limitations of 64-bit floating point numbers. So it's an approximation of an approximation. But more importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE (bins) depends on the number of reviews.
 Overall, these p-values can be trusted on a qualitative (but not quantitative) level, in other words, we can be sure that all of our algorithms perform differently and that no two algorithms perform exactly the same.
 
 ![Wilcoxon, 19854 collections](./plots/Wilcoxon-19990-collections.png)

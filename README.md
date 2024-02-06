@@ -45,7 +45,7 @@ Total number of users: 19,990.
 
 Total number of reviews for evaluation: 708,151,820.
 
-The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters.
+The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
 ### Weighted by number of reviews
 
@@ -54,10 +54,10 @@ The following tables represent the weighted means and the 99% confidence interva
 | **FSRS-4.5** | **0.32±0.006** | **0.043±0.0010** | 17 |
 | FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.052±0.0014 | 17 |
-| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.065±0.0018 | 17 |
+| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.065±0.0018 | 4 |
 | FSRS v3 | 0.36±0.007 | 0.068±0.0016 | 13 |
 | LSTM | 0.37±0.007 | 0.075±0.0017 | 489 |
-| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0020 | 17 |
+| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0020 | 0 |
 | SM-2 | 0.54±0.012 | 0.170±0.0031 | 0 |
 | HLR | 0.70±0.017 | 0.193±0.0046 | 3 |
 
@@ -68,8 +68,8 @@ The following tables represent the weighted means and the 99% confidence interva
 | **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** | 17 |
 | FSRS rs | 0.350±0.0031 | 0.066±0.0008 | 17 |
 | FSRS v4 | 0.354±0.0033 | 0.074±0.0009 | 17 |
-| FSRS-4.5 (only pretrain) | 0.361±0.0032 | 0.079±0.0009 | 17 |
-| FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 17 |
+| FSRS-4.5 (only pretrain) | 0.361±0.0032 | 0.079±0.0009 | 4 |
+| FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 0 |
 | FSRS v3 | 0.416±0.0043 | 0.104±0.0014 | 13 |
 | LSTM | 0.50±0.007 | 0.137±0.0018 | 489 |
 | SM-2 | 0.68±0.011 | 0.210±0.0020 | 0 |

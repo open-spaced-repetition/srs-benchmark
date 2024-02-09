@@ -33,7 +33,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed. This benchmark also includes FSRS-4.5 with default parameters (which have been obtained by running FSRS-4.5 on all 20 thousand collections) and FSRS-4.5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
-- LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. Our implementation includes 489 parameters.
+- LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).
 - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it.
 
@@ -45,37 +45,37 @@ Total number of users: 19,990.
 
 Total number of reviews for evaluation: 708,151,820.
 
-The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**.
+The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
 ### Weighted by number of reviews
 
-| Algorithm | Log Loss | RMSE (bins) |
+| Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- |
-| **FSRS-4.5** | **0.32±0.006** | **0.043±0.0010** |
-| FSRS rs | 0.33±0.006 | 0.046±0.0011 |
-| FSRS v4 | 0.33±0.006 | 0.052±0.0014 |
-| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.065±0.0018 |
-| FSRS v3 | 0.36±0.007 | 0.068±0.0016 |
-| LSTM | 0.37±0.007 | 0.075±0.0017 |
-| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0020 |
-| SM-2 | 0.54±0.012 | 0.170±0.0031 |
-| Transformer | 0.56±0.018 | 0.182±0.0045 |
-| HLR | 0.70±0.017 | 0.193±0.0046 |
+| **FSRS-4.5** | **0.32±0.006** | **0.043±0.0010** | 17 |
+| FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
+| FSRS v4 | 0.33±0.006 | 0.052±0.0014 | 17 |
+| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.065±0.0018 | 4 |
+| FSRS v3 | 0.36±0.007 | 0.068±0.0016 | 13 |
+| LSTM | 0.37±0.007 | 0.075±0.0017 | 489 |
+| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0020 | 0 |
+| SM-2 | 0.54±0.012 | 0.170±0.0031 | 0 |
+| Transformer | 0.56±0.018 | 0.182±0.0045 | 622 |
+| HLR | 0.70±0.017 | 0.193±0.0046 | 3 |
 
 ### Weighted by ln(number of reviews)
 
 | Algorithm | Log Loss | RMSE (bins) |
 | --- | --- | --- |
-| **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** |
-| FSRS rs | 0.350±0.0031 | 0.066±0.0008 |
-| FSRS v4 | 0.354±0.0033 | 0.074±0.0009 |
-| FSRS-4.5 (only pretrain) | 0.361±0.0032 | 0.079±0.0009 |
-| FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 |
-| FSRS v3 | 0.416±0.0043 | 0.104±0.0014 |
-| LSTM | 0.50±0.007 | 0.137±0.0018 |
-| Transformer | 0.56±0.008 | 0.181±0.0018 |
-| SM-2 | 0.68±0.011 | 0.210±0.0020 |
-| HLR | 2.03±0.045 | 0.391±0.0040 |
+| **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** | 17 |
+| FSRS rs | 0.350±0.0031 | 0.066±0.0008 | 17 |
+| FSRS v4 | 0.354±0.0033 | 0.074±0.0009 | 17 |
+| FSRS-4.5 (only pretrain) | 0.361±0.0032 | 0.079±0.0009 | 4 |
+| FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 0 |
+| FSRS v3 | 0.416±0.0043 | 0.104±0.0014 | 13 |
+| LSTM | 0.50±0.007 | 0.137±0.0018 | 489 |
+| Transformer | 0.56±0.008 | 0.181±0.0018 | 622 |
+| SM-2 | 0.68±0.011 | 0.210±0.0020 | 0 |
+| HLR | 2.03±0.045 | 0.391±0.0040 | 3 |
 
 The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE (bins) of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-4.5 outperforms all other algorithms; the bottom row is red because HLR performs worse than any other algorithm.
 

@@ -75,11 +75,12 @@ def weighted_avg_and_std(values, weights):
 
 
 if __name__ == "__main__":
+    dev_mode_name = "FSRS-4.5-dev"
     common_set = set(
-        map(lambda x: x.stem, pathlib.Path(f"./result/FSRS-4.5-dev").glob("*.json"))
-    ) if pathlib.Path("./result/FSRS-4.5-dev").exists() else None
+        map(lambda x: x.stem, pathlib.Path(f"./result/{dev_mode_name}").glob("*.json"))
+    ) if pathlib.Path(f"./result/{dev_mode_name}").exists() else None
     for model in (
-        "FSRS-4.5-dev",
+        dev_mode_name,
         "FSRS-4.5",
         "FSRS-rs",
         "FSRSv4",
@@ -87,6 +88,7 @@ if __name__ == "__main__":
         "FSRS-4.5-dry-run",
         "FSRSv3",
         "LSTM",
+        "Transformer",
         "HLR",
         "SM2",
     ):

@@ -14,7 +14,7 @@ The dataset for the FSRS benchmark comes from 20 thousand people who use Anki, a
 
 ### Data Split
 
-In the FSRS benchmark, we use a tool called TimeSeriesSplit. This is part of the [sklearn](https://scikit-learn.org/) library used for machine learning. The tool helps us split the data by time—older reviews are used for training and newer reviews for testing. That way, we don't accidentally cheat by giving the algorithm future information it shouldn't have. In practice, we use past study sessions to predict future ones. This makes TimeSeriesSplit a good fit for our benchmark.
+In the FSRS benchmark, we use a tool called `TimeSeriesSplit`. This is part of the [sklearn](https://scikit-learn.org/) library used for machine learning. The tool helps us split the data by time: older reviews are used for training and newer reviews for testing. That way, we don't accidentally cheat by giving the algorithm future information it shouldn't have. In practice, we use past study sessions to predict future ones. This makes `TimeSeriesSplit` a good fit for our benchmark.
 
 Note: TimeSeriesSplit will remove the first split from evaluation. This is because the first split is used for training, and we don't want to evaluate the algorithm on the same data it was trained on.
 
@@ -50,7 +50,7 @@ The following tables represent the weighted means and the 99% confidence interva
 ### Weighted by number of reviews
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | **FSRS-4.5** | **0.32±0.006** | **0.043±0.0010** | 17 |
 | FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.052±0.0014 | 17 |
@@ -59,12 +59,13 @@ The following tables represent the weighted means and the 99% confidence interva
 | LSTM | 0.37±0.007 | 0.075±0.0017 | 489 |
 | FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0020 | 0 |
 | SM-2 | 0.54±0.012 | 0.170±0.0031 | 0 |
+| Transformer | 0.56±0.018 | 0.182±0.0045 | 622 |
 | HLR | 0.70±0.017 | 0.193±0.0046 | 3 |
 
 ### Weighted by ln(number of reviews)
 
-| Algorithm | Log Loss | RMSE (bins) | Parameters |
-| --- | --- | --- | --- |
+| Algorithm | Log Loss | RMSE (bins) |
+| --- | --- | --- |
 | **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** | 17 |
 | FSRS rs | 0.350±0.0031 | 0.066±0.0008 | 17 |
 | FSRS v4 | 0.354±0.0033 | 0.074±0.0009 | 17 |
@@ -72,6 +73,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 0 |
 | FSRS v3 | 0.416±0.0043 | 0.104±0.0014 | 13 |
 | LSTM | 0.50±0.007 | 0.137±0.0018 | 489 |
+| Transformer | 0.56±0.008 | 0.181±0.0018 | 622 |
 | SM-2 | 0.68±0.011 | 0.210±0.0020 | 0 |
 | HLR | 2.03±0.045 | 0.391±0.0040 | 3 |
 

@@ -50,7 +50,7 @@ The following tables represent the weighted means and the 99% confidence interva
 ### Weighted by number of reviews
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | **FSRS-4.5** | **0.32±0.006** | **0.043±0.0010** | 17 |
 | FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.052±0.0014 | 17 |
@@ -64,8 +64,8 @@ The following tables represent the weighted means and the 99% confidence interva
 
 ### Weighted by ln(number of reviews)
 
-| Algorithm | Log Loss | RMSE (bins) |
-| --- | --- | --- |
+| Algorithm | Log Loss | RMSE (bins) | Parameters |
+| --- | --- | --- | --- |
 | **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** | 17 |
 | FSRS rs | 0.350±0.0031 | 0.066±0.0008 | 17 |
 | FSRS v4 | 0.354±0.0033 | 0.074±0.0009 | 17 |

@@ -236,7 +236,7 @@ def process(file):
         rmse_bins_ratings[last_rating] = rmse_rating
 
     result = {
-        path: {
+        "metrics": {
             "RMSE": rmse_raw,
             "LogLoss": logloss,
             "RMSE(bins)": rmse_bins,

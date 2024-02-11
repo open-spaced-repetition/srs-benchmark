@@ -103,7 +103,7 @@ if __name__ == "__main__":
                 continue
             with open(result_file, "r") as f:
                 result = json.load(f)
-                m.append(result[model])
+                m.append(result["metrics"])
                 sizes.append(result["size"])
                 if "weights" in result:
                     weights.append(result["weights"])

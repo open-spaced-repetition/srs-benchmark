@@ -130,8 +130,8 @@ if __name__ == "__main__":
         for result_file in result_files:
             with open(result_file, "r") as f:
                 result = json.load(f)
-                logloss.append(result[model]["LogLoss"])
-                RMSE.append(result[model]["RMSE(bins)"])
+                logloss.append(result["metrics"]["LogLoss"])
+                RMSE.append(result["metrics"]["RMSE(bins)"])
                 if model == models[0]:
                     sizes.append(result["size"])
 

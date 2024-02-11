@@ -990,7 +990,7 @@ def evaluate(y, p, model_name, file):
         pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
     )[0]
     result = {
-        model_name: {
+        "metrics": {
             "RMSE": rmse_raw,
             "LogLoss": logloss,
             "RMSE(bins)": rmse_bins,

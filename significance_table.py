@@ -114,6 +114,7 @@ if __name__ == "__main__":
         "FSRS-4.5-dry-run",
         "FSRSv3",
         "LSTM",
+        "Transformer",
         "SM2",
         "HLR",
     ]
@@ -196,7 +197,7 @@ if __name__ == "__main__":
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_sm2 = models.index("SM2")
-    models[index_4_5_dry_run] = "FSRS-4.5 \n def. \n param."
+    models[index_4_5_dry_run] = "FSRS-4.5 \n def. param."
     models[index_4_5_pretrain] = "FSRS-4.5 \n pretrain"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
@@ -232,7 +233,7 @@ if __name__ == "__main__":
                     fontsize=11,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models, fontsize=12)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=12, rotation=45)
     ax.set_yticks(np.arange(n), labels=models, fontsize=12)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)

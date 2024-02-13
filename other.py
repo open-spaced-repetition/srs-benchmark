@@ -534,7 +534,7 @@ class ACT_R(nn.Module):
     a = 0.176786766570677  # decay intercept
     c = 0.216967308403809  # decay scale
     s = 0.254893976981164  # noise
-    h = 86400 * 0.025      # time scale
+    h = 86400 * 0.025      # inteference scalar
     tau = -0.704205679427144  # threshold
     init_w = [a, c]
     clipper = ACT_RWeightClipper()

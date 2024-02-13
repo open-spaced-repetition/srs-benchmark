@@ -527,6 +527,8 @@ class ACT_RWeightClipper:
             w = module.w.data
             w[0] = w[0].clamp(0, 10)
             w[1] = w[1].clamp(0, 10)
+            w[2] = w[2].clamp(0, 10)
+            w[3] = w[3].clamp(-10, 0)
             module.w.data = w
 
 
@@ -536,7 +538,7 @@ class ACT_R(nn.Module):
     s = 0.254893976981164  # noise
     h = 86400 * 0.025      # inteference scalar
     tau = -0.704205679427144  # threshold
-    init_w = [a, c]
+    init_w = [a, c, s, tau]
     clipper = ACT_RWeightClipper()
 
     def __init__(self, w: List[float] = init_w):
@@ -558,10 +560,10 @@ class ACT_R(nn.Module):
                 )
             )
             m[i] = act
-        return self.activation(m)
+        return self.activation(m[1:])
 
     def activation(self, m):
-        return 1 / (1 + torch.exp((self.tau - m) / self.s))
+        return 1 / (1 + torch.exp((self.w[3] - m) / self.w[2]))
 
     def state_dict(self):
         return list(
@@ -772,7 +774,7 @@ class Trainer:
                 real_batch_size = seq_lens.shape[0]
                 if isinstance(self.model, ACT_R):
                     outputs = self.model(sequences)
-                    retentions = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
+                    retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
                 else:
                     if isinstance(self.model, HLR):
                         outputs, _ = self.model(sequences.transpose(0, 1))
@@ -812,7 +814,7 @@ class Trainer:
             real_batch_size = seq_lens.shape[0]
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
+                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
             else:
                 if isinstance(self.model, HLR):
                     outputs, _ = self.model(sequences)
@@ -836,7 +838,7 @@ class Trainer:
 
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
+                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
             else:
                 if isinstance(self.model, HLR):
                     outputs, _ = self.model(sequences)
@@ -888,7 +890,7 @@ class Collection:
             if isinstance(self.model, ACT_R):
                 outputs = self.model(fast_dataset.x_train.transpose(0, 1))
                 retentions = outputs[
-                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
+                    fast_dataset.seq_len - 2, torch.arange(len(fast_dataset)), 0
                 ]
                 return retentions.cpu().tolist()
             else:

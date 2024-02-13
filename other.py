@@ -19,6 +19,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers
 from utils import cross_comparison
+from fsrs_optimizer import plot_brier
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -524,11 +525,11 @@ class ACT_RWeightClipper:
 
     def __call__(self, module):
         if hasattr(module, "w"):
-            w = module.w.data
-            w[0] = w[0].clamp(0, 10)
-            w[1] = w[1].clamp(0, 10)
-            w[2] = w[2].clamp(0, 10)
-            w[3] = w[3].clamp(-10, 0)
+            w = module.w.data            
+            w[0] = w[0].clamp(0.001, 1)
+            w[1] = w[1].clamp(0.001, 1)
+            # w[2] = w[2].clamp(0, 10)
+            # w[3] = w[3].clamp(-10, 0)
             module.w.data = w
 
 
@@ -538,7 +539,7 @@ class ACT_R(nn.Module):
     s = 0.254893976981164  # noise
     h = 86400 * 0.025      # inteference scalar
     tau = -0.704205679427144  # threshold
-    init_w = [a, c, s, tau]
+    init_w = [a, c]
     clipper = ACT_RWeightClipper()
 
     def __init__(self, w: List[float] = init_w):
@@ -563,7 +564,7 @@ class ACT_R(nn.Module):
         return self.activation(m[1:])
 
     def activation(self, m):
-        return 1 / (1 + torch.exp((self.w[3] - m) / self.w[2]))
+        return 1 / (1 + torch.exp((self.tau - m) / self.s))
 
     def state_dict(self):
         return list(
@@ -1003,6 +1004,7 @@ def create_features(df, model_name="FSRSv3"):
 def process(args):
     plt.close("all")
     file, model_name = args
+    print(file)
     if model_name == "SM2":
         process_untrainable(file)
         return
@@ -1064,6 +1066,10 @@ def process(args):
 
 
 def evaluate(y, p, model_name, file, w_list=None):
+    if os.environ.get("PLOT"):
+        fig = plt.figure()
+        plot_brier(p, y, ax=fig.add_subplot(111))
+        fig.savefig(f"evaluation/{model_name}/{file.stem}.png")
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )

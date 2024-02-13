@@ -19,6 +19,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers
 from utils import cross_comparison
+from fsrs_optimizer import plot_brier
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -518,6 +519,62 @@ class HLR(nn.Module):
         return 0.5 ** (t / s)
 
 
+class ACT_RWeightClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data            
+            w[0] = w[0].clamp(0.001, 1)
+            w[1] = w[1].clamp(0.001, 1)
+            # w[2] = w[2].clamp(0, 10)
+            # w[3] = w[3].clamp(-10, 0)
+            module.w.data = w
+
+
+class ACT_R(nn.Module):
+    a = 0.176786766570677  # decay intercept
+    c = 0.216967308403809  # decay scale
+    s = 0.254893976981164  # noise
+    h = 86400 * 0.025      # inteference scalar
+    tau = -0.704205679427144  # threshold
+    init_w = [a, c]
+    clipper = ACT_RWeightClipper()
+
+    def __init__(self, w: List[float] = init_w):
+        super().__init__()
+        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def forward(self, sp: Tensor):
+        """
+        :param inputs: shape[seq_len, batch_size, 1]
+        """
+        m = torch.zeros_like(sp, dtype=torch.float)
+        m[0] = -torch.inf
+        for i in range(1, len(sp)):
+            act = torch.log(
+                torch.sum(
+                    ((sp[i] - sp[0:i]) * self.h).clamp_min(1)
+                    ** (-(self.w[1] * torch.exp(m[0:i]) + self.w[0])),
+                    dim=0,
+                )
+            )
+            m[i] = act
+        return self.activation(m[1:])
+
+    def activation(self, m):
+        return 1 / (1 + torch.exp((self.tau - m) / self.s))
+
+    def state_dict(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+
 def sm2(r_history):
     ivl = 0
     ef = 2.5
@@ -569,8 +626,12 @@ class RevlogDataset(Dataset):
         self.x_train = pad_sequence(
             dataframe["tensor"].to_list(), batch_first=True, padding_value=0
         ).to(device=device)
-        self.t_train = torch.tensor(dataframe["delta_t"].values, dtype=torch.int).to(device=device)
-        self.y_train = torch.tensor(dataframe["y"].values, dtype=torch.float).to(device=device)
+        self.t_train = torch.tensor(dataframe["delta_t"].values, dtype=torch.int).to(
+            device=device
+        )
+        self.y_train = torch.tensor(dataframe["y"].values, dtype=torch.float).to(
+            device=device
+        )
         self.seq_len = torch.tensor(
             dataframe["tensor"].map(len).values, dtype=torch.long
         ).to(device=device)
@@ -650,7 +711,9 @@ class Trainer:
         if isinstance(MODEL, FSRS4):
             self.model.pretrain(train_set)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
-        self.clipper = MODEL.clipper if isinstance(MODEL, (FSRS3, FSRS4)) else None
+        self.clipper = (
+            MODEL.clipper if isinstance(MODEL, (FSRS3, FSRS4, ACT_R)) else None
+        )
         self.batch_size = batch_size
         self.build_dataset(train_set, test_set)
         self.n_epoch = n_epoch
@@ -704,23 +767,29 @@ class Trainer:
             for i, batch in enumerate(
                 self.train_data_loader
                 if not isinstance(self.model, FSRS4)
-                else self.next_train_data_loader # FSRS4 has two training stages
+                else self.next_train_data_loader  # FSRS4 has two training stages
             ):
                 self.model.train()
                 self.optimizer.zero_grad()
                 sequences, delta_ts, labels, seq_lens = batch
                 real_batch_size = seq_lens.shape[0]
-                if isinstance(self.model, HLR):
-                    outputs, _ = self.model(sequences.transpose(0, 1))
-                    stabilities = outputs.squeeze()
+                if isinstance(self.model, ACT_R):
+                    outputs = self.model(sequences)
+                    retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
                 else:
-                    outputs, _ = self.model(sequences)
-                    stabilities = outputs[
-                        seq_lens - 1, torch.arange(real_batch_size), 0
-                    ]
-                retentions = self.model.forgetting_curve(delta_ts, stabilities)
+                    if isinstance(self.model, HLR):
+                        outputs, _ = self.model(sequences.transpose(0, 1))
+                        stabilities = outputs.squeeze()
+                    else:
+                        outputs, _ = self.model(sequences)
+                        stabilities = outputs[
+                            seq_lens - 1, torch.arange(real_batch_size), 0
+                        ]
+                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
                 loss = self.loss_fn(retentions, labels).sum()
-                if isinstance(self.model, FSRS4): # the initial stability is not trainable
+                if isinstance(
+                    self.model, FSRS4
+                ):  # the initial stability is not trainable
                     for param in self.model.parameters():
                         param.grad[:4] = torch.zeros(4)
                 loss.backward()
@@ -744,13 +813,19 @@ class Trainer:
                 self.train_set.seq_len,
             )
             real_batch_size = seq_lens.shape[0]
-            if isinstance(self.model, HLR):
-                outputs, _ = self.model(sequences)
-                stabilities = outputs.squeeze()
+            if isinstance(self.model, ACT_R):
+                outputs = self.model(sequences.transpose(0, 1))
+                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
             else:
-                outputs, _ = self.model(sequences.transpose(0, 1))
-                stabilities = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
-            retentions = self.model.forgetting_curve(delta_ts, stabilities)
+                if isinstance(self.model, HLR):
+                    outputs, _ = self.model(sequences)
+                    stabilities = outputs.squeeze()
+                else:
+                    outputs, _ = self.model(sequences.transpose(0, 1))
+                    stabilities = outputs[
+                        seq_lens - 1, torch.arange(real_batch_size), 0
+                    ]
+                retentions = self.model.forgetting_curve(delta_ts, stabilities)
             tran_loss = self.loss_fn(retentions, labels).mean()
             self.avg_train_losses.append(tran_loss)
 
@@ -762,18 +837,23 @@ class Trainer:
             )
             real_batch_size = seq_lens.shape[0]
 
-            if isinstance(self.model, HLR):
-                outputs, _ = self.model(sequences)
-                stabilities = outputs.squeeze()
+            if isinstance(self.model, ACT_R):
+                outputs = self.model(sequences.transpose(0, 1))
+                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
             else:
-                outputs, _ = self.model(sequences.transpose(0, 1))
-                stabilities = outputs[seq_lens - 1, torch.arange(real_batch_size), 0]
-
-            retentions = self.model.forgetting_curve(delta_ts, stabilities)
+                if isinstance(self.model, HLR):
+                    outputs, _ = self.model(sequences)
+                    stabilities = outputs.squeeze()
+                else:
+                    outputs, _ = self.model(sequences.transpose(0, 1))
+                    stabilities = outputs[
+                        seq_lens - 1, torch.arange(real_batch_size), 0
+                    ]
+                retentions = self.model.forgetting_curve(delta_ts, stabilities)
             test_loss = self.loss_fn(retentions, labels).mean()
             self.avg_eval_losses.append(test_loss)
 
-            if isinstance(self.model, (FSRS3, FSRS4)):
+            if isinstance(self.model, (FSRS3, FSRS4, ACT_R)):
                 w = list(
                     map(
                         lambda x: round(float(x), 4),
@@ -805,31 +885,25 @@ class Collection:
         self.model = MDOEL
         self.model.eval()
 
-    def predict(self, t_history: str, r_history: str):
-        with torch.no_grad():
-            if isinstance(self.model, RNN) or isinstance(self.model, Transformer):
-                line_tensor = lineToTensorRNN(
-                    list(zip([t_history], [r_history]))[0]
-                ).unsqueeze(1)
-            else:
-                line_tensor = lineToTensor(
-                    list(zip([t_history], [r_history]))[0]
-                ).unsqueeze(1)
-            output_t = self.model(line_tensor)
-            return output_t[-1][0]
-
     def batch_predict(self, dataset):
         fast_dataset = RevlogDataset(dataset)
         with torch.no_grad():
-            if isinstance(self.model, HLR):
-                outputs, _ = self.model(fast_dataset.x_train)
-                stabilities = outputs.squeeze()
-            else:
-                outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
-                stabilities = outputs[
-                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
+            if isinstance(self.model, ACT_R):
+                outputs = self.model(fast_dataset.x_train.transpose(0, 1))
+                retentions = outputs[
+                    fast_dataset.seq_len - 2, torch.arange(len(fast_dataset)), 0
                 ]
-            return stabilities.cpu().tolist()
+                return retentions.cpu().tolist()
+            else:
+                if isinstance(self.model, HLR):
+                    outputs, _ = self.model(fast_dataset.x_train)
+                    stabilities = outputs.squeeze()
+                else:
+                    outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
+                    stabilities = outputs[
+                        fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
+                    ]
+                return stabilities.cpu().tolist()
 
 
 def process_untrainable(file):
@@ -905,6 +979,12 @@ def create_features(df, model_name="FSRSv3"):
             for r_sublist in r_history
             for r_item in r_sublist
         ]
+    elif model_name == "ACT-R":
+        df["tensor"] = [
+            (torch.cumsum(torch.tensor([t_item]), dim=1) + 1).transpose(0, 1)
+            for t_sublist in t_history
+            for t_item in t_sublist
+        ]
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     filtered_dataset = (
         df[df["i"] == 2]
@@ -924,6 +1004,7 @@ def create_features(df, model_name="FSRSv3"):
 def process(args):
     plt.close("all")
     file, model_name = args
+    print(file)
     if model_name == "SM2":
         process_untrainable(file)
         return
@@ -938,6 +1019,8 @@ def process(args):
         model = HLR
     elif model_name == "Transformer":
         model = Transformer
+    elif model_name == "ACT-R":
+        model = ACT_R
 
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
@@ -969,17 +1052,24 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        testset["stability"] = my_collection.batch_predict(testset)
-        testset["p"] = my_collection.model.forgetting_curve(
-            testset["delta_t"], testset["stability"]
-        )
+        if model == ACT_R:
+            testset["p"] = my_collection.batch_predict(testset)
+        else:
+            testset["stability"] = my_collection.batch_predict(testset)
+            testset["p"] = my_collection.model.forgetting_curve(
+                testset["delta_t"], testset["stability"]
+            )
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
-    evaluate(y, p, model_name, file)
+    evaluate(y, p, model_name, file, w_list if type(w_list[0]) == list else None)
 
 
-def evaluate(y, p, model_name, file):
+def evaluate(y, p, model_name, file, w_list=None):
+    if os.environ.get("PLOT"):
+        fig = plt.figure()
+        plot_brier(p, y, ax=fig.add_subplot(111))
+        fig.savefig(f"evaluation/{model_name}/{file.stem}.png")
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )
@@ -999,6 +1089,8 @@ def evaluate(y, p, model_name, file):
         "user": int(file.stem),
         "size": len(y),
     }
+    if w_list:
+        result["weights"] = list(map(lambda x: round(x, 4), w_list[-1]))
     # save as json
     Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
     with open(f"result/{model_name}/{file.stem}.json", "w") as f:

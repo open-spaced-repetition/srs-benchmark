@@ -534,7 +534,7 @@ class ACT_R(nn.Module):
     a = 0.176786766570677  # decay intercept
     c = 0.216967308403809  # decay scale
     s = 0.254893976981164  # noise
-    h = 86400  # time scale
+    h = 86400 * 0.025      # time scale
     tau = -0.704205679427144  # threshold
     init_w = [a, c]
     clipper = ACT_RWeightClipper()
@@ -548,7 +548,7 @@ class ACT_R(nn.Module):
         :param inputs: shape[seq_len, batch_size, 1]
         """
         m = torch.zeros_like(sp, dtype=torch.float)
-        m[0] = m[0] - torch.inf
+        m[0] = -torch.inf
         for i in range(1, len(sp)):
             act = torch.log(
                 torch.sum(
@@ -557,7 +557,7 @@ class ACT_R(nn.Module):
                     dim=0,
                 )
             )
-            m[i] = m[i] + act
+            m[i] = act
         return self.activation(m)
 
     def activation(self, m):
@@ -1058,10 +1058,10 @@ def process(args):
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
 
-    evaluate(y, p, model_name, file)
+    evaluate(y, p, model_name, file, w_list if type(w_list[0]) == list else None)
 
 
-def evaluate(y, p, model_name, file):
+def evaluate(y, p, model_name, file, w_list=None):
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )
@@ -1081,6 +1081,8 @@ def evaluate(y, p, model_name, file):
         "user": int(file.stem),
         "size": len(y),
     }
+    if w_list:
+        result["weights"] = list(map(lambda x: round(x, 4), w_list[-1]))
     # save as json
     Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
     with open(f"result/{model_name}/{file.stem}.json", "w") as f:

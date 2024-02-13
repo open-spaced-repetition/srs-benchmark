@@ -513,7 +513,7 @@ class HLR(nn.Module):
 
     def forward(self, x):
         dp = self.fc(x)
-        return 2**dp, None
+        return 2**dp
 
     def forgetting_curve(self, t, s):
         return 0.5 ** (t / s)
@@ -573,6 +573,22 @@ class ACT_R(nn.Module):
                 dict(self.named_parameters())["w"].data,
             )
         )
+
+
+class DASH(nn.Module):
+    def __init__(self, state_dict=None):
+        super(DASH, self).__init__()
+        self.fc = nn.Linear(8, 1)
+        self.sigmoid = nn.Sigmoid()
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
+
+    def forward(self, x):
+        x = torch.log(x + 1)
+        x = self.fc(x)
+        x = self.sigmoid(x)
+        return x
 
 
 def sm2(r_history):
@@ -776,9 +792,12 @@ class Trainer:
                 if isinstance(self.model, ACT_R):
                     outputs = self.model(sequences)
                     retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+                elif isinstance(self.model, DASH):
+                    outputs = self.model(sequences.transpose(0, 1))
+                    retentions = outputs.squeeze()
                 else:
                     if isinstance(self.model, HLR):
-                        outputs, _ = self.model(sequences.transpose(0, 1))
+                        outputs = self.model(sequences.transpose(0, 1))
                         stabilities = outputs.squeeze()
                     else:
                         outputs, _ = self.model(sequences)
@@ -816,9 +835,12 @@ class Trainer:
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+            elif isinstance(self.model, DASH):
+                outputs = self.model(sequences)
+                retentions = outputs.squeeze()
             else:
                 if isinstance(self.model, HLR):
-                    outputs, _ = self.model(sequences)
+                    outputs = self.model(sequences)
                     stabilities = outputs.squeeze()
                 else:
                     outputs, _ = self.model(sequences.transpose(0, 1))
@@ -840,9 +862,12 @@ class Trainer:
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+            elif isinstance(self.model, DASH):
+                outputs = self.model(sequences)
+                retentions = outputs.squeeze()
             else:
                 if isinstance(self.model, HLR):
-                    outputs, _ = self.model(sequences)
+                    outputs = self.model(sequences)
                     stabilities = outputs.squeeze()
                 else:
                     outputs, _ = self.model(sequences.transpose(0, 1))
@@ -894,9 +919,13 @@ class Collection:
                     fast_dataset.seq_len - 2, torch.arange(len(fast_dataset)), 0
                 ]
                 return retentions.cpu().tolist()
+            elif isinstance(self.model, DASH):
+                outputs = self.model(fast_dataset.x_train)
+                retentions = outputs.squeeze()
+                return retentions.cpu().tolist()
             else:
                 if isinstance(self.model, HLR):
-                    outputs, _ = self.model(fast_dataset.x_train)
+                    outputs = self.model(fast_dataset.x_train)
                     stabilities = outputs.squeeze()
                 else:
                     outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
@@ -985,6 +1014,39 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist in t_history
             for t_item in t_sublist
         ]
+    elif model_name == "DASH":
+        def extract_features(r_history, t_history, delta_t):
+            features = [
+                0, # n_1
+                0, # c_1
+                0, # n_7
+                0, # c_7
+                0, # n_30
+                0, # c_30
+                0, # total attempts
+                0, # correct recalls
+            ] 
+            r_history = list(map(lambda x: 1 if x > 1 else 0, r_history))
+            time_accumulator = delta_t
+            for i in range(len(t_history) - 1, -1, -1):
+                time_accumulator += t_history[i]
+                if time_accumulator <= 1:
+                    features[0] += 1
+                    features[1] += r_history[i]
+                if time_accumulator <= 7:
+                    features[2] += 1
+                    features[3] += r_history[i]
+                if time_accumulator <= 30:
+                    features[4] += 1
+                    features[5] += r_history[i]
+                features[6] += 1
+                features[7] += r_history[i]
+            return features
+        df["tensor"] = [
+            torch.tensor(extract_features(r_item[:-1], t_item[:-1], t_item[-1]))
+            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_item, r_item in zip(t_sublist, r_sublist)
+        ]
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     filtered_dataset = (
         df[df["i"] == 2]
@@ -1021,6 +1083,8 @@ def process(args):
         model = Transformer
     elif model_name == "ACT-R":
         model = ACT_R
+    elif model_name == "DASH":
+        model = DASH
 
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
@@ -1052,7 +1116,7 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        if model == ACT_R:
+        if model in (ACT_R, DASH):
             testset["p"] = my_collection.batch_predict(testset)
         else:
             testset["stability"] = my_collection.batch_predict(testset)

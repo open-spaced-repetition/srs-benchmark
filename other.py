@@ -534,6 +534,7 @@ class ACT_RWeightClipper:
 
 
 class ACT_R(nn.Module):
+    # 2 params
     a = 0.176786766570677  # decay intercept
     c = 0.216967308403809  # decay scale
     s = 0.254893976981164  # noise
@@ -576,6 +577,7 @@ class ACT_R(nn.Module):
 
 
 class DASH(nn.Module):
+    # 9 params
     def __init__(self, state_dict=None):
         super(DASH, self).__init__()
         self.fc = nn.Linear(8, 1)

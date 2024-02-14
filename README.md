@@ -35,6 +35,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
 - Transformer: a type of neural network that has gained popularity in recent years due to its superior performance in natural language processing. ChatGPT is based on this architecture.
+- DASH: the model proposed in [here](https://doi.org/10.4324/9781315413570-8). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression, for more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).
 - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it.
 
@@ -54,6 +55,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | --- | --- | --- | --- |
 | **FSRS-4.5** | **0.32±0.006** | **0.043±0.0010** | 17 |
 | FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
+| DASH | 0.34±0.005 | 0.046±0.0011 | 9 |
 | FSRS v4 | 0.33±0.006 | 0.052±0.0014 | 17 |
 | FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.065±0.0018 | 4 |
 | FSRS v3 | 0.36±0.007 | 0.068±0.0016 | 13 |
@@ -70,6 +72,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | **FSRS-4.5** | **0.346±0.0030** | **0.063±0.0008** | 17 |
 | FSRS rs | 0.350±0.0031 | 0.066±0.0008 | 17 |
 | FSRS v4 | 0.354±0.0033 | 0.074±0.0009 | 17 |
+| DASH | 0.377±0.0030 | 0.077±0.0010 | 9 |
 | FSRS-4.5 (only pretrain) | 0.361±0.0032 | 0.079±0.0009 | 4 |
 | FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 0 |
 | FSRS v3 | 0.416±0.0043 | 0.104±0.0014 | 13 |

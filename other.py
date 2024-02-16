@@ -525,7 +525,7 @@ class ACT_RWeightClipper:
 
     def __call__(self, module):
         if hasattr(module, "w"):
-            w = module.w.data            
+            w = module.w.data
             w[0] = w[0].clamp(0.001, 1)
             w[1] = w[1].clamp(0.001, 1)
             # w[2] = w[2].clamp(0, 10)
@@ -538,7 +538,7 @@ class ACT_R(nn.Module):
     a = 0.176786766570677  # decay intercept
     c = 0.216967308403809  # decay scale
     s = 0.254893976981164  # noise
-    h = 86400 * 0.025      # inteference scalar
+    h = 86400 * 0.025  # inteference scalar
     tau = -0.704205679427144  # threshold
     init_w = [a, c]
     clipper = ACT_RWeightClipper()
@@ -1016,36 +1016,37 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist in t_history
             for t_item in t_sublist
         ]
-    elif model_name == "DASH":
-        def extract_features(r_history, t_history, delta_t):
-            features = [
-                0, # n_1
-                0, # c_1
-                0, # n_7
-                0, # c_7
-                0, # n_30
-                0, # c_30
-                0, # total attempts
-                0, # correct recalls
-            ] 
-            r_history = list(map(lambda x: 1 if x > 1 else 0, r_history))
-            time_accumulator = delta_t
-            for i in range(len(t_history) - 1, -1, -1):
-                time_accumulator += t_history[i]
-                if time_accumulator <= 1:
-                    features[0] += 1
-                    features[1] += r_history[i]
-                if time_accumulator <= 7:
-                    features[2] += 1
-                    features[3] += r_history[i]
-                if time_accumulator <= 30:
-                    features[4] += 1
-                    features[5] += r_history[i]
-                features[6] += 1
-                features[7] += r_history[i]
+    elif model_name in ("DASH", "DASH[MCM]"):
+        def dash_tw_features(r_history, t_history, enable_decay=False):
+            features = np.zeros(8)
+            r_history = np.array(r_history) > 1
+            tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426])
+            time_windows = np.array([1, 7, 30, np.inf])
+
+            # Compute the cumulative sum of t_history in reverse order
+            cumulative_times = np.cumsum(t_history[::-1])[::-1]
+
+            for j, time_window in enumerate(time_windows):
+                # Calculate decay factors for each time window
+                if enable_decay:
+                    decay_factors = np.exp(-cumulative_times / tau_w[j])
+                else:
+                    decay_factors = np.ones_like(cumulative_times)
+
+                # Identify the indices where cumulative times are within the current time window
+                valid_indices = cumulative_times <= time_window
+
+                # Update features using decay factors where valid
+                features[j * 2] += np.sum(decay_factors[valid_indices])
+                features[j * 2 + 1] += np.sum(r_history[valid_indices] * decay_factors[valid_indices])
+
             return features
+
         df["tensor"] = [
-            torch.tensor(extract_features(r_item[:-1], t_item[:-1], t_item[-1]))
+            torch.tensor(
+                dash_tw_features(r_item[:-1], t_item[1:], "MCM" in model_name),
+                dtype=torch.float32,
+            )
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
@@ -1085,7 +1086,7 @@ def process(args):
         model = Transformer
     elif model_name == "ACT-R":
         model = ACT_R
-    elif model_name == "DASH":
+    elif model_name in ("DASH", "DASH[MCM]"):
         model = DASH
 
     dataset = create_features(dataset, model_name)

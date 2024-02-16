@@ -140,3 +140,4 @@ collection/
 *.csv
 *.ipynb
 *.tsv
+*.r

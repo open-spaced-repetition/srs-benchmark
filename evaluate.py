@@ -86,6 +86,7 @@ if __name__ == "__main__":
         "FSRSv4",
         "DASH",
         "DASH[MCM]",
+        "DASH[ACT-R]",
         "FSRS-4.5-pretrain",
         "FSRS-4.5-dry-run",
         "FSRSv3",

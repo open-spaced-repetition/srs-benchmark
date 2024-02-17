@@ -593,6 +593,57 @@ class DASH(nn.Module):
         return x
 
 
+class DASH_ACTRWeightClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data
+            w[0] = w[0].clamp_min(0.001)
+            w[1] = w[1].clamp_min(0.001)
+            module.w.data = w
+
+
+class DASH_ACTR(nn.Module):
+    init_w = [1.4164, 0.516, -0.0564, 1.9223, 1.0549]
+    clipper = DASH_ACTRWeightClipper()
+
+    def __init__(self, w=init_w):
+        super(DASH_ACTR, self).__init__()
+        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, inputs):
+        """
+        :param inputs: shape[seq_len, batch_size, 2], 2 means r and t
+        """
+        inputs[:, :, 1] = inputs[:, :, 1].clamp_min(0.1)
+        retentions = self.sigmoid(
+            self.w[0]
+            * torch.log(
+                1
+                + torch.sum(
+                    torch.where(
+                        inputs[:, :, 1] == 0.1, 0, inputs[:, :, 1] ** -self.w[1]
+                    )
+                    * torch.where(inputs[:, :, 0] == 0, self.w[2], self.w[3]),
+                    dim=0,
+                ).clamp_min(0)
+            )
+            + self.w[4]
+        )
+        return retentions
+
+    def state_dict(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+
 def sm2(r_history):
     ivl = 0
     ef = 2.5
@@ -730,7 +781,9 @@ class Trainer:
             self.model.pretrain(train_set)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.clipper = (
-            MODEL.clipper if isinstance(MODEL, (FSRS3, FSRS4, ACT_R)) else None
+            MODEL.clipper
+            if isinstance(MODEL, (FSRS3, FSRS4, ACT_R, DASH_ACTR))
+            else None
         )
         self.batch_size = batch_size
         self.build_dataset(train_set, test_set)
@@ -794,6 +847,9 @@ class Trainer:
                 if isinstance(self.model, ACT_R):
                     outputs = self.model(sequences)
                     retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+                elif isinstance(self.model, DASH_ACTR):
+                    outputs = self.model(sequences)
+                    retentions = outputs.squeeze()
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences.transpose(0, 1))
                     retentions = outputs.squeeze()
@@ -837,6 +893,9 @@ class Trainer:
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+            elif isinstance(self.model, DASH_ACTR):
+                outputs = self.model(sequences.transpose(0, 1))
+                retentions = outputs.squeeze()
             elif isinstance(self.model, DASH):
                 outputs = self.model(sequences)
                 retentions = outputs.squeeze()
@@ -864,6 +923,9 @@ class Trainer:
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+            elif isinstance(self.model, DASH_ACTR):
+                outputs = self.model(sequences.transpose(0, 1))
+                retentions = outputs.squeeze()
             elif isinstance(self.model, DASH):
                 outputs = self.model(sequences)
                 retentions = outputs.squeeze()
@@ -880,7 +942,7 @@ class Trainer:
             test_loss = self.loss_fn(retentions, labels).mean()
             self.avg_eval_losses.append(test_loss)
 
-            if isinstance(self.model, (FSRS3, FSRS4, ACT_R)):
+            if isinstance(self.model, (FSRS3, FSRS4, ACT_R, DASH_ACTR)):
                 w = list(
                     map(
                         lambda x: round(float(x), 4),
@@ -920,6 +982,10 @@ class Collection:
                 retentions = outputs[
                     fast_dataset.seq_len - 2, torch.arange(len(fast_dataset)), 0
                 ]
+                return retentions.cpu().tolist()
+            elif isinstance(self.model, DASH_ACTR):
+                outputs = self.model(fast_dataset.x_train.transpose(0, 1))
+                retentions = outputs.squeeze()
                 return retentions.cpu().tolist()
             elif isinstance(self.model, DASH):
                 outputs = self.model(fast_dataset.x_train)
@@ -1017,6 +1083,7 @@ def create_features(df, model_name="FSRSv3"):
             for t_item in t_sublist
         ]
     elif model_name in ("DASH", "DASH[MCM]"):
+
         def dash_tw_features(r_history, t_history, enable_decay=False):
             features = np.zeros(8)
             r_history = np.array(r_history) > 1
@@ -1038,13 +1105,32 @@ def create_features(df, model_name="FSRSv3"):
 
                 # Update features using decay factors where valid
                 features[j * 2] += np.sum(decay_factors[valid_indices])
-                features[j * 2 + 1] += np.sum(r_history[valid_indices] * decay_factors[valid_indices])
+                features[j * 2 + 1] += np.sum(
+                    r_history[valid_indices] * decay_factors[valid_indices]
+                )
 
             return features
 
         df["tensor"] = [
             torch.tensor(
                 dash_tw_features(r_item[:-1], t_item[1:], "MCM" in model_name),
+                dtype=torch.float32,
+            )
+            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_item, r_item in zip(t_sublist, r_sublist)
+        ]
+    elif model_name == "DASH[ACT-R]":
+
+        def dash_actr_features(r_history, t_history):
+            r_history = torch.tensor(np.array(r_history) > 1, dtype=torch.float32)
+            sp_history = torch.tensor(t_history, dtype=torch.float32)
+            cumsum = torch.cumsum(sp_history, dim=0)
+            features = [r_history, sp_history - cumsum + cumsum[-1:None]]
+            return torch.stack(features, dim=1)
+
+        df["tensor"] = [
+            torch.tensor(
+                dash_actr_features(r_item[:-1], t_item[1:]),
                 dtype=torch.float32,
             )
             for t_sublist, r_sublist in zip(t_history, r_history)
@@ -1088,6 +1174,8 @@ def process(args):
         model = ACT_R
     elif model_name in ("DASH", "DASH[MCM]"):
         model = DASH
+    elif model_name == "DASH[ACT-R]":
+        model = DASH_ACTR
 
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
@@ -1119,7 +1207,7 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        if model in (ACT_R, DASH):
+        if model in (ACT_R, DASH, DASH_ACTR):
             testset["p"] = my_collection.batch_predict(testset)
         else:
             testset["stability"] = my_collection.batch_predict(testset)

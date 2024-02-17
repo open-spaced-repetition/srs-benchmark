@@ -45,7 +45,7 @@ For more details about the FSRS algorithm, read this wiki page: [The Algorithm](
 
 Total number of users: 19,990.
 
-Total number of reviews for evaluation: 708,151,820.
+Total number of reviews for evaluation: 708,151,820. Same-day reviews are excluded; only one review per day (the first chronologically) is used by each algorithm. This is why the number of reviews is significantly lower than the 1.5 billion mentioned earlier. Plus, an outlier filter is also used.
 
 The following tables represent the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 

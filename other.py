@@ -1204,6 +1204,7 @@ def process(args):
 
     p = []
     y = []
+    save_tmp = []
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
@@ -1216,6 +1217,12 @@ def process(args):
             )
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
+        save_tmp.append(testset)
+
+    if os.environ.get("FILE"):
+        save_tmp = pd.concat(save_tmp)
+        del save_tmp["tensor"]
+        save_tmp.to_csv(f"evaluation/{model_name}/{file.stem}.tsv", sep="\t", index=False)
 
     evaluate(y, p, model_name, file, w_list if type(w_list[0]) == list else None)
 

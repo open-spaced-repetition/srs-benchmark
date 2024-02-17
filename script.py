@@ -85,7 +85,7 @@ def predict(w_list, testsets, last_rating=None, file=None):
         if file:
             save_tmp.append(tmp)
 
-    if False and file:
+    if os.environ.get("FILE") and file:
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
         save_tmp.to_csv(f"evaluation/{path}/{file.stem}.tsv", sep="\t", index=False)

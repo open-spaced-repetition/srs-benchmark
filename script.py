@@ -27,6 +27,7 @@ from fsrs_optimizer import (
     power_forgetting_curve,
     remove_outliers,
     remove_non_continuous_rows,
+    plot_brier,
 )
 
 
@@ -214,6 +215,12 @@ def process(file):
             w_list.append(optimizer.init_w)
 
     p, y = predict(w_list, testsets, file=file)
+
+    if os.environ.get("PLOT"):
+        fig = plt.figure()
+        plot_brier(p, y, ax=fig.add_subplot(111))
+        fig.savefig(f"evaluation/{path}/{file.stem}.png")
+
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )

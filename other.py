@@ -33,6 +33,8 @@ n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
 
+model_name = os.environ.get("MODEL", "FSRSv3")
+
 
 class FSRS3WeightClipper:
     def __init__(self, frequency: int = 1):
@@ -528,19 +530,20 @@ class ACT_RWeightClipper:
             w = module.w.data
             w[0] = w[0].clamp(0.001, 1)
             w[1] = w[1].clamp(0.001, 1)
-            # w[2] = w[2].clamp(0, 10)
-            # w[3] = w[3].clamp(-10, 0)
+            w[2] = w[2].clamp(0.001, 1)
+            w[3] = w[3].clamp_max(-0.001)
+            w[4] = w[4].clamp(0.001, 1)
             module.w.data = w
 
 
 class ACT_R(nn.Module):
-    # 2 params
+    # 5 params
     a = 0.176786766570677  # decay intercept
     c = 0.216967308403809  # decay scale
     s = 0.254893976981164  # noise
-    h = 86400 * 0.025  # inteference scalar
     tau = -0.704205679427144  # threshold
-    init_w = [a, c]
+    h = 0.025  # interference scalar
+    init_w = [a, c, s, tau, h]
     clipper = ACT_RWeightClipper()
 
     def __init__(self, w: List[float] = init_w):
@@ -556,7 +559,7 @@ class ACT_R(nn.Module):
         for i in range(1, len(sp)):
             act = torch.log(
                 torch.sum(
-                    ((sp[i] - sp[0:i]) * self.h).clamp_min(1)
+                    ((sp[i] - sp[0:i]) * 86400 * self.w[4]).clamp_min(1)
                     ** (-(self.w[1] * torch.exp(m[0:i]) + self.w[0])),
                     dim=0,
                 )
@@ -565,7 +568,7 @@ class ACT_R(nn.Module):
         return self.activation(m[1:])
 
     def activation(self, m):
-        return 1 / (1 + torch.exp((self.tau - m) / self.s))
+        return 1 / (1 + torch.exp((self.w[3] - m) / self.w[2]))
 
     def state_dict(self):
         return list(
@@ -578,19 +581,30 @@ class ACT_R(nn.Module):
 
 class DASH(nn.Module):
     # 9 params
-    def __init__(self, state_dict=None):
+    init_w = (
+        [0.0624, 0.3942, 0.2726, 0.5325, -0.1232, 0.1909, 0.2831, 0.2534, 0.6209]
+        if "MCM" not in model_name
+        else [0.1231, 0.5196, 0.4233, 0.6776, -0.0846, 0.1814, 0.3138, 0.3407, 0.6606]
+    )
+
+    def __init__(self, w: List[float] = init_w):
         super(DASH, self).__init__()
         self.fc = nn.Linear(8, 1)
         self.sigmoid = nn.Sigmoid()
 
-        if state_dict is not None:
-            self.load_state_dict(state_dict)
+        self.fc.weight = nn.Parameter(torch.tensor(w[:8], dtype=torch.float32))
+        self.fc.bias = nn.Parameter(torch.tensor(w[8], dtype=torch.float32))
 
     def forward(self, x):
         x = torch.log(x + 1)
         x = self.fc(x)
         x = self.sigmoid(x)
         return x
+
+    def state_dict(self):
+        return (
+            self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
+        )
 
 
 class DASH_ACTRWeightClipper:
@@ -1222,7 +1236,9 @@ def process(args):
     if os.environ.get("FILE"):
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
-        save_tmp.to_csv(f"evaluation/{model_name}/{file.stem}.tsv", sep="\t", index=False)
+        save_tmp.to_csv(
+            f"evaluation/{model_name}/{file.stem}.tsv", sep="\t", index=False
+        )
 
     evaluate(y, p, model_name, file, w_list if type(w_list[0]) == list else None)
 
@@ -1262,14 +1278,15 @@ def evaluate(y, p, model_name, file, w_list=None):
 if __name__ == "__main__":
     unprocessed_files = []
     dataset_path = "./dataset"
-    model = os.environ.get("MODEL", "FSRSv3")
-    Path(f"evaluation/{model}").mkdir(parents=True, exist_ok=True)
-    Path(f"result/{model}").mkdir(parents=True, exist_ok=True)
-    processed_files = list(map(lambda x: x.stem, Path(f"result/{model}").iterdir()))
+    Path(f"evaluation/{model_name}").mkdir(parents=True, exist_ok=True)
+    Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
+    processed_files = list(
+        map(lambda x: x.stem, Path(f"result/{model_name}").iterdir())
+    )
     for file in Path(dataset_path).glob("*.csv"):
         if file.stem in processed_files:
             continue
-        unprocessed_files.append((file, model))
+        unprocessed_files.append((file, model_name))
 
     unprocessed_files.sort(key=lambda x: int(x[0].stem), reverse=False)
 

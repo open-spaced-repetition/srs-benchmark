@@ -592,8 +592,8 @@ class DASH(nn.Module):
         self.fc = nn.Linear(8, 1)
         self.sigmoid = nn.Sigmoid()
 
-        self.fc.weight = nn.Parameter(torch.tensor(w[:8], dtype=torch.float32))
-        self.fc.bias = nn.Parameter(torch.tensor(w[8], dtype=torch.float32))
+        self.fc.weight = nn.Parameter(torch.tensor([w[:8]], dtype=torch.float32))
+        self.fc.bias = nn.Parameter(torch.tensor([w[8]], dtype=torch.float32))
 
     def forward(self, x):
         x = torch.log(x + 1)

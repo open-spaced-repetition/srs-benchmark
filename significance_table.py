@@ -115,6 +115,7 @@ if __name__ == "__main__":
         "FSRS-4.5-dry-run",
         "DASH",
         "DASH[MCM]",
+        "ACT-R",
         "FSRSv3",
         "LSTM",
         "Transformer",
@@ -206,7 +207,7 @@ if __name__ == "__main__":
     models[index_v3] = "FSRS v3"
     models[index_sm2] = "SM-2"
 
-    fig, ax = plt.subplots(figsize=(10, 9), dpi=150)
+    fig, ax = plt.subplots(figsize=(12, 12), dpi=200)
     ax.set_title(
         f"Wilcoxon signed-rank test, p-values ({n_collections} collections)",
         fontsize=24,
@@ -233,7 +234,7 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=8,
+                    fontsize=10,
                 )
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=12, rotation=45)

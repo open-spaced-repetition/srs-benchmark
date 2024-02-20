@@ -89,6 +89,7 @@ if __name__ == "__main__":
         "DASH[ACT-R]",
         "FSRS-4.5-pretrain",
         "FSRS-4.5-dry-run",
+        "ACT-R",
         "FSRSv3",
         "LSTM",
         "Transformer",

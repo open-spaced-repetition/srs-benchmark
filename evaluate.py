@@ -83,10 +83,10 @@ if __name__ == "__main__":
         dev_mode_name,
         "FSRS-4.5",
         "FSRS-rs",
-        "FSRSv4",
         "DASH",
         "DASH[MCM]",
         "DASH[ACT-R]",
+        "FSRSv4",
         "FSRS-4.5-pretrain",
         "FSRS-4.5-dry-run",
         "ACT-R",
@@ -125,7 +125,7 @@ if __name__ == "__main__":
             for metric in ("LogLoss", "RMSE(bins)"):
                 metrics = np.array([item[metric] for item in m])
                 wmean, wstd = weighted_avg_and_std(metrics, size)
-                print(f"{model} {metric} (mean±std): {wmean:.3f}±{wstd:.3f}")
+                print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
                 CI = confidence_interval(metrics, size)
                 rounded_mean, rounded_CI = sigdig(wmean, CI)
                 print(f"{model} {metric}: {rounded_mean}±{rounded_CI}")

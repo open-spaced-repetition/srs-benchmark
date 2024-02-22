@@ -1046,6 +1046,30 @@ def process_untrainable(file):
 
     evaluate(y, p, model_name, file)
 
+def baseline(file):
+    model_name = "AVG"
+    dataset = pd.read_csv(file)
+    dataset = create_features(dataset, model_name)
+    if dataset.shape[0] < 6:
+        return
+    testsets = []
+    avg_ps = []
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    for train_index, test_index in tscv.split(dataset):
+        test_set = dataset.iloc[test_index].copy()
+        testsets.append(test_set)
+        train_set = dataset.iloc[train_index].copy()
+        avg_ps.append(train_set["y"].mean())
+
+    p = []
+    y = []
+
+    for avg_p, testset in zip(avg_ps, testsets):
+        p.extend([avg_p] * testset.shape[0])
+        y.extend(testset["y"].tolist())
+    
+    evaluate(y, p, model_name, file)
+    
 
 def create_features(df, model_name="FSRSv3"):
     df = df[(df["delta_t"] != 0) & (df["rating"].isin([1, 2, 3, 4]))].copy()
@@ -1157,7 +1181,6 @@ def create_features(df, model_name="FSRSv3"):
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:
-        tqdm.write(f"{file.stem} does not have enough data.")
         return pd.DataFrame()
     df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)
@@ -1173,6 +1196,9 @@ def process(args):
     print(file)
     if model_name == "SM2":
         process_untrainable(file)
+        return
+    if model_name == "AVG":
+        baseline(file)
         return
     dataset = pd.read_csv(file)
     if model_name == "LSTM":

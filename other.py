@@ -1157,10 +1157,11 @@ def create_features(df, model_name="FSRSv3"):
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:
+        tqdm.write(f"{file.stem} does not have enough data.")
         return pd.DataFrame()
     df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)
-    df = df.groupby("card_id", as_index=False, group_keys=False).progress_apply(
+    df = df.groupby("card_id", as_index=False, group_keys=False).apply(
         remove_non_continuous_rows
     )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
@@ -1193,6 +1194,7 @@ def process(args):
 
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
+        tqdm.write(f"{file.stem} does not have enough data.")
         return
     w_list = []
     testsets = []

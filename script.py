@@ -3,6 +3,7 @@ import sys
 import json
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
@@ -156,10 +157,11 @@ def create_time_series(df):
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:
+        tqdm.write(f"{file.stem} does not have enough data.")
         return pd.DataFrame()
     df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)
-    df = df.groupby("card_id", as_index=False, group_keys=False).progress_apply(
+    df = df.groupby("card_id", as_index=False, group_keys=False).apply(
         remove_non_continuous_rows
     )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
@@ -171,6 +173,7 @@ def process(file):
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
+        tqdm.write(f"{file.stem} does not have enough data.")
         return
     w_list = []
     testsets = []

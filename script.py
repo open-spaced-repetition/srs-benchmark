@@ -157,7 +157,6 @@ def create_time_series(df):
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:
-        tqdm.write(f"{file.stem} does not have enough data.")
         return pd.DataFrame()
     df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)

@@ -55,10 +55,10 @@ The following tables represent the weighted means and the 99% confidence interva
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
 | FSRS-4.5 | **0.32±0.006** | 0.043±0.0010 | 17 |
-| FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
 | DASH | 0.33±0.005 | **0.038±0.0008** | 9 |
 | DASH[MCM] | 0.33±0.005 | 0.039±0.0008 | 9 |
 | DASH[ACT-R] | 0.33±0.005 | 0.039±0.0011 | 5 |
+| FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.052±0.0014 | 17 |
 | FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.065±0.0018 | 4 |
 | ACT-R | 0.35±0.006 | 0.043±0.0013 | 5 |
@@ -81,7 +81,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS v4 | 0.354±0.0033 | 0.074±0.0009 | 17 |
 | FSRS-4.5 (only pretrain) | 0.361±0.0032 | 0.079±0.0009 | 4 |
 | FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 0 |
-| ACT-R | 0.382±0.0035 | 0.0644±0.00100 | 5 |
+| ACT-R | 0.382±0.0035 | 0.064±0.0010 | 5 |
 | FSRS v3 | 0.416±0.0043 | 0.104±0.0014 | 13 |
 | LSTM | 0.50±0.007 | 0.137±0.0018 | 489 |
 | Transformer | 0.56±0.008 | 0.181±0.0018 | 622 |

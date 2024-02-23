@@ -73,3 +73,17 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
         ax.set_xticks(np.arange(0, 1.1, 0.1))
         fig.show()
     return universal_metric_list
+
+def rmse_matrix(df):
+    df["lapse"] = df["r_history"].map(lambda x: x.count("1"))
+    df["delta_t"] = df["delta_t"].map(
+        lambda x: round(2.48 * np.power(3.62, np.floor(np.log(x)/np.log(3.62))), 2)
+    )
+    df["i"] = df["i"].map(
+        lambda x: round(1.99 * np.power(1.89, np.floor(np.log(x)/np.log(1.89))), 0)
+    )
+    df["lapse"] = df["lapse"].map(
+        lambda x: round(1.65 * np.power(1.73, np.floor(np.log(x)/np.log(1.73))), 0) if x != 0 else 0
+    )
+    tmp = df.groupby(["delta_t", "i", "lapse"]).agg({"y": "mean", "p": "mean", "review_th": "count"}).reset_index()
+    return mean_squared_error(tmp["y"], tmp["p"], sample_weight=tmp["review_th"], squared=False)

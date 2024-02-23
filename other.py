@@ -18,7 +18,7 @@ from scipy.optimize import minimize
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers
-from utils import cross_comparison
+from utils import cross_comparison, rmse_matrix
 from fsrs_optimizer import plot_brier
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -840,7 +840,6 @@ class Trainer:
         self.test_data_loader = DataLoader(
             self.test_set, batch_sampler=sampler, collate_fn=collate_fn
         )
-        print("dataset built")
 
     def train(self, verbose: bool = True):
         best_loss = np.inf
@@ -1031,6 +1030,7 @@ def process_untrainable(file):
 
     p = []
     y = []
+    save_tmp = []
 
     for i, testset in enumerate(testsets):
         testset["stability"] = testset["r_history"].map(sm2)
@@ -1043,8 +1043,9 @@ def process_untrainable(file):
             print(e)
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
-
-    evaluate(y, p, model_name, file)
+        save_tmp.append(testset)
+    save_tmp = pd.concat(save_tmp)
+    evaluate(y, p, save_tmp, model_name, file)
 
 def baseline(file):
     model_name = "AVG"
@@ -1063,12 +1064,15 @@ def baseline(file):
 
     p = []
     y = []
+    save_tmp = []
 
     for avg_p, testset in zip(avg_ps, testsets):
+        testset["p"] = avg_p
         p.extend([avg_p] * testset.shape[0])
         y.extend(testset["y"].tolist())
-    
-    evaluate(y, p, model_name, file)
+        save_tmp.append(testset)
+    save_tmp = pd.concat(save_tmp)
+    evaluate(y, p, save_tmp, model_name, file)
     
 
 def create_features(df, model_name="FSRSv3"):
@@ -1261,17 +1265,17 @@ def process(args):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
 
+    save_tmp = pd.concat(save_tmp)
+    del save_tmp["tensor"]
     if os.environ.get("FILE"):
-        save_tmp = pd.concat(save_tmp)
-        del save_tmp["tensor"]
         save_tmp.to_csv(
             f"evaluation/{model_name}/{file.stem}.tsv", sep="\t", index=False
         )
 
-    evaluate(y, p, model_name, file, w_list if type(w_list[0]) == list else None)
+    evaluate(y, p, save_tmp, model_name, file, w_list if type(w_list[0]) == list else None)
 
 
-def evaluate(y, p, model_name, file, w_list=None):
+def evaluate(y, p, df, model_name, file, w_list=None):
     if os.environ.get("PLOT"):
         fig = plt.figure()
         plot_brier(p, y, ax=fig.add_subplot(111))
@@ -1282,9 +1286,7 @@ def evaluate(y, p, model_name, file, w_list=None):
     ici = np.mean(np.abs(p_calibrated - p))
     rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-    rmse_bins = cross_comparison(
-        pd.DataFrame({"y": y, f"R ({model_name})": p}), model_name, model_name
-    )[0]
+    rmse_bins = rmse_matrix(df)
     result = {
         "metrics": {
             "RMSE": rmse_raw,

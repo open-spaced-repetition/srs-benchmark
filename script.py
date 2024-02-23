@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from utils import cross_comparison
+from utils import cross_comparison, rmse_matrix
 import concurrent.futures
 from itertools import accumulate
 import torch
@@ -62,8 +62,8 @@ else:
 def predict(w_list, testsets, last_rating=None, file=None):
     p = []
     y = []
-    if file:
-        save_tmp = []
+    save_tmp = [] if file else None
+
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         tmp = (
@@ -86,13 +86,13 @@ def predict(w_list, testsets, last_rating=None, file=None):
         y.extend(tmp["y"].tolist())
         if file:
             save_tmp.append(tmp)
-
-    if os.environ.get("FILE") and file:
+    if file:
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
-        save_tmp.to_csv(f"evaluation/{path}/{file.stem}.tsv", sep="\t", index=False)
+        if os.environ.get("FILE"):
+            save_tmp.to_csv(f"evaluation/{path}/{file.stem}.tsv", sep="\t", index=False)
 
-    return p, y
+    return p, y, save_tmp
 
 
 def convert_to_items(df):  # -> list[FsrsItem]
@@ -217,7 +217,7 @@ def process(file):
             print(e)
             w_list.append(optimizer.init_w)
 
-    p, y = predict(w_list, testsets, file=file)
+    p, y, evaluation = predict(w_list, testsets, file=file)
 
     if os.environ.get("PLOT"):
         fig = plt.figure()
@@ -230,31 +230,16 @@ def process(file):
     ici = np.mean(np.abs(p_calibrated - p))
     rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-    rmse_bins = cross_comparison(pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS")[
-        0
-    ]
-    size = len(y)
-
-    rmse_bins_ratings = {}
-    for last_rating in ("1", "2", "3", "4"):
-        p, y = predict(w_list, testsets, last_rating=last_rating)
-        if len(p) == 0:
-            continue
-        rmse_rating = cross_comparison(
-            pd.DataFrame({"y": y, "R (FSRS)": p}), "FSRS", "FSRS"
-        )[0]
-        rmse_bins_ratings[last_rating] = rmse_rating
-
+    rmse_bins = rmse_matrix(evaluation)
     result = {
         "metrics": {
             "RMSE": rmse_raw,
             "LogLoss": logloss,
             "RMSE(bins)": rmse_bins,
             "ICI": ici,
-            "RMSE(bins)Ratings": rmse_bins_ratings,
         },
         "user": int(file.stem),
-        "size": size,
+        "size": len(y),
         "weights": list(map(lambda x: round(x, 4), w_list[-1])),
     }
     # save as json

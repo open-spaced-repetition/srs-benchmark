@@ -20,6 +20,7 @@ import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers
 from utils import cross_comparison, rmse_matrix
 from fsrs_optimizer import plot_brier
+import multiprocessing as mp
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -228,11 +229,11 @@ class FSRS4(nn.Module):
         :return state:
         """
         if torch.equal(state, torch.zeros_like(state)):
-            keys = torch.tensor([1, 2, 3, 4])
+            keys = torch.tensor([1, 2, 3, 4], device=device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
-            new_s = torch.ones_like(state[:, 0])
+            new_s = torch.ones_like(state[:, 0], device=device)
             new_s[index[0]] = self.w[index[1]]
             new_d = self.w[4] - self.w[5] * (X[:, 1] - 3)
             new_d = new_d.clamp(1, 10)
@@ -877,12 +878,12 @@ class Trainer:
                         ]
                     retentions = self.model.forgetting_curve(delta_ts, stabilities)
                 loss = self.loss_fn(retentions, labels).sum()
+                loss.backward()
                 if isinstance(
                     self.model, FSRS4
                 ):  # the initial stability is not trainable
                     for param in self.model.parameters():
                         param.grad[:4] = torch.zeros(4)
-                loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
                 if self.clipper:
@@ -983,8 +984,8 @@ class Trainer:
 
 
 class Collection:
-    def __init__(self, MDOEL) -> None:
-        self.model = MDOEL
+    def __init__(self, MODEL) -> None:
+        self.model = MODEL.to(device=device)
         self.model.eval()
 
     def batch_predict(self, dataset):
@@ -1306,6 +1307,7 @@ def evaluate(y, p, df, model_name, file, w_list=None):
 
 
 if __name__ == "__main__":
+    mp.set_start_method('spawn', force=True)
     unprocessed_files = []
     dataset_path = "./dataset"
     Path(f"evaluation/{model_name}").mkdir(parents=True, exist_ok=True)

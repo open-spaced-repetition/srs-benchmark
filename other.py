@@ -503,14 +503,15 @@ class Transformer(nn.Module):
 
 class HLR(nn.Module):
     # 3 params
-    def __init__(self, state_dict=None):
+    init_w = [2.4196, -1.0799, 2.0871]
+    def __init__(self, w: List[float] = init_w):
         super().__init__()
         self.n_input = 2
         self.n_out = 1
         self.fc = nn.Linear(self.n_input, self.n_out)
 
-        if state_dict is not None:
-            self.load_state_dict(state_dict)
+        self.fc.weight = nn.Parameter(torch.tensor([w[:2]], dtype=torch.float32))
+        self.fc.bias = nn.Parameter(torch.tensor([w[2]], dtype=torch.float32))
 
     def forward(self, x):
         dp = self.fc(x)
@@ -518,6 +519,11 @@ class HLR(nn.Module):
 
     def forgetting_curve(self, t, s):
         return 0.5 ** (t / s)
+
+    def state_dict(self):
+        return (
+            self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
+        )
 
 
 class ACT_RWeightClipper:

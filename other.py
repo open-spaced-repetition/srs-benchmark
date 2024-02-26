@@ -503,7 +503,7 @@ class Transformer(nn.Module):
 
 class HLR(nn.Module):
     # 3 params
-    init_w = [2.4196, -1.0799, 2.0871]
+    init_w = [2.5819, -0.8674, 2.7245]
     def __init__(self, w: List[float] = init_w):
         super().__init__()
         self.n_input = 2
@@ -1026,8 +1026,8 @@ def create_features(df, model_name="FSRSv3"):
         df["tensor"] = [
             torch.tensor(
                 [
-                    np.sqrt(r_item.count(2) + r_item.count(3) + r_item.count(4)),
-                    np.sqrt(r_item.count(1)),
+                    np.sqrt(r_item[:-1].count(2) + r_item[:-1].count(3) + r_item[:-1].count(4)),
+                    np.sqrt(r_item[:-1].count(1)),
                 ],
                 dtype=torch.float32,
             )

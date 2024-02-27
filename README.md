@@ -65,9 +65,9 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0020 | 0 |
 | FSRS v3 | 0.36±0.007 | 0.072±0.0015 | 13 |
 | LSTM | 0.37±0.007 | 0.075±0.0017 | 489 |
+| HLR | 0.40±0.008 | 0.105±0.0020 | 3 |
 | SM-2 | 0.54±0.012 | 0.170±0.0031 | 0 |
 | Transformer | 0.56±0.018 | 0.182±0.0045 | 622 |
-| HLR | 0.70±0.017 | 0.193±0.0046 | 3 |
 
 ### Weighted by ln(number of reviews)
 
@@ -83,10 +83,10 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 0 |
 | ACT-R | 0.382±0.0035 | 0.064±0.0010 | 5 |
 | FSRS v3 | 0.415±0.0042 | 0.108±0.0014 | 13 |
+| HLR | 0.439±0.0047 | 0.123±0.0013 | 3 |
 | LSTM | 0.50±0.007 | 0.137±0.0018 | 489 |
 | Transformer | 0.56±0.008 | 0.181±0.0018 | 622 |
 | SM-2 | 0.68±0.011 | 0.210±0.0020 | 0 |
-| HLR | 2.03±0.045 | 0.391±0.0040 | 3 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 Averages weighted by the natural logarithm of the number of reviews are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.

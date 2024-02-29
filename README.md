@@ -61,7 +61,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | DASH[MCM] | 0.33±0.005 | 0.063±0.0011 | 9 |
 | DASH[ACT-R] | 0.33±0.006 | 0.066±0.0014 | 5 |
 | FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.065±0.0018 | 4 |
-| ACT-R | 0.35±0.006 | 0.043±0.0013 | 5 |
+| ACT-R | 0.35±0.006 | 0.090±0.0022 | 5 |
 | FSRS-4.5 (default parameters) | 0.35±0.006 | 0.076±0.0020 | 0 |
 | FSRS v3 | 0.36±0.007 | 0.072±0.0015 | 13 |
 | LSTM | 0.37±0.007 | 0.075±0.0017 | 489 |
@@ -81,7 +81,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS v4 | 0.354±0.0031 | 0.078±0.0009 | 17 |
 | FSRS-4.5 (only pretrain) | 0.361±0.0032 | 0.079±0.0009 | 4 |
 | FSRS-4.5 (default parameters) | 0.376±0.0033 | 0.095±0.0011 | 0 |
-| ACT-R | 0.382±0.0035 | 0.064±0.0010 | 5 |
+| ACT-R | 0.381±0.0035 | 0.109±0.0012 | 5 |
 | FSRS v3 | 0.415±0.0042 | 0.108±0.0014 | 13 |
 | HLR | 0.439±0.0047 | 0.123±0.0013 | 3 |
 | LSTM | 0.50±0.007 | 0.137±0.0018 | 489 |

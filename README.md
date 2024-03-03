@@ -33,7 +33,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed. This benchmark also includes FSRS-4.5 with default parameters (which have been obtained by running FSRS-4.5 on all 20 thousand collections) and FSRS-4.5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
-- LSTM: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
+- GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
 - Transformer: a type of neural network that has gained popularity in recent years due to its superior performance in natural language processing. ChatGPT is based on this architecture.
 - DASH: the model proposed in [here](https://doi.org/10.4324/9781315413570-8). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this model: DASH[MCM] and DASH[ACT-R]. For more details, you can read the paper [here](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
 - ACT-R: the model proposed in [here](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
@@ -64,7 +64,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.35±0.006 | 0.087±0.0020 | 0 |
 | ACT-R | 0.35±0.006 | 0.090±0.0022 | 5 |
 | FSRS v3 | 0.36±0.007 | 0.072±0.0015 | 13 |
-| LSTM | 0.37±0.007 | 0.075±0.0017 | 489 |
+| GRU | 0.38±0.007 | 0.08±0.0016 | 36 |
 | HLR | 0.40±0.008 | 0.105±0.0020 | 3 |
 | SM-2 | 0.54±0.013 | 0.149±0.0031 | 0 |
 | Transformer | 0.56±0.018 | 0.182±0.0045 | 622 |
@@ -83,8 +83,8 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS-4.5 (default parameters) | 0.375±0.0033 | 0.106±0.0011 | 0 |
 | ACT-R | 0.381±0.0035 | 0.109±0.0012 | 5 |
 | FSRS v3 | 0.415±0.0042 | 0.108±0.0014 | 13 |
+| GRU | 0.431±0.049 | 0.107±0.0012 | 36 |
 | HLR | 0.439±0.0047 | 0.123±0.0013 | 3 |
-| LSTM | 0.50±0.007 | 0.137±0.0018 | 489 |
 | Transformer | 0.56±0.008 | 0.181±0.0018 | 622 |
 | SM-2 | 0.68±0.011 | 0.195±0.0020 | 0 |
 

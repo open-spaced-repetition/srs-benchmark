@@ -16,8 +16,7 @@ from scipy.optimize import minimize
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers
-from utils import rmse_matrix
-from fsrs_optimizer import plot_brier, BatchDataset, BatchLoader
+from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier
 import multiprocessing as mp
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -25,8 +24,10 @@ torch.manual_seed(42)
 tqdm.pandas()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 lr: float = 4e-2
+wd: float = 1e-5
 n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
@@ -419,15 +420,15 @@ class FSRS4(nn.Module):
         self.w.data[0:4] = Tensor(list(map(lambda x: max(min(100, x), 0.01), init_s0)))
 
 
-n_input = 5
-n_hidden = 8
+n_input = 2
+n_hidden = 2
 n_output = 1
 n_layers = 1
-network = "LSTM"
+network = "GRU"
 
 
 class RNN(nn.Module):
-    # 489 params with default settings
+    # 36 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
         self.n_input = n_input
@@ -440,6 +441,10 @@ class RNN(nn.Module):
                 hidden_size=self.n_hidden,
                 num_layers=self.n_layers,
             )
+            nn.init.orthogonal_(self.rnn.weight_ih_l0)
+            nn.init.orthogonal_(self.rnn.weight_hh_l0)
+            self.rnn.bias_ih_l0.data.fill_(0)
+            self.rnn.bias_hh_l0.data.fill_(0)
         elif network == "LSTM":
             self.rnn = nn.LSTM(
                 input_size=self.n_input,
@@ -457,6 +462,8 @@ class RNN(nn.Module):
 
         if state_dict is not None:
             self.load_state_dict(state_dict)
+        else:
+            self.load_state_dict(torch.load(f'./{network}_pretrain.pth', map_location=device))
 
     def forward(self, x, hx=None):
         x, h = self.rnn(x, hx=hx)
@@ -503,14 +510,15 @@ class Transformer(nn.Module):
 
 class HLR(nn.Module):
     # 3 params
-    def __init__(self, state_dict=None):
+    init_w = [2.5819, -0.8674, 2.7245]
+    def __init__(self, w: List[float] = init_w):
         super().__init__()
         self.n_input = 2
         self.n_out = 1
         self.fc = nn.Linear(self.n_input, self.n_out)
 
-        if state_dict is not None:
-            self.load_state_dict(state_dict)
+        self.fc.weight = nn.Parameter(torch.tensor([w[:2]], dtype=torch.float32))
+        self.fc.bias = nn.Parameter(torch.tensor([w[2]], dtype=torch.float32))
 
     def forward(self, x):
         dp = self.fc(x)
@@ -518,6 +526,11 @@ class HLR(nn.Module):
 
     def forgetting_curve(self, t, s):
         return 0.5 ** (t / s)
+
+    def state_dict(self):
+        return (
+            self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
+        )
 
 
 class ACT_RWeightClipper:
@@ -709,12 +722,16 @@ class Trainer:
         test_set: pd.DataFrame,
         n_epoch: int = 1,
         lr: float = 1e-2,
+        wd: float = 1e-4,
         batch_size: int = 256,
     ) -> None:
         self.model = MODEL.to(device=device)
         if isinstance(MODEL, FSRS4):
             self.model.pretrain(train_set)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+        if isinstance(MODEL, (RNN, Transformer)):
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=wd)
+        else:
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.clipper = (
             MODEL.clipper
             if isinstance(MODEL, (FSRS3, FSRS4, ACT_R, DASH_ACTR))
@@ -765,10 +782,14 @@ class Trainer:
                 self.model.train()
                 self.optimizer.zero_grad()
                 sequences, delta_ts, labels, seq_lens = batch
+                sequences = sequences.to(device=device)
+                delta_ts = delta_ts.to(device=device)
+                labels = labels.to(device=device)
+                seq_lens = seq_lens.to(device=device)
                 real_batch_size = seq_lens.shape[0]
                 if isinstance(self.model, ACT_R):
                     outputs = self.model(sequences)
-                    retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+                    retentions = outputs[seq_lens - 2, torch.arange(real_batch_size, device=device), 0]
                 elif isinstance(self.model, DASH_ACTR):
                     outputs = self.model(sequences)
                     retentions = outputs.squeeze()
@@ -782,7 +803,7 @@ class Trainer:
                     else:
                         outputs, _ = self.model(sequences)
                         stabilities = outputs[
-                            seq_lens - 1, torch.arange(real_batch_size), 0
+                            seq_lens - 1, torch.arange(real_batch_size, device=device), 0
                         ]
                     retentions = self.model.forgetting_curve(delta_ts, stabilities)
                 loss = self.loss_fn(retentions, labels).sum()
@@ -811,10 +832,14 @@ class Trainer:
                 self.train_set.y_train,
                 self.train_set.seq_len,
             )
+            sequences = sequences.to(device=device)
+            delta_ts = delta_ts.to(device=device)
+            labels = labels.to(device=device)
+            seq_lens = seq_lens.to(device=device)
             real_batch_size = seq_lens.shape[0]
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size, device=device), 0]
             elif isinstance(self.model, DASH_ACTR):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs.squeeze()
@@ -828,7 +853,7 @@ class Trainer:
                 else:
                     outputs, _ = self.model(sequences.transpose(0, 1))
                     stabilities = outputs[
-                        seq_lens - 1, torch.arange(real_batch_size), 0
+                        seq_lens - 1, torch.arange(real_batch_size, device=device), 0
                     ]
                 retentions = self.model.forgetting_curve(delta_ts, stabilities)
             tran_loss = self.loss_fn(retentions, labels).mean()
@@ -840,11 +865,15 @@ class Trainer:
                 self.test_set.y_train,
                 self.test_set.seq_len,
             )
+            sequences = sequences.to(device=device)
+            delta_ts = delta_ts.to(device=device)
+            labels = labels.to(device=device)
+            seq_lens = seq_lens.to(device=device)
             real_batch_size = seq_lens.shape[0]
 
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size), 0]
+                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size, device=device), 0]
             elif isinstance(self.model, DASH_ACTR):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs.squeeze()
@@ -858,7 +887,7 @@ class Trainer:
                 else:
                     outputs, _ = self.model(sequences.transpose(0, 1))
                     stabilities = outputs[
-                        seq_lens - 1, torch.arange(real_batch_size), 0
+                        seq_lens - 1, torch.arange(real_batch_size, device=device), 0
                     ]
                 retentions = self.model.forgetting_curve(delta_ts, stabilities)
             test_loss = self.loss_fn(retentions, labels).mean()
@@ -883,6 +912,8 @@ class Trainer:
     def plot(self):
         fig = plt.figure()
         ax = fig.gca()
+        self.avg_train_losses = [x.item() for x in self.avg_train_losses]
+        self.avg_eval_losses = [x.item() for x in self.avg_eval_losses]
         ax.plot(self.avg_train_losses, label="train")
         ax.plot(self.avg_eval_losses, label="test")
         ax.set_xlabel("epoch")
@@ -898,6 +929,8 @@ class Collection:
 
     def batch_predict(self, dataset):
         fast_dataset = BatchDataset(dataset)
+        fast_dataset.x_train = fast_dataset.x_train.to(device=device)
+        fast_dataset.seq_len = fast_dataset.seq_len.to(device=device)
         with torch.no_grad():
             if isinstance(self.model, ACT_R):
                 outputs = self.model(fast_dataset.x_train.transpose(0, 1))
@@ -987,6 +1020,7 @@ def baseline(file):
 
 def create_features(df, model_name="FSRSv3"):
     df = df[(df["delta_t"] != 0) & (df["rating"].isin([1, 2, 3, 4]))].copy()
+    df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
     df["i"] = df.groupby("card_id").cumcount() + 1
     t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[i] for i in x])
@@ -1000,13 +1034,14 @@ def create_features(df, model_name="FSRSv3"):
     df["t_history"] = [
         ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
     ]
-    if model_name.startswith("FSRS"):
+    if model_name.startswith("FSRS") or model_name == "GRU":
+        dtype = torch.float32 if model_name == "GRU" else torch.int
         df["tensor"] = [
-            torch.tensor((t_item[:-1], r_item[:-1])).transpose(0, 1)
+            torch.tensor((t_item[:-1], r_item[:-1]), dtype=dtype).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
-    elif model_name in ("LSTM", "Transformer"):
+    elif model_name == "Transformer":
         df["tensor"] = [
             torch.tensor(
                 [t_item[:-1]]
@@ -1020,8 +1055,8 @@ def create_features(df, model_name="FSRSv3"):
         df["tensor"] = [
             torch.tensor(
                 [
-                    np.sqrt(r_item.count(2) + r_item.count(3) + r_item.count(4)),
-                    np.sqrt(r_item.count(1)),
+                    np.sqrt(r_item[:-1].count(2) + r_item[:-1].count(3) + r_item[:-1].count(4)),
+                    np.sqrt(r_item[:-1].count(1)),
                 ],
                 dtype=torch.float32,
             )
@@ -1030,7 +1065,7 @@ def create_features(df, model_name="FSRSv3"):
         ]
     elif model_name == "ACT-R":
         df["tensor"] = [
-            (torch.cumsum(torch.tensor([t_item]), dim=1) + 1).transpose(0, 1)
+            (torch.cumsum(torch.tensor([t_item]), dim=1)).transpose(0, 1)
             for t_sublist in t_history
             for t_item in t_sublist
         ]
@@ -1115,7 +1150,7 @@ def process(args):
         baseline(file)
         return
     dataset = pd.read_csv(file)
-    if model_name == "LSTM":
+    if model_name == "GRU":
         model = RNN
     elif model_name == "FSRSv3":
         model = FSRS3
@@ -1150,6 +1185,7 @@ def process(args):
                 test_set,
                 n_epoch=n_epoch,
                 lr=lr,
+                wd=wd,
                 batch_size=batch_size,
             )
             w_list.append(trainer.train(verbose=verbose))

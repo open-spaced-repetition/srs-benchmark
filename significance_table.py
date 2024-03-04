@@ -117,10 +117,9 @@ if __name__ == "__main__":
         "FSRS-4.5-dry-run",
         "ACT-R",
         "FSRSv3",
-        "LSTM",
-        "Transformer",
-        "SM2",
+        "GRU",
         "HLR",
+        "SM2",
     ]
     csv_name = f"{len(models)} models.csv"
     print(f"Number of tests={(len(models)-1) ** 2}")

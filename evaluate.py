@@ -92,8 +92,7 @@ if __name__ == "__main__":
         "FSRS-4.5-dry-run",
         "ACT-R",
         "FSRSv3",
-        "LSTM",
-        "Transformer",
+        "GRU",
         "HLR",
         "SM2",
     ):

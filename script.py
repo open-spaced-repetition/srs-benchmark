@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, log_loss
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from utils import cross_comparison, rmse_matrix
 import concurrent.futures
 from itertools import accumulate
 import torch
@@ -29,6 +28,7 @@ from fsrs_optimizer import (
     remove_outliers,
     remove_non_continuous_rows,
     plot_brier,
+    rmse_matrix,
 )
 
 

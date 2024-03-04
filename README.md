@@ -53,7 +53,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **00.32±0.006** | **0.052±0.0011** | 17 |
+| **FSRS-4.5** | **0.32±0.006** | **0.052±0.0011** | 17 |
 | FSRS rs | 0.33±0.006 | 0.056±0.0012 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.057±0.0014 | 17 |
 | DASH | 0.33±0.005 | 0.061±0.0011 | 9 |

@@ -71,12 +71,12 @@ The following tables represent the weighted means and the 99% confidence interva
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| FSRS-4.5 | **0.346±0.0031** | 0.072±0.0008 | 17 |
+| **FSRS-4.5** | **0.346±0.0031** | **0.072±0.0008** | 17 |
 | FSRS rs | 0.350±0.0031 | 0.075±0.0008 | 17 |
 | DASH | 0.350±0.0030 | 0.080±0.0009 | 9 |
 | DASH[MCM] | 0.351±0.0029 | 0.082±0.0009 | 9 |
-| DASH[ACT-R] | 0.354±0.0031 | 0.085±0.0010 | 5 |
 | FSRS v4 | 0.354±0.0031 | 0.078±0.0009 | 17 |
+| DASH[ACT-R] | 0.354±0.0031 | 0.085±0.0010 | 5 |
 | FSRS-4.5 (only pretrain) | 0.360±0.0032 | 0.089±0.0009 | 4 |
 | FSRS-4.5 (default parameters) | 0.375±0.0033 | 0.106±0.0011 | 0 |
 | ACT-R | 0.381±0.0035 | 0.109±0.0012 | 5 |

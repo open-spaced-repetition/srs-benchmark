@@ -160,8 +160,8 @@ if __name__ == "__main__":
             if i == j:
                 wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f'{models[i]}, LogLoss']
-                df2 = df[f'{models[j]}, LogLoss']
+                df1 = df[f'{models[i]}, RMSE']
+                df2 = df[f'{models[j]}, RMSE']
                 if n_collections > 50:
                     result = logp_wilcox(df1[:n_collections], df2[:n_collections])[0]
                 else:
@@ -175,8 +175,8 @@ if __name__ == "__main__":
             if i == j:
                 color_wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f'{models[i]}, LogLoss']
-                df2 = df[f'{models[j]}, LogLoss']
+                df1 = df[f'{models[i]}, RMSE']
+                df2 = df[f'{models[j]}, RMSE']
                 # we'll need the second value returned by my function to determine the color
                 approx = logp_wilcox(df1[:n_collections], df2[:n_collections])
                 if n_collections > 50:

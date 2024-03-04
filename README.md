@@ -34,7 +34,6 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed. This benchmark also includes FSRS-4.5 with default parameters (which have been obtained by running FSRS-4.5 on all 20 thousand collections) and FSRS-4.5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
 - FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
-- Transformer: a type of neural network that has gained popularity in recent years due to its superior performance in natural language processing. ChatGPT is based on this architecture.
 - DASH: the model proposed in [here](https://doi.org/10.4324/9781315413570-8). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this model: DASH[MCM] and DASH[ACT-R]. For more details, you can read the paper [here](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
 - ACT-R: the model proposed in [here](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression. For more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).
@@ -55,7 +54,7 @@ The following tables represent the weighted means and the 99% confidence interva
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
 | **FSRS-4.5** | **00.32±0.006** | **0.052±0.0011** | 17 |
-| FSRS rs | 0.33±0.006 | 0.046±0.0011 | 17 |
+| FSRS rs | 0.33±0.006 | 0.056±0.0012 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.057±0.0014 | 17 |
 | DASH | 0.33±0.005 | 0.061±0.0011 | 9 |
 | DASH[MCM] | 0.33±0.005 | 0.063±0.0011 | 9 |
@@ -67,15 +66,14 @@ The following tables represent the weighted means and the 99% confidence interva
 | GRU | 0.38±0.007 | 0.08±0.0016 | 36 |
 | HLR | 0.40±0.008 | 0.105±0.0020 | 3 |
 | SM-2 | 0.54±0.013 | 0.149±0.0031 | 0 |
-| Transformer | 0.56±0.018 | 0.182±0.0045 | 622 |
 
 ### Weighted by ln(number of reviews)
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
 | FSRS-4.5 | **0.346±0.0031** | 0.072±0.0008 | 17 |
+| FSRS rs | 0.350±0.0031 | 0.075±0.0008 | 17 |
 | DASH | 0.350±0.0030 | 0.080±0.0009 | 9 |
-| FSRS rs | 0.350±0.0031 | 0.066±0.0008 | 17 |
 | DASH[MCM] | 0.351±0.0029 | 0.082±0.0009 | 9 |
 | DASH[ACT-R] | 0.354±0.0031 | 0.085±0.0010 | 5 |
 | FSRS v4 | 0.354±0.0031 | 0.078±0.0009 | 17 |
@@ -85,7 +83,6 @@ The following tables represent the weighted means and the 99% confidence interva
 | FSRS v3 | 0.415±0.0042 | 0.108±0.0014 | 13 |
 | GRU | 0.431±0.049 | 0.107±0.0012 | 36 |
 | HLR | 0.439±0.0047 | 0.123±0.0013 | 3 |
-| Transformer | 0.56±0.008 | 0.181±0.0018 | 622 |
 | SM-2 | 0.68±0.011 | 0.195±0.0020 | 0 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
@@ -167,7 +164,7 @@ FSRSv4/FSRSv3/HLR/LSTM/SM2:
 MODEL=FSRSv4 python other.py
 ```
 
-> Please change the `MODEL` variable to `FSRSv3`, `HLR`, `LSTM`, or `SM2` to run the corresponding model.
+> Please change the `MODEL` variable to `FSRSv3`, `HLR`, `GRU`, or `SM2` to run the corresponding model.
 
 Dev model in fsrs-optimizer:
 

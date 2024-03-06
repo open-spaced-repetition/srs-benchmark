@@ -188,8 +188,9 @@ def process(file):
         # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
         try:
             if rust:
-                items = convert_to_items(train_set[train_set["i"] >= 2])
-                weights = backend.compute_weights_from_items(items)
+                train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
+                test_set_items = convert_to_items(test_set[test_set["i"] >= 2])
+                weights = backend.benchmark(train_set_items, test_set_items)
                 w_list.append(weights)
             else:
                 optimizer.S0_dataset_group = (

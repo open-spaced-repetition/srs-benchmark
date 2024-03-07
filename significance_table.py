@@ -107,8 +107,8 @@ def format(exponent, n):
 
 if __name__ == "__main__":
     models = [
-        "FSRS-4.5",
         "FSRS-rs",
+        "FSRS-4.5",
         "FSRSv4",
         "DASH",
         "DASH[MCM]",

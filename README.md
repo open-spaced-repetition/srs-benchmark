@@ -32,7 +32,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - FSRS v3: the first version of the FSRS algorithm that people actually used.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed. This benchmark also includes FSRS-4.5 with default parameters (which have been obtained by running FSRS-4.5 on all 20 thousand collections) and FSRS-4.5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
-- FSRS rs: the Rust port of FSRS v4, it's simplified due to the limitations of the Rust-based deep learning framework. See also: https://github.com/open-spaced-repetition/fsrs-rs
+- FSRS-rs: the Rust port of FSRS-4.5. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
 - DASH: the model proposed in [here](https://doi.org/10.4324/9781315413570-8). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this model: DASH[MCM] and DASH[ACT-R]. For more details, you can read the paper [here](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
 - ACT-R: the model proposed in [here](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
@@ -54,7 +54,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
 | **FSRS-4.5** | **0.32±0.006** | **0.052±0.0011** | 17 |
-| FSRS rs | 0.32±0.005 | 0.053±0.0013 | 17 |
+| FSRS-rs | 0.32±0.005 | 0.053±0.0013 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.057±0.0014 | 17 |
 | DASH | 0.33±0.005 | 0.061±0.0011 | 9 |
 | DASH[MCM] | 0.33±0.005 | 0.063±0.0011 | 9 |
@@ -72,7 +72,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
 | **FSRS-4.5** | **0.346±0.0031** | **0.072±0.0008** | 17 |
-| FSRS rs | 0.347±0.0030 | 0.073±0.0008 | 17 |
+| FSRS-rs | 0.347±0.0030 | 0.073±0.0008 | 17 |
 | FSRS v4 | 0.354±0.0031 | 0.078±0.0009 | 17 |
 | DASH | 0.350±0.0030 | 0.080±0.0009 | 9 |
 | DASH[MCM] | 0.351±0.0029 | 0.082±0.0009 | 9 |
@@ -88,7 +88,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 Averages weighted by the natural logarithm of the number of reviews are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
 
-The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS rs outperforms all other algorithms; the bottom row is red because SM-2 performs worse than any other algorithm. Grey means that the p-value is >0.05, and we cannot conclude that one algorithm performs better than the other.
+The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-rs outperforms all other algorithms; the bottom row is red because SM-2 performs worse than any other algorithm. Grey means that the p-value is >0.05, and we cannot conclude that one algorithm performs better than the other.
 
 Almost all p-values are extremely small, many orders of magnitude smaller than 0.05. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the decimal logarithm of the p-value rather than the p-value itself, to avoid the limitations of 64-bit floating point numbers. So it's an approximation of an approximation. But more importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE depends on the number of reviews.
 Overall, these p-values can be trusted on a qualitative (but not quantitative) level.
@@ -107,7 +107,7 @@ FSRS-4.5:
 0.219, 2.8237
 ```
 
-FSRS rs:
+FSRS-rs:
 
 ```
 0.5612, 1.4166, 4.1698, 11.2266,

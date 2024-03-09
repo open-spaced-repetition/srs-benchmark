@@ -3,6 +3,7 @@ import numpy as np
 import json
 import pathlib
 from KDEpy import FFTKDE
+from fsrs_optimizer import DEFAULT_WEIGHT
 
 def chen_rule(data, weights=None):
     # https://www.hindawi.com/journals/jps/2015/242683/
@@ -196,31 +197,12 @@ if __name__ == "__main__":
     weights = []
     sizes = []
     n_params = 17
-    defaults = [
-        0.5614,
-        1.2546,
-        3.5878,
-        7.9731,
-        5.1043,
-        1.1303,
-        0.823,
-        0.0465,
-        1.629,
-        0.135,
-        1.0045,
-        2.132,
-        0.0839,
-        0.3204,
-        1.3547,
-        0.219,
-        2.7849,
-    ]
     # if you used other default parameters, please replace the ones above
     for result_file in result_files:
         with open(result_file, "r") as f:
             result = json.load(f)
             for i in range(n_params):
-                if abs(result["weights"][i] - defaults[i]) <= 1e-4:
+                if abs(result["weights"][i] - DEFAULT_WEIGHT[i]) <= 1e-4:
                     # remove users who have parameters that are close to the default
                     break
             else:

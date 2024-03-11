@@ -5,6 +5,7 @@ import pathlib
 from KDEpy import FFTKDE
 from fsrs_optimizer import DEFAULT_WEIGHT
 
+
 def chen_rule(data, weights=None):
     # https://www.hindawi.com/journals/jps/2015/242683/
     data = np.asarray(data)
@@ -24,20 +25,28 @@ def chen_rule(data, weights=None):
         # 3/8 = 'normal_unbiased'
         # 1/2 = 'hazen'
         # 1 = 'linear'
-        cdf = (np.cumsum(weights) - C * weights) / (np.sum(weights) + (1 - 2 * C) * weights)  # 'like' a CDF function
-        return np.interp(q, cdf, data)  # when all weights are equal to 1, this is equivalent to using 'linear' in np.percentile
+        cdf = (np.cumsum(weights) - C * weights) / (
+            np.sum(weights) + (1 - 2 * C) * weights
+        )  # 'like' a CDF function
+        return np.interp(
+            q, cdf, data
+        )  # when all weights are equal to 1, this is equivalent to using 'linear' in np.percentile
 
     std = np.sqrt(np.cov(data, aweights=weights))
-    IQR = (weighted_percentile(data, weights, q=0.75) - weighted_percentile(data, weights, q=0.25)) / 1.3489795003921634
+    IQR = (
+        weighted_percentile(data, weights, q=0.75)
+        - weighted_percentile(data, weights, q=0.25)
+    ) / 1.3489795003921634
     scale = min(IQR, std)
     mean = np.average(data, weights=weights)
     n = len(data)
     if mean != 0 and scale > 0:
-        cv = (1 + 1/(4 * n)) * scale / mean  # corrected for small sample size
-        h = ((4 * (2 + cv ** 2)) ** (1/5)) * scale * (n ** (-2/5))
+        cv = (1 + 1 / (4 * n)) * scale / mean  # corrected for small sample size
+        h = ((4 * (2 + cv**2)) ** (1 / 5)) * scale * (n ** (-2 / 5))
         return h
     else:
         raise Exception("Chen's rule failed")
+
 
 def mode_of_three(data):
     assert len(data) == 3

@@ -61,7 +61,21 @@ class FSRS3WeightClipper:
 
 class FSRS3(nn.Module):
     # 13 params
-    init_w = [1, 1, 5, -0.5, -0.5, 0.2, 1.4, -0.2, 0.8, 2, -0.2, 0.2, 1]
+    init_w = [
+        0.9605,
+        1.7234,
+        4.8527,
+        -1.1917,
+        -1.2956,
+        0.0573,
+        1.7352,
+        -0.1673,
+        1.065,
+        1.8907,
+        -0.3832,
+        0.5867,
+        1.0721,
+    ]
     clipper = FSRS3WeightClipper()
 
     def __init__(self, w: List[float] = init_w):
@@ -463,7 +477,9 @@ class RNN(nn.Module):
         if state_dict is not None:
             self.load_state_dict(state_dict)
         else:
-            self.load_state_dict(torch.load(f'./{network}_pretrain.pth', map_location=device))
+            self.load_state_dict(
+                torch.load(f"./{network}_pretrain.pth", map_location=device)
+            )
 
     def forward(self, x, hx=None):
         x, h = self.rnn(x, hx=hx)
@@ -511,6 +527,7 @@ class Transformer(nn.Module):
 class HLR(nn.Module):
     # 3 params
     init_w = [2.5819, -0.8674, 2.7245]
+
     def __init__(self, w: List[float] = init_w):
         super().__init__()
         self.n_input = 2
@@ -729,7 +746,9 @@ class Trainer:
         if isinstance(MODEL, FSRS4):
             self.model.pretrain(train_set)
         if isinstance(MODEL, (RNN, Transformer)):
-            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr, weight_decay=wd)
+            self.optimizer = torch.optim.AdamW(
+                self.model.parameters(), lr=lr, weight_decay=wd
+            )
         else:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.clipper = (
@@ -789,7 +808,9 @@ class Trainer:
                 real_batch_size = seq_lens.shape[0]
                 if isinstance(self.model, ACT_R):
                     outputs = self.model(sequences)
-                    retentions = outputs[seq_lens - 2, torch.arange(real_batch_size, device=device), 0]
+                    retentions = outputs[
+                        seq_lens - 2, torch.arange(real_batch_size, device=device), 0
+                    ]
                 elif isinstance(self.model, DASH_ACTR):
                     outputs = self.model(sequences)
                     retentions = outputs.squeeze()
@@ -803,7 +824,9 @@ class Trainer:
                     else:
                         outputs, _ = self.model(sequences)
                         stabilities = outputs[
-                            seq_lens - 1, torch.arange(real_batch_size, device=device), 0
+                            seq_lens - 1,
+                            torch.arange(real_batch_size, device=device),
+                            0,
                         ]
                     retentions = self.model.forgetting_curve(delta_ts, stabilities)
                 loss = self.loss_fn(retentions, labels).sum()
@@ -839,7 +862,9 @@ class Trainer:
             real_batch_size = seq_lens.shape[0]
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size, device=device), 0]
+                retentions = outputs[
+                    seq_lens - 2, torch.arange(real_batch_size, device=device), 0
+                ]
             elif isinstance(self.model, DASH_ACTR):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs.squeeze()
@@ -873,7 +898,9 @@ class Trainer:
 
             if isinstance(self.model, ACT_R):
                 outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[seq_lens - 2, torch.arange(real_batch_size, device=device), 0]
+                retentions = outputs[
+                    seq_lens - 2, torch.arange(real_batch_size, device=device), 0
+                ]
             elif isinstance(self.model, DASH_ACTR):
                 outputs = self.model(sequences.transpose(0, 1))
                 retentions = outputs.squeeze()
@@ -1055,7 +1082,11 @@ def create_features(df, model_name="FSRSv3"):
         df["tensor"] = [
             torch.tensor(
                 [
-                    np.sqrt(r_item[:-1].count(2) + r_item[:-1].count(3) + r_item[:-1].count(4)),
+                    np.sqrt(
+                        r_item[:-1].count(2)
+                        + r_item[:-1].count(3)
+                        + r_item[:-1].count(4)
+                    ),
                     np.sqrt(r_item[:-1].count(1)),
                 ],
                 dtype=torch.float32,

@@ -38,7 +38,9 @@ def process_revlog(revlog):
     last_learn_start = (
         df[df["is_learn_start"]].groupby("card_id")["sequence_group"].last()
     )
-    df["last_learn_start"] = df["card_id"].map(last_learn_start).fillna(0).astype("int64")
+    df["last_learn_start"] = (
+        df["card_id"].map(last_learn_start).fillna(0).astype("int64")
+    )
     df["mask"] = df["last_learn_start"] <= df["sequence_group"]
     df = df[df["mask"] == True]
     df = df.groupby("card_id").filter(lambda group: group["review_state"].iloc[0] == 0)

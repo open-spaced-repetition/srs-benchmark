@@ -64,7 +64,6 @@ def predict(w_list, testsets, last_rating=None, file=None):
     y = []
     save_tmp = [] if file else None
 
-
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         tmp = (
             testset[

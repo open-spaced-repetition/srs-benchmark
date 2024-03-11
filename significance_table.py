@@ -114,8 +114,8 @@ if __name__ == "__main__":
         "DASH[MCM]",
         "DASH[ACT-R]",
         "FSRS-4.5-pretrain",
-        "FSRS-4.5-dry-run",
         "FSRSv3",
+        "FSRS-4.5-dry-run",
         "GRU",
         "ACT-R",
         "HLR",
@@ -160,13 +160,15 @@ if __name__ == "__main__":
             if i == j:
                 wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f'{models[i]}, RMSE (bins)']
-                df2 = df[f'{models[j]}, RMSE (bins)']
+                df1 = df[f"{models[i]}, RMSE (bins)"]
+                df2 = df[f"{models[j]}, RMSE (bins)"]
                 if n_collections > 50:
                     result = logp_wilcox(df1[:n_collections], df2[:n_collections])[0]
                 else:
                     # use the exact result for small n
-                    result = np.log10(stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue)
+                    result = np.log10(
+                        stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue
+                    )
                 wilcox[i][j] = result
 
     color_wilcox = [[-1 for i in range(n)] for j in range(n)]
@@ -175,15 +177,17 @@ if __name__ == "__main__":
             if i == j:
                 color_wilcox[i][j] = float("NaN")
             else:
-                df1 = df[f'{models[i]}, RMSE (bins)']
-                df2 = df[f'{models[j]}, RMSE (bins)']
+                df1 = df[f"{models[i]}, RMSE (bins)"]
+                df2 = df[f"{models[j]}, RMSE (bins)"]
                 # we'll need the second value returned by my function to determine the color
                 approx = logp_wilcox(df1[:n_collections], df2[:n_collections])
                 if n_collections > 50:
                     result = approx[0]
                 else:
                     # use the exact result for small n
-                    result = np.log10(stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue)
+                    result = np.log10(
+                        stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue
+                    )
 
                 if np.power(10, result) > 0.01:
                     # color for insignificant p-values
@@ -221,9 +225,9 @@ if __name__ == "__main__":
                 pass
             else:
                 if 10 ** wilcox[i][j] > 0.1:
-                    string = f'{10 ** wilcox[i][j]:.2f}'
+                    string = f"{10 ** wilcox[i][j]:.2f}"
                 elif 10 ** wilcox[i][j] > 0.01:
-                    string = f'{10 ** wilcox[i][j]:.3f}'
+                    string = f"{10 ** wilcox[i][j]:.3f}"
                 else:
                     string = format(wilcox[i][j], 0)
                 text = ax.text(
@@ -244,5 +248,5 @@ if __name__ == "__main__":
     for location in ["left", "right", "top", "bottom"]:
         ax.spines[location].set_linewidth(2)
     title = f"Wilcoxon-{n_collections}-collections"
-    plt.savefig(f"./plots/{title}.png", bbox_inches='tight')
+    plt.savefig(f"./plots/{title}.png", bbox_inches="tight")
     # plt.show()

@@ -29,4 +29,4 @@ trainer = Trainer(
 )
 trainer.train()
 
-torch.save(trainer.model.state_dict(), './GRU_pretrain.pth')
+torch.save(trainer.model.state_dict(), "./GRU_pretrain.pth")

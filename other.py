@@ -688,7 +688,7 @@ class DASH_ACTR(nn.Module):
 
 
 class NN_17(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
         self.hidden_size = 8
         self.state2stability = nn.Sequential(
@@ -733,6 +733,9 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.Mish(),
         )
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
 
     def forward(self, inputs):
         state = torch.zeros((inputs.shape[1], self.hidden_size))
@@ -1054,6 +1057,13 @@ class Collection:
                 if isinstance(self.model, HLR):
                     outputs = self.model(fast_dataset.x_train)
                     stabilities = outputs.squeeze()
+                elif isinstance(self.model, NN_17):
+                    outputs = self.model(fast_dataset.x_train.transpose(0, 1))
+                    stabilities = self.model.state2stability(
+                        outputs[
+                            fast_dataset.seq_len - 1, torch.arange(len(fast_dataset))
+                        ]
+                    ).squeeze(1)
                 else:
                     outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
                     stabilities = outputs[

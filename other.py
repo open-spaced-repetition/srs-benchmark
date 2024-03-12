@@ -751,9 +751,9 @@ class NN_17(nn.Module):
         :param state: shape[batch_size, hidden_size]
         :return state:
         """
-        delta_t = X[:, 0].unsqueeze(0)
-        rating = X[:, 1].unsqueeze(0)
-        lapses = X[:, 2].unsqueeze(0)
+        delta_t = X[:, 0].unsqueeze(1)
+        rating = X[:, 1].unsqueeze(1)
+        lapses = X[:, 2].unsqueeze(1)
         last_s = self.state2stability(state)
         last_d = self.state2difficulty(state)
         theoritical_r = self.forgetting_curve(delta_t, last_s)
@@ -914,7 +914,12 @@ class Trainer:
                         stabilities = outputs.squeeze()
                     elif isinstance(self.model, NN_17):
                         outputs = self.model(sequences)
-                        stabilities = self.model.state2stability(outputs)
+                        stabilities = self.model.state2stability(
+                            outputs[
+                                seq_lens - 1,
+                                torch.arange(real_batch_size, device=device)
+                            ]
+                        ).squeeze(1)
                     else:
                         outputs, _ = self.model(sequences)
                         stabilities = outputs[
@@ -973,11 +978,18 @@ class Trainer:
                         stabilities = outputs.squeeze()
                     elif isinstance(self.model, NN_17):
                         outputs = self.model(sequences.transpose(0, 1))
-                        stabilities = self.model.state2stability(outputs)
+                        stabilities = self.model.state2stability(
+                            outputs[
+                                seq_lens - 1,
+                                torch.arange(real_batch_size, device=device)
+                            ]
+                        ).squeeze(1)
                     else:
                         outputs, _ = self.model(sequences.transpose(0, 1))
                         stabilities = outputs[
-                            seq_lens - 1, torch.arange(real_batch_size, device=device), 0
+                            seq_lens - 1,
+                            torch.arange(real_batch_size, device=device),
+                            0,
                         ]
                     retentions = self.model.forgetting_curve(delta_ts, stabilities)
                 loss = self.loss_fn(retentions, labels).mean()
@@ -1229,8 +1241,7 @@ def create_features(df, model_name="FSRSv3"):
 
         df["tensor"] = [
             torch.tensor(
-                (t_item[:-1], r_item[:-1], r_history_to_l_history(r_item[:-1])),
-                dtype=dtype,
+                (t_item[:-1], r_item[:-1], r_history_to_l_history(r_item[:-1]))
             ).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)

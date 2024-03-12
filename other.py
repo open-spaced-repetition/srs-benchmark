@@ -717,13 +717,13 @@ class NN_17(nn.Module):
             nn.Linear(2, self.hidden_size),
             nn.Mish(),
             nn.Linear(self.hidden_size, 1),
-            nn.ReLU(),
+            nn.Softplus(),
         )
         self.sinc = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
             nn.Linear(self.hidden_size, 1),
-            nn.ReLU(),
+            nn.Softplus(),
         )
         self.next_state = nn.Sequential(
             nn.Linear(4, self.hidden_size),
@@ -757,7 +757,7 @@ class NN_17(nn.Module):
         delta_t = X[:, 0].unsqueeze(1)
         rating = X[:, 1].unsqueeze(1)
         lapses = X[:, 2].unsqueeze(1)
-        last_s = self.state2stability(state)
+        last_s = self.state2stability(state).clamp(0.01, 36500)
         last_d = self.state2difficulty(state)
         theoritical_r = self.forgetting_curve(delta_t, last_s)
         corrected_r_input = torch.concat([last_s, last_d, theoritical_r], dim=1)
@@ -767,7 +767,7 @@ class NN_17(nn.Module):
         pls_input = torch.concat([corrected_r, lapses], dim=1)
         pls = self.pls(pls_input)
         sinc_input = torch.concat([corrected_r, last_s, last_d], dim=1)
-        sinc = self.sinc(sinc_input)
+        sinc = self.sinc(sinc_input).clamp(1, 100)
         new_s = torch.where(
             rating > 1,
             last_s * sinc,

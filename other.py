@@ -477,9 +477,12 @@ class RNN(nn.Module):
         if state_dict is not None:
             self.load_state_dict(state_dict)
         else:
-            self.load_state_dict(
-                torch.load(f"./{network}_pretrain.pth", map_location=device)
-            )
+            try:
+                self.load_state_dict(
+                    torch.load(f"./{network}_pretrain.pth", map_location=device)
+                )
+            except FileNotFoundError:
+                pass
 
     def forward(self, x, hx=None):
         x, h = self.rnn(x, hx=hx)
@@ -512,6 +515,13 @@ class Transformer(nn.Module):
 
         if state_dict is not None:
             self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(f"./{model_name}_pretrain.pth", map_location=device)
+                )
+            except FileNotFoundError:
+                pass
 
     def forward(self, src):
         tgt = torch.zeros(1, src.shape[1], n_input).to(device=device)
@@ -718,6 +728,13 @@ class NN_17(nn.Module):
 
         if state_dict is not None:
             self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(f"./{model_name}_pretrain.pth", map_location=device)
+                )
+            except FileNotFoundError:
+                pass
 
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2))
@@ -760,6 +777,7 @@ class NN_17(nn.Module):
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
+
 
 def sm2(r_history):
     ivl = 0
@@ -1105,20 +1123,10 @@ def create_features(df, model_name="FSRSv3"):
     df["t_history"] = [
         ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
     ]
-    if model_name.startswith("FSRS") or model_name == "GRU":
-        dtype = torch.float32 if model_name == "GRU" else torch.int
+    if model_name.startswith("FSRS") or model_name in ("GRU", "Transformer"):
+        dtype = torch.int if model_name.startswith("FSRS") else torch.float32
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=dtype).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history, r_history)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-    elif model_name == "Transformer":
-        df["tensor"] = [
-            torch.tensor(
-                [t_item[:-1]]
-                + [[int(item == i) for item in r_item[:-1]] for i in range(1, 5)],
-                dtype=torch.float32,
-            ).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]

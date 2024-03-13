@@ -719,8 +719,8 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, 1),
             nn.Softplus(),
         )
-        self.sinc = nn.Sequential(
-            nn.Linear(3, self.hidden_size),
+        self.fsinc = nn.Sequential(
+            nn.Linear(2, self.hidden_size),
             nn.Mish(),
             nn.Linear(self.hidden_size, 1),
             nn.Softplus(),
@@ -765,8 +765,8 @@ class NN_17(nn.Module):
         new_d = self.next_d(next_d_input)
         pls_input = torch.concat([corrected_r, lapses], dim=1)
         pls = self.pls(pls_input)
-        sinc_input = torch.concat([corrected_r, last_s, last_d], dim=1)
-        sinc = self.sinc(sinc_input).clamp(1, 100)
+        sinc_input = torch.concat([corrected_r, last_s], dim=1)
+        sinc = (5 * (1 - last_d) + 1) * self.fsinc(sinc_input).clamp(0, 100) + 1
         new_s = torch.where(
             rating > 1,
             last_s * sinc,

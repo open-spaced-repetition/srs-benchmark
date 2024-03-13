@@ -691,16 +691,6 @@ class NN_17(nn.Module):
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
         self.hidden_size = 8
-        self.state2stability = nn.Sequential(
-            nn.Linear(self.hidden_size, 1),
-            nn.Softplus(),
-        )
-        self.state2difficulty = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.Mish(),
-            nn.Linear(self.hidden_size, 1),
-            nn.Sigmoid(),
-        )
         self.corrected_r = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
@@ -725,25 +715,17 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, 1),
             nn.Softplus(),
         )
-        self.next_state = nn.Sequential(
-            nn.Linear(4, self.hidden_size),
-            nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.Mish(),
-        )
 
         if state_dict is not None:
             self.load_state_dict(state_dict)
 
     def forward(self, inputs):
-        state = torch.zeros((inputs.shape[1], self.hidden_size))
+        state = torch.ones((inputs.shape[1], 2))
         outputs = []
         for X in inputs:
             state = self.step(X, state)
             outputs.append(state)
-        return torch.stack(outputs)
+        return torch.stack(outputs), state
 
     def step(self, X, state):
         """
@@ -757,8 +739,8 @@ class NN_17(nn.Module):
         delta_t = X[:, 0].unsqueeze(1)
         rating = X[:, 1].unsqueeze(1)
         lapses = X[:, 2].unsqueeze(1)
-        last_s = self.state2stability(state).clamp(0.01, 36500)
-        last_d = self.state2difficulty(state)
+        last_s = state[:, 0].unsqueeze(1)
+        last_d = state[:, 1].unsqueeze(1)
         theoritical_r = self.forgetting_curve(delta_t, last_s)
         corrected_r_input = torch.concat([last_s, last_d, theoritical_r], dim=1)
         corrected_r = self.corrected_r(corrected_r_input)
@@ -773,13 +755,11 @@ class NN_17(nn.Module):
             last_s * sinc,
             pls,
         )
-        next_state_input = torch.concat([new_d, new_s, corrected_r, lapses], dim=1)
-        next_state = self.next_state(next_state_input)
+        next_state = torch.concat([new_d, new_s], dim=1)
         return next_state
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
-
 
 def sm2(r_history):
     ivl = 0
@@ -915,14 +895,6 @@ class Trainer:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences.transpose(0, 1))
                         stabilities = outputs.squeeze()
-                    elif isinstance(self.model, NN_17):
-                        outputs = self.model(sequences)
-                        stabilities = self.model.state2stability(
-                            outputs[
-                                seq_lens - 1,
-                                torch.arange(real_batch_size, device=device)
-                            ]
-                        ).squeeze(1)
                     else:
                         outputs, _ = self.model(sequences)
                         stabilities = outputs[
@@ -979,14 +951,6 @@ class Trainer:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences)
                         stabilities = outputs.squeeze()
-                    elif isinstance(self.model, NN_17):
-                        outputs = self.model(sequences.transpose(0, 1))
-                        stabilities = self.model.state2stability(
-                            outputs[
-                                seq_lens - 1,
-                                torch.arange(real_batch_size, device=device)
-                            ]
-                        ).squeeze(1)
                     else:
                         outputs, _ = self.model(sequences.transpose(0, 1))
                         stabilities = outputs[
@@ -1057,13 +1021,6 @@ class Collection:
                 if isinstance(self.model, HLR):
                     outputs = self.model(fast_dataset.x_train)
                     stabilities = outputs.squeeze()
-                elif isinstance(self.model, NN_17):
-                    outputs = self.model(fast_dataset.x_train.transpose(0, 1))
-                    stabilities = self.model.state2stability(
-                        outputs[
-                            fast_dataset.seq_len - 1, torch.arange(len(fast_dataset))
-                        ]
-                    ).squeeze(1)
                 else:
                     outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
                     stabilities = outputs[

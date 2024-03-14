@@ -80,7 +80,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | FSRS-4.5 (only pretrain) | 0.360±0.0032 | 0.089±0.0009 | 4 |
 | FSRS v3 | 0.404±0.0041 | 0.101±0.0013 | 13 |
 | FSRS-4.5 (default parameters) | 0.375±0.0033 | 0.106±0.0011 | 0 |
-| GRU | 0.431±0.049 | 0.107±0.0012 | 36 |
+| GRU | 0.431±0.0049 | 0.107±0.0012 | 36 |
 | ACT-R | 0.381±0.0035 | 0.109±0.0012 | 5 |
 | HLR | 0.439±0.0047 | 0.123±0.0013 | 3 |
 | SM-2 | 0.68±0.011 | 0.195±0.0020 | 0 |

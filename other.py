@@ -701,28 +701,52 @@ class NN_17(nn.Module):
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
         self.hidden_size = 8
+        self.S0 = nn.Sequential(
+            nn.Linear(1, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Softplus(),
+        )
+        self.D0 = nn.Sequential(
+            nn.Linear(1, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Sigmoid(),
+        )
         self.corrected_r = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, 1),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
             nn.Sigmoid(),
         )
         self.next_d = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, 1),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
             nn.Sigmoid(),
         )
         self.pls = nn.Sequential(
             nn.Linear(2, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, 1),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
             nn.Softplus(),
         )
         self.fsinc = nn.Sequential(
             nn.Linear(2, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, 1),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
             nn.Softplus(),
         )
 
@@ -750,29 +774,51 @@ class NN_17(nn.Module):
             input[:,0] is elapsed time
             input[:,1] is rating
             input[:,2] is lapses
-        :param state: shape[batch_size, hidden_size]
+        :param state: shape[batch_size, 2]
+            state[:,0] is stability
+            state[:,1] is difficulty
         :return state:
         """
         delta_t = X[:, 0].unsqueeze(1)
         rating = X[:, 1].unsqueeze(1)
         lapses = X[:, 2].unsqueeze(1)
-        last_s = state[:, 0].unsqueeze(1)
-        last_d = state[:, 1].unsqueeze(1)
-        theoritical_r = self.forgetting_curve(delta_t, last_s)
-        corrected_r_input = torch.concat([last_s, last_d, theoritical_r], dim=1)
-        corrected_r = self.corrected_r(corrected_r_input)
-        next_d_input = torch.concat([last_d, corrected_r, rating], dim=1)
-        new_d = self.next_d(next_d_input)
-        pls_input = torch.concat([corrected_r, lapses], dim=1)
-        pls = self.pls(pls_input)
-        sinc_input = torch.concat([corrected_r, last_s], dim=1)
-        sinc = (5 * (1 - last_d) + 1) * self.fsinc(sinc_input).clamp(0, 100) + 1
-        new_s = torch.where(
-            rating > 1,
-            last_s * sinc,
-            pls,
-        )
-        next_state = torch.concat([new_d, new_s], dim=1)
+
+        if torch.equal(state, torch.ones_like(state)):
+            # first review
+            new_s = self.S0(rating.float())
+            # print(new_s)
+            new_d = self.D0(rating.float())
+            new_d = new_d.clamp(0, 1)
+        else:
+            last_s = state[:, 0].unsqueeze(1)
+            last_d = state[:, 1].unsqueeze(1)
+
+            theoretical_r = self.forgetting_curve(delta_t, last_s)
+            theoretical_r = theoretical_r.clamp(0.0001, 0.9999)
+
+            corrected_r_input = torch.concat([last_s, last_d, theoretical_r], dim=1)
+            corrected_r = self.corrected_r(corrected_r_input)
+            corrected_r = corrected_r.clamp(0.0001, 0.9999)
+
+            next_d_input = torch.concat([last_d, corrected_r, rating], dim=1)
+            new_d = self.next_d(next_d_input)
+            new_d = new_d.clamp(0, 1)
+
+            pls_input = torch.concat([corrected_r, lapses], dim=1)
+            pls = self.pls(pls_input)
+            pls = pls.clamp(0.01, 36500)
+
+            sinc_input = torch.concat([corrected_r, last_s], dim=1)
+            sinc = (5 * (1 - last_d) + 1) * self.fsinc(sinc_input).clamp(0, 100) + 1
+
+            new_s = torch.where(
+                rating > 1,
+                last_s * sinc,
+                pls,
+            )
+
+        new_s = new_s.clamp(0.01, 36500)
+        next_state = torch.concat([new_s, new_d], dim=1)
         return next_state
 
     def forgetting_curve(self, t, s):

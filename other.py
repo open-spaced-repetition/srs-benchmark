@@ -477,9 +477,12 @@ class RNN(nn.Module):
         if state_dict is not None:
             self.load_state_dict(state_dict)
         else:
-            self.load_state_dict(
-                torch.load(f"./{network}_pretrain.pth", map_location=device)
-            )
+            try:
+                self.load_state_dict(
+                    torch.load(f"./{network}_pretrain.pth", map_location=device)
+                )
+            except FileNotFoundError:
+                pass
 
     def forward(self, x, hx=None):
         x, h = self.rnn(x, hx=hx)
@@ -512,6 +515,13 @@ class Transformer(nn.Module):
 
         if state_dict is not None:
             self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(f"./{model_name}_pretrain.pth", map_location=device)
+                )
+            except FileNotFoundError:
+                pass
 
     def forward(self, src):
         tgt = torch.zeros(1, src.shape[1], n_input).to(device=device)
@@ -687,6 +697,134 @@ class DASH_ACTR(nn.Module):
         )
 
 
+class NN_17(nn.Module):
+    def __init__(self, state_dict=None) -> None:
+        super(NN_17, self).__init__()
+        self.hidden_size = 8
+        self.S0 = nn.Sequential(
+            nn.Linear(1, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Softplus(),
+        )
+        self.D0 = nn.Sequential(
+            nn.Linear(1, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Sigmoid(),
+        )
+        self.corrected_r = nn.Sequential(
+            nn.Linear(3, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Sigmoid(),
+        )
+        self.next_d = nn.Sequential(
+            nn.Linear(3, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Sigmoid(),
+        )
+        self.pls = nn.Sequential(
+            nn.Linear(2, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Softplus(),
+        )
+        self.fsinc = nn.Sequential(
+            nn.Linear(2, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Softplus(),
+        )
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(f"./{model_name}_pretrain.pth", map_location=device)
+                )
+            except FileNotFoundError:
+                pass
+
+    def forward(self, inputs):
+        state = torch.ones((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def step(self, X, state):
+        """
+        :param input: shape[batch_size, 3]
+            input[:,0] is elapsed time
+            input[:,1] is rating
+            input[:,2] is lapses
+        :param state: shape[batch_size, 2]
+            state[:,0] is stability
+            state[:,1] is difficulty
+        :return state:
+        """
+        delta_t = X[:, 0].unsqueeze(1)
+        rating = X[:, 1].unsqueeze(1)
+        lapses = X[:, 2].unsqueeze(1)
+
+        if torch.equal(state, torch.ones_like(state)):
+            # first review
+            new_s = self.S0(rating.float())
+            # print(new_s)
+            new_d = self.D0(rating.float())
+            new_d = new_d.clamp(0, 1)
+        else:
+            last_s = state[:, 0].unsqueeze(1)
+            last_d = state[:, 1].unsqueeze(1)
+
+            theoretical_r = self.forgetting_curve(delta_t, last_s)
+            theoretical_r = theoretical_r.clamp(0.0001, 0.9999)
+
+            corrected_r_input = torch.concat([last_s, last_d, theoretical_r], dim=1)
+            corrected_r = self.corrected_r(corrected_r_input)
+            corrected_r = corrected_r.clamp(0.0001, 0.9999)
+
+            next_d_input = torch.concat([last_d, corrected_r, rating], dim=1)
+            new_d = self.next_d(next_d_input)
+            new_d = new_d.clamp(0, 1)
+
+            pls_input = torch.concat([corrected_r, lapses], dim=1)
+            pls = self.pls(pls_input)
+            pls = pls.clamp(0.01, 36500)
+
+            sinc_input = torch.concat([corrected_r, last_s], dim=1)
+            sinc = (5 * (1 - last_d) + 1) * self.fsinc(sinc_input).clamp(0, 100) + 1
+
+            new_s = torch.where(
+                rating > 1,
+                last_s * sinc,
+                pls,
+            )
+
+        new_s = new_s.clamp(0.01, 36500)
+        next_state = torch.concat([new_s, new_d], dim=1)
+        return next_state
+
+    def forgetting_curve(self, t, s):
+        return 0.9 ** (t / s)
+
+
 def sm2(r_history):
     ivl = 0
     ef = 2.5
@@ -849,76 +987,46 @@ class Trainer:
     def eval(self):
         self.model.eval()
         with torch.no_grad():
-            sequences, delta_ts, labels, seq_lens = (
-                self.train_set.x_train,
-                self.train_set.t_train,
-                self.train_set.y_train,
-                self.train_set.seq_len,
-            )
-            sequences = sequences.to(device=device)
-            delta_ts = delta_ts.to(device=device)
-            labels = labels.to(device=device)
-            seq_lens = seq_lens.to(device=device)
-            real_batch_size = seq_lens.shape[0]
-            if isinstance(self.model, ACT_R):
-                outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[
-                    seq_lens - 2, torch.arange(real_batch_size, device=device), 0
-                ]
-            elif isinstance(self.model, DASH_ACTR):
-                outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs.squeeze()
-            elif isinstance(self.model, DASH):
-                outputs = self.model(sequences)
-                retentions = outputs.squeeze()
-            else:
-                if isinstance(self.model, HLR):
-                    outputs = self.model(sequences)
-                    stabilities = outputs.squeeze()
-                else:
-                    outputs, _ = self.model(sequences.transpose(0, 1))
-                    stabilities = outputs[
-                        seq_lens - 1, torch.arange(real_batch_size, device=device), 0
+            losses = []
+            for dataset in (self.train_set, self.test_set):
+                sequences, delta_ts, labels, seq_lens = (
+                    dataset.x_train,
+                    dataset.t_train,
+                    dataset.y_train,
+                    dataset.seq_len,
+                )
+                sequences = sequences.to(device=device)
+                delta_ts = delta_ts.to(device=device)
+                labels = labels.to(device=device)
+                seq_lens = seq_lens.to(device=device)
+                real_batch_size = seq_lens.shape[0]
+                if isinstance(self.model, ACT_R):
+                    outputs = self.model(sequences.transpose(0, 1))
+                    retentions = outputs[
+                        seq_lens - 2, torch.arange(real_batch_size, device=device), 0
                     ]
-                retentions = self.model.forgetting_curve(delta_ts, stabilities)
-            tran_loss = self.loss_fn(retentions, labels).mean()
-            self.avg_train_losses.append(tran_loss)
-
-            sequences, delta_ts, labels, seq_lens = (
-                self.test_set.x_train,
-                self.test_set.t_train,
-                self.test_set.y_train,
-                self.test_set.seq_len,
-            )
-            sequences = sequences.to(device=device)
-            delta_ts = delta_ts.to(device=device)
-            labels = labels.to(device=device)
-            seq_lens = seq_lens.to(device=device)
-            real_batch_size = seq_lens.shape[0]
-
-            if isinstance(self.model, ACT_R):
-                outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs[
-                    seq_lens - 2, torch.arange(real_batch_size, device=device), 0
-                ]
-            elif isinstance(self.model, DASH_ACTR):
-                outputs = self.model(sequences.transpose(0, 1))
-                retentions = outputs.squeeze()
-            elif isinstance(self.model, DASH):
-                outputs = self.model(sequences)
-                retentions = outputs.squeeze()
-            else:
-                if isinstance(self.model, HLR):
+                elif isinstance(self.model, DASH_ACTR):
+                    outputs = self.model(sequences.transpose(0, 1))
+                    retentions = outputs.squeeze()
+                elif isinstance(self.model, DASH):
                     outputs = self.model(sequences)
-                    stabilities = outputs.squeeze()
+                    retentions = outputs.squeeze()
                 else:
-                    outputs, _ = self.model(sequences.transpose(0, 1))
-                    stabilities = outputs[
-                        seq_lens - 1, torch.arange(real_batch_size, device=device), 0
-                    ]
-                retentions = self.model.forgetting_curve(delta_ts, stabilities)
-            test_loss = self.loss_fn(retentions, labels).mean()
-            self.avg_eval_losses.append(test_loss)
+                    if isinstance(self.model, HLR):
+                        outputs = self.model(sequences)
+                        stabilities = outputs.squeeze()
+                    else:
+                        outputs, _ = self.model(sequences.transpose(0, 1))
+                        stabilities = outputs[
+                            seq_lens - 1,
+                            torch.arange(real_batch_size, device=device),
+                            0,
+                        ]
+                    retentions = self.model.forgetting_curve(delta_ts, stabilities)
+                loss = self.loss_fn(retentions, labels).mean()
+                losses.append(loss)
+            self.avg_train_losses.append(losses[0])
+            self.avg_eval_losses.append(losses[1])
 
             if isinstance(self.model, (FSRS3, FSRS4, ACT_R, DASH_ACTR)):
                 w = list(
@@ -931,7 +1039,7 @@ class Trainer:
                 w = self.model.state_dict()
 
             weighted_loss = (
-                tran_loss * len(self.train_set) + test_loss * len(self.test_set)
+                losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
             ) / (len(self.train_set) + len(self.test_set))
 
             return weighted_loss, w
@@ -955,7 +1063,7 @@ class Collection:
         self.model.eval()
 
     def batch_predict(self, dataset):
-        fast_dataset = BatchDataset(dataset)
+        fast_dataset = BatchDataset(dataset, sort_by_length=False)
         fast_dataset.x_train = fast_dataset.x_train.to(device=device)
         fast_dataset.seq_len = fast_dataset.seq_len.to(device=device)
         with torch.no_grad():
@@ -1061,20 +1169,10 @@ def create_features(df, model_name="FSRSv3"):
     df["t_history"] = [
         ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
     ]
-    if model_name.startswith("FSRS") or model_name == "GRU":
-        dtype = torch.float32 if model_name == "GRU" else torch.int
+    if model_name.startswith("FSRS") or model_name in ("GRU", "Transformer"):
+        dtype = torch.int if model_name.startswith("FSRS") else torch.float32
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=dtype).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history, r_history)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-    elif model_name == "Transformer":
-        df["tensor"] = [
-            torch.tensor(
-                [t_item[:-1]]
-                + [[int(item == i) for item in r_item[:-1]] for i in range(1, 5)],
-                dtype=torch.float32,
-            ).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
@@ -1154,6 +1252,21 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
+    elif model_name == "NN_17":
+
+        def r_history_to_l_history(r_history):
+            l_history = [0 for _ in range(len(r_history) + 1)]
+            for i, r in enumerate(r_history):
+                l_history[i + 1] = l_history[i] + (r == 1)
+            return l_history[:-1]
+
+        df["tensor"] = [
+            torch.tensor(
+                (t_item[:-1], r_item[:-1], r_history_to_l_history(r_item[:-1]))
+            ).transpose(0, 1)
+            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_item, r_item in zip(t_sublist, r_sublist)
+        ]
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     filtered_dataset = (
         df[df["i"] == 2]
@@ -1197,6 +1310,8 @@ def process(args):
         model = DASH
     elif model_name == "DASH[ACT-R]":
         model = DASH_ACTR
+    elif model_name == "NN_17":
+        model = NN_17
 
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:

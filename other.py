@@ -1063,7 +1063,7 @@ class Collection:
         self.model.eval()
 
     def batch_predict(self, dataset):
-        fast_dataset = BatchDataset(dataset)
+        fast_dataset = BatchDataset(dataset, sort_by_length=False)
         fast_dataset.x_train = fast_dataset.x_train.to(device=device)
         fast_dataset.seq_len = fast_dataset.seq_len.to(device=device)
         with torch.no_grad():

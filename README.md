@@ -80,7 +80,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | FSRS-4.5 (only pretrain) | 0.360±0.0032 | 0.089±0.0009 | 4 |
 | FSRS v3 | 0.404±0.0041 | 0.101±0.0013 | 13 |
 | FSRS-4.5 (default parameters) | 0.375±0.0033 | 0.106±0.0011 | 0 |
-| GRU | 0.431±0.049 | 0.107±0.0012 | 36 |
+| GRU | 0.431±0.0049 | 0.107±0.0012 | 36 |
 | ACT-R | 0.381±0.0035 | 0.109±0.0012 | 5 |
 | HLR | 0.439±0.0047 | 0.123±0.0013 | 3 |
 | SM-2 | 0.68±0.011 | 0.195±0.0020 | 0 |
@@ -88,9 +88,9 @@ The following tables show the weighted means and the 99% confidence intervals. T
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 Averages weighted by the natural logarithm of the number of reviews are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
 
-The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-4.5 outperforms all other algorithms; the bottom row is red because SM-2 performs worse than any other algorithm. Grey means that the p-value is >0.05, and we cannot conclude that one algorithm performs better than the other.
+The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. The top row is green because FSRS-4.5 outperforms all other algorithms; the bottom row is red because SM-2 performs worse than any other algorithm. Grey means that the p-value is >0.01, and we cannot conclude that one algorithm performs better than the other.
 
-Almost all p-values are extremely small, many orders of magnitude smaller than 0.05. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the decimal logarithm of the p-value rather than the p-value itself, to avoid the limitations of 64-bit floating point numbers. So it's an approximation of an approximation. But more importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE depends on the number of reviews.
+Almost all p-values are extremely small, many orders of magnitude smaller than 0.01. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the decimal logarithm of the p-value rather than the p-value itself, to avoid the limitations of 64-bit floating point numbers. So it's an approximation of an approximation. But more importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE depends on the number of reviews.
 Overall, these p-values can be trusted on a qualitative (but not quantitative) level.
 
 ![Wilcoxon, 19990 collections](./plots/Wilcoxon-19990-collections.png)

@@ -696,9 +696,23 @@ class DASH_ACTR(nn.Module):
             )
         )
 
+class NN_17WeightClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data
+            w[0] = w[0].clamp_min(0.001)
+            w[1] = w[1].clamp_min(0.001)
+            w[2] = w[2].clamp_min(0.001)
+            w[3] = w[3].clamp_min(0.001)
+            module.w.data = w
+
 
 class NN_17(nn.Module):
     init_w = [1, 1, 1, 1]
+    clipper = NN_17WeightClipper()
 
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
@@ -899,7 +913,7 @@ class Trainer:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.clipper = (
             MODEL.clipper
-            if isinstance(MODEL, (FSRS3, FSRS4, ACT_R, DASH_ACTR))
+            if isinstance(MODEL, (FSRS3, FSRS4, ACT_R, DASH_ACTR, NN_17))
             else None
         )
         self.batch_size = batch_size

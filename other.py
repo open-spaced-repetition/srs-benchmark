@@ -955,6 +955,22 @@ class Trainer:
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences.transpose(0, 1))
                     retentions = outputs.squeeze()
+                elif isinstance(self.model, NN_17):
+                    outputs, _ = self.model(sequences)
+                    stabilities = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        0,
+                    ]
+                    difficulties = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        1,
+                    ]
+                    theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
+                    retentions = self.model.corrected_r(
+                        torch.stack([stabilities, difficulties, theoretical_r], dim=1)
+                    ).squeeze()
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences.transpose(0, 1))
@@ -1011,6 +1027,22 @@ class Trainer:
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences)
                     retentions = outputs.squeeze()
+                elif isinstance(self.model, NN_17):
+                    outputs, _ = self.model(sequences.transpose(0, 1))
+                    stabilities = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        0,
+                    ]
+                    difficulties = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        1,
+                    ]
+                    theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
+                    retentions = self.model.corrected_r(
+                        torch.stack([stabilities, difficulties, theoretical_r], dim=1)
+                    ).squeeze()
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences)
@@ -1080,6 +1112,21 @@ class Collection:
             elif isinstance(self.model, DASH):
                 outputs = self.model(fast_dataset.x_train)
                 retentions = outputs.squeeze()
+                return retentions.cpu().tolist()
+            elif isinstance(self.model, NN_17):
+                outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
+                stabilities = outputs[
+                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
+                ]
+                difficulties = outputs[
+                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 1
+                ]
+                theoretical_r = self.model.forgetting_curve(
+                    fast_dataset.t_train, stabilities
+                )
+                retentions = self.model.corrected_r(
+                    torch.stack([stabilities, difficulties, theoretical_r], dim=1)
+                ).squeeze()
                 return retentions.cpu().tolist()
             else:
                 if isinstance(self.model, HLR):
@@ -1346,7 +1393,7 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        if model in (ACT_R, DASH, DASH_ACTR):
+        if model in (ACT_R, DASH, DASH_ACTR, NN_17):
             testset["p"] = my_collection.batch_predict(testset)
         else:
             testset["stability"] = my_collection.batch_predict(testset)

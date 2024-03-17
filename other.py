@@ -711,33 +711,24 @@ class NN_17WeightClipper:
 
 
 class NN_17(nn.Module):
-    init_w = [1, 1, 1, 1]
+    init_s = [1, 1, 1, 1]
+    init_d = [0.5, 0.5, 0.5, 0.5]
     clipper = NN_17WeightClipper()
 
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
         self.hidden_size = 8
-        self.w = nn.Parameter(
+        self.S0 = nn.Parameter(
             torch.tensor(
-                self.init_w,
+                self.init_s,
                 dtype=torch.float32,
             )
         )
-        self.S0 = nn.Sequential(
-            nn.Linear(1, self.hidden_size),
-            nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus(),
-        )
-        self.D0 = nn.Sequential(
-            nn.Linear(1, self.hidden_size),
-            nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid(),
+        self.D0 = nn.Parameter(
+            torch.tensor(
+                self.init_d,
+                dtype=torch.float32,
+            )
         )
         self.corrected_r = nn.Sequential(
             nn.Linear(3, self.hidden_size),
@@ -806,11 +797,16 @@ class NN_17(nn.Module):
         lapses = X[:, 2].unsqueeze(1)
 
         if torch.equal(state, torch.ones_like(state)):
-            # first review
-            new_s = self.S0(rating.float())
-            # print(new_s)
-            new_d = self.D0(rating.float())
-            new_d = new_d.clamp(0, 1)
+            # first review            
+            keys = torch.tensor([1, 2, 3, 4])
+            keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
+            new_s = torch.zeros_like(state[:, 0])
+            new_s[index[0]] = self.S0[index[1]]
+            new_s = new_s.unsqueeze(1)
+            new_d = torch.zeros_like(state[:, 1])
+            new_d[index[0]] = self.D0[index[1]]
+            new_d = new_d.unsqueeze(1)
         else:
             last_s = state[:, 0].unsqueeze(1)
             last_d = state[:, 1].unsqueeze(1)

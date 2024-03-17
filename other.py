@@ -698,9 +698,17 @@ class DASH_ACTR(nn.Module):
 
 
 class NN_17(nn.Module):
+    init_w = [1, 1, 1, 1]
+
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
         self.hidden_size = 8
+        self.w = nn.Parameter(
+            torch.tensor(
+                self.init_w,
+                dtype=torch.float32,
+            )
+        )
         self.S0 = nn.Sequential(
             nn.Linear(1, self.hidden_size),
             nn.Mish(),

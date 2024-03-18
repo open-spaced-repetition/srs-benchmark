@@ -701,23 +701,49 @@ class NN_17WeightClipper:
         self.frequency = frequency
 
     def __call__(self, module):
-        if hasattr(module, "w"):
-            w = module.w.data
-            w[0] = w[0].clamp_min(0.001)
-            w[1] = w[1].clamp_min(0.001)
-            w[2] = w[2].clamp_min(0.001)
-            w[3] = w[3].clamp_min(0.001)
-            module.w.data = w
+        if hasattr(module, "S0"):
+            w = module.S0.data
+            w[0] = w[0].clamp(0.01, 365)
+            w[1] = w[1].clamp(0.01, 365)
+            w[2] = w[2].clamp(0.01, 365)
+            w[3] = w[3].clamp(0.01, 365)
+            module.S0.data = w
 
+        if hasattr(module, "D0"):
+            w = module.D0.data
+            w[0] = w[0].clamp(0, 1)
+            w[1] = w[1].clamp(0, 1)
+            w[2] = w[2].clamp(0, 1)
+            w[3] = w[3].clamp(0, 1)
+            module.D0.data = w
+
+        if hasattr(module, "sinc_w"):
+            w = module.sinc_w.data
+            w[0] = w[0].clamp(-5, 5)
+            w[1] = w[1].clamp(0, 1)
+            w[2] = w[2].clamp(-5, 5)
+            module.sinc_w.data = w
+
+def exp_activ(input):
+    return torch.exp(-input).clamp(0.0001, 0.9999)
+
+class ExpActivation(nn.Module):
+    def __init__(self):
+        super().__init__()  # init the base class
+
+    def forward(self, input):
+        return exp_activ(input)
 
 class NN_17(nn.Module):
-    init_s = [1, 1, 1, 1]
-    init_d = [0.5, 0.5, 0.5, 0.5]
+    # 496 params
+    init_s = [1, 2.5, 4.5, 10]
+    init_d = [1, 0.72, 0.07, 0.05]
+    w = [1.26, 0.0, 0.67]
     clipper = NN_17WeightClipper()
 
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
-        self.hidden_size = 8
+        self.hidden_size = 10
         self.S0 = nn.Parameter(
             torch.tensor(
                 self.init_s,
@@ -730,13 +756,21 @@ class NN_17(nn.Module):
                 dtype=torch.float32,
             )
         )
-        self.corrected_r = nn.Sequential(
+        self.sinc_w = nn.Parameter(
+            torch.tensor(
+                self.w,
+                dtype=torch.float32,
+            )
+        )
+        self.rw = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid(),
+            # nn.Sigmoid()
+            nn.Softplus(),  # make sure that the input for ExpActivation() is >=0
+            ExpActivation()
         )
         self.next_d = nn.Sequential(
             nn.Linear(3, self.hidden_size),
@@ -744,7 +778,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid(),
+            nn.Sigmoid()
         )
         self.pls = nn.Sequential(
             nn.Linear(2, self.hidden_size),
@@ -752,15 +786,23 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus(),
+            nn.Softplus()
         )
-        self.fsinc = nn.Sequential(
+        self.sinc = nn.Sequential(
+            nn.Linear(3, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Softplus()
+        )
+        self.best_sinc = nn.Sequential(
             nn.Linear(2, self.hidden_size),
             nn.Mish(),
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus(),
+            nn.Softplus()
         )
 
         if state_dict is not None:
@@ -772,6 +814,7 @@ class NN_17(nn.Module):
                 )
             except FileNotFoundError:
                 pass
+
 
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2))
@@ -797,7 +840,7 @@ class NN_17(nn.Module):
         lapses = X[:, 2].unsqueeze(1)
 
         if torch.equal(state, torch.ones_like(state)):
-            # first review            
+            # first review
             keys = torch.tensor([1, 2, 3, 4])
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
@@ -811,27 +854,44 @@ class NN_17(nn.Module):
             last_s = state[:, 0].unsqueeze(1)
             last_d = state[:, 1].unsqueeze(1)
 
-            theoretical_r = self.forgetting_curve(delta_t, last_s)
-            theoretical_r = theoretical_r.clamp(0.0001, 0.9999)
+            # Theoretical R
+            rt = self.forgetting_curve(delta_t, last_s)
+            rt = rt.clamp(0.0001, 0.9999)
 
-            corrected_r_input = torch.concat([last_s, last_d, theoretical_r], dim=1)
-            corrected_r = self.corrected_r(corrected_r_input)
-            corrected_r = corrected_r.clamp(0.0001, 0.9999)
+            # Rw
+            rw_input = torch.concat([last_d, last_s, rt], dim=1)
+            rw = self.rw(rw_input)
+            rw = rw.clamp(0.0001, 0.9999)
 
-            next_d_input = torch.concat([last_d, corrected_r, rating], dim=1)
+            # S that corresponds to Rw
+            sr = self.inverse_forgetting_curve(rw, delta_t)
+            sr = sr.clamp(0.01, 36500)
+
+            # Difficulty
+            next_d_input = torch.concat([last_d, rw, rating], dim=1)
             new_d = self.next_d(next_d_input)
-            new_d = new_d.clamp(0, 1)
 
-            pls_input = torch.concat([corrected_r, lapses], dim=1)
+            # Post-lapse stability
+            pls_input = torch.concat([rw, lapses], dim=1)
             pls = self.pls(pls_input)
             pls = pls.clamp(0.01, 36500)
 
-            sinc_input = torch.concat([corrected_r, last_s], dim=1)
-            sinc = (5 * (1 - last_d) + 1) * self.fsinc(sinc_input).clamp(0, 100) + 1
+            # SInc
+            sinc_t = 1 + \
+                     torch.exp(self.sinc_w[0]) \
+                     * (5 * (1 - new_d) + 1) \
+                     * torch.pow(sr, -self.sinc_w[1]) \
+                     * torch.exp(-rw * self.sinc_w[2])
+
+            sinc_input = torch.concat([new_d, sr, rw], dim=1)
+            sinc_nn = 1 + self.sinc(sinc_input)
+            best_sinc_input = torch.concat([sinc_t, sinc_nn], dim=1)
+            best_sinc = 1 + self.best_sinc(best_sinc_input)
+            best_sinc.clamp(1, 100)
 
             new_s = torch.where(
                 rating > 1,
-                last_s * sinc,
+                sr * best_sinc,
                 pls,
             )
 
@@ -841,6 +901,10 @@ class NN_17(nn.Module):
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
+
+    def inverse_forgetting_curve(self, r: Tensor, t: Tensor) -> Tensor:
+        log_09 = -0.10536051565782628
+        return log_09 / torch.log(r) * t
 
 
 def sm2(r_history):
@@ -986,8 +1050,8 @@ class Trainer:
                         1,
                     ]
                     theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
-                    retentions = self.model.corrected_r(
-                        torch.stack([stabilities, difficulties, theoretical_r], dim=1)
+                    retentions = self.model.rw(
+                        torch.stack([difficulties, stabilities, theoretical_r], dim=1)
                     ).squeeze()
                 else:
                     if isinstance(self.model, HLR):
@@ -1058,8 +1122,8 @@ class Trainer:
                         1,
                     ]
                     theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
-                    retentions = self.model.corrected_r(
-                        torch.stack([stabilities, difficulties, theoretical_r], dim=1)
+                    retentions = self.model.rw(
+                        torch.stack([difficulties, stabilities, theoretical_r], dim=1)
                     ).squeeze()
                 else:
                     if isinstance(self.model, HLR):
@@ -1142,8 +1206,8 @@ class Collection:
                 theoretical_r = self.model.forgetting_curve(
                     fast_dataset.t_train, stabilities
                 )
-                retentions = self.model.corrected_r(
-                    torch.stack([stabilities, difficulties, theoretical_r], dim=1)
+                retentions = self.model.rw(
+                    torch.stack([difficulties, stabilities, theoretical_r], dim=1)
                 ).squeeze()
                 return retentions.cpu().tolist()
             else:

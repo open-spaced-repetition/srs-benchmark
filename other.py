@@ -10,7 +10,7 @@ import os
 from torch import nn
 from torch import Tensor
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_squared_error, log_loss
+from sklearn.metrics import root_mean_squared_error, log_loss
 from tqdm.auto import tqdm
 from scipy.optimize import minimize
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -696,34 +696,81 @@ class DASH_ACTR(nn.Module):
             )
         )
 
+class NN_17WeightClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "S0"):
+            w = module.S0.data
+            w[0] = w[0].clamp(0.01, 365)
+            w[1] = w[1].clamp(0.01, 365)
+            w[2] = w[2].clamp(0.01, 365)
+            w[3] = w[3].clamp(0.01, 365)
+            module.S0.data = w
+
+        if hasattr(module, "D0"):
+            w = module.D0.data
+            w[0] = w[0].clamp(0, 1)
+            w[1] = w[1].clamp(0, 1)
+            w[2] = w[2].clamp(0, 1)
+            w[3] = w[3].clamp(0, 1)
+            module.D0.data = w
+
+        if hasattr(module, "sinc_w"):
+            w = module.sinc_w.data
+            w[0] = w[0].clamp(-5, 5)
+            w[1] = w[1].clamp(0, 1)
+            w[2] = w[2].clamp(-5, 5)
+            module.sinc_w.data = w
+
+def exp_activ(input):
+    return torch.exp(-input).clamp(0.0001, 0.9999)
+
+class ExpActivation(nn.Module):
+    def __init__(self):
+        super().__init__()  # init the base class
+
+    def forward(self, input):
+        return exp_activ(input)
 
 class NN_17(nn.Module):
+    # 496 params
+    init_s = [1, 2.5, 4.5, 10]
+    init_d = [1, 0.72, 0.07, 0.05]
+    w = [1.26, 0.0, 0.67]
+    clipper = NN_17WeightClipper()
+
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
-        self.hidden_size = 8
-        self.S0 = nn.Sequential(
-            nn.Linear(1, self.hidden_size),
-            nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus(),
+        self.hidden_size = 10
+        self.S0 = nn.Parameter(
+            torch.tensor(
+                self.init_s,
+                dtype=torch.float32,
+            )
         )
-        self.D0 = nn.Sequential(
-            nn.Linear(1, self.hidden_size),
-            nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid(),
+        self.D0 = nn.Parameter(
+            torch.tensor(
+                self.init_d,
+                dtype=torch.float32,
+            )
         )
-        self.corrected_r = nn.Sequential(
+        self.sinc_w = nn.Parameter(
+            torch.tensor(
+                self.w,
+                dtype=torch.float32,
+            )
+        )
+        self.rw = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid(),
+            # nn.Sigmoid()
+            nn.Softplus(),  # make sure that the input for ExpActivation() is >=0
+            ExpActivation()
         )
         self.next_d = nn.Sequential(
             nn.Linear(3, self.hidden_size),
@@ -731,7 +778,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid(),
+            nn.Sigmoid()
         )
         self.pls = nn.Sequential(
             nn.Linear(2, self.hidden_size),
@@ -739,15 +786,23 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus(),
+            nn.Softplus()
         )
-        self.fsinc = nn.Sequential(
+        self.sinc = nn.Sequential(
+            nn.Linear(3, self.hidden_size),
+            nn.Mish(),
+            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Mish(),
+            nn.Linear(self.hidden_size // 2, 1),
+            nn.Softplus()
+        )
+        self.best_sinc = nn.Sequential(
             nn.Linear(2, self.hidden_size),
             nn.Mish(),
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus(),
+            nn.Softplus()
         )
 
         if state_dict is not None:
@@ -759,6 +814,7 @@ class NN_17(nn.Module):
                 )
             except FileNotFoundError:
                 pass
+
 
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2))
@@ -785,35 +841,57 @@ class NN_17(nn.Module):
 
         if torch.equal(state, torch.ones_like(state)):
             # first review
-            new_s = self.S0(rating.float())
-            # print(new_s)
-            new_d = self.D0(rating.float())
-            new_d = new_d.clamp(0, 1)
+            keys = torch.tensor([1, 2, 3, 4])
+            keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
+            new_s = torch.zeros_like(state[:, 0])
+            new_s[index[0]] = self.S0[index[1]]
+            new_s = new_s.unsqueeze(1)
+            new_d = torch.zeros_like(state[:, 1])
+            new_d[index[0]] = self.D0[index[1]]
+            new_d = new_d.unsqueeze(1)
         else:
             last_s = state[:, 0].unsqueeze(1)
             last_d = state[:, 1].unsqueeze(1)
 
-            theoretical_r = self.forgetting_curve(delta_t, last_s)
-            theoretical_r = theoretical_r.clamp(0.0001, 0.9999)
+            # Theoretical R
+            rt = self.forgetting_curve(delta_t, last_s)
+            rt = rt.clamp(0.0001, 0.9999)
 
-            corrected_r_input = torch.concat([last_s, last_d, theoretical_r], dim=1)
-            corrected_r = self.corrected_r(corrected_r_input)
-            corrected_r = corrected_r.clamp(0.0001, 0.9999)
+            # Rw
+            rw_input = torch.concat([last_d, last_s, rt], dim=1)
+            rw = self.rw(rw_input)
+            rw = rw.clamp(0.0001, 0.9999)
 
-            next_d_input = torch.concat([last_d, corrected_r, rating], dim=1)
+            # S that corresponds to Rw
+            sr = self.inverse_forgetting_curve(rw, delta_t)
+            sr = sr.clamp(0.01, 36500)
+
+            # Difficulty
+            next_d_input = torch.concat([last_d, rw, rating], dim=1)
             new_d = self.next_d(next_d_input)
-            new_d = new_d.clamp(0, 1)
 
-            pls_input = torch.concat([corrected_r, lapses], dim=1)
+            # Post-lapse stability
+            pls_input = torch.concat([rw, lapses], dim=1)
             pls = self.pls(pls_input)
             pls = pls.clamp(0.01, 36500)
 
-            sinc_input = torch.concat([corrected_r, last_s], dim=1)
-            sinc = (5 * (1 - last_d) + 1) * self.fsinc(sinc_input).clamp(0, 100) + 1
+            # SInc
+            sinc_t = 1 + \
+                     torch.exp(self.sinc_w[0]) \
+                     * (5 * (1 - new_d) + 1) \
+                     * torch.pow(sr, -self.sinc_w[1]) \
+                     * torch.exp(-rw * self.sinc_w[2])
+
+            sinc_input = torch.concat([new_d, sr, rw], dim=1)
+            sinc_nn = 1 + self.sinc(sinc_input)
+            best_sinc_input = torch.concat([sinc_t, sinc_nn], dim=1)
+            best_sinc = 1 + self.best_sinc(best_sinc_input)
+            best_sinc.clamp(1, 100)
 
             new_s = torch.where(
                 rating > 1,
-                last_s * sinc,
+                sr * best_sinc,
                 pls,
             )
 
@@ -823,6 +901,10 @@ class NN_17(nn.Module):
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
+
+    def inverse_forgetting_curve(self, r: Tensor, t: Tensor) -> Tensor:
+        log_09 = -0.10536051565782628
+        return log_09 / torch.log(r) * t
 
 
 def sm2(r_history):
@@ -891,7 +973,7 @@ class Trainer:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.clipper = (
             MODEL.clipper
-            if isinstance(MODEL, (FSRS3, FSRS4, ACT_R, DASH_ACTR))
+            if isinstance(MODEL, (FSRS3, FSRS4, ACT_R, DASH_ACTR, NN_17))
             else None
         )
         self.batch_size = batch_size
@@ -955,6 +1037,22 @@ class Trainer:
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences.transpose(0, 1))
                     retentions = outputs.squeeze()
+                elif isinstance(self.model, NN_17):
+                    outputs, _ = self.model(sequences)
+                    stabilities = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        0,
+                    ]
+                    difficulties = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        1,
+                    ]
+                    theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
+                    retentions = self.model.rw(
+                        torch.stack([difficulties, stabilities, theoretical_r], dim=1)
+                    ).squeeze()
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences.transpose(0, 1))
@@ -1011,6 +1109,22 @@ class Trainer:
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences)
                     retentions = outputs.squeeze()
+                elif isinstance(self.model, NN_17):
+                    outputs, _ = self.model(sequences.transpose(0, 1))
+                    stabilities = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        0,
+                    ]
+                    difficulties = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        1,
+                    ]
+                    theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
+                    retentions = self.model.rw(
+                        torch.stack([difficulties, stabilities, theoretical_r], dim=1)
+                    ).squeeze()
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences)
@@ -1080,6 +1194,21 @@ class Collection:
             elif isinstance(self.model, DASH):
                 outputs = self.model(fast_dataset.x_train)
                 retentions = outputs.squeeze()
+                return retentions.cpu().tolist()
+            elif isinstance(self.model, NN_17):
+                outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
+                stabilities = outputs[
+                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
+                ]
+                difficulties = outputs[
+                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 1
+                ]
+                theoretical_r = self.model.forgetting_curve(
+                    fast_dataset.t_train, stabilities
+                )
+                retentions = self.model.rw(
+                    torch.stack([difficulties, stabilities, theoretical_r], dim=1)
+                ).squeeze()
                 return retentions.cpu().tolist()
             else:
                 if isinstance(self.model, HLR):
@@ -1346,7 +1475,7 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        if model in (ACT_R, DASH, DASH_ACTR):
+        if model in (ACT_R, DASH, DASH_ACTR, NN_17):
             testset["p"] = my_collection.batch_predict(testset)
         else:
             testset["stability"] = my_collection.batch_predict(testset)
@@ -1378,7 +1507,7 @@ def evaluate(y, p, df, model_name, file, w_list=None):
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )
     ici = np.mean(np.abs(p_calibrated - p))
-    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
+    rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(df)
     result = {

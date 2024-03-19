@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 
 
 def cross_comparison(revlogs, algoA, algoB, graph=False):
@@ -41,11 +41,10 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
         cross_comparison_group = cross_comparison_record.groupby(by=f"{algoA}_bin").agg(
             {"y": ["mean"], f"{algoB}_B-W": ["mean"], f"R ({algoB})": ["mean", "count"]}
         )
-        universal_metric = mean_squared_error(
+        universal_metric = root_mean_squared_error(
             y_true=cross_comparison_group["y", "mean"],
             y_pred=cross_comparison_group[f"R ({algoB})", "mean"],
-            sample_weight=cross_comparison_group[f"R ({algoB})", "count"],
-            squared=False,
+            sample_weight=cross_comparison_group[f"R ({algoB})", "count"]
         )
         cross_comparison_group[f"R ({algoB})", "percent"] = (
             cross_comparison_group[f"R ({algoB})", "count"]

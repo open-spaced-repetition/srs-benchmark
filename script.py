@@ -7,7 +7,7 @@ from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_squared_error, log_loss
+from sklearn.metrics import root_mean_squared_error, log_loss
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import concurrent.futures
 from itertools import accumulate
@@ -227,7 +227,7 @@ def process(file):
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )
     ici = np.mean(np.abs(p_calibrated - p))
-    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
+    rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(evaluation)
     result = {

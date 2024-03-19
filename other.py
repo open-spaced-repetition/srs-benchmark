@@ -10,7 +10,7 @@ import os
 from torch import nn
 from torch import Tensor
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_squared_error, log_loss
+from sklearn.metrics import root_mean_squared_error, log_loss
 from tqdm.auto import tqdm
 from scipy.optimize import minimize
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -1507,7 +1507,7 @@ def evaluate(y, p, df, model_name, file, w_list=None):
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )
     ici = np.mean(np.abs(p_calibrated - p))
-    rmse_raw = mean_squared_error(y_true=y, y_pred=p, squared=False)
+    rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(df)
     result = {

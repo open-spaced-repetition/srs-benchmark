@@ -39,12 +39,15 @@ n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
+do_fullinfo_stats = True
 
-dry_run = os.environ.get("DRY_RUN")
+dry_run = os.environ.get("DRY_RUN", False)
 only_pretrain = os.environ.get("PRETRAIN")
 rust = os.environ.get("FSRS_RS")
 if rust:
     path = "FSRS-rs"
+    if do_fullinfo_stats:
+        path += "-fullinfo"
     from anki._backend import RustBackend
 
     backend = RustBackend()
@@ -57,6 +60,8 @@ else:
         path += "-pretrain"
     if dev_mode:
         path += "-dev"
+    if do_fullinfo_stats:
+        path += "-fullinfo"
 
 
 def predict(w_list, testsets, last_rating=None, file=None):
@@ -175,13 +180,35 @@ def process(file):
         return
     w_list = []
     testsets = []
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-    for train_index, test_index in tscv.split(dataset):
+    sizes = []
+
+    if do_fullinfo_stats:
+        loop = range(len(dataset))
+    else:
+        tscv = TimeSeriesSplit(n_splits=n_splits)
+        loop = tscv.split(dataset)
+    for loop_args in loop:
+        if do_fullinfo_stats:
+            i:int = loop_args  # type: ignore
+            # ensure this_train_size is a power of 2
+            this_train_size = i+5
+            if not (this_train_size & (this_train_size - 1) == 0):
+                continue
+
+            train_index = np.array(list(range(this_train_size)))
+            test_index = np.array(list(range(this_train_size, this_train_size+this_train_size//4+1)))
+            if test_index[-1] >= len(dataset):
+                break
+        else:
+            train_index, test_index = loop_args  #type: ignore
+
         optimizer.define_model()
         test_set = dataset.iloc[test_index].copy()
-        testsets.append(test_set)
+        # print(train_index, test_index, test_set)
         if dry_run:
             w_list.append(optimizer.init_w)
+            testsets.append(test_set)
+            sizes.append(len(train_index))
             continue
         train_set = dataset.iloc[train_index].copy()
         # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
@@ -212,30 +239,56 @@ def process(file):
                         batch_size=batch_size,
                     )
                     w_list.append(trainer.train(verbose=verbose))
+            # No error, so training data was adequate
+            testsets.append(test_set)
+            sizes.append(len(train_set))
         except Exception as e:
-            print(e)
-            w_list.append(optimizer.init_w)
+            if str(e).endswith('inadequate.'):
+                print("Skipping - Inadequate data")
+            else:
+                print('Error:', e)
 
-    p, y, evaluation = predict(w_list, testsets, file=file)
+    if len(w_list) == 0:
+        print("No data for", file.stem)
+        return
 
-    if os.environ.get("PLOT"):
-        fig = plt.figure()
-        plot_brier(p, y, ax=fig.add_subplot(111))
-        fig.savefig(f"evaluation/{path}/{file.stem}.png")
+    if do_fullinfo_stats:
+        all_p = []
+        all_y = []
+        all_evaluation = []
+        for i in range(len(w_list)):
+            p, y, evaluation = predict([w_list[i]], [testsets[i]], file=file)
+            all_p.append(p)
+            all_y.append(y)
+            all_evaluation.append(evaluation)
+        
+        ici = None
+        rmse_raw = [root_mean_squared_error(y_true=e_t, y_pred=e_p) for e_t, e_p in zip(all_y, all_p)]
+        logloss = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
+        rmse_bins = [rmse_matrix(e) for e in all_evaluation]
+    else:
+        p, y, evaluation = predict(w_list, testsets, file=file)
 
-    p_calibrated = lowess(
-        y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
-    )
-    ici = np.mean(np.abs(p_calibrated - p))
-    rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
-    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-    rmse_bins = rmse_matrix(evaluation)
+        if os.environ.get("PLOT"):
+            fig = plt.figure()
+            plot_brier(p, y, ax=fig.add_subplot(111))
+            fig.savefig(f"evaluation/{path}/{file.stem}.png")
+
+        p_calibrated = lowess(
+            y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
+        )
+        ici = np.mean(np.abs(p_calibrated - p))
+        rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
+        logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
+        rmse_bins = rmse_matrix(evaluation)
+
     result = {
         "metrics": {
             "RMSE": rmse_raw,
             "LogLoss": logloss,
             "RMSE(bins)": rmse_bins,
             "ICI": ici,
+            "TrainSizes": sizes,
         },
         "user": int(file.stem),
         "size": len(y),
@@ -249,17 +302,20 @@ def process(file):
 
 if __name__ == "__main__":
     unprocessed_files = []
-    dataset_path = "./dataset"
+    dataset_path0 = "./dataset/"
+    dataset_path1 = "./dataset/FSRS-Anki-20k/dataset/1/"
+    dataset_path2 = "./dataset/FSRS-Anki-20k/dataset/2/"
     Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     processed_files = list(map(lambda x: x.stem, Path(f"result/{path}").iterdir()))
-    for file in Path(dataset_path).glob("*.csv"):
-        if file.stem in processed_files:
-            continue
-        unprocessed_files.append(file)
+    for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:
+        for file in Path(dataset_path).glob("*.csv"):
+            if file.stem in processed_files:
+                continue
+            unprocessed_files.append(file)
 
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
-    num_threads = int(os.environ.get("THREADS", "8"))
+    num_threads = int(os.environ.get("THREADS", "4"))
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
         results = list(executor.map(process, unprocessed_files))

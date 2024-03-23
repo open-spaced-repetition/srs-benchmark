@@ -41,7 +41,7 @@ batch_size: int = 512
 verbose: bool = False
 do_fullinfo_stats = True
 
-dry_run = os.environ.get("DRY_RUN", False)
+dry_run = os.environ.get("DRY_RUN")
 only_pretrain = os.environ.get("PRETRAIN")
 rust = os.environ.get("FSRS_RS")
 if rust:
@@ -316,6 +316,6 @@ if __name__ == "__main__":
 
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
-    num_threads = int(os.environ.get("THREADS", "4"))
+    num_threads = int(os.environ.get("THREADS", "8"))
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
         results = list(executor.map(process, unprocessed_files))

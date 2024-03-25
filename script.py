@@ -293,6 +293,7 @@ def process(file):
         "user": int(file.stem),
         "size": len(y),
         "weights": list(map(lambda x: round(x, 4), w_list[-1])),
+        "allweights": [list(w) for w in w_list],
     }
     # save as json
     Path(f"result/{path}").mkdir(parents=True, exist_ok=True)

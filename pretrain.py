@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch
 from other import create_features, Trainer, RNN, Transformer, NN_17
 
-model_name = "NN_17"
+model_name = "Transformer"
 
 if model_name == "GRU":
     model = RNN

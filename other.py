@@ -497,13 +497,9 @@ class RNN(nn.Module):
 
 
 class Transformer(nn.Module):
-    # 622 params with default settings
+    # 127 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
-        self.n_input = n_input
-        self.n_hidden = n_hidden
-        self.n_output = n_output
-        self.n_layers = n_layers
         self.transformer = nn.Transformer(
             d_model=n_input,
             nhead=n_input,

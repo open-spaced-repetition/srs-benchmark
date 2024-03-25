@@ -952,7 +952,7 @@ class Trainer:
         self,
         MODEL: nn.Module,
         train_set: pd.DataFrame,
-        test_set: pd.DataFrame,
+        test_set: Optional[pd.DataFrame],
         n_epoch: int = 1,
         lr: float = 1e-2,
         wd: float = 1e-4,
@@ -987,7 +987,7 @@ class Trainer:
         self.avg_eval_losses = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
-    def build_dataset(self, train_set: pd.DataFrame, test_set: pd.DataFrame):
+    def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         pre_train_set = train_set[train_set["i"] == 2]
         self.pre_train_set = BatchDataset(pre_train_set, self.batch_size)
         self.pre_train_data_loader = BatchLoader(self.pre_train_set)
@@ -999,8 +999,11 @@ class Trainer:
         self.train_set = BatchDataset(train_set, self.batch_size)
         self.train_data_loader = BatchLoader(self.train_set)
 
-        self.test_set = BatchDataset(test_set, self.batch_size)
-        self.test_data_loader = BatchLoader(self.test_set)
+        self.test_set = (
+            []
+            if test_set is None
+            else BatchDataset(test_set, batch_size=self.batch_size)
+        )
 
     def train(self, verbose: bool = True):
         best_loss = np.inf
@@ -1083,6 +1086,9 @@ class Trainer:
         with torch.no_grad():
             losses = []
             for dataset in (self.train_set, self.test_set):
+                if len(dataset) == 0:
+                    losses.append(0)
+                    continue
                 sequences, delta_ts, labels, seq_lens = (
                     dataset.x_train,
                     dataset.t_train,
@@ -1453,7 +1459,7 @@ def process(args):
             trainer = Trainer(
                 model(),
                 train_set,
-                test_set,
+                None,
                 n_epoch=n_epoch,
                 lr=lr,
                 wd=wd,

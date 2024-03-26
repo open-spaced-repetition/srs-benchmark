@@ -188,7 +188,7 @@ def process(file):
         try:
             if rust:
                 train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
-                weights = backend.benchmark(train_set_items, [])
+                weights = backend.benchmark(train_set_items, train_set_items)
                 w_list.append(weights)
             else:
                 optimizer.S0_dataset_group = (

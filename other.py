@@ -302,9 +302,10 @@ class FSRS4(nn.Module):
         for first_rating in ("1", "2", "3", "4"):
             group = S0_dataset_group[S0_dataset_group["r_history"] == first_rating]
             if group.empty:
-                tqdm.write(
-                    f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
-                )
+                if verbose:
+                    tqdm.write(
+                        f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
+                    )
                 continue
             delta_t = group["delta_t"]
             recall = (group["y"]["mean"] * group["y"]["count"] + average_recall * 1) / (
@@ -1005,7 +1006,7 @@ class Trainer:
             else BatchDataset(test_set, batch_size=self.batch_size)
         )
 
-    def train(self, verbose: bool = True):
+    def train(self):
         best_loss = np.inf
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
@@ -1465,7 +1466,7 @@ def process(args):
                 wd=wd,
                 batch_size=batch_size,
             )
-            w_list.append(trainer.train(verbose=verbose))
+            w_list.append(trainer.train())
         except Exception as e:
             print(file)
             print(e)

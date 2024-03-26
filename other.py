@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Optional
 from pathlib import Path
 import matplotlib.pyplot as plt
-import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 import json
 import os
@@ -693,6 +693,7 @@ class DASH_ACTR(nn.Module):
             )
         )
 
+
 class NN_17WeightClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
@@ -721,8 +722,10 @@ class NN_17WeightClipper:
             w[2] = w[2].clamp(-5, 5)
             module.sinc_w.data = w
 
+
 def exp_activ(input):
     return torch.exp(-input).clamp(0.0001, 0.9999)
+
 
 class ExpActivation(nn.Module):
     def __init__(self):
@@ -730,6 +733,7 @@ class ExpActivation(nn.Module):
 
     def forward(self, input):
         return exp_activ(input)
+
 
 class NN_17(nn.Module):
     # 496 params
@@ -767,7 +771,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size // 2, 1),
             # nn.Sigmoid()
             nn.Softplus(),  # make sure that the input for ExpActivation() is >=0
-            ExpActivation()
+            ExpActivation(),
         )
         self.next_d = nn.Sequential(
             nn.Linear(3, self.hidden_size),
@@ -775,7 +779,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
         self.pls = nn.Sequential(
             nn.Linear(2, self.hidden_size),
@@ -783,7 +787,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus()
+            nn.Softplus(),
         )
         self.sinc = nn.Sequential(
             nn.Linear(3, self.hidden_size),
@@ -791,7 +795,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus()
+            nn.Softplus(),
         )
         self.best_sinc = nn.Sequential(
             nn.Linear(2, self.hidden_size),
@@ -799,7 +803,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus()
+            nn.Softplus(),
         )
 
         if state_dict is not None:
@@ -811,7 +815,6 @@ class NN_17(nn.Module):
                 )
             except FileNotFoundError:
                 pass
-
 
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2))
@@ -874,11 +877,9 @@ class NN_17(nn.Module):
             pls = pls.clamp(0.01, 36500)
 
             # SInc
-            sinc_t = 1 + \
-                     torch.exp(self.sinc_w[0]) \
-                     * (5 * (1 - new_d) + 1) \
-                     * torch.pow(sr, -self.sinc_w[1]) \
-                     * torch.exp(-rw * self.sinc_w[2])
+            sinc_t = 1 + torch.exp(self.sinc_w[0]) * (5 * (1 - new_d) + 1) * torch.pow(
+                sr, -self.sinc_w[1]
+            ) * torch.exp(-rw * self.sinc_w[2])
 
             sinc_input = torch.concat([new_d, sr, rw], dim=1)
             sinc_nn = 1 + self.sinc(sinc_input)
@@ -1418,7 +1419,6 @@ def create_features(df, model_name="FSRSv3"):
 def process(args):
     plt.close("all")
     file, model_name = args
-    print(file)
     if model_name == "SM2":
         process_untrainable(file)
         return
@@ -1447,8 +1447,7 @@ def process(args):
 
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
-        tqdm.write(f"{file.stem} does not have enough data.")
-        return
+        raise Exception(f"{file.stem} does not have enough data.")
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
@@ -1499,6 +1498,7 @@ def process(args):
     evaluate(
         y, p, save_tmp, model_name, file, w_list if type(w_list[0]) == list else None
     )
+    return file
 
 
 def evaluate(y, p, df, model_name, file, w_list=None):
@@ -1548,5 +1548,16 @@ if __name__ == "__main__":
     unprocessed_files.sort(key=lambda x: int(x[0].stem), reverse=False)
 
     num_threads = int(os.environ.get("THREADS", "8"))
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-        results = list(executor.map(process, unprocessed_files))
+    with ProcessPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(process, file) for file in unprocessed_files]
+        for future in (
+            pbar := tqdm(
+                as_completed(futures),
+                total=len(futures),
+            )
+        ):
+            try:
+                result = future.result()
+                pbar.set_description(f"Processed {result}")
+            except Exception as e:
+                tqdm.write(str(e))

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import root_mean_squared_error, log_loss
 from statsmodels.nonparametric.smoothers_lowess import lowess
-import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
 import torch
 
@@ -171,8 +171,7 @@ def process(file):
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
-        tqdm.write(f"{file.stem} does not have enough data.")
-        return
+        raise Exception(f"{file.stem} does not have enough data.")
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
@@ -260,5 +259,16 @@ if __name__ == "__main__":
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
     num_threads = int(os.environ.get("THREADS", "8"))
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-        results = list(executor.map(process, unprocessed_files))
+    with ProcessPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(process, file) for file in unprocessed_files]
+        for future in (
+            pbar := tqdm(
+                as_completed(futures),
+                total=len(futures),
+            )
+        ):
+            try:
+                result = future.result()
+                pbar.set_description(f"Processed {result}")
+            except Exception as e:
+                tqdm.write(str(e))

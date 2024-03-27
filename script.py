@@ -318,7 +318,7 @@ if __name__ == "__main__":
             pbar := tqdm(
                 as_completed(futures),
                 total=len(futures),
-                smoothing=0
+                smoothing=0.03
             )
         ):
             try:

@@ -39,7 +39,8 @@ n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
-do_fullinfo_stats = True
+verbose_inadequate_data: bool = False
+do_fullinfo_stats: bool = True
 
 dry_run = os.environ.get("DRY_RUN")
 only_pretrain = os.environ.get("PRETRAIN")
@@ -237,7 +238,8 @@ def process(file):
             sizes.append(len(train_set))
         except Exception as e:
             if str(e).endswith('inadequate.'):
-                print("Skipping - Inadequate data")
+                if verbose_inadequate_data:
+                    print("Skipping - Inadequate data")
             else:
                 print('Error:', e)
             if not do_fullinfo_stats:

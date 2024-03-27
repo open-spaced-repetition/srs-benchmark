@@ -177,6 +177,7 @@ def process(file):
     if dataset.shape[0] < 6:
         raise Exception(f"{file.stem} does not have enough data.")
     w_list = []
+    trainsets = []
     testsets = []
     sizes = []
 
@@ -200,12 +201,14 @@ def process(file):
 
         optimizer.define_model()
         test_set = dataset.iloc[test_index].copy()
+        train_set = dataset.iloc[train_index].copy()
         if dry_run:
             w_list.append(optimizer.init_w)
-            testsets.append(test_set)
             sizes.append(len(train_index))
+            testsets.append(test_set)
+            if do_fullinfo_stats:
+                trainsets.append(train_set)
             continue
-        train_set = dataset.iloc[train_index].copy()
         # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
         try:
             if rust:
@@ -234,8 +237,10 @@ def process(file):
                     )
                     w_list.append(trainer.train(verbose=verbose))
             # No error, so training data was adequate
-            testsets.append(test_set)
             sizes.append(len(train_set))
+            testsets.append(test_set)
+            if do_fullinfo_stats:
+                trainsets.append(train_set)
         except Exception as e:
             if str(e).endswith('inadequate.'):
                 if verbose_inadequate_data:
@@ -245,8 +250,10 @@ def process(file):
             if not do_fullinfo_stats:
                 # Default behavior is to use the default weights if it cannot optimise
                 w_list.append(optimizer.init_w)
-                testsets.append(test_set)
                 sizes.append(len(train_set))
+                testsets.append(test_set)
+                if do_fullinfo_stats:
+                    trainsets.append(train_set)  # Kept for readability
             else:
                 # If we are doing fullinfo stats, we will be stricter - no default weights are saved for optimised FSRS if optimisation fails 
                 pass
@@ -260,18 +267,35 @@ def process(file):
         all_p = []
         all_y = []
         all_evaluation = []
+        last_y = []
         for i in range(len(w_list)):
             p, y, evaluation = predict([w_list[i]], [testsets[i]], file=file)
             all_p.append(p)
             all_y.append(y)
             all_evaluation.append(evaluation)
+            last_y = y
         
         ici = None
         rmse_raw = [root_mean_squared_error(y_true=e_t, y_pred=e_p) for e_t, e_p in zip(all_y, all_p)]
-        logloss = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
+        logloss  = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
         rmse_bins = [rmse_matrix(e) for e in all_evaluation]
+
+        all_p = []
+        all_y = []
+        all_evaluation = []
+        for i in range(len(w_list)):
+            p, y, evaluation = predict([w_list[i]], [trainsets[i]], file=file)
+            all_p.append(p)
+            all_y.append(y)
+            all_evaluation.append(evaluation)
+        
+        rmse_raw_train = [root_mean_squared_error(y_true=e_t, y_pred=e_p) for e_t, e_p in zip(all_y, all_p)]
+        logloss_train  = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
+        rmse_bins_train = [rmse_matrix(e) for e in all_evaluation]
+
     else:
         p, y, evaluation = predict(w_list, testsets, file=file)
+        last_y = y
 
         if os.environ.get("PLOT"):
             fig = plt.figure()
@@ -286,6 +310,10 @@ def process(file):
         logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
         rmse_bins = rmse_matrix(evaluation)
 
+        rmse_raw_train = None
+        logloss_train = None
+        rmse_bins_train = None
+
     result = {
         "metrics": {
             "RMSE": rmse_raw,
@@ -293,9 +321,12 @@ def process(file):
             "RMSE(bins)": rmse_bins,
             "ICI": ici,
             "TrainSizes": sizes,
+            "RMSETrain": rmse_raw_train,
+            "LogLossTrain": logloss_train,
+            "RMSE(bins)Train": rmse_bins_train,
         },
         "user": int(file.stem),
-        "size": len(y),
+        "size": len(last_y),
         "weights": list(map(lambda x: round(x, 4), w_list[-1])),
         "allweights": [list(w) for w in w_list],
     }

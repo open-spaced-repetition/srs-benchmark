@@ -41,7 +41,7 @@ batch_size: int = 512
 verbose: bool = False
 do_fullinfo_stats = True
 
-dry_run = os.environ.get("DRY_RUN", False)
+dry_run = os.environ.get("DRY_RUN")
 only_pretrain = os.environ.get("PRETRAIN")
 rust = os.environ.get("FSRS_RS")
 if rust:
@@ -62,7 +62,6 @@ else:
         path += "-dev"
     if do_fullinfo_stats:
         path += "-fullinfo"
-
 
 def predict(w_list, testsets, last_rating=None, file=None):
     p = []
@@ -181,7 +180,7 @@ def process(file):
     sizes = []
 
     if do_fullinfo_stats:
-        loop = range(4, len(dataset))
+        loop = range(3, len(dataset))
     else:
         tscv = TimeSeriesSplit(n_splits=n_splits)
         loop = tscv.split(dataset)
@@ -312,13 +311,14 @@ if __name__ == "__main__":
 
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
-    num_threads = int(os.environ.get("THREADS", "8"))
+    num_threads = int(os.environ.get("THREADS", "4"))
     with ProcessPoolExecutor(max_workers=num_threads) as executor:
         futures = [executor.submit(process, file) for file in unprocessed_files]
         for future in (
             pbar := tqdm(
                 as_completed(futures),
                 total=len(futures),
+                smoothing=0
             )
         ):
             try:

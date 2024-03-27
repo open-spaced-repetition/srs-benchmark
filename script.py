@@ -41,7 +41,7 @@ batch_size: int = 512
 verbose: bool = False
 do_fullinfo_stats = True
 
-dry_run = os.environ.get("DRY_RUN")
+dry_run = os.environ.get("DRY_RUN", False)
 only_pretrain = os.environ.get("PRETRAIN")
 rust = os.environ.get("FSRS_RS")
 if rust:
@@ -181,17 +181,15 @@ def process(file):
     sizes = []
 
     if do_fullinfo_stats:
-        loop = range(len(dataset))
+        loop = range(4, len(dataset))
     else:
         tscv = TimeSeriesSplit(n_splits=n_splits)
         loop = tscv.split(dataset)
     for loop_args in loop:
         if do_fullinfo_stats:
             i:int = loop_args  # type: ignore
-            # ensure this_train_size is a power of 2
-            this_train_size = i+5
-            if not (this_train_size & (this_train_size - 1) == 0):
-                continue
+            # Set this_train_size to be a power of 2
+            this_train_size = 2**i
 
             train_index = np.array(list(range(this_train_size)))
             test_index = np.array(list(range(this_train_size, this_train_size+this_train_size//4+1)))
@@ -202,7 +200,6 @@ def process(file):
 
         optimizer.define_model()
         test_set = dataset.iloc[test_index].copy()
-        # print(train_index, test_index, test_set)
         if dry_run:
             w_list.append(optimizer.init_w)
             testsets.append(test_set)

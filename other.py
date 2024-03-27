@@ -1037,7 +1037,7 @@ class Trainer:
                     retentions = outputs.squeeze()
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences.transpose(0, 1))
-                    retentions = outputs.squeeze()
+                    retentions = outputs.squeeze(1)
                 elif isinstance(self.model, NN_17):
                     outputs, _ = self.model(sequences)
                     stabilities = outputs[

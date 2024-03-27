@@ -167,7 +167,6 @@ def create_time_series(df):
 
 def process(file):
     plt.close("all")
-    print(file)
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
@@ -243,6 +242,7 @@ def process(file):
     Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
     with open(f"result/{path}/{file.stem}.json", "w") as f:
         json.dump(result, f, indent=4)
+    return file
 
 
 if __name__ == "__main__":

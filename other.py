@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Optional
 from pathlib import Path
 import matplotlib.pyplot as plt
-import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 import json
 import os
@@ -302,9 +302,10 @@ class FSRS4(nn.Module):
         for first_rating in ("1", "2", "3", "4"):
             group = S0_dataset_group[S0_dataset_group["r_history"] == first_rating]
             if group.empty:
-                tqdm.write(
-                    f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
-                )
+                if verbose:
+                    tqdm.write(
+                        f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
+                    )
                 continue
             delta_t = group["delta_t"]
             recall = (group["y"]["mean"] * group["y"]["count"] + average_recall * 1) / (
@@ -497,13 +498,9 @@ class RNN(nn.Module):
 
 
 class Transformer(nn.Module):
-    # 622 params with default settings
+    # 127 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
-        self.n_input = n_input
-        self.n_hidden = n_hidden
-        self.n_output = n_output
-        self.n_layers = n_layers
         self.transformer = nn.Transformer(
             d_model=n_input,
             nhead=n_input,
@@ -696,6 +693,7 @@ class DASH_ACTR(nn.Module):
             )
         )
 
+
 class NN_17WeightClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
@@ -724,8 +722,10 @@ class NN_17WeightClipper:
             w[2] = w[2].clamp(-5, 5)
             module.sinc_w.data = w
 
+
 def exp_activ(input):
     return torch.exp(-input).clamp(0.0001, 0.9999)
+
 
 class ExpActivation(nn.Module):
     def __init__(self):
@@ -733,6 +733,7 @@ class ExpActivation(nn.Module):
 
     def forward(self, input):
         return exp_activ(input)
+
 
 class NN_17(nn.Module):
     # 496 params
@@ -770,7 +771,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size // 2, 1),
             # nn.Sigmoid()
             nn.Softplus(),  # make sure that the input for ExpActivation() is >=0
-            ExpActivation()
+            ExpActivation(),
         )
         self.next_d = nn.Sequential(
             nn.Linear(3, self.hidden_size),
@@ -778,7 +779,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
         self.pls = nn.Sequential(
             nn.Linear(2, self.hidden_size),
@@ -786,7 +787,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus()
+            nn.Softplus(),
         )
         self.sinc = nn.Sequential(
             nn.Linear(3, self.hidden_size),
@@ -794,7 +795,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus()
+            nn.Softplus(),
         )
         self.best_sinc = nn.Sequential(
             nn.Linear(2, self.hidden_size),
@@ -802,7 +803,7 @@ class NN_17(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size // 2),
             nn.Mish(),
             nn.Linear(self.hidden_size // 2, 1),
-            nn.Softplus()
+            nn.Softplus(),
         )
 
         if state_dict is not None:
@@ -814,7 +815,6 @@ class NN_17(nn.Module):
                 )
             except FileNotFoundError:
                 pass
-
 
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2))
@@ -877,11 +877,9 @@ class NN_17(nn.Module):
             pls = pls.clamp(0.01, 36500)
 
             # SInc
-            sinc_t = 1 + \
-                     torch.exp(self.sinc_w[0]) \
-                     * (5 * (1 - new_d) + 1) \
-                     * torch.pow(sr, -self.sinc_w[1]) \
-                     * torch.exp(-rw * self.sinc_w[2])
+            sinc_t = 1 + torch.exp(self.sinc_w[0]) * (5 * (1 - new_d) + 1) * torch.pow(
+                sr, -self.sinc_w[1]
+            ) * torch.exp(-rw * self.sinc_w[2])
 
             sinc_input = torch.concat([new_d, sr, rw], dim=1)
             sinc_nn = 1 + self.sinc(sinc_input)
@@ -956,7 +954,7 @@ class Trainer:
         self,
         MODEL: nn.Module,
         train_set: pd.DataFrame,
-        test_set: pd.DataFrame,
+        test_set: Optional[pd.DataFrame],
         n_epoch: int = 1,
         lr: float = 1e-2,
         wd: float = 1e-4,
@@ -991,7 +989,7 @@ class Trainer:
         self.avg_eval_losses = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
-    def build_dataset(self, train_set: pd.DataFrame, test_set: pd.DataFrame):
+    def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         pre_train_set = train_set[train_set["i"] == 2]
         self.pre_train_set = BatchDataset(pre_train_set, self.batch_size)
         self.pre_train_data_loader = BatchLoader(self.pre_train_set)
@@ -1003,10 +1001,13 @@ class Trainer:
         self.train_set = BatchDataset(train_set, self.batch_size)
         self.train_data_loader = BatchLoader(self.train_set)
 
-        self.test_set = BatchDataset(test_set, self.batch_size)
-        self.test_data_loader = BatchLoader(self.test_set)
+        self.test_set = (
+            []
+            if test_set is None
+            else BatchDataset(test_set, batch_size=self.batch_size)
+        )
 
-    def train(self, verbose: bool = True):
+    def train(self):
         best_loss = np.inf
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
@@ -1036,7 +1037,7 @@ class Trainer:
                     retentions = outputs.squeeze()
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences.transpose(0, 1))
-                    retentions = outputs.squeeze()
+                    retentions = outputs.squeeze(1)
                 elif isinstance(self.model, NN_17):
                     outputs, _ = self.model(sequences)
                     stabilities = outputs[
@@ -1087,6 +1088,9 @@ class Trainer:
         with torch.no_grad():
             losses = []
             for dataset in (self.train_set, self.test_set):
+                if len(dataset) == 0:
+                    losses.append(0)
+                    continue
                 sequences, delta_ts, labels, seq_lens = (
                     dataset.x_train,
                     dataset.t_train,
@@ -1415,7 +1419,6 @@ def create_features(df, model_name="FSRSv3"):
 def process(args):
     plt.close("all")
     file, model_name = args
-    print(file)
     if model_name == "SM2":
         process_untrainable(file)
         return
@@ -1444,8 +1447,7 @@ def process(args):
 
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
-        tqdm.write(f"{file.stem} does not have enough data.")
-        return
+        raise Exception(f"{file.stem} does not have enough data.")
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
@@ -1457,13 +1459,13 @@ def process(args):
             trainer = Trainer(
                 model(),
                 train_set,
-                test_set,
+                None,
                 n_epoch=n_epoch,
                 lr=lr,
                 wd=wd,
                 batch_size=batch_size,
             )
-            w_list.append(trainer.train(verbose=verbose))
+            w_list.append(trainer.train())
         except Exception as e:
             print(file)
             print(e)
@@ -1496,6 +1498,7 @@ def process(args):
     evaluate(
         y, p, save_tmp, model_name, file, w_list if type(w_list[0]) == list else None
     )
+    return file
 
 
 def evaluate(y, p, df, model_name, file, w_list=None):
@@ -1545,5 +1548,16 @@ if __name__ == "__main__":
     unprocessed_files.sort(key=lambda x: int(x[0].stem), reverse=False)
 
     num_threads = int(os.environ.get("THREADS", "8"))
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-        results = list(executor.map(process, unprocessed_files))
+    with ProcessPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(process, file) for file in unprocessed_files]
+        for future in (
+            pbar := tqdm(
+                as_completed(futures),
+                total=len(futures),
+            )
+        ):
+            try:
+                result = future.result()
+                pbar.set_description(f"Processed {result}")
+            except Exception as e:
+                tqdm.write(str(e))

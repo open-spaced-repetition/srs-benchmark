@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import root_mean_squared_error, log_loss
 from statsmodels.nonparametric.smoothers_lowess import lowess
-import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
 import torch
 
@@ -172,12 +172,10 @@ def create_time_series(df):
 
 def process(file):
     plt.close("all")
-    print(file)
     dataset = pd.read_csv(file)
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
-        tqdm.write(f"{file.stem} does not have enough data.")
-        return
+        raise Exception(f"{file.stem} does not have enough data.")
     w_list = []
     testsets = []
     sizes = []
@@ -215,8 +213,7 @@ def process(file):
         try:
             if rust:
                 train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
-                test_set_items = convert_to_items(test_set[test_set["i"] >= 2])
-                weights = backend.benchmark(train_set_items, test_set_items)
+                weights = backend.benchmark(train_set_items, train_set_items)
                 w_list.append(weights)
             else:
                 optimizer.S0_dataset_group = (
@@ -232,7 +229,7 @@ def process(file):
                 else:
                     trainer = Trainer(
                         train_set,
-                        test_set,
+                        None,
                         optimizer.init_w,
                         n_epoch=n_epoch,
                         lr=lr,
@@ -299,6 +296,7 @@ def process(file):
     Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
     with open(f"result/{path}/{file.stem}.json", "w") as f:
         json.dump(result, f, indent=4)
+    return file
 
 
 if __name__ == "__main__":
@@ -318,5 +316,16 @@ if __name__ == "__main__":
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
     num_threads = int(os.environ.get("THREADS", "8"))
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_threads) as executor:
-        results = list(executor.map(process, unprocessed_files))
+    with ProcessPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(process, file) for file in unprocessed_files]
+        for future in (
+            pbar := tqdm(
+                as_completed(futures),
+                total=len(futures),
+            )
+        ):
+            try:
+                result = future.result()
+                pbar.set_description(f"Processed {result}")
+            except Exception as e:
+                tqdm.write(str(e))

@@ -240,6 +240,15 @@ def process(file):
                 print("Skipping - Inadequate data")
             else:
                 print('Error:', e)
+            if not do_fullinfo_stats:
+                # Default behavior is to use the default weights if it cannot optimise
+                w_list.append(optimizer.init_w)
+                testsets.append(test_set)
+                sizes.append(len(train_set))
+            else:
+                # If we are doing fullinfo stats, we will be stricter - no default weights are saved for optimised FSRS if optimisation fails 
+                pass
+                
 
     if len(w_list) == 0:
         print("No data for", file.stem)

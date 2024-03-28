@@ -39,12 +39,16 @@ n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
+verbose_inadequate_data: bool = False
+do_fullinfo_stats: bool = True
 
 dry_run = os.environ.get("DRY_RUN")
 only_pretrain = os.environ.get("PRETRAIN")
 rust = os.environ.get("FSRS_RS")
 if rust:
     path = "FSRS-rs"
+    if do_fullinfo_stats:
+        path += "-fullinfo"
     from anki._backend import RustBackend
 
     backend = RustBackend()
@@ -57,7 +61,8 @@ else:
         path += "-pretrain"
     if dev_mode:
         path += "-dev"
-
+    if do_fullinfo_stats:
+        path += "-fullinfo"
 
 def predict(w_list, testsets, last_rating=None, file=None):
     p = []
@@ -172,16 +177,38 @@ def process(file):
     if dataset.shape[0] < 6:
         raise Exception(f"{file.stem} does not have enough data.")
     w_list = []
+    trainsets = []
     testsets = []
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-    for train_index, test_index in tscv.split(dataset):
+    sizes = []
+
+    if do_fullinfo_stats:
+        loop = range(3, len(dataset))
+    else:
+        tscv = TimeSeriesSplit(n_splits=n_splits)
+        loop = tscv.split(dataset)
+    for loop_args in loop:
+        if do_fullinfo_stats:
+            i:int = loop_args  # type: ignore
+            # Set this_train_size to be a power of 2
+            this_train_size = 2**i
+
+            train_index = np.array(list(range(this_train_size)))
+            test_index = np.array(list(range(this_train_size, this_train_size+this_train_size//4+1)))
+            if test_index[-1] >= len(dataset):
+                break
+        else:
+            train_index, test_index = loop_args  #type: ignore
+
         optimizer.define_model()
         test_set = dataset.iloc[test_index].copy()
-        testsets.append(test_set)
+        train_set = dataset.iloc[train_index].copy()
         if dry_run:
             w_list.append(optimizer.init_w)
+            sizes.append(len(train_index))
+            testsets.append(test_set)
+            if do_fullinfo_stats:
+                trainsets.append(train_set)
             continue
-        train_set = dataset.iloc[train_index].copy()
         # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
         try:
             if rust:
@@ -209,34 +236,99 @@ def process(file):
                         batch_size=batch_size,
                     )
                     w_list.append(trainer.train(verbose=verbose))
+            # No error, so training data was adequate
+            sizes.append(len(train_set))
+            testsets.append(test_set)
+            if do_fullinfo_stats:
+                trainsets.append(train_set)
         except Exception as e:
-            print(e)
-            w_list.append(optimizer.init_w)
+            if str(e).endswith('inadequate.'):
+                if verbose_inadequate_data:
+                    print("Skipping - Inadequate data")
+            else:
+                print('Error:', e)
+            if not do_fullinfo_stats:
+                # Default behavior is to use the default weights if it cannot optimise
+                w_list.append(optimizer.init_w)
+                sizes.append(len(train_set))
+                testsets.append(test_set)
+                if do_fullinfo_stats:
+                    trainsets.append(train_set)  # Kept for readability
+            else:
+                # If we are doing fullinfo stats, we will be stricter - no default weights are saved for optimised FSRS if optimisation fails 
+                pass
+                
 
-    p, y, evaluation = predict(w_list, testsets, file=file)
+    if len(w_list) == 0:
+        print("No data for", file.stem)
+        return
 
-    if os.environ.get("PLOT"):
-        fig = plt.figure()
-        plot_brier(p, y, ax=fig.add_subplot(111))
-        fig.savefig(f"evaluation/{path}/{file.stem}.png")
+    if do_fullinfo_stats:
+        all_p = []
+        all_y = []
+        all_evaluation = []
+        last_y = []
+        for i in range(len(w_list)):
+            p, y, evaluation = predict([w_list[i]], [testsets[i]], file=file)
+            all_p.append(p)
+            all_y.append(y)
+            all_evaluation.append(evaluation)
+            last_y = y
+        
+        ici = None
+        rmse_raw = [root_mean_squared_error(y_true=e_t, y_pred=e_p) for e_t, e_p in zip(all_y, all_p)]
+        logloss  = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
+        rmse_bins = [rmse_matrix(e) for e in all_evaluation]
 
-    p_calibrated = lowess(
-        y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
-    )
-    ici = np.mean(np.abs(p_calibrated - p))
-    rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
-    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-    rmse_bins = rmse_matrix(evaluation)
+        all_p = []
+        all_y = []
+        all_evaluation = []
+        for i in range(len(w_list)):
+            p, y, evaluation = predict([w_list[i]], [trainsets[i]], file=file)
+            all_p.append(p)
+            all_y.append(y)
+            all_evaluation.append(evaluation)
+        
+        rmse_raw_train = [root_mean_squared_error(y_true=e_t, y_pred=e_p) for e_t, e_p in zip(all_y, all_p)]
+        logloss_train  = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
+        rmse_bins_train = [rmse_matrix(e) for e in all_evaluation]
+
+    else:
+        p, y, evaluation = predict(w_list, testsets, file=file)
+        last_y = y
+
+        if os.environ.get("PLOT"):
+            fig = plt.figure()
+            plot_brier(p, y, ax=fig.add_subplot(111))
+            fig.savefig(f"evaluation/{path}/{file.stem}.png")
+
+        p_calibrated = lowess(
+            y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
+        )
+        ici = np.mean(np.abs(p_calibrated - p))
+        rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
+        logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
+        rmse_bins = rmse_matrix(evaluation)
+
+        rmse_raw_train = None
+        logloss_train = None
+        rmse_bins_train = None
+
     result = {
         "metrics": {
             "RMSE": rmse_raw,
             "LogLoss": logloss,
             "RMSE(bins)": rmse_bins,
             "ICI": ici,
+            "TrainSizes": sizes,
+            "RMSETrain": rmse_raw_train,
+            "LogLossTrain": logloss_train,
+            "RMSE(bins)Train": rmse_bins_train,
         },
         "user": int(file.stem),
-        "size": len(y),
+        "size": len(last_y),
         "weights": list(map(lambda x: round(x, 4), w_list[-1])),
+        "allweights": [list(w) for w in w_list],
     }
     # save as json
     Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
@@ -247,24 +339,28 @@ def process(file):
 
 if __name__ == "__main__":
     unprocessed_files = []
-    dataset_path = "./dataset"
+    dataset_path0 = "./dataset/"
+    dataset_path1 = "./dataset/FSRS-Anki-20k/dataset/1/"
+    dataset_path2 = "./dataset/FSRS-Anki-20k/dataset/2/"
     Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     processed_files = list(map(lambda x: x.stem, Path(f"result/{path}").iterdir()))
-    for file in Path(dataset_path).glob("*.csv"):
-        if file.stem in processed_files:
-            continue
-        unprocessed_files.append(file)
+    for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:
+        for file in Path(dataset_path).glob("*.csv"):
+            if file.stem in processed_files:
+                continue
+            unprocessed_files.append(file)
 
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
-    num_threads = int(os.environ.get("THREADS", "8"))
+    num_threads = int(os.environ.get("THREADS", "4"))
     with ProcessPoolExecutor(max_workers=num_threads) as executor:
         futures = [executor.submit(process, file) for file in unprocessed_files]
         for future in (
             pbar := tqdm(
                 as_completed(futures),
                 total=len(futures),
+                smoothing=0.03
             )
         ):
             try:

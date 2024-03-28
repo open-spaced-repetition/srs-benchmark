@@ -141,3 +141,7 @@ collection/
 *.ipynb
 *.tsv
 *.r
+
+# Dataset
+dataset/FSRS-Anki-20k
+dataset/*.csv

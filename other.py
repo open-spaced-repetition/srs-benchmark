@@ -1033,8 +1033,7 @@ class Trainer:
                         seq_lens - 2, torch.arange(real_batch_size, device=device), 0
                     ]
                 elif isinstance(self.model, DASH_ACTR):
-                    outputs = self.model(sequences)
-                    retentions = outputs.squeeze()
+                    retentions = self.model(sequences)
                 elif isinstance(self.model, DASH):
                     outputs = self.model(sequences.transpose(0, 1))
                     retentions = outputs.squeeze(1)

@@ -1,3 +1,5 @@
+For each datapoint, get the test and train losses. Compare the train losses and check if a lower train loss indicates a lower test loss
+
 Size: 8
 Amt where 'default' does better than 'opt': 98 / 7586
 Mean RMSE: 0.295 (default) vs 0.301 (opt)

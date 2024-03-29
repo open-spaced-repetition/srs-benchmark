@@ -1255,6 +1255,7 @@ def process_untrainable(file):
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
     evaluate(y, p, save_tmp, model_name, file)
+    return file
 
 
 def baseline(file):
@@ -1283,6 +1284,7 @@ def baseline(file):
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
     evaluate(y, p, save_tmp, model_name, file)
+    return file
 
 
 def create_features(df, model_name="FSRSv3"):
@@ -1419,11 +1421,9 @@ def process(args):
     plt.close("all")
     file, model_name = args
     if model_name == "SM2":
-        process_untrainable(file)
-        return
+        return process_untrainable(file)
     if model_name == "AVG":
-        baseline(file)
-        return
+        return baseline(file)
     dataset = pd.read_csv(file)
     if model_name == "GRU":
         model = RNN

@@ -1,0 +1,143 @@
+For each pair of models, get the datapoints where model A does better than model B on train, and plot how well they do on test
+This tests: If a model does better on train, will it do better on test?
+Grey = Histograms overlap (e.g. if y=0-20 is grey (overlap), and y=20-30 is blue (fullopt), then fullopt has 10 more losses in that bin)
+Note: For low n, they won't add up to the total as full_opt fails and uses pretrain weights, causing the losses to be equal
+
+Conclusion: There are very few gains to be had by comparing train losses - Using pretrain for n=8-64 and full_opt for 64+ is best
+
+Size: 8
+Amt where train loss: fullopt < default < pretrain:    28 / 7586   ~   Test loss: 0.210, 0.193, 0.201
+Amt where train loss: fullopt < pretrain < default:   815 / 7586   ~   Test loss: 0.250, 0.251, 0.255
+Amt where train loss: default < pretrain < fullopt:     4 / 7586   ~   Test loss: 0.281, 0.220, 0.221
+Amt where train loss: default < fullopt < pretrain:    24 / 7586   ~   Test loss: 0.319, 0.317, 0.315
+Amt where train loss: pretrain < fullopt < default:    87 / 7586   ~   Test loss: 0.280, 0.281, 0.277
+Amt where train loss: pretrain < default < fullopt:     1 / 7586   ~   Test loss: 0.240, 0.228, 0.240
+
+Size: 16
+Amt where train loss: fullopt < default < pretrain:    93 / 7586   ~   Test loss: 0.239, 0.228, 0.240
+Amt where train loss: fullopt < pretrain < default:  1864 / 7586   ~   Test loss: 0.227, 0.228, 0.230
+Amt where train loss: default < pretrain < fullopt:    15 / 7586   ~   Test loss: 0.211, 0.194, 0.194
+Amt where train loss: default < fullopt < pretrain:    62 / 7586   ~   Test loss: 0.222, 0.232, 0.232
+Amt where train loss: pretrain < fullopt < default:   275 / 7586   ~   Test loss: 0.273, 0.274, 0.276
+Amt where train loss: pretrain < default < fullopt:     7 / 7586   ~   Test loss: 0.218, 0.215, 0.231
+
+Size: 32
+Amt where train loss: fullopt < default < pretrain:   193 / 7586   ~   Test loss: 0.194, 0.195, 0.198
+Amt where train loss: fullopt < pretrain < default:  3442 / 7586   ~   Test loss: 0.198, 0.199, 0.207
+Amt where train loss: default < pretrain < fullopt:    27 / 7586   ~   Test loss: 0.173, 0.167, 0.168
+Amt where train loss: default < fullopt < pretrain:   119 / 7586   ~   Test loss: 0.186, 0.195, 0.196
+Amt where train loss: pretrain < fullopt < default:   634 / 7586   ~   Test loss: 0.231, 0.232, 0.222
+Amt where train loss: pretrain < default < fullopt:    17 / 7586   ~   Test loss: 0.183, 0.187, 0.183
+
+Size: 64
+Amt where train loss: fullopt < default < pretrain:   365 / 7586   ~   Test loss: 0.191, 0.186, 0.191
+Amt where train loss: fullopt < pretrain < default:  4852 / 7586   ~   Test loss: 0.179, 0.180, 0.191
+Amt where train loss: default < pretrain < fullopt:    50 / 7586   ~   Test loss: 0.154, 0.156, 0.160
+Amt where train loss: default < fullopt < pretrain:   126 / 7586   ~   Test loss: 0.171, 0.185, 0.189
+Amt where train loss: pretrain < fullopt < default:   749 / 7586   ~   Test loss: 0.203, 0.204, 0.209
+Amt where train loss: pretrain < default < fullopt:    28 / 7586   ~   Test loss: 0.140, 0.140, 0.142
+
+Size: 128
+Amt where train loss: fullopt < default < pretrain:   393 / 7583   ~   Test loss: 0.164, 0.162, 0.165
+Amt where train loss: fullopt < pretrain < default:  5708 / 7583   ~   Test loss: 0.158, 0.159, 0.174
+Amt where train loss: default < pretrain < fullopt:    63 / 7583   ~   Test loss: 0.161, 0.160, 0.161
+Amt where train loss: default < fullopt < pretrain:   147 / 7583   ~   Test loss: 0.170, 0.170, 0.172
+Amt where train loss: pretrain < fullopt < default:   717 / 7583   ~   Test loss: 0.170, 0.172, 0.187
+Amt where train loss: pretrain < default < fullopt:    50 / 7583   ~   Test loss: 0.131, 0.130, 0.130
+
+Size: 256
+Amt where train loss: fullopt < default < pretrain:   457 / 7577   ~   Test loss: 0.140, 0.142, 0.143
+Amt where train loss: fullopt < pretrain < default:  6088 / 7577   ~   Test loss: 0.143, 0.145, 0.162
+Amt where train loss: default < pretrain < fullopt:    53 / 7577   ~   Test loss: 0.132, 0.132, 0.135
+Amt where train loss: default < fullopt < pretrain:   133 / 7577   ~   Test loss: 0.151, 0.152, 0.151
+Amt where train loss: pretrain < fullopt < default:   645 / 7577   ~   Test loss: 0.156, 0.157, 0.169
+Amt where train loss: pretrain < default < fullopt:    48 / 7577   ~   Test loss: 0.134, 0.132, 0.137
+
+Size: 512
+Amt where train loss: fullopt < default < pretrain:   499 / 7540   ~   Test loss: 0.132, 0.135, 0.136
+Amt where train loss: fullopt < pretrain < default:  6217 / 7540   ~   Test loss: 0.130, 0.133, 0.152
+Amt where train loss: default < pretrain < fullopt:    55 / 7540   ~   Test loss: 0.116, 0.115, 0.118
+Amt where train loss: default < fullopt < pretrain:   115 / 7540   ~   Test loss: 0.145, 0.149, 0.148
+Amt where train loss: pretrain < fullopt < default:   578 / 7540   ~   Test loss: 0.143, 0.144, 0.161
+Amt where train loss: pretrain < default < fullopt:    29 / 7540   ~   Test loss: 0.144, 0.141, 0.147
+
+Size: 1024
+Amt where train loss: fullopt < default < pretrain:   490 / 7397   ~   Test loss: 0.119, 0.123, 0.125
+Amt where train loss: fullopt < pretrain < default:  6183 / 7397   ~   Test loss: 0.117, 0.122, 0.141
+Amt where train loss: default < pretrain < fullopt:    64 / 7397   ~   Test loss: 0.114, 0.115, 0.118
+Amt where train loss: default < fullopt < pretrain:    94 / 7397   ~   Test loss: 0.123, 0.121, 0.123
+Amt where train loss: pretrain < fullopt < default:   511 / 7397   ~   Test loss: 0.131, 0.131, 0.155
+Amt where train loss: pretrain < default < fullopt:    35 / 7397   ~   Test loss: 0.135, 0.135, 0.139
+
+Size: 2048
+Amt where train loss: fullopt < default < pretrain:   436 / 6987   ~   Test loss: 0.112, 0.117, 0.119
+Amt where train loss: fullopt < pretrain < default:  6008 / 6987   ~   Test loss: 0.106, 0.113, 0.132
+Amt where train loss: default < pretrain < fullopt:    49 / 6987   ~   Test loss: 0.153, 0.154, 0.157
+Amt where train loss: default < fullopt < pretrain:    78 / 6987   ~   Test loss: 0.118, 0.117, 0.117
+Amt where train loss: pretrain < fullopt < default:   377 / 6987   ~   Test loss: 0.126, 0.126, 0.145
+Amt where train loss: pretrain < default < fullopt:    27 / 6987   ~   Test loss: 0.136, 0.132, 0.141
+
+Size: 4096
+Amt where train loss: fullopt < default < pretrain:   401 / 5929   ~   Test loss: 0.106, 0.113, 0.115
+Amt where train loss: fullopt < pretrain < default:  5109 / 5929   ~   Test loss: 0.095, 0.105, 0.122
+Amt where train loss: default < pretrain < fullopt:    30 / 5929   ~   Test loss: 0.129, 0.127, 0.134
+Amt where train loss: default < fullopt < pretrain:    75 / 5929   ~   Test loss: 0.126, 0.130, 0.131
+Amt where train loss: pretrain < fullopt < default:   286 / 5929   ~   Test loss: 0.117, 0.118, 0.135
+Amt where train loss: pretrain < default < fullopt:    23 / 5929   ~   Test loss: 0.137, 0.137, 0.141
+
+Size: 8192
+Amt where train loss: fullopt < default < pretrain:   374 / 4612   ~   Test loss: 0.090, 0.100, 0.101
+Amt where train loss: fullopt < pretrain < default:  3995 / 4612   ~   Test loss: 0.085, 0.097, 0.112
+Amt where train loss: default < pretrain < fullopt:    22 / 4612   ~   Test loss: 0.158, 0.158, 0.162
+Amt where train loss: default < fullopt < pretrain:    58 / 4612   ~   Test loss: 0.090, 0.094, 0.095
+Amt where train loss: pretrain < fullopt < default:   154 / 4612   ~   Test loss: 0.106, 0.108, 0.121
+Amt where train loss: pretrain < default < fullopt:     7 / 4612   ~   Test loss: 0.107, 0.108, 0.132
+
+Size: 16384
+Amt where train loss: fullopt < default < pretrain:   285 / 3299   ~   Test loss: 0.079, 0.095, 0.097
+Amt where train loss: fullopt < pretrain < default:  2878 / 3299   ~   Test loss: 0.077, 0.091, 0.105
+Amt where train loss: default < pretrain < fullopt:    13 / 3299   ~   Test loss: 0.102, 0.097, 0.102
+Amt where train loss: default < fullopt < pretrain:    40 / 3299   ~   Test loss: 0.083, 0.085, 0.088
+Amt where train loss: pretrain < fullopt < default:    73 / 3299   ~   Test loss: 0.092, 0.090, 0.110
+Amt where train loss: pretrain < default < fullopt:     8 / 3299   ~   Test loss: 0.098, 0.099, 0.115
+
+Size: 32768
+Amt where train loss: fullopt < default < pretrain:   208 / 2119   ~   Test loss: 0.078, 0.096, 0.098
+Amt where train loss: fullopt < pretrain < default:  1843 / 2119   ~   Test loss: 0.067, 0.085, 0.096
+Amt where train loss: default < pretrain < fullopt:     6 / 2119   ~   Test loss: 0.130, 0.142, 0.140
+Amt where train loss: default < fullopt < pretrain:    24 / 2119   ~   Test loss: 0.097, 0.100, 0.101
+Amt where train loss: pretrain < fullopt < default:    34 / 2119   ~   Test loss: 0.077, 0.075, 0.088
+Amt where train loss: pretrain < default < fullopt:     4 / 2119   ~   Test loss: 0.133, 0.136, 0.141
+
+Size: 65536
+Amt where train loss: fullopt < default < pretrain:   121 / 1146   ~   Test loss: 0.066, 0.090, 0.092
+Amt where train loss: fullopt < pretrain < default:   996 / 1146   ~   Test loss: 0.060, 0.080, 0.090
+Amt where train loss: default < pretrain < fullopt:     1 / 1146   ~   Test loss: 0.076, 0.060, 0.079
+Amt where train loss: default < fullopt < pretrain:    11 / 1146   ~   Test loss: 0.077, 0.078, 0.080
+Amt where train loss: pretrain < fullopt < default:    17 / 1146   ~   Test loss: 0.090, 0.091, 0.127
+Amt where train loss: pretrain < default < fullopt:     0 / 1146   ~   Test loss: nan, nan, nan
+
+Size: 131072
+Amt where train loss: fullopt < default < pretrain:    56 / 485   ~   Test loss: 0.061, 0.080, 0.081
+Amt where train loss: fullopt < pretrain < default:   424 / 485   ~   Test loss: 0.054, 0.077, 0.085
+Amt where train loss: default < pretrain < fullopt:     0 / 485   ~   Test loss: nan, nan, nan
+Amt where train loss: default < fullopt < pretrain:     5 / 485   ~   Test loss: 0.078, 0.082, 0.084
+Amt where train loss: pretrain < fullopt < default:     0 / 485   ~   Test loss: nan, nan, nan
+Amt where train loss: pretrain < default < fullopt:     0 / 485   ~   Test loss: nan, nan, nan
+
+Size: 262144
+Amt where train loss: fullopt < default < pretrain:    21 / 128   ~   Test loss: 0.063, 0.079, 0.079
+Amt where train loss: fullopt < pretrain < default:   107 / 128   ~   Test loss: 0.048, 0.078, 0.083
+Amt where train loss: default < pretrain < fullopt:     0 / 128   ~   Test loss: nan, nan, nan
+Amt where train loss: default < fullopt < pretrain:     0 / 128   ~   Test loss: nan, nan, nan
+Amt where train loss: pretrain < fullopt < default:     0 / 128   ~   Test loss: nan, nan, nan
+Amt where train loss: pretrain < default < fullopt:     0 / 128   ~   Test loss: nan, nan, nan
+
+Size: 524288
+Amt where train loss: fullopt < default < pretrain:     1 / 7   ~   Test loss: 0.040, 0.042, 0.045
+Amt where train loss: fullopt < pretrain < default:     6 / 7   ~   Test loss: 0.055, 0.125, 0.133
+Amt where train loss: default < pretrain < fullopt:     0 / 7   ~   Test loss: nan, nan, nan
+Amt where train loss: default < fullopt < pretrain:     0 / 7   ~   Test loss: nan, nan, nan
+Amt where train loss: pretrain < fullopt < default:     0 / 7   ~   Test loss: nan, nan, nan
+Amt where train loss: pretrain < default < fullopt:     0 / 7   ~   Test loss: nan, nan, nan
+

@@ -1,235 +1,235 @@
 For each datapoint, get the test and train losses. Compare the train losses and check if a lower train loss indicates a lower test loss
 
 Size: 8
-Amt where 'default' does better than 'opt': 98 / 7586
-Mean RMSE: 0.295 (default) vs 0.301 (opt)
-Amt where 'opt' does better than 'default': 6345 / 7586
-Mean RMSE: 0.231 (opt) vs 0.244 (default)
-Amt where 'default' does better than 'pretrain': 120 / 7586
-Mean RMSE: 0.274 (default) vs 0.280 (pretrain)
-Amt where 'pretrain' does better than 'default': 6104 / 7586
-Mean RMSE: 0.235 (pretrain) vs 0.248 (default)
-Amt where 'opt' does better than 'pretrain': 1081 / 7586
-Mean RMSE: 0.228 (opt) vs 0.229 (pretrain)
-Amt where 'pretrain' does better than 'opt': 97 / 7586
-Mean RMSE: 0.276 (pretrain) vs 0.277 (opt)
+Amt where 'default' does better than 'opt' on train: 98 / 7586
+Mean RMSE (test): 0.295 (default) vs 0.301 (opt)
+Amt where 'opt' does better than 'default' on train: 6345 / 7586
+Mean RMSE (test): 0.231 (opt) vs 0.244 (default)
+Amt where 'default' does better than 'pretrain' on train: 120 / 7586
+Mean RMSE (test): 0.274 (default) vs 0.280 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6104 / 7586
+Mean RMSE (test): 0.235 (pretrain) vs 0.248 (default)
+Amt where 'opt' does better than 'pretrain' on train: 1081 / 7586
+Mean RMSE (test): 0.228 (opt) vs 0.229 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 97 / 7586
+Mean RMSE (test): 0.276 (pretrain) vs 0.277 (opt)
 
 Size: 16
-Amt where 'default' does better than 'opt': 178 / 7586
-Mean RMSE: 0.235 (default) vs 0.241 (opt)
-Amt where 'opt' does better than 'default': 6747 / 7586
-Mean RMSE: 0.215 (opt) vs 0.227 (default)
-Amt where 'default' does better than 'pretrain': 242 / 7586
-Mean RMSE: 0.233 (default) vs 0.241 (pretrain)
-Amt where 'pretrain' does better than 'default': 6414 / 7586
-Mean RMSE: 0.218 (pretrain) vs 0.231 (default)
-Amt where 'opt' does better than 'pretrain': 2266 / 7586
-Mean RMSE: 0.216 (opt) vs 0.218 (pretrain)
-Amt where 'pretrain' does better than 'opt': 319 / 7586
-Mean RMSE: 0.265 (pretrain) vs 0.267 (opt)
+Amt where 'default' does better than 'opt' on train: 178 / 7586
+Mean RMSE (test): 0.235 (default) vs 0.241 (opt)
+Amt where 'opt' does better than 'default' on train: 6747 / 7586
+Mean RMSE (test): 0.215 (opt) vs 0.227 (default)
+Amt where 'default' does better than 'pretrain' on train: 242 / 7586
+Mean RMSE (test): 0.233 (default) vs 0.241 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6414 / 7586
+Mean RMSE (test): 0.218 (pretrain) vs 0.231 (default)
+Amt where 'opt' does better than 'pretrain' on train: 2266 / 7586
+Mean RMSE (test): 0.216 (opt) vs 0.218 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 319 / 7586
+Mean RMSE (test): 0.265 (pretrain) vs 0.267 (opt)
 
 Size: 32
-Amt where 'default' does better than 'opt': 215 / 7586
-Mean RMSE: 0.184 (default) vs 0.190 (opt)
-Amt where 'opt' does better than 'default': 7096 / 7586
-Mean RMSE: 0.190 (opt) vs 0.202 (default)
-Amt where 'default' does better than 'pretrain': 373 / 7586
-Mean RMSE: 0.192 (default) vs 0.198 (pretrain)
-Amt where 'pretrain' does better than 'default': 6666 / 7586
-Mean RMSE: 0.194 (pretrain) vs 0.206 (default)
-Amt where 'opt' does better than 'pretrain': 4008 / 7586
-Mean RMSE: 0.191 (opt) vs 0.192 (pretrain)
-Amt where 'pretrain' does better than 'opt': 696 / 7586
-Mean RMSE: 0.224 (pretrain) vs 0.225 (opt)
+Amt where 'default' does better than 'opt' on train: 215 / 7586
+Mean RMSE (test): 0.184 (default) vs 0.190 (opt)
+Amt where 'opt' does better than 'default' on train: 7096 / 7586
+Mean RMSE (test): 0.190 (opt) vs 0.202 (default)
+Amt where 'default' does better than 'pretrain' on train: 373 / 7586
+Mean RMSE (test): 0.192 (default) vs 0.198 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6666 / 7586
+Mean RMSE (test): 0.194 (pretrain) vs 0.206 (default)
+Amt where 'opt' does better than 'pretrain' on train: 4008 / 7586
+Mean RMSE (test): 0.191 (opt) vs 0.192 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 696 / 7586
+Mean RMSE (test): 0.224 (pretrain) vs 0.225 (opt)
 
 Size: 64
-Amt where 'default' does better than 'opt': 239 / 7586
-Mean RMSE: 0.158 (default) vs 0.167 (opt)
-Amt where 'opt' does better than 'default': 7262 / 7586
-Mean RMSE: 0.175 (opt) vs 0.188 (default)
-Amt where 'default' does better than 'pretrain': 564 / 7586
-Mean RMSE: 0.178 (default) vs 0.185 (pretrain)
-Amt where 'pretrain' does better than 'default': 6728 / 7586
-Mean RMSE: 0.177 (pretrain) vs 0.191 (default)
-Amt where 'opt' does better than 'pretrain': 5540 / 7586
-Mean RMSE: 0.177 (opt) vs 0.178 (pretrain)
-Amt where 'pretrain' does better than 'opt': 839 / 7586
-Mean RMSE: 0.197 (pretrain) vs 0.198 (opt)
+Amt where 'default' does better than 'opt' on train: 239 / 7586
+Mean RMSE (test): 0.158 (default) vs 0.167 (opt)
+Amt where 'opt' does better than 'default' on train: 7262 / 7586
+Mean RMSE (test): 0.175 (opt) vs 0.188 (default)
+Amt where 'default' does better than 'pretrain' on train: 564 / 7586
+Mean RMSE (test): 0.178 (default) vs 0.185 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6728 / 7586
+Mean RMSE (test): 0.177 (pretrain) vs 0.191 (default)
+Amt where 'opt' does better than 'pretrain' on train: 5540 / 7586
+Mean RMSE (test): 0.177 (opt) vs 0.178 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 839 / 7586
+Mean RMSE (test): 0.197 (pretrain) vs 0.198 (opt)
 
 Size: 128
-Amt where 'default' does better than 'opt': 276 / 7583
-Mean RMSE: 0.157 (default) vs 0.157 (opt)
-Amt where 'opt' does better than 'default': 7295 / 7583
-Mean RMSE: 0.157 (opt) vs 0.172 (default)
-Amt where 'default' does better than 'pretrain': 614 / 7583
-Mean RMSE: 0.163 (default) vs 0.165 (pretrain)
-Amt where 'pretrain' does better than 'default': 6837 / 7583
-Mean RMSE: 0.158 (pretrain) vs 0.174 (default)
-Amt where 'opt' does better than 'pretrain': 6363 / 7583
-Mean RMSE: 0.157 (opt) vs 0.158 (pretrain)
-Amt where 'pretrain' does better than 'opt': 835 / 7583
-Mean RMSE: 0.167 (pretrain) vs 0.168 (opt)
+Amt where 'default' does better than 'opt' on train: 276 / 7583
+Mean RMSE (test): 0.157 (default) vs 0.157 (opt)
+Amt where 'opt' does better than 'default' on train: 7295 / 7583
+Mean RMSE (test): 0.157 (opt) vs 0.172 (default)
+Amt where 'default' does better than 'pretrain' on train: 614 / 7583
+Mean RMSE (test): 0.163 (default) vs 0.165 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6837 / 7583
+Mean RMSE (test): 0.158 (pretrain) vs 0.174 (default)
+Amt where 'opt' does better than 'pretrain' on train: 6363 / 7583
+Mean RMSE (test): 0.157 (opt) vs 0.158 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 835 / 7583
+Mean RMSE (test): 0.167 (pretrain) vs 0.168 (opt)
 
 Size: 256
-Amt where 'default' does better than 'opt': 248 / 7577
-Mean RMSE: 0.140 (default) vs 0.142 (opt)
-Amt where 'opt' does better than 'default': 7328 / 7577
-Mean RMSE: 0.144 (opt) vs 0.161 (default)
-Amt where 'default' does better than 'pretrain': 646 / 7577
-Mean RMSE: 0.143 (default) vs 0.144 (pretrain)
-Amt where 'pretrain' does better than 'default': 6872 / 7577
-Mean RMSE: 0.146 (pretrain) vs 0.163 (default)
-Amt where 'opt' does better than 'pretrain': 6725 / 7577
-Mean RMSE: 0.143 (opt) vs 0.145 (pretrain)
-Amt where 'pretrain' does better than 'opt': 757 / 7577
-Mean RMSE: 0.152 (pretrain) vs 0.153 (opt)
+Amt where 'default' does better than 'opt' on train: 248 / 7577
+Mean RMSE (test): 0.140 (default) vs 0.142 (opt)
+Amt where 'opt' does better than 'default' on train: 7328 / 7577
+Mean RMSE (test): 0.144 (opt) vs 0.161 (default)
+Amt where 'default' does better than 'pretrain' on train: 646 / 7577
+Mean RMSE (test): 0.143 (default) vs 0.144 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6872 / 7577
+Mean RMSE (test): 0.146 (pretrain) vs 0.163 (default)
+Amt where 'opt' does better than 'pretrain' on train: 6725 / 7577
+Mean RMSE (test): 0.143 (opt) vs 0.145 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 757 / 7577
+Mean RMSE (test): 0.152 (pretrain) vs 0.153 (opt)
 
 Size: 512
-Amt where 'default' does better than 'opt': 201 / 7540
-Mean RMSE: 0.136 (default) vs 0.140 (opt)
-Amt where 'opt' does better than 'default': 7338 / 7540
-Mean RMSE: 0.131 (opt) vs 0.151 (default)
-Amt where 'default' does better than 'pretrain': 669 / 7540
-Mean RMSE: 0.135 (default) vs 0.137 (pretrain)
-Amt where 'pretrain' does better than 'default': 6838 / 7540
-Mean RMSE: 0.134 (pretrain) vs 0.153 (default)
-Amt where 'opt' does better than 'pretrain': 6861 / 7540
-Mean RMSE: 0.130 (opt) vs 0.133 (pretrain)
-Amt where 'pretrain' does better than 'opt': 664 / 7540
-Mean RMSE: 0.140 (pretrain) vs 0.142 (opt)
+Amt where 'default' does better than 'opt' on train: 201 / 7540
+Mean RMSE (test): 0.136 (default) vs 0.140 (opt)
+Amt where 'opt' does better than 'default' on train: 7338 / 7540
+Mean RMSE (test): 0.131 (opt) vs 0.151 (default)
+Amt where 'default' does better than 'pretrain' on train: 669 / 7540
+Mean RMSE (test): 0.135 (default) vs 0.137 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6838 / 7540
+Mean RMSE (test): 0.134 (pretrain) vs 0.153 (default)
+Amt where 'opt' does better than 'pretrain' on train: 6861 / 7540
+Mean RMSE (test): 0.130 (opt) vs 0.133 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 664 / 7540
+Mean RMSE (test): 0.140 (pretrain) vs 0.142 (opt)
 
 Size: 1024
-Amt where 'default' does better than 'opt': 195 / 7397
-Mean RMSE: 0.121 (default) vs 0.123 (opt)
-Amt where 'opt' does better than 'default': 7202 / 7397
-Mean RMSE: 0.118 (opt) vs 0.141 (default)
-Amt where 'default' does better than 'pretrain': 648 / 7397
-Mean RMSE: 0.122 (default) vs 0.124 (pretrain)
-Amt where 'pretrain' does better than 'default': 6731 / 7397
-Mean RMSE: 0.123 (pretrain) vs 0.142 (default)
-Amt where 'opt' does better than 'pretrain': 6783 / 7397
-Mean RMSE: 0.117 (opt) vs 0.122 (pretrain)
-Amt where 'pretrain' does better than 'opt': 612 / 7397
-Mean RMSE: 0.130 (pretrain) vs 0.130 (opt)
+Amt where 'default' does better than 'opt' on train: 195 / 7397
+Mean RMSE (test): 0.121 (default) vs 0.123 (opt)
+Amt where 'opt' does better than 'default' on train: 7202 / 7397
+Mean RMSE (test): 0.118 (opt) vs 0.141 (default)
+Amt where 'default' does better than 'pretrain' on train: 648 / 7397
+Mean RMSE (test): 0.122 (default) vs 0.124 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6731 / 7397
+Mean RMSE (test): 0.123 (pretrain) vs 0.142 (default)
+Amt where 'opt' does better than 'pretrain' on train: 6783 / 7397
+Mean RMSE (test): 0.117 (opt) vs 0.122 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 612 / 7397
+Mean RMSE (test): 0.130 (pretrain) vs 0.130 (opt)
 
 Size: 2048
-Amt where 'default' does better than 'opt': 154 / 6987
-Mean RMSE: 0.131 (default) vs 0.134 (opt)
-Amt where 'opt' does better than 'default': 6833 / 6987
-Mean RMSE: 0.108 (opt) vs 0.132 (default)
-Amt where 'default' does better than 'pretrain': 563 / 6987
-Mean RMSE: 0.120 (default) vs 0.122 (pretrain)
-Amt where 'pretrain' does better than 'default': 6413 / 6987
-Mean RMSE: 0.114 (pretrain) vs 0.133 (default)
-Amt where 'opt' does better than 'pretrain': 6533 / 6987
-Mean RMSE: 0.107 (opt) vs 0.114 (pretrain)
-Amt where 'pretrain' does better than 'opt': 453 / 6987
-Mean RMSE: 0.130 (pretrain) vs 0.130 (opt)
+Amt where 'default' does better than 'opt' on train: 154 / 6987
+Mean RMSE (test): 0.131 (default) vs 0.134 (opt)
+Amt where 'opt' does better than 'default' on train: 6833 / 6987
+Mean RMSE (test): 0.108 (opt) vs 0.132 (default)
+Amt where 'default' does better than 'pretrain' on train: 563 / 6987
+Mean RMSE (test): 0.120 (default) vs 0.122 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6413 / 6987
+Mean RMSE (test): 0.114 (pretrain) vs 0.133 (default)
+Amt where 'opt' does better than 'pretrain' on train: 6533 / 6987
+Mean RMSE (test): 0.107 (opt) vs 0.114 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 453 / 6987
+Mean RMSE (test): 0.130 (pretrain) vs 0.130 (opt)
 
 Size: 4096
-Amt where 'default' does better than 'opt': 128 / 5929
-Mean RMSE: 0.129 (default) vs 0.133 (opt)
-Amt where 'opt' does better than 'default': 5801 / 5929
-Mean RMSE: 0.097 (opt) vs 0.122 (default)
-Amt where 'default' does better than 'pretrain': 506 / 5929
-Mean RMSE: 0.116 (default) vs 0.118 (pretrain)
-Amt where 'pretrain' does better than 'default': 5419 / 5929
-Mean RMSE: 0.105 (pretrain) vs 0.123 (default)
-Amt where 'opt' does better than 'pretrain': 5589 / 5929
-Mean RMSE: 0.096 (opt) vs 0.106 (pretrain)
-Amt where 'pretrain' does better than 'opt': 339 / 5929
-Mean RMSE: 0.120 (pretrain) vs 0.121 (opt)
+Amt where 'default' does better than 'opt' on train: 128 / 5929
+Mean RMSE (test): 0.129 (default) vs 0.133 (opt)
+Amt where 'opt' does better than 'default' on train: 5801 / 5929
+Mean RMSE (test): 0.097 (opt) vs 0.122 (default)
+Amt where 'default' does better than 'pretrain' on train: 506 / 5929
+Mean RMSE (test): 0.116 (default) vs 0.118 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 5419 / 5929
+Mean RMSE (test): 0.105 (pretrain) vs 0.123 (default)
+Amt where 'opt' does better than 'pretrain' on train: 5589 / 5929
+Mean RMSE (test): 0.096 (opt) vs 0.106 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 339 / 5929
+Mean RMSE (test): 0.120 (pretrain) vs 0.121 (opt)
 
 Size: 8192
-Amt where 'default' does better than 'opt': 87 / 4612
-Mean RMSE: 0.109 (default) vs 0.114 (opt)
-Amt where 'opt' does better than 'default': 4525 / 4612
-Mean RMSE: 0.086 (opt) vs 0.111 (default)
-Amt where 'default' does better than 'pretrain': 454 / 4612
-Mean RMSE: 0.101 (default) vs 0.103 (pretrain)
-Amt where 'pretrain' does better than 'default': 4156 / 4612
-Mean RMSE: 0.097 (pretrain) vs 0.112 (default)
-Amt where 'opt' does better than 'pretrain': 4429 / 4612
-Mean RMSE: 0.086 (opt) vs 0.097 (pretrain)
-Amt where 'pretrain' does better than 'opt': 183 / 4612
-Mean RMSE: 0.112 (pretrain) vs 0.115 (opt)
+Amt where 'default' does better than 'opt' on train: 87 / 4612
+Mean RMSE (test): 0.109 (default) vs 0.114 (opt)
+Amt where 'opt' does better than 'default' on train: 4525 / 4612
+Mean RMSE (test): 0.086 (opt) vs 0.111 (default)
+Amt where 'default' does better than 'pretrain' on train: 454 / 4612
+Mean RMSE (test): 0.101 (default) vs 0.103 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 4156 / 4612
+Mean RMSE (test): 0.097 (pretrain) vs 0.112 (default)
+Amt where 'opt' does better than 'pretrain' on train: 4429 / 4612
+Mean RMSE (test): 0.086 (opt) vs 0.097 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 183 / 4612
+Mean RMSE (test): 0.112 (pretrain) vs 0.115 (opt)
 
 Size: 16384
-Amt where 'default' does better than 'opt': 61 / 3299
-Mean RMSE: 0.089 (default) vs 0.093 (opt)
-Amt where 'opt' does better than 'default': 3238 / 3299
-Mean RMSE: 0.078 (opt) vs 0.104 (default)
-Amt where 'default' does better than 'pretrain': 338 / 3299
-Mean RMSE: 0.094 (default) vs 0.096 (pretrain)
-Amt where 'pretrain' does better than 'default': 2959 / 3299
-Mean RMSE: 0.091 (pretrain) vs 0.105 (default)
-Amt where 'opt' does better than 'pretrain': 3205 / 3299
-Mean RMSE: 0.078 (opt) vs 0.092 (pretrain)
-Amt where 'pretrain' does better than 'opt': 94 / 3299
-Mean RMSE: 0.093 (pretrain) vs 0.094 (opt)
+Amt where 'default' does better than 'opt' on train: 61 / 3299
+Mean RMSE (test): 0.089 (default) vs 0.093 (opt)
+Amt where 'opt' does better than 'default' on train: 3238 / 3299
+Mean RMSE (test): 0.078 (opt) vs 0.104 (default)
+Amt where 'default' does better than 'pretrain' on train: 338 / 3299
+Mean RMSE (test): 0.094 (default) vs 0.096 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 2959 / 3299
+Mean RMSE (test): 0.091 (pretrain) vs 0.105 (default)
+Amt where 'opt' does better than 'pretrain' on train: 3205 / 3299
+Mean RMSE (test): 0.078 (opt) vs 0.092 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 94 / 3299
+Mean RMSE (test): 0.093 (pretrain) vs 0.094 (opt)
 
 Size: 32768
-Amt where 'default' does better than 'opt': 34 / 2119
-Mean RMSE: 0.107 (default) vs 0.112 (opt)
-Amt where 'opt' does better than 'default': 2085 / 2119
-Mean RMSE: 0.069 (opt) vs 0.096 (default)
-Amt where 'default' does better than 'pretrain': 238 / 2119
-Mean RMSE: 0.097 (default) vs 0.099 (pretrain)
-Amt where 'pretrain' does better than 'default': 1881 / 2119
-Mean RMSE: 0.085 (pretrain) vs 0.096 (default)
-Amt where 'opt' does better than 'pretrain': 2075 / 2119
-Mean RMSE: 0.069 (opt) vs 0.086 (pretrain)
-Amt where 'pretrain' does better than 'opt': 44 / 2119
-Mean RMSE: 0.091 (pretrain) vs 0.090 (opt)
+Amt where 'default' does better than 'opt' on train: 34 / 2119
+Mean RMSE (test): 0.107 (default) vs 0.112 (opt)
+Amt where 'opt' does better than 'default' on train: 2085 / 2119
+Mean RMSE (test): 0.069 (opt) vs 0.096 (default)
+Amt where 'default' does better than 'pretrain' on train: 238 / 2119
+Mean RMSE (test): 0.097 (default) vs 0.099 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 1881 / 2119
+Mean RMSE (test): 0.085 (pretrain) vs 0.096 (default)
+Amt where 'opt' does better than 'pretrain' on train: 2075 / 2119
+Mean RMSE (test): 0.069 (opt) vs 0.086 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 44 / 2119
+Mean RMSE (test): 0.091 (pretrain) vs 0.090 (opt)
 
 Size: 65536
-Amt where 'default' does better than 'opt': 12 / 1146
-Mean RMSE: 0.077 (default) vs 0.078 (opt)
-Amt where 'opt' does better than 'default': 1134 / 1146
-Mean RMSE: 0.061 (opt) vs 0.090 (default)
-Amt where 'default' does better than 'pretrain': 133 / 1146
-Mean RMSE: 0.088 (default) vs 0.091 (pretrain)
-Amt where 'pretrain' does better than 'default': 1013 / 1146
-Mean RMSE: 0.080 (pretrain) vs 0.090 (default)
-Amt where 'opt' does better than 'pretrain': 1128 / 1146
-Mean RMSE: 0.061 (opt) vs 0.081 (pretrain)
-Amt where 'pretrain' does better than 'opt': 18 / 1146
-Mean RMSE: 0.089 (pretrain) vs 0.091 (opt)
+Amt where 'default' does better than 'opt' on train: 12 / 1146
+Mean RMSE (test): 0.077 (default) vs 0.078 (opt)
+Amt where 'opt' does better than 'default' on train: 1134 / 1146
+Mean RMSE (test): 0.061 (opt) vs 0.090 (default)
+Amt where 'default' does better than 'pretrain' on train: 133 / 1146
+Mean RMSE (test): 0.088 (default) vs 0.091 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 1013 / 1146
+Mean RMSE (test): 0.080 (pretrain) vs 0.090 (default)
+Amt where 'opt' does better than 'pretrain' on train: 1128 / 1146
+Mean RMSE (test): 0.061 (opt) vs 0.081 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 18 / 1146
+Mean RMSE (test): 0.089 (pretrain) vs 0.091 (opt)
 
 Size: 131072
-Amt where 'default' does better than 'opt': 5 / 485
-Mean RMSE: 0.078 (default) vs 0.082 (opt)
-Amt where 'opt' does better than 'default': 480 / 485
-Mean RMSE: 0.055 (opt) vs 0.084 (default)
-Amt where 'default' does better than 'pretrain': 61 / 485
-Mean RMSE: 0.080 (default) vs 0.081 (pretrain)
-Amt where 'pretrain' does better than 'default': 424 / 485
-Mean RMSE: 0.077 (pretrain) vs 0.085 (default)
-Amt where 'opt' does better than 'pretrain': 485 / 485
-Mean RMSE: 0.055 (opt) vs 0.078 (pretrain)
-Amt where 'pretrain' does better than 'opt': 0 / 485
+Amt where 'default' does better than 'opt' on train: 5 / 485
+Mean RMSE (test): 0.078 (default) vs 0.082 (opt)
+Amt where 'opt' does better than 'default' on train: 480 / 485
+Mean RMSE (test): 0.055 (opt) vs 0.084 (default)
+Amt where 'default' does better than 'pretrain' on train: 61 / 485
+Mean RMSE (test): 0.080 (default) vs 0.081 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 424 / 485
+Mean RMSE (test): 0.077 (pretrain) vs 0.085 (default)
+Amt where 'opt' does better than 'pretrain' on train: 485 / 485
+Mean RMSE (test): 0.055 (opt) vs 0.078 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 0 / 485
 
 Size: 262144
-Amt where 'default' does better than 'opt': 0 / 128
-Amt where 'opt' does better than 'default': 128 / 128
-Mean RMSE: 0.051 (opt) vs 0.083 (default)
-Amt where 'default' does better than 'pretrain': 21 / 128
-Mean RMSE: 0.079 (default) vs 0.079 (pretrain)
-Amt where 'pretrain' does better than 'default': 107 / 128
-Mean RMSE: 0.078 (pretrain) vs 0.083 (default)
-Amt where 'opt' does better than 'pretrain': 128 / 128
-Mean RMSE: 0.051 (opt) vs 0.078 (pretrain)
-Amt where 'pretrain' does better than 'opt': 0 / 128
+Amt where 'default' does better than 'opt' on train: 0 / 128
+Amt where 'opt' does better than 'default' on train: 128 / 128
+Mean RMSE (test): 0.051 (opt) vs 0.083 (default)
+Amt where 'default' does better than 'pretrain' on train: 21 / 128
+Mean RMSE (test): 0.079 (default) vs 0.079 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 107 / 128
+Mean RMSE (test): 0.078 (pretrain) vs 0.083 (default)
+Amt where 'opt' does better than 'pretrain' on train: 128 / 128
+Mean RMSE (test): 0.051 (opt) vs 0.078 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 0 / 128
 
 Size: 524288
-Amt where 'default' does better than 'opt': 0 / 7
-Amt where 'opt' does better than 'default': 7 / 7
-Mean RMSE: 0.053 (opt) vs 0.120 (default)
-Amt where 'default' does better than 'pretrain': 1 / 7
-Mean RMSE: 0.042 (default) vs 0.045 (pretrain)
-Amt where 'pretrain' does better than 'default': 6 / 7
-Mean RMSE: 0.125 (pretrain) vs 0.133 (default)
-Amt where 'opt' does better than 'pretrain': 7 / 7
-Mean RMSE: 0.053 (opt) vs 0.114 (pretrain)
-Amt where 'pretrain' does better than 'opt': 0 / 7
+Amt where 'default' does better than 'opt' on train: 0 / 7
+Amt where 'opt' does better than 'default' on train: 7 / 7
+Mean RMSE (test): 0.053 (opt) vs 0.120 (default)
+Amt where 'default' does better than 'pretrain' on train: 1 / 7
+Mean RMSE (test): 0.042 (default) vs 0.045 (pretrain)
+Amt where 'pretrain' does better than 'default' on train: 6 / 7
+Mean RMSE (test): 0.125 (pretrain) vs 0.133 (default)
+Amt where 'opt' does better than 'pretrain' on train: 7 / 7
+Mean RMSE (test): 0.053 (opt) vs 0.114 (pretrain)
+Amt where 'pretrain' does better than 'opt' on train: 0 / 7
 

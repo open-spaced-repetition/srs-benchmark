@@ -77,16 +77,13 @@ def weighted_avg_and_std(values, weights):
 
 if __name__ == "__main__":
     dev_mode_name = "FSRS-4.5-dev"
-    common_set = (
-        set(
-            map(
-                lambda x: x.stem,
-                pathlib.Path(f"./result/{dev_mode_name}").glob("*.json"),
-            )
-        )
-        if pathlib.Path(f"./result/{dev_mode_name}").exists()
-        else None
-    )
+    dev_file = pathlib.Path(f"./result/{dev_mode_name}.jsonl")
+    if dev_file.exists():
+        with open(dev_file, "r") as f:
+            data = f.readlines()
+        common_set = set([json.loads(x)["user"] for x in data])
+    else:
+        common_set = None
     for model in (
         dev_mode_name,
         "FSRS-4.5",
@@ -107,17 +104,19 @@ if __name__ == "__main__":
         m = []
         weights = []
         sizes = []
-        result_dir = pathlib.Path(f"./result/{model}")
-        result_files = result_dir.glob("*.json")
-        for result_file in result_files:
-            if common_set and result_file.stem not in common_set:
+        result_file = pathlib.Path(f"./result/{model}.jsonl")
+        if not result_file.exists():
+            continue
+        with open(result_file, "r") as f:
+            data = f.readlines()
+        data = [json.loads(x) for x in data]
+        for result in data:
+            if common_set and result["user"] not in common_set:
                 continue
-            with open(result_file, "r") as f:
-                result = json.load(f)
-                m.append(result["metrics"])
-                sizes.append(result["size"])
-                if "weights" in result:
-                    weights.append(result["weights"])
+            m.append(result["metrics"])
+            sizes.append(result["size"])
+            if "weights" in result:
+                weights.append(result["weights"])
         if len(sizes) == 0:
             continue
         print(f"Total number of users: {len(sizes)}")

@@ -43,9 +43,9 @@ For more details about the FSRS algorithm, read this wiki page: [The Algorithm](
 
 ## Result
 
-Total number of users: 19,990.
+Total number of users: 19,993.
 
-Total number of reviews for evaluation: 708,151,820. Same-day reviews are excluded; only one review per day (the first chronologically) is used by each algorithm. This is why the number of reviews is significantly lower than the 1.5 billion mentioned earlier. Plus, an outlier filter is also used.
+Total number of reviews for evaluation: 728,883,020. Same-day reviews are excluded; only one review per day (the first chronologically) is used by each algorithm. This is why the number of reviews is significantly lower than the 1.5 billion mentioned earlier. Plus, an outlier filter is also used.
 
 The following tables show the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
@@ -53,37 +53,37 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.32±0.005** | **0.052±0.0010** | 17 |
-| FSRS-rs | 0.32±0.005 | 0.053±0.0013 | 17 |
-| FSRS v4 | 0.33±0.006 | 0.057±0.0014 | 17 |
-| DASH | 0.33±0.005 | 0.061±0.0011 | 9 |
-| DASH[MCM] | 0.33±0.005 | 0.063±0.0011 | 9 |
-| DASH[ACT-R] | 0.33±0.006 | 0.066±0.0014 | 5 |
-| FSRS v3 | 0.36±0.007 | 0.070±0.0015 | 13 |
-| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.076±0.0018 | 4 |
-| GRU | 0.38±0.007 | 0.080±0.0016 | 36 |
-| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.087±0.0020 | 0 |
-| ACT-R | 0.35±0.006 | 0.090±0.0022 | 5 |
-| HLR | 0.40±0.008 | 0.105±0.0020 | 3 |
-| SM-2 | 0.54±0.013 | 0.149±0.0031 | 0 |
+| **FSRS-4.5** | **0.33±0.005** | **0.057±0.0011** | 17 |
+| FSRS-rs | 0.33±0.005 | 0.059±0.0013 | 17 |
+| FSRS v4 | 0.33±0.006 | 0.062±0.0014 | 17 |
+| DASH | 0.33±0.005 | 0.063±0.0011 | 9 |
+| DASH[MCM] | 0.33±0.005 | 0.065±0.0012 | 9 |
+| DASH[ACT-R] | 0.34±0.006 | 0.069±0.0014 | 5 |
+| FSRS v3 | 0.38±0.007 | 0.077±0.0016 | 13 |
+| FSRS-4.5 (only pretrain) | 0.35±0.006 | 0.078±0.0019 | 4 |
+| GRU | 0.39±0.007 | 0.084±0.0017 | 36 |
+| FSRS-4.5 (default parameters) | 0.36±0.006 | 0.089±0.0020 | 0 |
+| ACT-R | 0.36±0.006 | 0.093±0.0023 | 5 |
+| HLR | 0.42±0.009 | 0.111±0.0021 | 3 |
+| SM-2 | 0.59±0.015 | 0.155±0.0032 | 0 |
 
 ### Weighted by ln(number of reviews)
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.346±0.0031** | **0.072±0.0008** | 17 |
-| FSRS-rs | 0.347±0.0030 | 0.073±0.0008 | 17 |
-| FSRS v4 | 0.354±0.0031 | 0.078±0.0009 | 17 |
-| DASH | 0.350±0.0030 | 0.080±0.0009 | 9 |
-| DASH[MCM] | 0.351±0.0029 | 0.082±0.0009 | 9 |
-| DASH[ACT-R] | 0.354±0.0031 | 0.085±0.0010 | 5 |
-| FSRS-4.5 (only pretrain) | 0.360±0.0032 | 0.089±0.0009 | 4 |
-| FSRS v3 | 0.404±0.0041 | 0.101±0.0013 | 13 |
-| FSRS-4.5 (default parameters) | 0.375±0.0033 | 0.106±0.0011 | 0 |
-| GRU | 0.431±0.0049 | 0.107±0.0012 | 36 |
-| ACT-R | 0.381±0.0035 | 0.109±0.0012 | 5 |
-| HLR | 0.439±0.0047 | 0.123±0.0013 | 3 |
-| SM-2 | 0.68±0.011 | 0.195±0.0020 | 0 |
+| **FSRS-4.5** | **0.354±0.0031** | **0.078±0.0009** | 17 |
+| FSRS-rs | 0.355±0.0031 | 0.079±0.0009 | 17 |
+| DASH | 0.357±0.0030 | 0.082±0.0009 | 9 |
+| DASH[MCM] | 0.357±0.0031 | 0.085±0.0009 | 9 |
+| FSRS v4 | 0.365±0.0033 | 0.085±0.0010 | 17 |
+| DASH[ACT-R] | 0.360±0.0032 | 0.087±0.0010 | 5 |
+| FSRS-4.5 (only pretrain) | 0.366±0.0032 | 0.093±0.0010 | 4 |
+| FSRS-4.5 (default parameters) | 0.381±0.0033 | 0.111±0.0012 | 0 |
+| FSRS v3 | 0.45±0.006 | 0.111±0.0015 | 13 |
+| GRU | 0.45±0.005 | 0.112±0.0013 | 36 |
+| ACT-R | 0.390±0.0035 | 0.113±0.0012 | 5 |
+| HLR | 0.48±0.006 | 0.132±0.0014 | 3 |
+| SM-2 | 0.80±0.016 | 0.204±0.0021 | 0 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 Averages weighted by the natural logarithm of the number of reviews are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
@@ -93,7 +93,7 @@ The image below shows the p-values obtained by running the Wilcoxon signed-rank 
 Almost all p-values are extremely small, many orders of magnitude smaller than 0.01. Of course, p-values this low beg the question, "Can we even trust these values?". `scipy.stats.wilcoxon` itself uses an approximation for n>50, and our modified implementation uses an approximation to return the decimal logarithm of the p-value rather than the p-value itself, to avoid the limitations of 64-bit floating point numbers. So it's an approximation of an approximation. But more importantly, this test is not weighted, meaning that it doesn't take into account the fact that RMSE depends on the number of reviews.
 Overall, these p-values can be trusted on a qualitative (but not quantitative) level.
 
-![Wilcoxon, 19990 collections](./plots/Wilcoxon-19990-collections.png)
+![Wilcoxon, 19993 collections](./plots/Wilcoxon-19993-collections.png)
 
 ## Median Parameters
 

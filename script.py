@@ -40,7 +40,7 @@ n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
 verbose_inadequate_data: bool = False
-do_fullinfo_stats: bool = True
+do_fullinfo_stats: bool = False
 
 dry_run = os.environ.get("DRY_RUN")
 only_pretrain = os.environ.get("PRETRAIN")
@@ -63,6 +63,7 @@ else:
         path += "-dev"
     if do_fullinfo_stats:
         path += "-fullinfo"
+
 
 def predict(w_list, testsets, last_rating=None, file=None):
     p = []
@@ -188,16 +189,18 @@ def process(file):
         loop = tscv.split(dataset)
     for loop_args in loop:
         if do_fullinfo_stats:
-            i:int = loop_args  # type: ignore
+            i: int = loop_args  # type: ignore
             # Set this_train_size to be a power of 2
             this_train_size = 2**i
 
             train_index = np.array(list(range(this_train_size)))
-            test_index = np.array(list(range(this_train_size, this_train_size+this_train_size//4+1)))
+            test_index = np.array(
+                list(range(this_train_size, this_train_size + this_train_size // 4 + 1))
+            )
             if test_index[-1] >= len(dataset):
                 break
         else:
-            train_index, test_index = loop_args  #type: ignore
+            train_index, test_index = loop_args  # type: ignore
 
         optimizer.define_model()
         test_set = dataset.iloc[test_index].copy()
@@ -242,11 +245,11 @@ def process(file):
             if do_fullinfo_stats:
                 trainsets.append(train_set)
         except Exception as e:
-            if str(e).endswith('inadequate.'):
+            if str(e).endswith("inadequate."):
                 if verbose_inadequate_data:
                     print("Skipping - Inadequate data")
             else:
-                print('Error:', e)
+                print("Error:", e)
             if not do_fullinfo_stats:
                 # Default behavior is to use the default weights if it cannot optimise
                 w_list.append(optimizer.init_w)
@@ -255,9 +258,8 @@ def process(file):
                 if do_fullinfo_stats:
                     trainsets.append(train_set)  # Kept for readability
             else:
-                # If we are doing fullinfo stats, we will be stricter - no default weights are saved for optimised FSRS if optimisation fails 
+                # If we are doing fullinfo stats, we will be stricter - no default weights are saved for optimised FSRS if optimisation fails
                 pass
-                
 
     if len(w_list) == 0:
         print("No data for", file.stem)
@@ -274,10 +276,16 @@ def process(file):
             all_y.append(y)
             all_evaluation.append(evaluation)
             last_y = y
-        
+
         ici = None
-        rmse_raw = [root_mean_squared_error(y_true=e_t, y_pred=e_p) for e_t, e_p in zip(all_y, all_p)]
-        logloss  = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
+        rmse_raw = [
+            root_mean_squared_error(y_true=e_t, y_pred=e_p)
+            for e_t, e_p in zip(all_y, all_p)
+        ]
+        logloss = [
+            log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1])
+            for e_t, e_p in zip(all_y, all_p)
+        ]
         rmse_bins = [rmse_matrix(e) for e in all_evaluation]
 
         all_p = []
@@ -288,9 +296,15 @@ def process(file):
             all_p.append(p)
             all_y.append(y)
             all_evaluation.append(evaluation)
-        
-        rmse_raw_train = [root_mean_squared_error(y_true=e_t, y_pred=e_p) for e_t, e_p in zip(all_y, all_p)]
-        logloss_train  = [log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1]) for e_t, e_p in zip(all_y, all_p)]
+
+        rmse_raw_train = [
+            root_mean_squared_error(y_true=e_t, y_pred=e_p)
+            for e_t, e_p in zip(all_y, all_p)
+        ]
+        logloss_train = [
+            log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1])
+            for e_t, e_p in zip(all_y, all_p)
+        ]
         rmse_bins_train = [rmse_matrix(e) for e in all_evaluation]
 
     else:
@@ -316,25 +330,22 @@ def process(file):
 
     result = {
         "metrics": {
-            "RMSE": rmse_raw,
-            "LogLoss": logloss,
-            "RMSE(bins)": rmse_bins,
-            "ICI": ici,
-            "TrainSizes": sizes,
-            "RMSETrain": rmse_raw_train,
-            "LogLossTrain": logloss_train,
-            "RMSE(bins)Train": rmse_bins_train,
+            "RMSE": round(rmse_raw, 6),
+            "LogLoss": round(logloss, 6),
+            "RMSE(bins)": round(rmse_bins, 6),
+            "ICI": round(ici, 6),
         },
         "user": int(file.stem),
         "size": len(last_y),
         "weights": list(map(lambda x: round(x, 4), w_list[-1])),
-        "allweights": [list(w) for w in w_list],
     }
-    # save as json
-    Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
-    with open(f"result/{path}/{file.stem}.json", "w") as f:
-        json.dump(result, f, indent=4)
-    return file
+    if do_fullinfo_stats:
+        result["metrics"]["TrainSizes"] = sizes
+        result["metrics"]["RMSETrain"] = round(rmse_raw_train, 6)
+        result["metrics"]["LogLossTrain"] = round(logloss_train, 6)
+        result["metrics"]["RMSE(bins)Train"] = round(rmse_bins_train, 6)
+        result["allweights"] = [list(w) for w in w_list]
+    return result
 
 
 if __name__ == "__main__":
@@ -342,12 +353,22 @@ if __name__ == "__main__":
     dataset_path0 = "./dataset/"
     dataset_path1 = "./dataset/FSRS-Anki-20k/dataset/1/"
     dataset_path2 = "./dataset/FSRS-Anki-20k/dataset/2/"
-    Path(f"result/{path}").mkdir(parents=True, exist_ok=True)
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
-    processed_files = list(map(lambda x: x.stem, Path(f"result/{path}").iterdir()))
+    Path("result").mkdir(parents=True, exist_ok=True)
+    result_file = Path(f"result/{path}.jsonl")
+    if result_file.exists():
+        data = list(map(lambda x: json.loads(x), open(result_file).readlines()))
+        data.sort(key=lambda x: x["user"])
+        with result_file.open("w", encoding="utf-8") as jsonl_file:
+            for json_data in data:
+                jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+        processed_user = set(map(lambda x: x["user"], data))
+    else:
+        processed_user = set()
+
     for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:
         for file in Path(dataset_path).glob("*.csv"):
-            if file.stem in processed_files:
+            if int(file.stem) in processed_user:
                 continue
             unprocessed_files.append(file)
 
@@ -357,14 +378,19 @@ if __name__ == "__main__":
     with ProcessPoolExecutor(max_workers=num_threads) as executor:
         futures = [executor.submit(process, file) for file in unprocessed_files]
         for future in (
-            pbar := tqdm(
-                as_completed(futures),
-                total=len(futures),
-                smoothing=0.03
-            )
+            pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
             try:
                 result = future.result()
-                pbar.set_description(f"Processed {result}")
+                with open(f"result/{path}.jsonl", "a") as f:
+                    f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                pbar.set_description(f"Processed {result['user']}")
             except Exception as e:
                 tqdm.write(str(e))
+
+    with open(f"result/{path}.jsonl", "r") as f:
+        data = list(map(lambda x: json.loads(x), f.readlines()))
+        data.sort(key=lambda x: x["user"])
+    with open(f"result/{path}.jsonl", "w") as f:
+        for json_data in data:
+            f.write(json.dumps(json_data, ensure_ascii=False) + "\n")

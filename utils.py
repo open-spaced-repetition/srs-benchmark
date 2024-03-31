@@ -44,7 +44,7 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
         universal_metric = root_mean_squared_error(
             y_true=cross_comparison_group["y", "mean"],
             y_pred=cross_comparison_group[f"R ({algoB})", "mean"],
-            sample_weight=cross_comparison_group[f"R ({algoB})", "count"]
+            sample_weight=cross_comparison_group[f"R ({algoB})", "count"],
         )
         cross_comparison_group[f"R ({algoB})", "percent"] = (
             cross_comparison_group[f"R ({algoB})", "count"]

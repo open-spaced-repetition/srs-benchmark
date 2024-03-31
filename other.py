@@ -1537,12 +1537,13 @@ if __name__ == "__main__":
     if result_file.exists():
         data = list(map(lambda x: json.loads(x), open(result_file).readlines()))
         data.sort(key=lambda x: x["user"])
-        with result_file.open('w', encoding='utf-8') as jsonl_file:
+        with result_file.open("w", encoding="utf-8") as jsonl_file:
             for json_data in data:
                 jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
         processed_user = set(map(lambda x: x["user"], data))
     else:
         processed_user = set()
+
     for file in Path(dataset_path).glob("*.csv"):
         if int(file.stem) in processed_user:
             continue
@@ -1554,10 +1555,7 @@ if __name__ == "__main__":
     with ProcessPoolExecutor(max_workers=num_threads) as executor:
         futures = [executor.submit(process, file) for file in unprocessed_files]
         for future in (
-            pbar := tqdm(
-                as_completed(futures),
-                total=len(futures),
-            )
+            pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
             try:
                 result = future.result()

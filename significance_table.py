@@ -129,15 +129,17 @@ if __name__ == "__main__":
         print(f"Model: {model}")
         RMSE = []
         logloss = []
-        result_dir = pathlib.Path(f"./result/{model}")
-        result_files = result_dir.glob("*.json")
-        for result_file in result_files:
-            with open(result_file, "r") as f:
-                result = json.load(f)
-                logloss.append(result["metrics"]["LogLoss"])
-                RMSE.append(result["metrics"]["RMSE(bins)"])
-                if model == models[0]:
-                    sizes.append(result["size"])
+        result_file = pathlib.Path(f"./result/{model}.jsonl")
+        if not result_file.exists():
+            continue
+        with open(result_file, "r") as f:
+            data = f.readlines()
+        data = [json.loads(x) for x in data]
+        for result in data:
+            logloss.append(result["metrics"]["LogLoss"])
+            RMSE.append(result["metrics"]["RMSE(bins)"])
+            if model == models[0]:
+                sizes.append(result["size"])
 
         series1 = pd.Series(logloss, name=f"{model}, LogLoss")
         series2 = pd.Series(RMSE, name=f"{model}, RMSE (bins)")

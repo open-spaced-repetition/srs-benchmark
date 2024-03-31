@@ -1254,8 +1254,8 @@ def process_untrainable(file):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    evaluate(y, p, save_tmp, model_name, file)
-    return file
+    result = evaluate(y, p, save_tmp, model_name, file)
+    return result
 
 
 def baseline(file):
@@ -1283,8 +1283,8 @@ def baseline(file):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    evaluate(y, p, save_tmp, model_name, file)
-    return file
+    result = evaluate(y, p, save_tmp, model_name, file)
+    return result
 
 
 def create_features(df, model_name="FSRSv3"):
@@ -1494,10 +1494,10 @@ def process(args):
             f"evaluation/{model_name}/{file.stem}.tsv", sep="\t", index=False
         )
 
-    evaluate(
+    result = evaluate(
         y, p, save_tmp, model_name, file, w_list if type(w_list[0]) == list else None
     )
-    return file
+    return result
 
 
 def evaluate(y, p, df, model_name, file, w_list=None):
@@ -1514,20 +1514,17 @@ def evaluate(y, p, df, model_name, file, w_list=None):
     rmse_bins = rmse_matrix(df)
     result = {
         "metrics": {
-            "RMSE": rmse_raw,
-            "LogLoss": logloss,
-            "RMSE(bins)": rmse_bins,
-            "ICI": ici,
+            "RMSE": round(rmse_raw, 6),
+            "LogLoss": round(logloss, 6),
+            "RMSE(bins)": round(rmse_bins, 6),
+            "ICI": round(ici, 6),
         },
         "user": int(file.stem),
         "size": len(y),
     }
     if w_list:
         result["weights"] = list(map(lambda x: round(x, 4), w_list[-1]))
-    # save as json
-    Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
-    with open(f"result/{model_name}/{file.stem}.json", "w") as f:
-        json.dump(result, f, indent=4)
+    return result
 
 
 if __name__ == "__main__":
@@ -1535,12 +1532,19 @@ if __name__ == "__main__":
     unprocessed_files = []
     dataset_path = "./dataset"
     Path(f"evaluation/{model_name}").mkdir(parents=True, exist_ok=True)
-    Path(f"result/{model_name}").mkdir(parents=True, exist_ok=True)
-    processed_files = list(
-        map(lambda x: x.stem, Path(f"result/{model_name}").iterdir())
-    )
+    Path("result").mkdir(parents=True, exist_ok=True)
+    result_file = Path(f"result/{model_name}.jsonl")
+    if result_file.exists():
+        data = list(map(lambda x: json.loads(x), open(result_file).readlines()))
+        data.sort(key=lambda x: x["user"])
+        with result_file.open('w', encoding='utf-8') as jsonl_file:
+            for json_data in data:
+                jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+        processed_user = set(map(lambda x: x["user"], data))
+    else:
+        processed_user = set()
     for file in Path(dataset_path).glob("*.csv"):
-        if file.stem in processed_files:
+        if int(file.stem) in processed_user:
             continue
         unprocessed_files.append((file, model_name))
 
@@ -1557,6 +1561,15 @@ if __name__ == "__main__":
         ):
             try:
                 result = future.result()
-                pbar.set_description(f"Processed {result}")
+                with open(f"result/{model_name}.jsonl", "a") as f:
+                    f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                pbar.set_description(f"Processed {result['user']}")
             except Exception as e:
                 tqdm.write(str(e))
+
+    with open(f"result/{model_name}.jsonl", "r") as f:
+        data = list(map(lambda x: json.loads(x), f.readlines()))
+        data.sort(key=lambda x: x["user"])
+    with open(f"result/{model_name}.jsonl", "w") as f:
+        for json_data in data:
+            f.write(json.dumps(json_data, ensure_ascii=False) + "\n")

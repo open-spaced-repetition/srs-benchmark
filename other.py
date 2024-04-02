@@ -1052,7 +1052,7 @@ class Trainer:
                     theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
                     retentions = self.model.rw(
                         torch.stack([difficulties, stabilities, theoretical_r], dim=1)
-                    ).squeeze()
+                    ).squeeze(1)
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences.transpose(0, 1))
@@ -1127,7 +1127,7 @@ class Trainer:
                     theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
                     retentions = self.model.rw(
                         torch.stack([difficulties, stabilities, theoretical_r], dim=1)
-                    ).squeeze()
+                    ).squeeze(1)
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences)
@@ -1211,7 +1211,7 @@ class Collection:
                 )
                 retentions = self.model.rw(
                     torch.stack([difficulties, stabilities, theoretical_r], dim=1)
-                ).squeeze()
+                ).squeeze(1)
                 return retentions.cpu().tolist()
             else:
                 if isinstance(self.model, HLR):

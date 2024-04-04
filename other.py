@@ -1386,7 +1386,7 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
-    elif model_name == "NN_17":
+    elif model_name == "NN-17":
 
         def r_history_to_l_history(r_history):
             l_history = [0 for _ in range(len(r_history) + 1)]
@@ -1441,7 +1441,7 @@ def process(args):
         model = DASH
     elif model_name == "DASH[ACT-R]":
         model = DASH_ACTR
-    elif model_name == "NN_17":
+    elif model_name == "NN-17":
         model = NN_17
 
     dataset = create_features(dataset, model_name)

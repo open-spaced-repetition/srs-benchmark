@@ -10,7 +10,7 @@ if model_name == "GRU":
     model = RNN
 elif model_name == "Transformer":
     model = Transformer
-elif model_name == "NN_17":
+elif model_name == "NN-17":
     model = NN_17
 
 df_list = []

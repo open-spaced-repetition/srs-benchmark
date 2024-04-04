@@ -109,6 +109,7 @@ if __name__ == "__main__":
     models = [
         "FSRS-4.5",
         "FSRS-rs",
+        "NN-17",
         "FSRSv4",
         "DASH",
         "DASH[MCM]",

@@ -736,7 +736,7 @@ class ExpActivation(nn.Module):
 
 
 class NN_17(nn.Module):
-    # 496 params
+    # 39 params
     init_s = [1, 2.5, 4.5, 10]
     init_d = [1, 0.72, 0.07, 0.05]
     w = [1.26, 0.0, 0.67]
@@ -744,7 +744,7 @@ class NN_17(nn.Module):
 
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
-        self.hidden_size = 10
+        self.hidden_size = 1
         self.S0 = nn.Parameter(
             torch.tensor(
                 self.init_s,
@@ -766,9 +766,7 @@ class NN_17(nn.Module):
         self.rw = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
+            nn.Linear(self.hidden_size, 1),
             # nn.Sigmoid()
             nn.Softplus(),  # make sure that the input for ExpActivation() is >=0
             ExpActivation(),
@@ -776,33 +774,25 @@ class NN_17(nn.Module):
         self.next_d = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
+            nn.Linear(self.hidden_size, 1),
             nn.Sigmoid(),
         )
         self.pls = nn.Sequential(
             nn.Linear(2, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
+            nn.Linear(self.hidden_size, 1),
             nn.Softplus(),
         )
         self.sinc = nn.Sequential(
             nn.Linear(3, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
+            nn.Linear(self.hidden_size, 1),
             nn.Softplus(),
         )
         self.best_sinc = nn.Sequential(
             nn.Linear(2, self.hidden_size),
             nn.Mish(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
-            nn.Mish(),
-            nn.Linear(self.hidden_size // 2, 1),
+            nn.Linear(self.hidden_size, 1),
             nn.Softplus(),
         )
 
@@ -1386,7 +1376,7 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
-    elif model_name == "NN_17":
+    elif model_name == "NN-17":
 
         def r_history_to_l_history(r_history):
             l_history = [0 for _ in range(len(r_history) + 1)]
@@ -1441,7 +1431,7 @@ def process(args):
         model = DASH
     elif model_name == "DASH[ACT-R]":
         model = DASH_ACTR
-    elif model_name == "NN_17":
+    elif model_name == "NN-17":
         model = NN_17
 
     dataset = create_features(dataset, model_name)

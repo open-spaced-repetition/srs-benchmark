@@ -4,14 +4,20 @@ from tqdm import tqdm
 import torch
 from other import create_features, Trainer, RNN, Transformer, NN_17
 
-model_name = "Transformer"
+model_name = "NN-17"
 
 if model_name == "GRU":
     model = RNN
 elif model_name == "Transformer":
     model = Transformer
-elif model_name == "NN_17":
+elif model_name == "NN-17":
     model = NN_17
+
+total = 0
+for param in model().parameters():
+    total += param.numel()
+
+print(total)
 
 df_list = []
 
@@ -28,7 +34,7 @@ w_list = []
 trainer = Trainer(
     model(),
     df,
-    df.sample(frac=0.01),
+    None,
     n_epoch=4,
     lr=4e-2,
     wd=1e-4,

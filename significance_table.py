@@ -116,6 +116,7 @@ if __name__ == "__main__":
         "FSRS-4.5-pretrain",
         "FSRS-4.5-dry-run",
         "FSRSv3",
+        "NN-17",
         "GRU",
         "ACT-R",
         "HLR",

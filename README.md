@@ -61,6 +61,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | DASH[ACT-R] | 0.34±0.006 | 0.069±0.0014 | 5 |
 | FSRS v3 | 0.38±0.007 | 0.077±0.0016 | 13 |
 | FSRS-4.5 (only pretrain) | 0.35±0.006 | 0.078±0.0019 | 4 |
+| NN-17 | 0.35±0.006 | 0.081±0.0015 | 39 |
 | GRU | 0.39±0.007 | 0.084±0.0017 | 36 |
 | FSRS-4.5 (default parameters) | 0.36±0.006 | 0.089±0.0020 | 0 |
 | ACT-R | 0.36±0.006 | 0.093±0.0023 | 5 |
@@ -78,6 +79,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | FSRS v4 | 0.365±0.0033 | 0.085±0.0010 | 17 |
 | DASH[ACT-R] | 0.360±0.0032 | 0.087±0.0010 | 5 |
 | FSRS-4.5 (only pretrain) | 0.366±0.0032 | 0.093±0.0010 | 4 |
+| NN-17 | 0.378±0.0033 | 0.106±0.0012 | 39 |
 | FSRS-4.5 (default parameters) | 0.381±0.0033 | 0.111±0.0012 | 0 |
 | FSRS v3 | 0.45±0.006 | 0.111±0.0015 | 13 |
 | GRU | 0.45±0.005 | 0.112±0.0013 | 36 |

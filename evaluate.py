@@ -88,6 +88,7 @@ if __name__ == "__main__":
         dev_mode_name,
         "FSRS-4.5",
         "FSRS-rs",
+        "NN-17",
         "DASH",
         "DASH[MCM]",
         "DASH[ACT-R]",

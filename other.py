@@ -736,7 +736,7 @@ class ExpActivation(nn.Module):
 
 
 class NN_17(nn.Module):
-    # 62 params
+    # 39 params
     init_s = [1, 2.5, 4.5, 10]
     init_d = [1, 0.72, 0.07, 0.05]
     w = [1.26, 0.0, 0.67]
@@ -744,7 +744,7 @@ class NN_17(nn.Module):
 
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
-        self.hidden_size = 2
+        self.hidden_size = 1
         self.S0 = nn.Parameter(
             torch.tensor(
                 self.init_s,

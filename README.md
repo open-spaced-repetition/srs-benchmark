@@ -37,6 +37,7 @@ Smaller is better. If you are unsure what metric to look at, look at RMSE (bins)
 - DASH: the model proposed in [here](https://doi.org/10.4324/9781315413570-8). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this model: DASH[MCM] and DASH[ACT-R]. For more details, you can read the paper [here](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
 - ACT-R: the model proposed in [here](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression. For more details, you can read the paper [here](https://github.com/duolingo/halflife-regression).
+- Transformer: a type of neural network that has gained popularity in recent years due to its superior performance in natural language processing. ChatGPT is based on this architecture.
 - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it.
 - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 
@@ -68,6 +69,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | ACT-R | 0.36±0.006 | 0.093±0.0023 | 5 |
 | HLR | 0.42±0.009 | 0.111±0.0021 | 3 |
 | SM-2 | 0.59±0.015 | 0.155±0.0032 | 0 |
+| Transformer | 0.52±0.011 | 0.188±0.0037 | 127 |
 
 ### Weighted by ln(number of reviews)
 
@@ -86,6 +88,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | GRU | 0.45±0.005 | 0.112±0.0013 | 36 |
 | ACT-R | 0.390±0.0035 | 0.113±0.0012 | 5 |
 | HLR | 0.48±0.006 | 0.132±0.0014 | 3 |
+| Transformer | 0.56±0.006 | 0.192±0.0018 | 127 |
 | SM-2 | 0.80±0.016 | 0.204±0.0021 | 0 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.

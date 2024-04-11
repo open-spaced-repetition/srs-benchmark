@@ -120,6 +120,7 @@ if __name__ == "__main__":
         "GRU",
         "ACT-R",
         "HLR",
+        "Transformer",
         "SM2",
     ]
     csv_name = f"{len(models)} models.csv"
@@ -240,7 +241,7 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=10,
+                    fontsize=9,
                 )
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=12, rotation=45)

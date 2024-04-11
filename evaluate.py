@@ -99,6 +99,7 @@ if __name__ == "__main__":
         "FSRSv3",
         "GRU",
         "HLR",
+        "Transformer",
         "SM2",
     ):
         print(f"Model: {model}")

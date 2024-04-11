@@ -68,6 +68,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | ACT-R | 0.36±0.006 | 0.093±0.0023 | 5 |
 | HLR | 0.42±0.009 | 0.111±0.0021 | 3 |
 | SM-2 | 0.59±0.015 | 0.155±0.0032 | 0 |
+| Transformer | 0.52±0.011 | 0.188±0.0037 | 127 |
 
 ### Weighted by ln(number of reviews)
 
@@ -86,6 +87,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | GRU | 0.45±0.005 | 0.112±0.0013 | 36 |
 | ACT-R | 0.390±0.0035 | 0.113±0.0012 | 5 |
 | HLR | 0.48±0.006 | 0.132±0.0014 | 3 |
+| Transformer | 0.56±0.006 | 0.192±0.0018 | 127 |
 | SM-2 | 0.80±0.016 | 0.204±0.0021 | 0 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.

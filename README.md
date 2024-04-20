@@ -55,7 +55,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.33±0.005** | **0.057±0.0011** | 17 |
+| **FSRS-4.5** | **0.33±0.006** | **0.056±0.0011** | 17 |
 | FSRS-rs | 0.33±0.005 | 0.059±0.0013 | 17 |
 | FSRS v4 | 0.33±0.006 | 0.062±0.0014 | 17 |
 | DASH | 0.33±0.005 | 0.063±0.0011 | 9 |
@@ -75,7 +75,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.354±0.0031** | **0.078±0.0009** | 17 |
+| **FSRS-4.5** | **0.353±0.0031** | **0.077±0.0009** | 17 |
 | FSRS-rs | 0.355±0.0031 | 0.079±0.0009 | 17 |
 | DASH | 0.357±0.0030 | 0.082±0.0009 | 9 |
 | DASH[MCM] | 0.357±0.0031 | 0.085±0.0009 | 9 |
@@ -103,26 +103,16 @@ Overall, these p-values can be trusted on a qualitative (but not quantitative) l
 
 ![Wilcoxon, 19993 collections](./plots/Wilcoxon-19993-collections.png)
 
-## Median Parameters
+## Default Parameters
 
 FSRS-4.5:
 
 ```
-0.5701, 1.448, 4.1396, 11.0112,
-5.1674, 1.2378, 0.8798, 0.0362,
-1.629, 0.1342, 1.0309,
-2.099, 0.0839, 0.3204, 1.5704,
-0.219, 2.8538
-```
-
-FSRS-rs:
-
-```
-0.5702, 1.4484, 4.1396, 11.01,
-5.1527, 1.2386, 0.8673, 0.0615,
-1.6406, 0.1319, 1.0178,
-2.1669, 0.0673, 0.3318, 1.5551,
-0.2218, 2.9248
+0.4872, 1.4003, 3.7145, 13.8206,
+5.1618, 1.2298, 0.8975, 0.031,
+1.6474, 0.1367, 1.0461,
+2.1072, 0.0793, 0.3246, 1.587,
+0.2272, 2.8755
 ```
 
 ## Comparisons with SuperMemo 15/16/17

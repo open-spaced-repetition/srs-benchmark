@@ -1220,7 +1220,7 @@ def process_untrainable(file):
     dataset = pd.read_csv(file)
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
-        return
+        return Exception("Not enough data")
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
     for _, test_index in tscv.split(dataset):
@@ -1253,7 +1253,7 @@ def baseline(file):
     dataset = pd.read_csv(file)
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
-        return
+        return Exception("Not enough data")
     testsets = []
     avg_ps = []
     tscv = TimeSeriesSplit(n_splits=n_splits)

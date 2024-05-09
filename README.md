@@ -45,9 +45,9 @@ For more details about the FSRS algorithm, read this wiki page: [The Algorithm](
 
 ## Result
 
-Total number of users: 19,993.
+Total number of users: 19,990.
 
-Total number of reviews for evaluation: 728,883,020. Same-day reviews are excluded; only one review per day (the first chronologically) is used by each algorithm. This is why the number of reviews is significantly lower than the 1.5 billion mentioned earlier. Plus, an outlier filter is also used.
+Total number of reviews for evaluation: 707,964,360. Same-day reviews are excluded; only one review per day (the first chronologically) is used by each algorithm. This is why the number of reviews is significantly lower than the 1.5 billion mentioned earlier. Plus, an outlier filter is also used.
 
 The following tables show the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
@@ -55,41 +55,41 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.33±0.006** | **0.056±0.0011** | 17 |
-| FSRS-rs | 0.33±0.006 | 0.058±0.0013 | 17 |
-| FSRS v4 | 0.33±0.006 | 0.062±0.0014 | 17 |
+| **FSRS-4.5** | **0.33±0.006** | **0.053±0.0011** | 17 |
+| FSRS-rs | 0.33±0.005 | 0.055±0.0013 | 17 |
+| FSRS v4 | 0.33±0.006 | 0.058±0.0014 | 17 |
 | DASH | 0.33±0.005 | 0.063±0.0011 | 9 |
-| DASH[MCM] | 0.33±0.005 | 0.065±0.0012 | 9 |
-| DASH[ACT-R] | 0.34±0.006 | 0.069±0.0014 | 5 |
-| FSRS v3 | 0.38±0.007 | 0.077±0.0016 | 13 |
-| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.077±0.0018 | 4 |
-| NN-17 | 0.35±0.006 | 0.081±0.0015 | 39 |
-| GRU | 0.39±0.007 | 0.084±0.0017 | 36 |
-| FSRS-4.5 (default parameters) | 0.36±0.006 | 0.089±0.0021 | 0 |
-| ACT-R | 0.36±0.006 | 0.093±0.0023 | 5 |
-| HLR | 0.42±0.009 | 0.111±0.0021 | 3 |
-| SM-2 | 0.59±0.015 | 0.155±0.0032 | 0 |
-| Transformer | 0.52±0.011 | 0.188±0.0037 | 127 |
+| DASH[MCM] | 0.33±0.005 | 0.064±0.0012 | 9 |
+| DASH[ACT-R] | 0.34±0.006 | 0.068±0.0014 | 5 |
+| FSRS v3 | 0.36±0.007 | 0.072±0.0015 | 13 |
+| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.075±0.0019 | 4 |
+| GRU | 0.38±0.007 | 0.080±0.0017 | 36 |
+| NN-17 | 0.35±0.006 | 0.081±0.0016 | 39 |
+| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.086±0.0021 | 0 |
+| ACT-R | 0.36±0.006 | 0.092±0.0023 | 5 |
+| HLR | 0.41±0.009 | 0.107±0.0021 | 3 |
+| SM-2 | 0.54±0.012 | 0.149±0.0031 | 0 |
+| Transformer | 0.52±0.011 | 0.187±0.0036 | 127 |
 
 ### Weighted by ln(number of reviews)
 
 | Algorithm | Log Loss | RMSE (bins) | Parameters |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.353±0.0031** | **0.077±0.0009** | 17 |
-| FSRS-rs | 0.354±0.0032 | 0.078±0.0009 | 17 |
-| DASH | 0.357±0.0030 | 0.082±0.0009 | 9 |
-| DASH[MCM] | 0.357±0.0031 | 0.085±0.0009 | 9 |
-| FSRS v4 | 0.365±0.0033 | 0.085±0.0010 | 17 |
-| DASH[ACT-R] | 0.360±0.0032 | 0.087±0.0010 | 5 |
-| FSRS-4.5 (only pretrain) | 0.365±0.0032 | 0.091±0.0009 | 4 |
-| NN-17 | 0.378±0.0033 | 0.106±0.0012 | 39 |
-| FSRS-4.5 (default parameters) | 0.381±0.0034 | 0.110±0.0012 | 0 |
-| FSRS v3 | 0.45±0.006 | 0.111±0.0015 | 13 |
-| GRU | 0.45±0.005 | 0.112±0.0013 | 36 |
-| ACT-R | 0.390±0.0035 | 0.113±0.0012 | 5 |
-| HLR | 0.48±0.006 | 0.132±0.0014 | 3 |
-| Transformer | 0.56±0.006 | 0.192±0.0018 | 127 |
-| SM-2 | 0.80±0.016 | 0.204±0.0021 | 0 |
+| **FSRS-4.5** | **0.349±0.0031** | **0.073±0.0008** | 17 |
+| FSRS-rs | 0.349±0.0030 | 0.074±0.0009 | 17 |
+| FSRS v4 | 0.358±0.0032 | 0.080±0.0009 | 17 |
+| DASH | 0.355±0.0030 | 0.082±0.0009 | 9 |
+| DASH[MCM] | 0.355±0.0031 | 0.084±0.0009 | 9 |
+| DASH[ACT-R] | 0.358±0.0032 | 0.087±0.0010 | 5 |
+| FSRS-4.5 (only pretrain) | 0.360±0.0031 | 0.088±0.0009 | 4 |
+| FSRS v3 | 0.413±0.0043 | 0.103±0.0013 | 13 |
+| NN-17 | 0.375±0.0034 | 0.105±0.0012 | 39 |
+| FSRS-4.5 (default parameters) | 0.375±0.0032 | 0.105±0.0011 | 0 |
+| GRU | 0.431±0.0049 | 0.107±0.0012 | 36 |
+| ACT-R | 0.389±0.0036 | 0.112±0.0012 | 5 |
+| HLR | 0.448±0.0049 | 0.125±0.0013 | 3 |
+| Transformer | 0.55±0.006 | 0.191±0.0018 | 127 |
+| SM-2 | 0.68±0.011 | 0.195±0.0021 | 0 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 
@@ -101,7 +101,7 @@ Almost all p-values are extremely small, many orders of magnitude smaller than 0
 
 Overall, these p-values can be trusted on a qualitative (but not quantitative) level.
 
-![Wilcoxon, 19993 collections](./plots/Wilcoxon-19993-collections.png)
+![Wilcoxon, 19990 collections](./plots/Wilcoxon-19990-collections.png)
 
 ## Default Parameters
 

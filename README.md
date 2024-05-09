@@ -101,7 +101,7 @@ Almost all p-values are extremely small, many orders of magnitude smaller than 0
 
 Overall, these p-values can be trusted on a qualitative (but not quantitative) level.
 
-![Wilcoxon, 19993 collections](./plots/Wilcoxon-19993-collections.png)
+![Wilcoxon, 19990 collections](./plots/Wilcoxon-19990-collections.png)
 
 ## Default Parameters
 

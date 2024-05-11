@@ -262,7 +262,7 @@ def process(file):
                 if verbose_inadequate_data:
                     print("Skipping - Inadequate data")
             else:
-                print("Error:", e)
+                print("User:", file.stem, "Error:", e)
             if not do_fullinfo_stats:
                 # Default behavior is to use the default weights if it cannot optimise
                 w_list.append(optimizer.init_w)

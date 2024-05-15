@@ -124,6 +124,10 @@ if __name__ == "__main__":
         print(f"Total number of users: {len(sizes)}")
         sizes = np.array(sizes)
         print(f"Total number of reviews: {sizes.sum()}")
+
+        if len(weights) > 0:
+            print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")
+
         for scale, size in (
             ("reviews", np.array(sizes)),
             ("log(reviews)", np.log(sizes)),
@@ -147,6 +151,3 @@ if __name__ == "__main__":
                 # except KeyError:
                 #     pass
             print()
-
-        if len(weights) > 0:
-            print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")

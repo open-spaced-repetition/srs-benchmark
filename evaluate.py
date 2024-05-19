@@ -3,6 +3,7 @@ import json
 import numpy as np
 import scipy
 import math
+import argparse
 
 
 def sigdig(value, CI):
@@ -84,69 +85,123 @@ if __name__ == "__main__":
         common_set = set([json.loads(x)["user"] for x in data])
     else:
         common_set = None
-    for model in (
-        dev_mode_name,
-        "FSRS-4.5",
-        "FSRS-rs",
-        "NN-17",
-        "DASH",
-        "DASH[MCM]",
-        "DASH[ACT-R]",
-        "FSRSv4",
-        "FSRS-4.5-pretrain",
-        "FSRS-4.5-dry-run",
-        "ACT-R",
-        "FSRSv3",
-        "GRU",
-        "HLR",
-        "Transformer",
-        "SM2",
-    ):
-        print(f"Model: {model}")
-        m = []
-        weights = []
-        sizes = []
-        result_file = pathlib.Path(f"./result/{model}.jsonl")
-        if not result_file.exists():
-            continue
-        with open(result_file, "r") as f:
-            data = f.readlines()
-        data = [json.loads(x) for x in data]
-        for result in data:
-            if common_set and result["user"] not in common_set:
-                continue
-            m.append(result["metrics"])
-            sizes.append(result["size"])
-            if "weights" in result:
-                weights.append(result["weights"])
-        if len(sizes) == 0:
-            continue
-        print(f"Total number of users: {len(sizes)}")
-        sizes = np.array(sizes)
-        print(f"Total number of reviews: {sizes.sum()}")
-        for scale, size in (
-            ("reviews", np.array(sizes)),
-            ("log(reviews)", np.log(sizes)),
-            ("users", np.ones_like(sizes)),
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fast", action="store_true")
+    args = parser.parse_args()
+    if args.fast:
+        for model in (
+            dev_mode_name,
+            "FSRS-4.5",
+            "FSRS-rs",
+            "NN-17",
+            "DASH",
+            "DASH[MCM]",
+            "DASH[ACT-R]",
+            "FSRSv4",
+            "FSRS-4.5-pretrain",
+            "FSRS-4.5-dry-run",
+            "ACT-R",
+            "FSRSv3",
+            "GRU",
+            "HLR",
+            "Transformer",
+            "SM2",
         ):
-            print(f"Weighted average by {scale}:")
-            for metric in ("LogLoss", "RMSE(bins)"):
-                metrics = np.array([item[metric] for item in m])
-                wmean, wstd = weighted_avg_and_std(metrics, size)
-                print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
-                CI = confidence_interval(metrics, size)
-                rounded_mean, rounded_CI = sigdig(wmean, CI)
-                print(f"{model} {metric}: {rounded_mean}±{rounded_CI}")
-                # try:
-                #     rmse_bin_again = np.array(
-                #         [item["RMSE(bins)Ratings"]["1"] for item in m]
-                #     )
-                #     print(
-                #         f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}"
-                #     )
-                # except KeyError:
-                #     pass
-            print()
+            print(f"Model: {model}")
+            m = []
+            weights = []
+            sizes = []
+            result_file = pathlib.Path(f"./result/{model}.jsonl")
+            if not result_file.exists():
+                continue
+            with open(result_file, "r") as f:
+                data = f.readlines()
+            data = [json.loads(x) for x in data]
+            for result in data:
+                if common_set and result["user"] not in common_set:
+                    continue
+                m.append(result["metrics"])
+                sizes.append(result["size"])
+                if "weights" in result:
+                    weights.append(result["weights"])
+            if len(sizes) == 0:
+                continue
+            print(f"Total number of users: {len(sizes)}")
+            sizes = np.array(sizes)
+            print(f"Total number of reviews: {sizes.sum()}")
+            for scale, size in (
+                ("reviews", np.array(sizes)),
+                ("log(reviews)", np.log(sizes)),
+                ("users", np.ones_like(sizes)),
+            ):
+                print(f"Weighted average by {scale}:")
+                for metric in ("LogLoss", "RMSE(bins)"):
+                    metrics = np.array([item[metric] for item in m])
+                    wmean, wstd = weighted_avg_and_std(metrics, size)
+                    print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
+                    # try:
+                    #     rmse_bin_again = np.array(
+                    #         [item["RMSE(bins)Ratings"]["1"] for item in m]
+                    #     )
+                    #     print(
+                    #         f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}"
+                    #     )
+                    # except KeyError:
+                    #     pass
+                print()
 
-        if len(weights) > 0:
-            print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")
+            if len(weights) > 0:
+                print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")
+
+    else:
+        for scale in ("reviews", "users"):
+            print(f"Weighted by number of {scale}\n")
+            print("| Model | #Params | LogLoss | RMSE(bins) |")
+            print("| --- | --- | --- | --- |")
+            for model, n_param in (
+                (dev_mode_name, None),
+                ("FSRS-4.5", 17),
+                ("FSRS-rs", 17),
+                ("FSRSv4", 17),
+                ("DASH", 9),
+                ("DASH[MCM]", 9),
+                ("DASH[ACT-R]", 5),
+                ("FSRSv3", 13),
+                ("FSRS-4.5-pretrain", 4),
+                ("GRU", 36),
+                ("NN-17", 39),
+                ("FSRS-4.5-dry-run", 0),
+                ("ACT-R", 5),
+                ("HLR", 3),
+                ("SM2", 0),
+                ("Transformer", 127),
+            ):
+                m = []
+                weights = []
+                sizes = []
+                result_file = pathlib.Path(f"./result/{model}.jsonl")
+                if not result_file.exists():
+                    continue
+                with open(result_file, "r") as f:
+                    data = f.readlines()
+                data = [json.loads(x) for x in data]
+                for result in data:
+                    if common_set and result["user"] not in common_set:
+                        continue
+                    m.append(result["metrics"])
+                    sizes.append(result["size"])
+                    if "weights" in result:
+                        weights.append(result["weights"])
+                if len(sizes) == 0:
+                    continue
+
+                size = np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
+                result = f"| {model} | {n_param} |"
+                for metric in ("LogLoss", "RMSE(bins)"):
+                    metrics = np.array([item[metric] for item in m])
+                    wmean, wstd = weighted_avg_and_std(metrics, size)
+                    # print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
+                    CI = confidence_interval(metrics, size)
+                    rounded_mean, rounded_CI = sigdig(wmean, CI)
+                    result += f" {rounded_mean}±{rounded_CI} |"
+                print(result)

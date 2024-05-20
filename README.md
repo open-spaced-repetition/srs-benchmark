@@ -53,47 +53,47 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 ### Weighted by number of reviews
 
-| Algorithm | Log Loss | RMSE (bins) | Parameters |
+| Model | #Params | LogLoss | RMSE(bins) |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.33±0.006** | **0.053±0.0011** | 17 |
-| FSRS-rs | 0.33±0.005 | 0.055±0.0013 | 17 |
-| FSRS v4 | 0.33±0.006 | 0.058±0.0014 | 17 |
-| DASH | 0.33±0.005 | 0.063±0.0011 | 9 |
-| DASH[MCM] | 0.33±0.005 | 0.064±0.0012 | 9 |
-| DASH[ACT-R] | 0.34±0.006 | 0.068±0.0014 | 5 |
-| FSRS v3 | 0.36±0.007 | 0.072±0.0015 | 13 |
-| FSRS-4.5 (only pretrain) | 0.34±0.006 | 0.075±0.0019 | 4 |
-| GRU | 0.38±0.007 | 0.080±0.0017 | 36 |
-| NN-17 | 0.35±0.006 | 0.081±0.0016 | 39 |
-| FSRS-4.5 (default parameters) | 0.35±0.006 | 0.086±0.0021 | 0 |
-| ACT-R | 0.36±0.006 | 0.092±0.0023 | 5 |
-| HLR | 0.41±0.009 | 0.107±0.0021 | 3 |
-| SM-2 | 0.54±0.012 | 0.149±0.0031 | 0 |
-| Transformer | 0.52±0.011 | 0.187±0.0036 | 127 |
+| **FSRS-4.5** | 17 | **0.33±0.005** | **0.053±0.0010** |
+| FSRS-rs | 17 | 0.33±0.006 | 0.055±0.0013 |
+| FSRS v4 | 17 | 0.33±0.006 | 0.058±0.0013 |
+| DASH | 9 | 0.33±0.005 | 0.063±0.0011 |
+| DASH[MCM] | 9 | 0.33±0.005 | 0.064±0.0011 |
+| DASH[ACT-R] | 5 | 0.34±0.006 | 0.068±0.0014 |
+| FSRS v3 | 13 | 0.36±0.007 | 0.072±0.0015 |
+| FSRS-4.5 (only pretrain) | 4 | 0.34±0.006 | 0.075±0.0018 |
+| GRU | 36 | 0.38±0.007 | 0.080±0.0017 |
+| NN-17 | 39 | 0.35±0.007 | 0.081±0.0016 |
+| FSRS-4.5 (default parameters) | 0 | 0.35±0.006 | 0.086±0.0021 |
+| ACT-R | 5 | 0.36±0.006 | 0.092±0.0022 |
+| HLR | 3 | 0.41±0.009 | 0.107±0.0021 |
+| SM-2 | 0 | 0.54±0.013 | 0.149±0.0032 |
+| Transformer | 127 | 0.52±0.012 | 0.187±0.0036 |
 
-### Weighted by ln(number of reviews)
+### Unweighted
 
-| Algorithm | Log Loss | RMSE (bins) | Parameters |
+| Model | #Params | LogLoss | RMSE(bins) |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | **0.349±0.0031** | **0.073±0.0008** | 17 |
-| FSRS-rs | 0.349±0.0030 | 0.074±0.0009 | 17 |
-| FSRS v4 | 0.358±0.0032 | 0.080±0.0009 | 17 |
-| DASH | 0.355±0.0030 | 0.082±0.0009 | 9 |
-| DASH[MCM] | 0.355±0.0031 | 0.084±0.0009 | 9 |
-| DASH[ACT-R] | 0.358±0.0032 | 0.087±0.0010 | 5 |
-| FSRS-4.5 (only pretrain) | 0.360±0.0031 | 0.088±0.0009 | 4 |
-| FSRS v3 | 0.413±0.0043 | 0.103±0.0013 | 13 |
-| NN-17 | 0.375±0.0034 | 0.105±0.0012 | 39 |
-| FSRS-4.5 (default parameters) | 0.375±0.0032 | 0.105±0.0011 | 0 |
-| GRU | 0.431±0.0049 | 0.107±0.0012 | 36 |
-| ACT-R | 0.389±0.0036 | 0.112±0.0012 | 5 |
-| HLR | 0.448±0.0049 | 0.125±0.0013 | 3 |
-| Transformer | 0.55±0.006 | 0.191±0.0018 | 127 |
-| SM-2 | 0.68±0.011 | 0.195±0.0021 | 0 |
+| **FSRS-4.5** | 17 | **0.352±0.0031** | **0.077±0.0009** |
+| FSRS-rs | 17 | 0.353±0.0032 | 0.077±0.0009 |
+| FSRS v4 | 17 | 0.362±0.0033 | 0.084±0.0010 |
+| DASH | 9 | 0.358±0.0031 | 0.085±0.0009 |
+| DASH[MCM] | 9 | 0.358±0.0032 | 0.087±0.0009 |
+| DASH[ACT-R] | 5 | 0.362±0.0033 | 0.090±0.0011 |
+| FSRS-4.5 (only pretrain) | 4 | 0.363±0.0032 | 0.091±0.0009 |
+| FSRS v3 | 13 | 0.422±0.0047 | 0.108±0.0014 |
+| FSRS-4.5 (default parameters) | 0 | 0.379±0.0033 | 0.108±0.0012 |
+| NN-17 | 39 | 0.380±0.0035 | 0.109±0.0014 |
+| GRU | 36 | 0.44±0.005 | 0.111±0.0013 |
+| ACT-R | 5 | 0.396±0.0041 | 0.116±0.0013 |
+| HLR | 3 | 0.46±0.005 | 0.129±0.0014 |
+| Transformer | 127 | 0.55±0.007 | 0.192±0.0018 |
+| SM-2 | 0 | 0.71±0.013 | 0.202±0.0022 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 
-Averages weighted by the natural logarithm of the number of reviews are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
+Unweighted averages are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
 
 The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. Grey means that the p-value is >0.01, and we cannot conclude that one algorithm performs better than the other.
 

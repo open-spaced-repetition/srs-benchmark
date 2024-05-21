@@ -216,8 +216,8 @@ def process(file):
         try:
             if rust:
                 train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
-                weights = backend.benchmark(train_set_items)
-                w_list.append(weights)
+                parameters = backend.benchmark(train_set_items)
+                w_list.append(parameters)
             else:
                 optimizer.S0_dataset_group = (
                     train_set[train_set["i"] == 2]
@@ -251,14 +251,14 @@ def process(file):
             else:
                 print("Error:", e)
             if not do_fullinfo_stats:
-                # Default behavior is to use the default weights if it cannot optimise
+                # Default behavior is to use the default parameters if it cannot optimise
                 w_list.append(optimizer.init_w)
                 sizes.append(len(train_set))
                 testsets.append(test_set)
                 if do_fullinfo_stats:
                     trainsets.append(train_set)  # Kept for readability
             else:
-                # If we are doing fullinfo stats, we will be stricter - no default weights are saved for optimised FSRS if optimisation fails
+                # If we are doing fullinfo stats, we will be stricter - no default parameters are saved for optimised FSRS if optimisation fails
                 pass
 
     if len(w_list) == 0:
@@ -337,14 +337,14 @@ def process(file):
         },
         "user": int(file.stem),
         "size": len(last_y),
-        "weights": list(map(lambda x: round(x, 4), w_list[-1])),
+        "parameters": list(map(lambda x: round(x, 4), w_list[-1])),
     }
     if do_fullinfo_stats:
         result["metrics"]["TrainSizes"] = sizes
         result["metrics"]["RMSETrain"] = round(rmse_raw_train, 6)
         result["metrics"]["LogLossTrain"] = round(logloss_train, 6)
         result["metrics"]["RMSE(bins)Train"] = round(rmse_bins_train, 6)
-        result["allweights"] = [list(w) for w in w_list]
+        result["allparameters"] = [list(w) for w in w_list]
     return result
 
 

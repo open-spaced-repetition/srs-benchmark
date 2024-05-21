@@ -36,7 +36,7 @@ verbose: bool = False
 model_name = os.environ.get("MODEL", "FSRSv3")
 
 
-class FSRS3WeightClipper:
+class FSRS3ParameterClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
 
@@ -76,7 +76,7 @@ class FSRS3(nn.Module):
         0.5867,
         1.0721,
     ]
-    clipper = FSRS3WeightClipper()
+    clipper = FSRS3ParameterClipper()
 
     def __init__(self, w: List[float] = init_w):
         super(FSRS3, self).__init__()
@@ -157,7 +157,7 @@ class FSRS3(nn.Module):
         )
 
 
-class FSRS4WeightClipper:
+class FSRS4ParameterClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
 
@@ -201,7 +201,7 @@ class FSRS4(nn.Module):
         0.29,
         2.61,
     ]
-    clipper = FSRS4WeightClipper()
+    clipper = FSRS4ParameterClipper()
 
     def __init__(self, w: List[float] = init_w):
         super(FSRS4, self).__init__()
@@ -557,7 +557,7 @@ class HLR(nn.Module):
         )
 
 
-class ACT_RWeightClipper:
+class ACT_RParameterClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
 
@@ -580,7 +580,7 @@ class ACT_R(nn.Module):
     tau = -0.704205679427144  # threshold
     h = 0.025  # interference scalar
     init_w = [a, c, s, tau, h]
-    clipper = ACT_RWeightClipper()
+    clipper = ACT_RParameterClipper()
 
     def __init__(self, w: List[float] = init_w):
         super().__init__()
@@ -643,7 +643,7 @@ class DASH(nn.Module):
         )
 
 
-class DASH_ACTRWeightClipper:
+class DASH_ACTRParameterClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
 
@@ -657,7 +657,7 @@ class DASH_ACTRWeightClipper:
 
 class DASH_ACTR(nn.Module):
     init_w = [1.4164, 0.516, -0.0564, 1.9223, 1.0549]
-    clipper = DASH_ACTRWeightClipper()
+    clipper = DASH_ACTRParameterClipper()
 
     def __init__(self, w=init_w):
         super(DASH_ACTR, self).__init__()
@@ -694,7 +694,7 @@ class DASH_ACTR(nn.Module):
         )
 
 
-class NN_17WeightClipper:
+class NN_17ParameterClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
 
@@ -740,7 +740,7 @@ class NN_17(nn.Module):
     init_s = [1, 2.5, 4.5, 10]
     init_d = [1, 0.72, 0.07, 0.05]
     w = [1.26, 0.0, 0.67]
-    clipper = NN_17WeightClipper()
+    clipper = NN_17ParameterClipper()
 
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()

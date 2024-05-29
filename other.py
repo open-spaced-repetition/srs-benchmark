@@ -26,9 +26,6 @@ tqdm.pandas()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-lr: float = 4e-2
-wd: float = 1e-5
-n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
@@ -77,6 +74,9 @@ class FSRS3(nn.Module):
         1.0721,
     ]
     clipper = FSRS3WeightClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, w: List[float] = init_w):
         super(FSRS3, self).__init__()
@@ -202,6 +202,9 @@ class FSRS4(nn.Module):
         2.61,
     ]
     clipper = FSRS4WeightClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, w: List[float] = init_w):
         super(FSRS4, self).__init__()
@@ -435,21 +438,21 @@ class FSRS4(nn.Module):
         self.w.data[0:4] = Tensor(list(map(lambda x: max(min(100, x), 0.01), init_s0)))
 
 
-n_input = 2
-n_hidden = 2
-n_output = 1
-n_layers = 1
 network = "GRU"
 
 
 class RNN(nn.Module):
-    # 36 params with default settings
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
+
+    # 39 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
-        self.n_input = n_input
-        self.n_hidden = n_hidden
-        self.n_out = n_output
-        self.n_layers = n_layers
+        self.n_input = 2
+        self.n_hidden = 2
+        self.n_out = 1
+        self.n_layers = 1
         if network == "GRU":
             self.rnn = nn.GRU(
                 input_size=self.n_input,
@@ -497,18 +500,66 @@ class RNN(nn.Module):
         return 0.9 ** (t / s)
 
 
+class GRU_P(nn.Module):
+    lr: float = 1e-2
+    wd: float = 1e-5
+    n_epoch: int = 16
+
+    # 297 params with default settings
+    def __init__(self, state_dict=None):
+        super().__init__()
+        self.n_input = 2
+        self.n_hidden = 8
+        self.n_out = 1
+        self.n_layers = 1
+        self.rnn = nn.GRU(
+            input_size=self.n_input,
+            hidden_size=self.n_hidden,
+            num_layers=self.n_layers,
+        )
+        nn.init.orthogonal_(self.rnn.weight_ih_l0)
+        nn.init.orthogonal_(self.rnn.weight_hh_l0)
+        self.rnn.bias_ih_l0.data.fill_(0)
+        self.rnn.bias_hh_l0.data.fill_(0)
+
+        self.fc = nn.Linear(self.n_hidden, self.n_out)
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(f"./GRU-P_pretrain.pth", map_location=device)
+                )
+            except FileNotFoundError:
+                pass
+
+    def forward(self, x, hx=None):
+        x, h = self.rnn(x, hx=hx)
+        output = torch.sigmoid(self.fc(x))
+        return output, h
+
+
 class Transformer(nn.Module):
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
+
     # 127 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
+        self.n_input = 2
+        self.n_hidden = 2
+        self.n_out = 1
+        self.n_layers = 1
         self.transformer = nn.Transformer(
-            d_model=n_input,
-            nhead=n_input,
-            num_encoder_layers=n_layers,
-            num_decoder_layers=n_layers,
-            dim_feedforward=n_hidden,
+            d_model=self.n_input,
+            nhead=self.n_input,
+            num_encoder_layers=self.n_layers,
+            num_decoder_layers=self.n_layers,
+            dim_feedforward=self.n_hidden,
         )
-        self.fc = nn.Linear(n_input, n_output)
+        self.fc = nn.Linear(self.n_input, self.n_out)
 
         if state_dict is not None:
             self.load_state_dict(state_dict)
@@ -521,7 +572,7 @@ class Transformer(nn.Module):
                 pass
 
     def forward(self, src):
-        tgt = torch.zeros(1, src.shape[1], n_input).to(device=device)
+        tgt = torch.zeros(1, src.shape[1], self.n_input).to(device=device)
         output = self.transformer(src, tgt)
         output = self.fc(output)
         output = torch.exp(output).repeat(src.shape[0], 1, 1)
@@ -534,6 +585,9 @@ class Transformer(nn.Module):
 class HLR(nn.Module):
     # 3 params
     init_w = [2.5819, -0.8674, 2.7245]
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, w: List[float] = init_w):
         super().__init__()
@@ -581,6 +635,9 @@ class ACT_R(nn.Module):
     h = 0.025  # interference scalar
     init_w = [a, c, s, tau, h]
     clipper = ACT_RWeightClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, w: List[float] = init_w):
         super().__init__()
@@ -622,6 +679,9 @@ class DASH(nn.Module):
         if "MCM" not in model_name
         else [0.2783, 0.8131, 0.4252, 1.0056, -0.1527, 0.6455, 0.1409, 0.669, 0.843]
     )
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, w: List[float] = init_w):
         super(DASH, self).__init__()
@@ -658,6 +718,9 @@ class DASH_ACTRWeightClipper:
 class DASH_ACTR(nn.Module):
     init_w = [1.4164, 0.516, -0.0564, 1.9223, 1.0549]
     clipper = DASH_ACTRWeightClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, w=init_w):
         super(DASH_ACTR, self).__init__()
@@ -741,6 +804,9 @@ class NN_17(nn.Module):
     init_d = [1, 0.72, 0.07, 0.05]
     w = [1.26, 0.0, 0.67]
     clipper = NN_17WeightClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, state_dict=None) -> None:
         super(NN_17, self).__init__()
@@ -953,7 +1019,7 @@ class Trainer:
         self.model = MODEL.to(device=device)
         if isinstance(MODEL, FSRS4):
             self.model.pretrain(train_set)
-        if isinstance(MODEL, (RNN, Transformer)):
+        if isinstance(MODEL, (RNN, Transformer, GRU_P)):
             self.optimizer = torch.optim.AdamW(
                 self.model.parameters(), lr=lr, weight_decay=wd
             )
@@ -1043,6 +1109,13 @@ class Trainer:
                     retentions = self.model.rw(
                         torch.stack([difficulties, stabilities, theoretical_r], dim=1)
                     ).squeeze(1)
+                elif isinstance(self.model, GRU_P):
+                    outputs, _ = self.model(sequences)
+                    retentions = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        0,
+                    ]
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences.transpose(0, 1))
@@ -1118,6 +1191,13 @@ class Trainer:
                     retentions = self.model.rw(
                         torch.stack([difficulties, stabilities, theoretical_r], dim=1)
                     ).squeeze(1)
+                elif isinstance(self.model, GRU_P):
+                    outputs, _ = self.model(sequences.transpose(0, 1))
+                    retentions = outputs[
+                        seq_lens - 1,
+                        torch.arange(real_batch_size, device=device),
+                        0,
+                    ]
                 else:
                     if isinstance(self.model, HLR):
                         outputs = self.model(sequences)
@@ -1202,6 +1282,12 @@ class Collection:
                 retentions = self.model.rw(
                     torch.stack([difficulties, stabilities, theoretical_r], dim=1)
                 ).squeeze(1)
+                return retentions.cpu().tolist()
+            elif isinstance(self.model, GRU_P):
+                outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
+                retentions = outputs[
+                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
+                ]
                 return retentions.cpu().tolist()
             else:
                 if isinstance(self.model, HLR):
@@ -1297,6 +1383,12 @@ def create_features(df, model_name="FSRSv3"):
         dtype = torch.int if model_name.startswith("FSRS") else torch.float32
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=dtype).transpose(0, 1)
+            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_item, r_item in zip(t_sublist, r_sublist)
+        ]
+    if model_name == "GRU-P":
+        df["tensor"] = [
+            torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
@@ -1417,6 +1509,8 @@ def process(args):
     dataset = pd.read_csv(file)
     if model_name == "GRU":
         model = RNN
+    elif model_name == "GRU-P":
+        model = GRU_P
     elif model_name == "FSRSv3":
         model = FSRS3
     elif model_name == "FSRSv4":
@@ -1449,9 +1543,9 @@ def process(args):
                 model(),
                 train_set,
                 None,
-                n_epoch=n_epoch,
-                lr=lr,
-                wd=wd,
+                n_epoch=model.n_epoch,
+                lr=model.lr,
+                wd=model.wd,
                 batch_size=batch_size,
             )
             w_list.append(trainer.train())
@@ -1466,7 +1560,7 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        if model in (ACT_R, DASH, DASH_ACTR, NN_17):
+        if model in (ACT_R, DASH, DASH_ACTR, NN_17, GRU_P):
             testset["p"] = my_collection.batch_predict(testset)
         else:
             testset["stability"] = my_collection.batch_predict(testset)

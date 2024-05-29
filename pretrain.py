@@ -2,12 +2,14 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 import torch
-from other import create_features, Trainer, RNN, Transformer, NN_17
+from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P
 
-model_name = "NN-17"
+model_name = "GRU-P"
 
 if model_name == "GRU":
     model = RNN
+if model_name == "GRU-P":
+    model = GRU_P
 elif model_name == "Transformer":
     model = Transformer
 elif model_name == "NN-17":

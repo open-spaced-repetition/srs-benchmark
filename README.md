@@ -55,7 +55,8 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 | Model | #Params | LogLoss | RMSE(bins) |
 | --- | --- | --- | --- |
-| **FSRS-4.5** | 17 | **0.33±0.005** | **0.053±0.0010** |
+| **GRU-P** | 297 | **0.32±0.005** | **0.045±0.0009** |
+| FSRS-4.5 | 17 | 0.33±0.005 | 0.053±0.0010 |
 | FSRS-rs | 17 | 0.33±0.006 | 0.055±0.0013 |
 | FSRS v4 | 17 | 0.33±0.006 | 0.058±0.0013 |
 | DASH | 9 | 0.33±0.005 | 0.063±0.0011 |
@@ -63,7 +64,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | DASH[ACT-R] | 5 | 0.34±0.006 | 0.068±0.0014 |
 | FSRS v3 | 13 | 0.36±0.007 | 0.072±0.0015 |
 | FSRS-4.5 (only pretrain) | 4 | 0.34±0.006 | 0.075±0.0018 |
-| GRU | 36 | 0.38±0.007 | 0.080±0.0017 |
+| GRU | 39 | 0.38±0.007 | 0.080±0.0017 |
 | NN-17 | 39 | 0.35±0.007 | 0.081±0.0016 |
 | FSRS-4.5 (default parameters) | 0 | 0.35±0.006 | 0.086±0.0021 |
 | ACT-R | 5 | 0.36±0.006 | 0.092±0.0022 |
@@ -75,6 +76,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 | Model | #Params | LogLoss | RMSE(bins) |
 | --- | --- | --- | --- |
+| GRU-P | 297 | 0.345±0.0030 | 0.068±0.0008 |
 | **FSRS-4.5** | 17 | **0.352±0.0031** | **0.077±0.0009** |
 | FSRS-rs | 17 | 0.353±0.0032 | 0.077±0.0009 |
 | FSRS v4 | 17 | 0.362±0.0033 | 0.084±0.0010 |
@@ -85,7 +87,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 | FSRS v3 | 13 | 0.422±0.0047 | 0.108±0.0014 |
 | FSRS-4.5 (default parameters) | 0 | 0.379±0.0033 | 0.108±0.0012 |
 | NN-17 | 39 | 0.380±0.0035 | 0.109±0.0014 |
-| GRU | 36 | 0.44±0.005 | 0.111±0.0013 |
+| GRU | 39 | 0.44±0.005 | 0.111±0.0013 |
 | ACT-R | 5 | 0.396±0.0041 | 0.116±0.0013 |
 | HLR | 3 | 0.46±0.005 | 0.129±0.0014 |
 | Transformer | 127 | 0.55±0.007 | 0.192±0.0018 |

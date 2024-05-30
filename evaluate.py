@@ -91,6 +91,7 @@ if __name__ == "__main__":
     if args.fast:
         for model in (
             dev_mode_name,
+            "GRU-P",
             "FSRS-4.5",
             "FSRS-rs",
             "NN-17",
@@ -160,6 +161,7 @@ if __name__ == "__main__":
             print("| --- | --- | --- | --- |")
             for model, n_param in (
                 (dev_mode_name, None),
+                ("GRU-P", 297),
                 ("FSRS-4.5", 17),
                 ("FSRS-rs", 17),
                 ("FSRSv4", 17),

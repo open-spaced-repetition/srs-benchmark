@@ -442,11 +442,11 @@ network = "GRU"
 
 
 class RNN(nn.Module):
+    # 39 params with default settings
     lr: float = 4e-2
     wd: float = 1e-5
     n_epoch: int = 5
 
-    # 39 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
         self.n_input = 2
@@ -501,11 +501,11 @@ class RNN(nn.Module):
 
 
 class GRU_P(nn.Module):
+    # 297 params with default settings
     lr: float = 1e-2
     wd: float = 1e-5
     n_epoch: int = 16
 
-    # 297 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
         self.n_input = 2
@@ -541,11 +541,11 @@ class GRU_P(nn.Module):
 
 
 class Transformer(nn.Module):
+    # 127 params with default settings
     lr: float = 4e-2
     wd: float = 1e-5
     n_epoch: int = 5
 
-    # 127 params with default settings
     def __init__(self, state_dict=None):
         super().__init__()
         self.n_input = 2
@@ -716,6 +716,7 @@ class DASH_ACTRWeightClipper:
 
 
 class DASH_ACTR(nn.Module):
+    # 5 params
     init_w = [1.4164, 0.516, -0.0564, 1.9223, 1.0549]
     clipper = DASH_ACTRWeightClipper()
     lr: float = 4e-2

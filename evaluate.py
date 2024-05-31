@@ -107,6 +107,7 @@ if __name__ == "__main__":
             "HLR",
             "Transformer",
             "SM2",
+            "AVG",
         ):
             print(f"Model: {model}")
             m = []
@@ -170,10 +171,11 @@ if __name__ == "__main__":
                 ("DASH[ACT-R]", 5),
                 ("FSRSv3", 13),
                 ("FSRS-4.5-pretrain", 4),
-                ("GRU", 36),
+                ("GRU", 39),
                 ("NN-17", 39),
                 ("FSRS-4.5-dry-run", 0),
                 ("ACT-R", 5),
+                ("AVG", 0),
                 ("HLR", 3),
                 ("SM2", 0),
                 ("Transformer", 127),

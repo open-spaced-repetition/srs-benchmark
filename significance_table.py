@@ -118,6 +118,7 @@ if __name__ == "__main__":
         "FSRSv3",
         "NN-17",
         "GRU",
+        "AVG",
         "ACT-R",
         "HLR",
         "SM2",

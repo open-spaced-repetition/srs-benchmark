@@ -107,6 +107,7 @@ def format(exponent, n):
 
 if __name__ == "__main__":
     models = [
+        "GRU-P",
         "FSRS-4.5",
         "FSRS-rs",
         "FSRSv4",
@@ -242,7 +243,7 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=9,
+                    fontsize=7,
                 )
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=12, rotation=45)

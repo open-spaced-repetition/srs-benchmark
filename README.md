@@ -22,10 +22,10 @@ Note: TimeSeriesSplit will remove the first split from evaluation. This is becau
 
 We use two metrics in the SRS benchmark to evaluate how well these algorithms work: log loss and a custom RMSE that we call RMSE (bins).
 
-- Log Loss (also known as Binary Cross Entropy): Utilized primarily for its applicability in binary classification problems, log loss serves as a measure of the discrepancies between predicted probabilities of recall and review outcomes (1 or 0). It quantifies how well the algorithm approximates the true recall probabilities, making it an important metric for model evaluation in spaced repetition systems.
-- Root Mean Square Error in Bins (RMSE (bins)): This is a metric engineered for the SRS benchmark. In this approach, predictions and review outcomes are grouped into bins based on three features: the interval length, the number of reviews, and the number of lapses. Within each bin, the squared difference between the average predicted probability of recall and the average recall rate is calculated. These values are then weighted according to the sample size in each bin, and then the final weighted root mean square error is calculated. This metric provides a nuanced understanding of model performance across different probability ranges. For more details, you can read [The Metric](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Metric).
+- Log Loss (also known as Binary Cross Entropy): Utilized primarily for its applicability in binary classification problems, log loss serves as a measure of the discrepancies between predicted probabilities of recall and review outcomes (1 or 0). It quantifies how well the algorithm approximates the true recall probabilities, making it an important metric for model evaluation in spaced repetition systems. Log Loss ranges from 0 to infinity, lower is better. 
+- Root Mean Square Error in Bins (RMSE (bins)): This is a metric engineered for the SRS benchmark. In this approach, predictions and review outcomes are grouped into bins based on three features: the interval length, the number of reviews, and the number of lapses. Within each bin, the squared difference between the average predicted probability of recall and the average recall rate is calculated. These values are then weighted according to the sample size in each bin, and then the final weighted root mean square error is calculated. This metric provides a nuanced understanding of model performance across different probability ranges. For more details, you can read [The Metric](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Metric). RMSE (bins) ranges from 0 to 1, lower is better.
 
-Smaller is better. If you are unsure what metric to look at, look at RMSE (bins). That value can be interpreted as "the average difference between the predicted probability of recalling a card and the measured probability". For example, if RMSE (bins)=0.05, it means that that algorithm is, on average, wrong by 5% when predicting the probability of recall.
+If you are unsure what metric to look at, look at RMSE (bins). Its value can be interpreted as "the average difference between the predicted probability of recalling a card and the measured probability". For example, if RMSE (bins)=0.05, it means that that algorithm is, on average, wrong by 5% when predicting the probability of recall.
 
 ### Models
 
@@ -52,9 +52,9 @@ Total number of reviews for evaluation: 707,964,360. Same-day reviews are exclud
 
 The following tables show the weighted means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
-### Weighted by number of reviews
+### Weighted by the number of reviews
 
-| Model | #Params | LogLoss | RMSE(bins) |
+| Model | Parameters | Log Loss | RMSE (bins) |
 | --- | --- | --- | --- |
 | **GRU-P** | 297 | **0.32±0.005** | **0.045±0.0009** |
 | FSRS-4.5 | 17 | 0.33±0.005 | 0.053±0.0010 |
@@ -76,7 +76,7 @@ The following tables show the weighted means and the 99% confidence intervals. T
 
 ### Unweighted
 
-| Model | #Params | LogLoss | RMSE(bins) |
+| Model | Parameters | Log Loss | RMSE (bins) |
 | --- | --- | --- | --- |
 | **GRU-P** | 297 | **0.345±0.0030** | **0.068±0.0008** |
 | FSRS-4.5 | 17 | 0.352±0.0031 | 0.077±0.0009 |

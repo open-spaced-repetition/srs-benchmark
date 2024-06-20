@@ -323,8 +323,10 @@ def process(file):
         rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
         logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
         rmse_bins = rmse_matrix(evaluation)
-        auc = roc_auc_score(y_true=y, y_score=p)
-
+        try:
+            auc = roc_auc_score(y_true=y, y_score=p)
+        except:
+            auc = 0.5
         rmse_raw_train = None
         logloss_train = None
         rmse_bins_train = None

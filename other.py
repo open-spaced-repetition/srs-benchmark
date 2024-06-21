@@ -10,7 +10,7 @@ import os
 from torch import nn
 from torch import Tensor
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import root_mean_squared_error, log_loss
+from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss
 from tqdm.auto import tqdm
 from scipy.optimize import minimize
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -1597,12 +1597,17 @@ def evaluate(y, p, df, model_name, file, w_list=None):
     rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(df)
+    try:
+        auc = roc_auc_score(y_true=y, y_score=p)
+    except:
+        auc = 0.5
     result = {
         "metrics": {
             "RMSE": round(rmse_raw, 6),
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
             "ICI": round(ici, 6),
+            "AUC": round(auc, 6),
         },
         "user": int(file.stem),
         "size": len(y),

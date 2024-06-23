@@ -324,9 +324,9 @@ def process(file):
         logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
         rmse_bins = rmse_matrix(evaluation)
         try:
-            auc = roc_auc_score(y_true=y, y_score=p)
+            auc = round(roc_auc_score(y_true=y, y_score=p), 6)
         except:
-            auc = 0.5
+            auc = None
         rmse_raw_train = None
         logloss_train = None
         rmse_bins_train = None
@@ -337,7 +337,7 @@ def process(file):
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
             "ICI": round(ici, 6),
-            "AUC": round(auc, 6),
+            "AUC": auc,
         },
         "user": int(file.stem),
         "size": len(last_y),

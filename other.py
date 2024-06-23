@@ -1598,16 +1598,16 @@ def evaluate(y, p, df, model_name, file, w_list=None):
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(df)
     try:
-        auc = roc_auc_score(y_true=y, y_score=p)
+        auc = round(roc_auc_score(y_true=y, y_score=p), 6)
     except:
-        auc = 0.5
+        auc = None
     result = {
         "metrics": {
             "RMSE": round(rmse_raw, 6),
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
             "ICI": round(ici, 6),
-            "AUC": round(auc, 6),
+            "AUC": auc,
         },
         "user": int(file.stem),
         "size": len(y),

@@ -206,7 +206,7 @@ if __name__ == "__main__":
     data = [json.loads(x) for x in data]
     weights = []
     sizes = []
-    n_params = 17
+    n_params = len(DEFAULT_WEIGHT)
     for result in data:
         for i in range(n_params):
             if abs(result["weights"][i] - DEFAULT_WEIGHT[i]) <= 1e-4:

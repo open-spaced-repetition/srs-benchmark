@@ -7,7 +7,7 @@ from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import root_mean_squared_error, log_loss
+from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
@@ -323,7 +323,10 @@ def process(file):
         rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
         logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
         rmse_bins = rmse_matrix(evaluation)
-
+        try:
+            auc = round(roc_auc_score(y_true=y, y_score=p), 6)
+        except:
+            auc = None
         rmse_raw_train = None
         logloss_train = None
         rmse_bins_train = None
@@ -334,6 +337,7 @@ def process(file):
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
             "ICI": round(ici, 6),
+            "AUC": auc,
         },
         "user": int(file.stem),
         "size": len(last_y),

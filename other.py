@@ -15,7 +15,7 @@ from tqdm.auto import tqdm
 from scipy.optimize import minimize
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import warnings
-from script import cum_concat, remove_non_continuous_rows, remove_outliers
+from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier
 import multiprocessing as mp
 
@@ -1582,7 +1582,16 @@ def process(args):
     result = evaluate(
         y, p, save_tmp, model_name, file, w_list if type(w_list[0]) == list else None
     )
-    return result
+
+    if os.environ.get("RAW"):
+        raw = {
+            "user": int(file.stem),
+            "p": list(map(lambda x: round(x, 4), p)),
+            "y": list(map(int, y)),
+        }
+    else:
+        raw = None
+    return result, raw
 
 
 def evaluate(y, p, df, model_name, file, w_list=None):
@@ -1620,24 +1629,28 @@ def evaluate(y, p, df, model_name, file, w_list=None):
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     unprocessed_files = []
-    dataset_path = "./dataset"
+    dataset_path0 = "./dataset/"
+    dataset_path1 = "../FSRS-Anki-20k/dataset/1/"
+    dataset_path2 = "../FSRS-Anki-20k/dataset/2/"
     Path(f"evaluation/{model_name}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
+    Path("raw").mkdir(parents=True, exist_ok=True)
     result_file = Path(f"result/{model_name}.jsonl")
+    raw_file = Path(f"raw/{model_name}.jsonl")
     if result_file.exists():
-        data = list(map(lambda x: json.loads(x), open(result_file).readlines()))
-        data.sort(key=lambda x: x["user"])
-        with result_file.open("w", encoding="utf-8") as jsonl_file:
-            for json_data in data:
-                jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+        data = sort_jsonl(result_file)
         processed_user = set(map(lambda x: x["user"], data))
     else:
         processed_user = set()
 
-    for file in Path(dataset_path).glob("*.csv"):
-        if int(file.stem) in processed_user:
-            continue
-        unprocessed_files.append((file, model_name))
+    if raw_file.exists():
+        sort_jsonl(raw_file)
+
+    for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:
+        for file in Path(dataset_path).glob("*.csv"):
+            if int(file.stem) in processed_user:
+                continue
+            unprocessed_files.append((file, model_name))
 
     unprocessed_files.sort(key=lambda x: int(x[0].stem), reverse=False)
 
@@ -1648,16 +1661,16 @@ if __name__ == "__main__":
             pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
             try:
-                result = future.result()
-                with open(f"result/{model_name}.jsonl", "a") as f:
+                result, raw = future.result()
+                with open(result_file, "a") as f:
                     f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                if raw:
+                    with open(raw_file, "a") as f:
+                        f.write(json.dumps(raw, ensure_ascii=False) + "\n")
                 pbar.set_description(f"Processed {result['user']}")
             except Exception as e:
                 tqdm.write(str(e))
 
-    with open(f"result/{model_name}.jsonl", "r") as f:
-        data = list(map(lambda x: json.loads(x), f.readlines()))
-        data.sort(key=lambda x: x["user"])
-    with open(f"result/{model_name}.jsonl", "w") as f:
-        for json_data in data:
-            f.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+    sort_jsonl(result_file)
+    if os.environ.get("RAW"):
+        sort_jsonl(raw_file)

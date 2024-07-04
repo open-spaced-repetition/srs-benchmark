@@ -145,3 +145,6 @@ collection/
 # Dataset
 dataset/FSRS-Anki-20k
 dataset/*.csv
+
+# Raw results
+raw/

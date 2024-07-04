@@ -7,7 +7,7 @@ from tqdm import tqdm
 from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import root_mean_squared_error, log_loss
+from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
@@ -158,14 +158,16 @@ def create_time_series(df):
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     filtered_dataset = (
         df[df["i"] == 2]
-        .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)
+        .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)[
+            df.columns
+        ]
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:
         return pd.DataFrame()
     df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)
-    df = df.groupby("card_id", as_index=False, group_keys=False).apply(
+    df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
         remove_non_continuous_rows
     )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
@@ -323,7 +325,10 @@ def process(file):
         rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
         logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
         rmse_bins = rmse_matrix(evaluation)
-
+        try:
+            auc = round(roc_auc_score(y_true=y, y_score=p), 6)
+        except:
+            auc = None
         rmse_raw_train = None
         logloss_train = None
         rmse_bins_train = None
@@ -334,6 +339,7 @@ def process(file):
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
             "ICI": round(ici, 6),
+            "AUC": auc,
         },
         "user": int(file.stem),
         "size": len(last_y),
@@ -345,26 +351,46 @@ def process(file):
         result["metrics"]["LogLossTrain"] = round(logloss_train, 6)
         result["metrics"]["RMSE(bins)Train"] = round(rmse_bins_train, 6)
         result["allweights"] = [list(w) for w in w_list]
-    return result
+
+    if os.environ.get("RAW"):
+        raw = {
+            "user": int(file.stem),
+            "p": list(map(lambda x: round(x, 4), p)),
+            "y": list(map(int, y)),
+        }
+    else:
+        raw = None
+
+    return result, raw
+
+
+def sort_jsonl(file):
+    data = list(map(lambda x: json.loads(x), open(file).readlines()))
+    data.sort(key=lambda x: x["user"])
+    with file.open("w", encoding="utf-8") as jsonl_file:
+        for json_data in data:
+            jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+    return data
 
 
 if __name__ == "__main__":
     unprocessed_files = []
     dataset_path0 = "./dataset/"
-    dataset_path1 = "./dataset/FSRS-Anki-20k/dataset/1/"
-    dataset_path2 = "./dataset/FSRS-Anki-20k/dataset/2/"
+    dataset_path1 = "../FSRS-Anki-20k/dataset/1/"
+    dataset_path2 = "../FSRS-Anki-20k/dataset/2/"
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
+    Path("raw").mkdir(parents=True, exist_ok=True)
     result_file = Path(f"result/{path}.jsonl")
+    raw_file = Path(f"raw/{path}.jsonl")
     if result_file.exists():
-        data = list(map(lambda x: json.loads(x), open(result_file).readlines()))
-        data.sort(key=lambda x: x["user"])
-        with result_file.open("w", encoding="utf-8") as jsonl_file:
-            for json_data in data:
-                jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+        data = sort_jsonl(result_file)
         processed_user = set(map(lambda x: x["user"], data))
     else:
         processed_user = set()
+
+    if raw_file.exists():
+        sort_jsonl(raw_file)
 
     for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:
         for file in Path(dataset_path).glob("*.csv"):
@@ -381,16 +407,16 @@ if __name__ == "__main__":
             pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
             try:
-                result = future.result()
-                with open(f"result/{path}.jsonl", "a") as f:
+                result, raw = future.result()
+                with open(result_file, "a") as f:
                     f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                if raw:
+                    with open(raw_file, "a") as f:
+                        f.write(json.dumps(raw, ensure_ascii=False) + "\n")
                 pbar.set_description(f"Processed {result['user']}")
             except Exception as e:
                 tqdm.write(str(e))
 
-    with open(f"result/{path}.jsonl", "r") as f:
-        data = list(map(lambda x: json.loads(x), f.readlines()))
-        data.sort(key=lambda x: x["user"])
-    with open(f"result/{path}.jsonl", "w") as f:
-        for json_data in data:
-            f.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+    sort_jsonl(result_file)
+    if os.environ.get("RAW"):
+        sort_jsonl(raw_file)

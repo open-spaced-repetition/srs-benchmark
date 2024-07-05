@@ -79,11 +79,7 @@ def predict(w_list, testsets, last_rating=None, file=None):
         if tmp.empty:
             continue
         my_collection = Collection(w)
-        stabilities, difficulties = my_collection.batch_predict(tmp)
-        stabilities = map(lambda x: round(x, 2), stabilities)
-        difficulties = map(lambda x: round(x, 2), difficulties)
-        tmp["stability"] = list(stabilities)
-        tmp["difficulty"] = list(difficulties)
+        tmp["stability"], tmp["difficulty"] = my_collection.batch_predict(tmp)
         tmp["p"] = power_forgetting_curve(tmp["delta_t"], tmp["stability"])
         p.extend(tmp["p"].tolist())
         y.extend(tmp["y"].tolist())
@@ -171,9 +167,7 @@ def create_time_series(df):
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     filtered_dataset = (
         df[df["i"] == 2]
-        .groupby(by=["first_rating"], as_index=False, group_keys=False)[
-            df.columns
-        ]
+        .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:

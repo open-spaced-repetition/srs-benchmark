@@ -92,6 +92,7 @@ if __name__ == "__main__":
         for model in (
             dev_mode_name,
             "GRU-P",
+            "FSRS-5",
             "FSRS-4.5",
             "FSRS-rs",
             "NN-17",

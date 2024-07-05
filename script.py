@@ -54,7 +54,7 @@ if rust:
     backend = RustBackend()
 
 else:
-    path = "FSRS-4.5"
+    path = "FSRS-5"
     if dry_run:
         path += "-dry-run"
     if only_pretrain:

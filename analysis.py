@@ -3,7 +3,7 @@ import numpy as np
 import json
 import pathlib
 from KDEpy import FFTKDE
-from fsrs_optimizer import DEFAULT_WEIGHT
+from fsrs_optimizer import DEFAULT_PARAMETER
 
 
 def chen_rule(data, weights=None):
@@ -200,16 +200,16 @@ def best_mode(a, weights):
 
 
 if __name__ == "__main__":
-    model = "FSRS-4.5"
+    model = "FSRS-5"
     with open(f"./result/{model}.jsonl", "r") as f:
         data = f.readlines()
     data = [json.loads(x) for x in data]
     weights = []
     sizes = []
-    n_params = len(DEFAULT_WEIGHT)
+    n_params = len(DEFAULT_PARAMETER)
     for result in data:
         for i in range(n_params):
-            if abs(result["weights"][i] - DEFAULT_WEIGHT[i]) <= 1e-4:
+            if abs(result["weights"][i] - DEFAULT_PARAMETER[i]) <= 1e-4:
                 # remove users who have parameters that are close to the default
                 break
         else:

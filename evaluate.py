@@ -112,7 +112,7 @@ if __name__ == "__main__":
         ):
             print(f"Model: {model}")
             m = []
-            weights = []
+            parameters = []
             sizes = []
             result_file = pathlib.Path(f"./result/{model}.jsonl")
             if not result_file.exists():
@@ -125,8 +125,8 @@ if __name__ == "__main__":
                     continue
                 m.append(result["metrics"])
                 sizes.append(result["size"])
-                if "weights" in result:
-                    weights.append(result["weights"])
+                if "parameters" in result:
+                    parameters.append(result["parameters"])
             if len(sizes) == 0:
                 continue
             print(f"Total number of users: {len(sizes)}")
@@ -153,8 +153,8 @@ if __name__ == "__main__":
                     #     pass
                 print()
 
-            if len(weights) > 0:
-                print(f"weights: {np.median(weights, axis=0).round(4).tolist()}")
+            if len(parameters) > 0:
+                print(f"parameters: {np.median(parameters, axis=0).round(4).tolist()}")
 
     else:
         for scale in ("reviews", "users"):
@@ -182,7 +182,7 @@ if __name__ == "__main__":
                 ("Transformer", 127),
             ):
                 m = []
-                weights = []
+                parameters = []
                 sizes = []
                 result_file = pathlib.Path(f"./result/{model}.jsonl")
                 if not result_file.exists():
@@ -195,8 +195,8 @@ if __name__ == "__main__":
                         continue
                     m.append(result["metrics"])
                     sizes.append(result["size"])
-                    if "weights" in result:
-                        weights.append(result["weights"])
+                    if "parameters" in result:
+                        parameters.append(result["parameters"])
                 if len(sizes) == 0:
                     continue
 

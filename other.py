@@ -1615,8 +1615,8 @@ def process_untrainable(file):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    result = evaluate(y, p, save_tmp, model_name, file)
-    return result
+    result, raw = evaluate(y, p, save_tmp, model_name, file)
+    return result, raw
 
 
 def baseline(file):
@@ -1644,8 +1644,8 @@ def baseline(file):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    result = evaluate(y, p, save_tmp, model_name, file)
-    return result
+    result, raw = evaluate(y, p, save_tmp, model_name, file)
+    return result, raw
 
 
 def create_features(df, model_name="FSRSv3"):
@@ -1768,17 +1768,19 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
+
+    df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     filtered_dataset = (
         df[df["i"] == 2]
-        .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)
+        .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:
         return pd.DataFrame()
     df[df["i"] == 2] = filtered_dataset
     df.dropna(inplace=True)
-    df = df.groupby("card_id", as_index=False, group_keys=False).apply(
+    df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
         remove_non_continuous_rows
     )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
@@ -1865,18 +1867,9 @@ def process(args):
             f"evaluation/{model_name}/{file.stem}.tsv", sep="\t", index=False
         )
 
-    result = evaluate(
+    result, raw = evaluate(
         y, p, save_tmp, model_name, file, w_list if type(w_list[0]) == list else None
     )
-
-    if os.environ.get("RAW"):
-        raw = {
-            "user": int(file.stem),
-            "p": list(map(lambda x: round(x, 4), p)),
-            "y": list(map(int, y)),
-        }
-    else:
-        raw = None
     return result, raw
 
 
@@ -1909,7 +1902,15 @@ def evaluate(y, p, df, model_name, file, w_list=None):
     }
     if w_list:
         result["parameters"] = list(map(lambda x: round(x, 4), w_list[-1]))
-    return result
+    if os.environ.get("RAW"):
+        raw = {
+            "user": int(file.stem),
+            "p": list(map(lambda x: round(x, 4), p)),
+            "y": list(map(int, y)),
+        }
+    else:
+        raw = None
+    return result, raw
 
 
 if __name__ == "__main__":

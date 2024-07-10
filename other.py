@@ -1622,7 +1622,7 @@ def evaluate(y, p, df, model_name, file, w_list=None):
         "size": len(y),
     }
     if w_list:
-        result["weights"] = list(map(lambda x: round(x, 4), w_list[-1]))
+        result["parameters"] = list(map(lambda x: round(x, 4), w_list[-1]))
     return result
 
 

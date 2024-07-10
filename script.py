@@ -54,7 +54,7 @@ if rust:
     backend = RustBackend()
 
 else:
-    path = "FSRS-4.5"
+    path = "FSRS-5"
     if dry_run:
         path += "-dry-run"
     if only_pretrain:
@@ -72,20 +72,14 @@ def predict(w_list, testsets, last_rating=None, file=None):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         tmp = (
-            testset[
-                testset["r_history"].str.endswith(last_rating) & (testset["i"] > 2)
-            ].copy()
+            testset[(testset["last_rating"] == last_rating) & (testset["i"] > 2)].copy()
             if last_rating
             else testset.copy()
         )
         if tmp.empty:
             continue
         my_collection = Collection(w)
-        stabilities, difficulties = my_collection.batch_predict(tmp)
-        stabilities = map(lambda x: round(x, 2), stabilities)
-        difficulties = map(lambda x: round(x, 2), difficulties)
-        tmp["stability"] = list(stabilities)
-        tmp["difficulty"] = list(difficulties)
+        tmp["stability"], tmp["difficulty"] = my_collection.batch_predict(tmp)
         tmp["p"] = power_forgetting_curve(tmp["delta_t"], tmp["stability"])
         p.extend(tmp["p"].tolist())
         y.extend(tmp["y"].tolist())
@@ -136,31 +130,44 @@ def cum_concat(x):
 
 
 def create_time_series(df):
-    df = df[(df["delta_t"] != 0) & (df["rating"].isin([1, 2, 3, 4]))].copy()
+    df = df[df["rating"].isin([1, 2, 3, 4])].copy()
     df["i"] = df.groupby("card_id").cumcount() + 1
-    t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
+    t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
-    r_history = df.groupby("card_id", group_keys=False)["rating"].apply(
+    r_history_list = df.groupby("card_id", group_keys=False)["rating"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
     df["r_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+        ",".join(map(str, item[:-1])) for sublist in r_history_list for item in sublist
     ]
     df["t_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+        ",".join(map(str, item[:-1])) for sublist in t_history_list for item in sublist
     ]
     df["tensor"] = [
         torch.tensor((t_item[:-1], r_item[:-1])).transpose(0, 1)
-        for t_sublist, r_sublist in zip(t_history, r_history)
+        for t_sublist, r_sublist in zip(t_history_list, r_history_list)
         for t_item, r_item in zip(t_sublist, r_sublist)
     ]
+    last_rating = []
+    for t_sublist, r_sublist in zip(t_history_list, r_history_list):
+        for t_history, r_history in zip(t_sublist, r_sublist):
+            flag = True
+            for t, r in zip(reversed(t_history[:-1]), reversed(r_history[:-1])):
+                if t > 0:
+                    last_rating.append(r)
+                    flag = False
+                    break
+            if flag:
+                last_rating.append(r_history[0])
+    df["last_rating"] = last_rating
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    df = df[df["delta_t"] != 0].copy()
+    df["i"] = df.groupby("card_id").cumcount() + 1
+    df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     filtered_dataset = (
         df[df["i"] == 2]
-        .groupby(by=["r_history", "t_history"], as_index=False, group_keys=False)[
-            df.columns
-        ]
+        .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
         .apply(remove_outliers)
     )
     if filtered_dataset.empty:
@@ -223,8 +230,8 @@ def process(file):
             else:
                 optimizer.S0_dataset_group = (
                     train_set[train_set["i"] == 2]
-                    # .groupby(by=["first_rating", "delta_t"], group_keys=False)
-                    .groupby(by=["r_history", "delta_t"], group_keys=False)
+                    .groupby(by=["first_rating", "delta_t"], group_keys=False)
+                    # .groupby(by=["r_history", "delta_t"], group_keys=False)
                     .agg({"y": ["mean", "count"]})
                     .reset_index()
                 )
@@ -251,7 +258,7 @@ def process(file):
                 if verbose_inadequate_data:
                     print("Skipping - Inadequate data")
             else:
-                print("Error:", e)
+                print("User:", file.stem, "Error:", e)
             if not do_fullinfo_stats:
                 # Default behavior is to use the default parameters if it cannot optimise
                 w_list.append(optimizer.init_w)

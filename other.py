@@ -767,7 +767,7 @@ class RNN(nn.Module):
         else:
             try:
                 self.load_state_dict(
-                    torch.load(f"./{network}_pretrain.pth", map_location=device)
+                    torch.load(f"./{network}_pretrain.pth", weights_only=True, map_location=device)
                 )
             except FileNotFoundError:
                 pass
@@ -813,7 +813,7 @@ class GRU_P(nn.Module):
         else:
             try:
                 self.load_state_dict(
-                    torch.load(f"./GRU-P_pretrain.pth", map_location=device)
+                    torch.load(f"./GRU-P_pretrain.pth", weights_only=True, map_location=device)
                 )
             except FileNotFoundError:
                 pass
@@ -850,7 +850,7 @@ class Transformer(nn.Module):
         else:
             try:
                 self.load_state_dict(
-                    torch.load(f"./{model_name}_pretrain.pth", map_location=device)
+                    torch.load(f"./{model_name}_pretrain.pth", weights_only=True, map_location=device)
                 )
             except FileNotFoundError:
                 pass
@@ -1152,7 +1152,7 @@ class NN_17(nn.Module):
         else:
             try:
                 self.load_state_dict(
-                    torch.load(f"./{model_name}_pretrain.pth", map_location=device)
+                    torch.load(f"./{model_name}_pretrain.pth", weights_only=True, map_location=device)
                 )
             except FileNotFoundError:
                 pass

@@ -225,7 +225,7 @@ if __name__ == "__main__":
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])
         # mode = best_mode(weights[:, i], sizes)
-        mode = best_mode(weights[:, i], np.ones_like(weights))
+        mode = best_mode(weights[:, i], np.ones_like(weights[:, i]))
         plt.ylim(ymin=0.1)
         plt.axvline(
             median,

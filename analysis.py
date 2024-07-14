@@ -224,7 +224,8 @@ if __name__ == "__main__":
         plt.hist(weights[:, i], bins=128, log=True)
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])
-        mode = best_mode(weights[:, i], sizes)
+        # mode = best_mode(weights[:, i], sizes)
+        mode = best_mode(weights[:, i], np.ones_like(sizes))
         plt.ylim(ymin=0.1)
         plt.axvline(
             median,

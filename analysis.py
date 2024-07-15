@@ -217,14 +217,15 @@ if __name__ == "__main__":
             sizes.append(result["size"])
 
     weights = np.array(weights)
-    sizes = np.sqrt(np.array(sizes))
+    # sizes = np.sqrt(np.array(sizes))
     print(weights.shape)
     pathlib.Path("./plots").mkdir(parents=True, exist_ok=True)
     for i in range(n_params):
         plt.hist(weights[:, i], bins=128, log=True)
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])
-        mode = best_mode(weights[:, i], sizes)
+        # mode = best_mode(weights[:, i], sizes)
+        mode = best_mode(weights[:, i], np.ones_like(weights[:, i]))
         plt.ylim(ymin=0.1)
         plt.axvline(
             median,

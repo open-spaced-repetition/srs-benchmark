@@ -209,11 +209,11 @@ if __name__ == "__main__":
     n_params = len(DEFAULT_PARAMETER)
     for result in data:
         for i in range(n_params):
-            if abs(result["weights"][i] - DEFAULT_PARAMETER[i]) <= 1e-4:
+            if abs(result["parameters"][i] - DEFAULT_PARAMETER[i]) <= 1e-4:
                 # remove users who have parameters that are close to the default
                 break
         else:
-            weights.append(result["weights"])
+            weights.append(result["parameters"])
             sizes.append(result["size"])
 
     weights = np.array(weights)

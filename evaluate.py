@@ -166,7 +166,7 @@ if __name__ == "__main__":
                 ("GRU-P", 297),
                 ("FSRS-5", 19),
                 ("FSRS-4.5", 17),
-                ("FSRS-rs", 17),
+                ("FSRS-rs", 19),
                 ("FSRSv4", 17),
                 ("DASH", 9),
                 ("DASH[MCM]", 9),

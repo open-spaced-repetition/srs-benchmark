@@ -1930,7 +1930,7 @@ if __name__ == "__main__":
     else:
         processed_user = set()
 
-    if raw_file.exists():
+    if os.environ.get("RAW") and raw_file.exists():
         sort_jsonl(raw_file)
 
     for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:

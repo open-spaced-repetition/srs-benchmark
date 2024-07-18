@@ -65,26 +65,19 @@ else:
         path += "-fullinfo"
 
 
-def predict(w_list, testsets, last_rating=None, file=None):
+def predict(w_list, testsets, file=None):
     p = []
     y = []
     save_tmp = [] if file else None
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
-        tmp = (
-            testset[(testset["last_rating"] == last_rating) & (testset["i"] > 2)].copy()
-            if last_rating
-            else testset.copy()
-        )
-        if tmp.empty:
-            continue
         my_collection = Collection(w)
-        tmp["stability"], tmp["difficulty"] = my_collection.batch_predict(tmp)
-        tmp["p"] = power_forgetting_curve(tmp["delta_t"], tmp["stability"])
-        p.extend(tmp["p"].tolist())
-        y.extend(tmp["y"].tolist())
+        testset["stability"], testset["difficulty"] = my_collection.batch_predict(testset)
+        testset["p"] = power_forgetting_curve(testset["delta_t"], testset["stability"])
+        p.extend(testset["p"].tolist())
+        y.extend(testset["y"].tolist())
         if file:
-            save_tmp.append(tmp)
+            save_tmp.append(testset)
     if file:
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
@@ -396,7 +389,7 @@ if __name__ == "__main__":
     else:
         processed_user = set()
 
-    if raw_file.exists():
+    if os.environ.get("RAW") and raw_file.exists():
         sort_jsonl(raw_file)
 
     for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:

@@ -126,7 +126,7 @@ def create_time_series(df):
     df = df[df["rating"].isin([1, 2, 3, 4])].copy()
     df["i"] = df.groupby("card_id").cumcount() + 1
     t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
-        lambda x: cum_concat([[i] for i in x])
+        lambda x: cum_concat([[max(0, i)] for i in x])
     )
     r_history_list = df.groupby("card_id", group_keys=False)["rating"].apply(
         lambda x: cum_concat([[i] for i in x])

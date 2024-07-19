@@ -119,19 +119,12 @@ if __name__ == "__main__":
                 ("users", np.ones_like(sizes)),
             ):
                 print(f"Weighted average by {scale}:")
-                for metric in ("LogLoss", "RMSE(bins)"):
+                for metric in ("LogLoss", "RMSE(bins)", "AUC"):
                     metrics = np.array([item[metric] for item in m])
+                    size = size[~np.isnan(metrics.astype(float))]
+                    metrics = metrics[~np.isnan(metrics.astype(float))]
                     wmean, wstd = weighted_avg_and_std(metrics, size)
                     print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
-                    # try:
-                    #     rmse_bin_again = np.array(
-                    #         [item["RMSE(bins)Ratings"]["1"] for item in m]
-                    #     )
-                    #     print(
-                    #         f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}"
-                    #     )
-                    # except KeyError:
-                    #     pass
                 print()
 
             if len(parameters) > 0:
@@ -184,7 +177,7 @@ if __name__ == "__main__":
 
                 size = np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
                 result = f"| {model} | {n_param} |"
-                for metric in ("LogLoss", "RMSE(bins)"):
+                for metric in ("LogLoss", "RMSE(bins)", "AUC"):
                     metrics = np.array([item[metric] for item in m])
                     size = size[~np.isnan(metrics.astype(float))]
                     metrics = metrics[~np.isnan(metrics.astype(float))]

@@ -10,31 +10,12 @@ def sigdig(value, CI):
     def num_lead_zeros(x):
         return math.inf if x == 0 else -math.floor(math.log10(abs(x))) - 1
 
-    def first_nonzero_digit(x):
-        x = str(x)
-        for digit in x:
-            if digit == "0" or digit == ".":
-                pass
-            else:
-                return int(digit)
-
     n_lead_zeros_CI = num_lead_zeros(CI)
-    # CI_sigdigs = min(len(str(CI)[2 + n_lead_zeros_CI :]), 2)
     CI_sigdigs = 2
     decimals = n_lead_zeros_CI + CI_sigdigs
     rounded_CI = round(CI, decimals)
-    first_sigdig_CI = first_nonzero_digit(rounded_CI)
-    if first_sigdig_CI < 5:
-        rounded_value = round(value, decimals - 1)
-        return str(f"{rounded_value:.{decimals - 1}f}"), str(
-            f"{rounded_CI:.{decimals}f}"
-        )
-    else:
-        rounded_value = round(value, max(decimals - 2, 0))
-        rounded_CI = round(CI, max(decimals - 1, 1))
-        return str(f"{rounded_value:.{max(decimals - 2, 0)}f}"), str(
-            f"{rounded_CI:.{max(decimals - 1, 1)}f}"
-        )
+    rounded_value = round(value, decimals - 1)
+    return str(f"{rounded_value:.{decimals - 1}f}"), str(f"{rounded_CI:.{decimals}f}")
 
 
 def confidence_interval(values, sizes):
@@ -138,19 +119,12 @@ if __name__ == "__main__":
                 ("users", np.ones_like(sizes)),
             ):
                 print(f"Weighted average by {scale}:")
-                for metric in ("LogLoss", "RMSE(bins)"):
+                for metric in ("LogLoss", "RMSE(bins)", "AUC"):
                     metrics = np.array([item[metric] for item in m])
+                    size = size[~np.isnan(metrics.astype(float))]
+                    metrics = metrics[~np.isnan(metrics.astype(float))]
                     wmean, wstd = weighted_avg_and_std(metrics, size)
                     print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
-                    # try:
-                    #     rmse_bin_again = np.array(
-                    #         [item["RMSE(bins)Ratings"]["1"] for item in m]
-                    #     )
-                    #     print(
-                    #         f"{model} mean (RMSE(bins)Ratings[again]): {np.average(rmse_bin_again):.4f}"
-                    #     )
-                    # except KeyError:
-                    #     pass
                 print()
 
             if len(parameters) > 0:
@@ -203,10 +177,11 @@ if __name__ == "__main__":
 
                 size = np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
                 result = f"| {model} | {n_param} |"
-                for metric in ("LogLoss", "RMSE(bins)"):
+                for metric in ("LogLoss", "RMSE(bins)", "AUC"):
                     metrics = np.array([item[metric] for item in m])
+                    size = size[~np.isnan(metrics.astype(float))]
+                    metrics = metrics[~np.isnan(metrics.astype(float))]
                     wmean, wstd = weighted_avg_and_std(metrics, size)
-                    # print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
                     CI = confidence_interval(metrics, size)
                     rounded_mean, rounded_CI = sigdig(wmean, CI)
                     result += f" {rounded_mean}±{rounded_CI} |"

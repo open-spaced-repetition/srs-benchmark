@@ -133,8 +133,8 @@ if __name__ == "__main__":
     else:
         for scale in ("reviews", "users"):
             print(f"Weighted by number of {scale}\n")
-            print("| Model | #Params | LogLoss | RMSE(bins) |")
-            print("| --- | --- | --- | --- |")
+            print("| Model | #Params | LogLoss | RMSE(bins) | AUC |")
+            print("| --- | --- | --- | --- | --- |")
             for model, n_param in (
                 (dev_mode_name, None),
                 ("GRU-P", 297),

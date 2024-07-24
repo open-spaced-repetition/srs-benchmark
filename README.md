@@ -49,7 +49,8 @@ For further information regarding the FSRS algorithm, please refer to the follow
 
 Total number of users: 19,990.
 
-Total number of reviews for evaluation: 707,964,360. Same-day reviews are excluded; only one review per day (the first chronologically) is used by each algorithm, except for FSRS-5. This is why the number of reviews is significantly lower than the 1.7 billion figure mentioned earlier. Additionally, some reviews are filtered out, such as when the user manually changed the due date (which would count as a review), or when the user used what's called a "filtered deck" if "Reschedule cards based on my answers in this deck" was disabled. Finally, an outlier filter is applied.
+Total number of reviews for evaluation: 707,964,360.
+Same-day reviews are excluded except in FSRS-5, i.e., each algorithm uses only one review per day (the first, chronologically). Some reviews are filtered out, for example, the revlog entries created on changing the due date manually or reviewing the cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 1.7 billion mentioned earlier. 
 
 The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 

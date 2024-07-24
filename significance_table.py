@@ -108,18 +108,19 @@ def format(exponent, n):
 if __name__ == "__main__":
     models = [
         "GRU-P",
-        "FSRS-4.5",
+        "FSRS-5",
         "FSRS-rs",
+        "FSRS-4.5",
         "FSRSv4",
-        "DASH",
-        "DASH[MCM]",
         "DASH[ACT-R]",
-        "FSRS-4.5-pretrain",
-        "FSRS-4.5-dry-run",
-        "FSRSv3",
+        "DASH",
+        "FSRS-5-pretrain",
+        "DASH[MCM]",
+        "FSRS-5-dry-run",
         "NN-17",
-        "GRU",
+        "FSRSv3",
         "AVG",
+        "GRU",
         "ACT-R",
         "HLR",
         "SM2",
@@ -205,13 +206,13 @@ if __name__ == "__main__":
                         color_wilcox[i][j] = 1
 
     # small changes to labels
-    index_4_5_dry_run = models.index("FSRS-4.5-dry-run")
-    index_4_5_pretrain = models.index("FSRS-4.5-pretrain")
+    index_5_dry_run = models.index("FSRS-5-dry-run")
+    index_5_pretrain = models.index("FSRS-5-pretrain")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_sm2 = models.index("SM2")
-    models[index_4_5_dry_run] = "FSRS-4.5 \n def. param."
-    models[index_4_5_pretrain] = "FSRS-4.5 \n pretrain"
+    models[index_5_dry_run] = "FSRS-5 \n def. param."
+    models[index_5_pretrain] = "FSRS-5 \n pretrain"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
     models[index_sm2] = "SM-2"

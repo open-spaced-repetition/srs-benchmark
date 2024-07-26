@@ -21,6 +21,16 @@ def sigdig(value, CI):
         return str(f"{rounded_value:.{decimals - 1}f}"), str(f"{rounded_CI:.{decimals}f}")
 
 
+# tests to ensure that sigdigs is working as intended
+value = 0.084111111
+CI = 0.0010011111
+assert sigdig(value, CI) == ('0.084', '0.0010')
+
+value = 0.084111111
+CI = 0.000999999999
+assert sigdig(value, CI) == ('0.084', '0.0010')
+
+
 def confidence_interval(values, sizes):
     identifiers = [i for i in range(len(values))]
     dict_x_w = {

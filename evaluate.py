@@ -58,7 +58,7 @@ def weighted_avg_and_std(values, weights):
 
 
 if __name__ == "__main__":
-    dev_mode_name = "FSRS-4.5-dev"
+    dev_mode_name = "FSRS-5-dev"
     dev_file = pathlib.Path(f"./result/{dev_mode_name}.jsonl")
     if dev_file.exists():
         with open(dev_file, "r") as f:

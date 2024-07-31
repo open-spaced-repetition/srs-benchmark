@@ -1316,6 +1316,7 @@ class Trainer:
         lr: float = 1e-2,
         wd: float = 1e-4,
         batch_size: int = 256,
+        max_seq_len: int = 64,
     ) -> None:
         self.model = MODEL.to(device=device)
         if isinstance(MODEL, (FSRS4, FSRS4dot5)):
@@ -1332,6 +1333,7 @@ class Trainer:
             else None
         )
         self.batch_size = batch_size
+        self.max_seq_len = max_seq_len
         self.build_dataset(train_set, test_set)
         self.n_epoch = n_epoch
         self.batch_nums = (
@@ -1348,20 +1350,20 @@ class Trainer:
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         pre_train_set = train_set[train_set["i"] == 2]
-        self.pre_train_set = BatchDataset(pre_train_set, self.batch_size)
+        self.pre_train_set = BatchDataset(pre_train_set, self.batch_size, max_seq_len=self.max_seq_len)
         self.pre_train_data_loader = BatchLoader(self.pre_train_set)
 
         next_train_set = train_set[train_set["i"] > 2]
-        self.next_train_set = BatchDataset(next_train_set, self.batch_size)
+        self.next_train_set = BatchDataset(next_train_set, self.batch_size, max_seq_len=self.max_seq_len)
         self.next_train_data_loader = BatchLoader(self.next_train_set)
 
-        self.train_set = BatchDataset(train_set, self.batch_size)
+        self.train_set = BatchDataset(train_set, self.batch_size, max_seq_len=self.max_seq_len)
         self.train_data_loader = BatchLoader(self.train_set)
 
         self.test_set = (
             []
             if test_set is None
-            else BatchDataset(test_set, batch_size=self.batch_size)
+            else BatchDataset(test_set, batch_size=self.batch_size, max_seq_len=self.max_seq_len)
         )
         self.test_data_loader = [] if test_set is None else BatchLoader(self.test_set)
 

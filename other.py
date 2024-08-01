@@ -1843,7 +1843,7 @@ def process(args):
         )
 
     result, raw = evaluate(
-        y, p, save_tmp, file_name, file, w_list if type(w_list[0]) == list else None
+        y, p, save_tmp, file_name, file, w_list
     )
     return result, raw
 
@@ -1875,8 +1875,10 @@ def evaluate(y, p, df, file_name, file, w_list=None):
         "user": int(file.stem),
         "size": len(y),
     }
-    if w_list:
+    if w_list and type(w_list[0]) == list:
         result["parameters"] = list(map(lambda x: round(x, 4), w_list[-1]))
+    elif os.environ.get("WEIGHTS"):
+        torch.save(w_list[-1], f"weights/{file_name}/{file.stem}.pth")
     if os.environ.get("RAW"):
         raw = {
             "user": int(file.stem),

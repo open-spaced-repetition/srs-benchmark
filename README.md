@@ -35,6 +35,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
     - GRU-P: a variant of GRU that removes forgetting curve and predicts the probability of recall directly.
+    - GRU-P-short: same as above, but it also takes into account same-day reviews.
 - DASH: the model proposed in [this paper](https://scholar.colorado.edu/concern/graduate_thesis_or_dissertations/zp38wc97m). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this model: DASH[MCM] and DASH[ACT-R]. For further information, please refer to [this paper](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
 - ACT-R: the model proposed in [this paper](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
@@ -50,7 +51,7 @@ For further information regarding the FSRS algorithm, please refer to the follow
 Total number of users: 19,990.
 
 Total number of reviews for evaluation: 707,964,360.
-Same-day reviews are excluded except in FSRS-5, i.e., each algorithm uses only one review per day (the first, chronologically). Some reviews are filtered out, for example, the revlog entries created on changing the due date manually or reviewing the cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 1.7 billion mentioned earlier. 
+Same-day reviews are excluded except in FSRS-5 and GRU-P-short, i.e., each algorithm uses only one review per day (the first, chronologically). Some reviews are filtered out, for example, the revlog entries created on changing the due date manually or reviewing the cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 1.7 billion mentioned earlier. 
 
 The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 

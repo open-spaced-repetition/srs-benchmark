@@ -124,7 +124,7 @@ def cum_concat(x):
 
 def create_time_series(df):
     df = df[df["rating"].isin([1, 2, 3, 4])]
-    df = df.groupby("card_id").apply(lambda x: x.head(256)).reset_index(drop=True)
+    df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
     df["i"] = df.groupby("card_id").cumcount() + 1
     t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[max(0, i)] for i in x])

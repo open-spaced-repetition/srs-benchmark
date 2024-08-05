@@ -1305,6 +1305,59 @@ def lineToTensorRNN(line):
         tensor[li][int(response)] = 1
     return tensor
 
+def iter(model, batch):
+    sequences, delta_ts, labels, seq_lens = batch
+    sequences = sequences.to(device=device)
+    delta_ts = delta_ts.to(device=device)
+    labels = labels.to(device=device)
+    seq_lens = seq_lens.to(device=device)
+    real_batch_size = seq_lens.shape[0]
+    if isinstance(model, ACT_R):
+        outputs = model(sequences)
+        retentions = outputs[
+            seq_lens - 2, torch.arange(real_batch_size, device=device), 0
+        ]
+    elif isinstance(model, DASH_ACTR):
+        retentions = model(sequences)
+    elif isinstance(model, DASH):
+        outputs = model(sequences.transpose(0, 1))
+        retentions = outputs.squeeze(1)
+    elif isinstance(model, NN_17):
+        outputs, _ = model(sequences)
+        stabilities = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=device),
+            0,
+        ]
+        difficulties = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=device),
+            1,
+        ]
+        theoretical_r = model.forgetting_curve(delta_ts, stabilities)
+        retentions = model.rw(
+            torch.stack([difficulties, stabilities, theoretical_r], dim=1)
+        ).squeeze(1)
+    elif isinstance(model, GRU_P):
+        outputs, _ = model(sequences)
+        retentions = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=device),
+            0,
+        ]
+    else:
+        if isinstance(model, HLR):
+            outputs = model(sequences.transpose(0, 1))
+            stabilities = outputs.squeeze()
+        else:
+            outputs, _ = model(sequences)
+            stabilities = outputs[
+                seq_lens - 1,
+                torch.arange(real_batch_size, device=device),
+                0,
+            ]
+        retentions = model.forgetting_curve(delta_ts, stabilities)
+    return retentions, labels
 
 class Trainer:
     def __init__(
@@ -1367,61 +1420,6 @@ class Trainer:
         )
         self.test_data_loader = [] if test_set is None else BatchLoader(self.test_set)
 
-    def iter(self, batch):
-        sequences, delta_ts, labels, seq_lens = batch
-        sequences = sequences.to(device=device)
-        delta_ts = delta_ts.to(device=device)
-        labels = labels.to(device=device)
-        seq_lens = seq_lens.to(device=device)
-        real_batch_size = seq_lens.shape[0]
-        if isinstance(self.model, ACT_R):
-            outputs = self.model(sequences)
-            retentions = outputs[
-                seq_lens - 2, torch.arange(real_batch_size, device=device), 0
-            ]
-        elif isinstance(self.model, DASH_ACTR):
-            retentions = self.model(sequences)
-        elif isinstance(self.model, DASH):
-            outputs = self.model(sequences.transpose(0, 1))
-            retentions = outputs.squeeze(1)
-        elif isinstance(self.model, NN_17):
-            outputs, _ = self.model(sequences)
-            stabilities = outputs[
-                seq_lens - 1,
-                torch.arange(real_batch_size, device=device),
-                0,
-            ]
-            difficulties = outputs[
-                seq_lens - 1,
-                torch.arange(real_batch_size, device=device),
-                1,
-            ]
-            theoretical_r = self.model.forgetting_curve(delta_ts, stabilities)
-            retentions = self.model.rw(
-                torch.stack([difficulties, stabilities, theoretical_r], dim=1)
-            ).squeeze(1)
-        elif isinstance(self.model, GRU_P):
-            outputs, _ = self.model(sequences)
-            retentions = outputs[
-                seq_lens - 1,
-                torch.arange(real_batch_size, device=device),
-                0,
-            ]
-        else:
-            if isinstance(self.model, HLR):
-                outputs = self.model(sequences.transpose(0, 1))
-                stabilities = outputs.squeeze()
-            else:
-                outputs, _ = self.model(sequences)
-                stabilities = outputs[
-                    seq_lens - 1,
-                    torch.arange(real_batch_size, device=device),
-                    0,
-                ]
-            retentions = self.model.forgetting_curve(delta_ts, stabilities)
-        loss = self.loss_fn(retentions, labels).sum()
-        return loss
-
     def train(self):
         best_loss = np.inf
         for k in range(self.n_epoch):
@@ -1436,7 +1434,8 @@ class Trainer:
             ):
                 self.model.train()
                 self.optimizer.zero_grad()
-                loss = self.iter(batch)
+                retentions, labels = iter(self.model, batch)
+                loss = self.loss_fn(retentions, labels).sum()
                 loss.backward()
                 if isinstance(
                     self.model, (FSRS4, FSRS4dot5)
@@ -1464,7 +1463,8 @@ class Trainer:
                 loss = 0
                 total = 0
                 for batch in data_loader:
-                    loss += self.iter(batch).detach().item()
+                    retentions, labels = iter(self.model, batch)
+                    loss += self.loss_fn(retentions, labels).sum().detach().item()
                     total += batch[3].shape[0]
                 losses.append(loss / total)
             self.avg_train_losses.append(losses[0])
@@ -1505,55 +1505,14 @@ class Collection:
         self.model.eval()
 
     def batch_predict(self, dataset):
-        fast_dataset = BatchDataset(dataset, sort_by_length=False)
-        fast_dataset.x_train = fast_dataset.x_train.to(device=device)
-        fast_dataset.seq_len = fast_dataset.seq_len.to(device=device)
+        batch_dataset = BatchDataset(dataset, batch_size=8192, sort_by_length=False)
+        batch_loader = BatchLoader(batch_dataset, shuffle=False)
+        results = []
         with torch.no_grad():
-            if isinstance(self.model, ACT_R):
-                outputs = self.model(fast_dataset.x_train.transpose(0, 1))
-                retentions = outputs[
-                    fast_dataset.seq_len - 2, torch.arange(len(fast_dataset)), 0
-                ]
-                return retentions.cpu().tolist()
-            elif isinstance(self.model, DASH_ACTR):
-                outputs = self.model(fast_dataset.x_train.transpose(0, 1))
-                retentions = outputs.squeeze()
-                return retentions.cpu().tolist()
-            elif isinstance(self.model, DASH):
-                outputs = self.model(fast_dataset.x_train)
-                retentions = outputs.squeeze()
-                return retentions.cpu().tolist()
-            elif isinstance(self.model, NN_17):
-                outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
-                stabilities = outputs[
-                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
-                ]
-                difficulties = outputs[
-                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 1
-                ]
-                theoretical_r = self.model.forgetting_curve(
-                    fast_dataset.t_train, stabilities
-                )
-                retentions = self.model.rw(
-                    torch.stack([difficulties, stabilities, theoretical_r], dim=1)
-                ).squeeze(1)
-                return retentions.cpu().tolist()
-            elif isinstance(self.model, GRU_P):
-                outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
-                retentions = outputs[
-                    fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
-                ]
-                return retentions.cpu().tolist()
-            else:
-                if isinstance(self.model, HLR):
-                    outputs = self.model(fast_dataset.x_train)
-                    stabilities = outputs.squeeze()
-                else:
-                    outputs, _ = self.model(fast_dataset.x_train.transpose(0, 1))
-                    stabilities = outputs[
-                        fast_dataset.seq_len - 1, torch.arange(len(fast_dataset)), 0
-                    ]
-                return stabilities.cpu().tolist()
+            for batch in batch_loader:
+                retentions, _ = iter(self.model, batch)
+                results.extend(retentions.cpu().tolist())
+        return results
 
 
 def process_untrainable(file):
@@ -1620,7 +1579,7 @@ def baseline(file):
 
 def create_features(df, model_name="FSRSv3"):
     df = df[df["rating"].isin([1, 2, 3, 4])]
-    df = df.groupby("card_id").apply(lambda x: x.head(256)).reset_index(drop=True)
+    df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
     if short_term is None:
         df = df[df["delta_t"] != 0].copy()
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
@@ -1825,13 +1784,7 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        if model in (ACT_R, DASH, DASH_ACTR, NN_17, GRU_P):
-            testset["p"] = my_collection.batch_predict(testset)
-        else:
-            testset["stability"] = my_collection.batch_predict(testset)
-            testset["p"] = my_collection.model.forgetting_curve(
-                testset["delta_t"], testset["stability"]
-            )
+        testset["p"] = my_collection.batch_predict(testset)
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)

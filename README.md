@@ -50,58 +50,59 @@ For further information regarding the FSRS algorithm, please refer to the follow
 
 Total number of users: 19,990.
 
-Total number of reviews for evaluation: 707,964,360.
+Total number of reviews for evaluation: 702,721,850.
 Same-day reviews are excluded except in FSRS-5 and GRU-P-short, i.e., each algorithm uses only one review per day (the first, chronologically). Some reviews are filtered out, for example, the revlog entries created on changing the due date manually or reviewing the cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 1.7 billion mentioned earlier. 
 
 The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
 ### Weighted by the number of reviews
 
-| Model | Parameters | Log Loss | RMSE (bins) | AUC |
+
+| Model | #Params | LogLoss | RMSE(bins) | AUC |
 | --- | --- | --- | --- | --- |
-| GRU-P-short | 297 | **0.314±0.0052** | **0.0420±0.00086** | **0.707±0.0029** |
-| GRU-P | 297 | 0.319±0.0052 | 0.0434±0.00085 | 0.698±0.0029 |
-| FSRS-5 | 19 | 0.321±0.0055 | 0.050±0.0012 | 0.700±0.0028 |
-| FSRS-4.5 | 17 | 0.325±0.0055 | 0.052±0.0010 | 0.693±0.0028 |
-| FSRS-rs | 19 | 0.324±0.0054 | 0.053±0.0015 | 0.692±0.0029 |
-| FSRS v4 | 17 | 0.331±0.0056 | 0.058±0.0014 | 0.690±0.0028 |
-| DASH | 9 | 0.332±0.0054 | 0.063±0.0011 | 0.643±0.0031 |
-| DASH[MCM] | 9 | 0.332±0.0054 | 0.064±0.0011 | 0.644±0.0032 |
-| DASH[ACT-R] | 5 | 0.336±0.0055 | 0.066±0.0014 | 0.632±0.0033 |
-| FSRS v3 | 13 | 0.361±0.0068 | 0.072±0.0015 | 0.667±0.0030 |
-| NN-17 | 39 | 0.346±0.0063 | 0.076±0.0016 | 0.596±0.0032 |
-| FSRS-5 (only pretrain) | 4 | 0.348±0.0067 | 0.077±0.0020 | 0.679±0.0030 |
-| GRU | 39 | 0.375±0.0071 | 0.079±0.0016 | 0.659±0.0029 |
-| FSRS-5 (default parameters) | 0 | 0.356±0.0070 | 0.085±0.0020 | 0.674±0.0030 |
-| ACT-R | 5 | 0.356±0.0060 | 0.085±0.0022 | 0.536±0.0032 |
-| AVG | 0 | 0.356±0.0059 | 0.086±0.0022 | 0.508±0.0029 |
-| HLR | 3 | 0.409±0.0089 | 0.107±0.0021 | 0.631±0.0034 |
-| SM-2 | 0 | 0.54±0.013 | 0.147±0.0031 | 0.599±0.0032 |
-| Transformer | 127 | 0.52±0.012 | 0.187±0.0037 | 0.515±0.0044 |
+| GRU-P-short | 297 | **0.313±0.0051** | **0.0420±0.00085** | **0.707±0.0029** |
+| GRU-P | 297 | 0.318±0.0053 | 0.0435±0.00091 | 0.697±0.0027 |
+| FSRS-5 | 19 | 0.320±0.0052 | 0.050±0.0010 | 0.700±0.0028 |
+| FSRS-rs | 19 | 0.322±0.0053 | 0.052±0.0011 | 0.692±0.0029 |
+| FSRS-4.5 | 17 | 0.324±0.0053 | 0.052±0.0011 | 0.693±0.0027 |
+| FSRSv4 | 17 | 0.329±0.0056 | 0.057±0.0012 | 0.690±0.0027 |
+| DASH | 9 | 0.331±0.0053 | 0.060±0.0010 | 0.642±0.0031 |
+| DASH[MCM] | 9 | 0.331±0.0054 | 0.062±0.0011 | 0.644±0.0030 |
+| DASH[ACT-R] | 5 | 0.334±0.0055 | 0.065±0.0012 | 0.632±0.0031 |
+| FSRSv3 | 13 | 0.360±0.0068 | 0.070±0.0015 | 0.667±0.0029 |
+| FSRS-5-pretrain | 4 | 0.338±0.0058 | 0.072±0.0016 | 0.685±0.0028 |
+| NN-17 | 39 | 0.346±0.0069 | 0.075±0.0015 | 0.595±0.0031 |
+| GRU | 39 | 0.375±0.0072 | 0.079±0.0016 | 0.658±0.0027 |
+| FSRS-5-dry-run | 0 | 0.346±0.0060 | 0.081±0.0017 | 0.681±0.0028 |
+| ACT-R | 5 | 0.354±0.0057 | 0.084±0.0019 | 0.536±0.0030 |
+| AVG | 0 | 0.354±0.0059 | 0.085±0.0019 | 0.508±0.0029 |
+| HLR | 3 | 0.404±0.0079 | 0.102±0.0020 | 0.632±0.0034 |
+| SM2 | 0 | 0.54±0.012 | 0.147±0.0029 | 0.599±0.0031 |
+| Transformer | 127 | 0.51±0.011 | 0.182±0.0033 | 0.515±0.0043 |
 
 ### Unweighted
 
 | Model | Parameters | Log Loss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
-| **GRU-P** | 297 | 0.345±0.0030 | **0.0656±0.00083** | 0.679±0.0018 |
-| GRU-P-short | 297 | **0.341±0.0030** | 0.0659±0.00085 | 0.687±0.0018 |
-| FSRS-5 | 19 | 0.347±0.0031 | 0.0712±0.00084 | **0.697±0.0017** |
-| FSRS-rs | 19 | 0.348±0.0031 | 0.0726±0.00088 | 0.693±0.0018 |
-| FSRS-4.5 | 17 | 0.352±0.0032 | 0.0743±0.00089 | 0.688±0.0017 |
-| FSRS v4 | 17 | 0.362±0.0034 | 0.084±0.0010 | 0.685±0.0017 |
-| DASH | 9 | 0.358±0.0031 | 0.0846±0.00096 | 0.632±0.0018 |
+| GRU-P | 297 | 0.345±0.0030 | **0.0655±0.00082** | 0.679±0.0017 |
+| GRU-P-short | 297 | **0.340±0.0030** | 0.0659±0.00084 | 0.687±0.0019 |
+| FSRS-5 | 19 | 0.346±0.0031 | 0.0712±0.00084 | **0.697±0.0017** |
+| FSRS-rs | 19 | 0.348±0.0031 | 0.0726±0.00086 | 0.693±0.0017 |
+| FSRS-4.5 | 17 | 0.352±0.0032 | 0.0742±0.00088 | 0.688±0.0017 |
+| DASH | 9 | 0.358±0.0031 | 0.0810±0.00095 | 0.632±0.0018 |
+| FSRSv4 | 17 | 0.362±0.0033 | 0.082±0.0010 | 0.685±0.0016 |
+| DASH[MCM] | 9 | 0.358±0.0030 | 0.0831±0.00094 | 0.636±0.0019 |
 | DASH[ACT-R] | 5 | 0.362±0.0033 | 0.086±0.0011 | 0.627±0.0019 |
-| DASH[MCM] | 9 | 0.358±0.0031 | 0.0871±0.00098 | 0.636±0.0019 |
-| FSRS-5 (only pretrain) | 4 | 0.365±0.0034 | 0.0884±0.00095 | 0.689±0.0016 |
+| FSRS-5-pretrain | 4 | 0.359±0.0032 | 0.0866±0.00091 | 0.692±0.0016 |
 | NN-17 | 39 | 0.380±0.0035 | 0.100±0.0013 | 0.570±0.0018 |
+| FSRS-5-dry-run | 0 | 0.373±0.0032 | 0.101±0.0011 | 0.691±0.0016 |
 | AVG | 0 | 0.385±0.0036 | 0.101±0.0011 | 0.500±0.0018 |
-| FSRS-5 (default parameters) | 0 | 0.377±0.0034 | 0.102±0.0011 | 0.688±0.0016 |
-| ACT-R | 5 | 0.396±0.0040 | 0.106±0.0012 | 0.525±0.0017 |
-| FSRS v3 | 13 | 0.422±0.0045 | 0.108±0.0014 | 0.661±0.0017 |
-| GRU | 39 | 0.440±0.0053 | 0.108±0.0013 | 0.650±0.0017 |
-| HLR | 3 | 0.456±0.0051 | 0.129±0.0014 | 0.636±0.0019 |
-| Transformer | 127 | 0.555±0.0067 | 0.192±0.0019 | 0.527±0.0021 |
-| SM-2 | 0 | 0.71±0.012 | 0.199±0.0021 | 0.604±0.0017 |
+| ACT-R | 5 | 0.395±0.0040 | 0.106±0.0012 | 0.524±0.0018 |
+| FSRSv3 | 13 | 0.422±0.0046 | 0.106±0.0013 | 0.661±0.0017 |
+| GRU | 39 | 0.440±0.0052 | 0.108±0.0013 | 0.650±0.0017 |
+| HLR | 3 | 0.456±0.0051 | 0.124±0.0013 | 0.636±0.0018 |
+| Transformer | 127 | 0.554±0.0064 | 0.185±0.0018 | 0.527±0.0021 |
+| SM2 | 0 | 0.71±0.013 | 0.199±0.0021 | 0.604±0.0018 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 

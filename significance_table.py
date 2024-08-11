@@ -113,12 +113,12 @@ if __name__ == "__main__":
         "FSRS-rs",
         "FSRS-4.5",
         "FSRSv4",
-        "DASH[ACT-R]",
         "DASH",
-        "FSRS-5-pretrain",
         "DASH[MCM]",
-        "NN-17",
+        "DASH[ACT-R]",
+        "FSRS-5-pretrain",
         "FSRS-5-dry-run",
+        "NN-17",
         "FSRSv3",
         "AVG",
         "GRU",
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     models[index_v3] = "FSRS v3"
     models[index_sm2] = "SM-2"
 
-    fig, ax = plt.subplots(figsize=(12, 12), dpi=200)
+    fig, ax = plt.subplots(figsize=(14, 14), dpi=200)
     ax.set_title(
         f"Wilcoxon signed-rank test, p-values ({n_collections} collections)",
         fontsize=24,
@@ -248,8 +248,8 @@ if __name__ == "__main__":
                     fontsize=7,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models, fontsize=11, rotation=45)
-    ax.set_yticks(np.arange(n), labels=models, fontsize=11)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=10, rotation=45)
+    ax.set_yticks(np.arange(n), labels=models, fontsize=10)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")

@@ -16,19 +16,23 @@ def sigdig(value, CI):
     rounded_CI = round(CI, decimals)
     rounded_value = round(value, decimals - 1)
     if n_lead_zeros_CI > num_lead_zeros(rounded_CI):
-        return str(f"{round(value, decimals - 2):.{decimals - 2}f}"), str(f"{round(CI, decimals - 1):.{decimals - 1}f}")
+        return str(f"{round(value, decimals - 2):.{decimals - 2}f}"), str(
+            f"{round(CI, decimals - 1):.{decimals - 1}f}"
+        )
     else:
-        return str(f"{rounded_value:.{decimals - 1}f}"), str(f"{rounded_CI:.{decimals}f}")
+        return str(f"{rounded_value:.{decimals - 1}f}"), str(
+            f"{rounded_CI:.{decimals}f}"
+        )
 
 
 # tests to ensure that sigdigs is working as intended
 value = 0.084111111
 CI = 0.0010011111
-assert sigdig(value, CI) == ('0.084', '0.0010')
+assert sigdig(value, CI) == ("0.084", "0.0010")
 
 value = 0.084111111
 CI = 0.000999999999
-assert sigdig(value, CI) == ('0.084', '0.0010')
+assert sigdig(value, CI) == ("0.084", "0.0010")
 
 
 def confidence_interval(values, sizes):
@@ -87,6 +91,7 @@ if __name__ == "__main__":
             dev_mode_name,
             "GRU-P-short",
             "GRU-P",
+            "FSRS-5-catboost",
             "FSRS-5",
             "FSRS-rs",
             "FSRS-4.5",
@@ -153,6 +158,7 @@ if __name__ == "__main__":
                 (dev_mode_name, None),
                 ("GRU-P-short", 297),
                 ("GRU-P", 297),
+                ("FSRS-5-catboost", 19),
                 ("FSRS-5", 19),
                 ("FSRS-rs", 19),
                 ("FSRS-4.5", 17),

@@ -3,3 +3,5 @@ matplotlib
 scikit-learn
 fsrs-optimizer
 huggingface_hub
+catboost
+numpy<2

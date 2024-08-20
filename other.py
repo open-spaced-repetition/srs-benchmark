@@ -787,7 +787,7 @@ class RNN(nn.Module):
         return self.fc(h)
 
     def forgetting_curve(self, t, s):
-        return 0.9 ** (t / s)
+        return (1 + FACTOR * t / s) ** DECAY
 
 
 class GRU_P(nn.Module):
@@ -875,7 +875,7 @@ class Transformer(nn.Module):
         return output, None
 
     def forgetting_curve(self, t, s):
-        return 0.9 ** (t / s)
+        return (1 + FACTOR * t / s) ** DECAY
 
 
 class HLR(nn.Module):

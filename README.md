@@ -78,7 +78,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 | AVG | 0 | 0.354±0.0059 | 0.085±0.0019 | 0.508±0.0029 |
 | HLR | 3 | 0.404±0.0079 | 0.102±0.0020 | 0.632±0.0034 |
 | SM2 | 0 | 0.54±0.012 | 0.147±0.0029 | 0.599±0.0031 |
-| Transformer | 127 | 0.51±0.011 | 0.182±0.0033 | 0.515±0.0043 |
+| Transformer | 127 | 0.439±0.0078 | 0.164±0.0031 | 0.516±0.0043 |
 
 ### Unweighted
 
@@ -101,7 +101,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 | FSRSv3 | 13 | 0.422±0.0046 | 0.106±0.0013 | 0.661±0.0017 |
 | GRU | 39 | 0.440±0.0052 | 0.108±0.0013 | 0.650±0.0017 |
 | HLR | 3 | 0.456±0.0051 | 0.124±0.0013 | 0.636±0.0018 |
-| Transformer | 127 | 0.554±0.0064 | 0.185±0.0018 | 0.527±0.0021 |
+| Transformer | 127 | 0.468±0.0047 | 0.164±0.0016 | 0.527±0.0021 |
 | SM2 | 0 | 0.71±0.013 | 0.199±0.0021 | 0.604±0.0018 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.

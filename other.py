@@ -1305,6 +1305,7 @@ def lineToTensorRNN(line):
         tensor[li][int(response)] = 1
     return tensor
 
+
 def iter(model, batch):
     sequences, delta_ts, labels, seq_lens = batch
     sequences = sequences.to(device=device)
@@ -1359,6 +1360,7 @@ def iter(model, batch):
         retentions = model.forgetting_curve(delta_ts, stabilities)
     return retentions, labels
 
+
 class Trainer:
     def __init__(
         self,
@@ -1403,20 +1405,28 @@ class Trainer:
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         pre_train_set = train_set[train_set["i"] == 2]
-        self.pre_train_set = BatchDataset(pre_train_set, self.batch_size, max_seq_len=self.max_seq_len)
+        self.pre_train_set = BatchDataset(
+            pre_train_set, self.batch_size, max_seq_len=self.max_seq_len
+        )
         self.pre_train_data_loader = BatchLoader(self.pre_train_set)
 
         next_train_set = train_set[train_set["i"] > 2]
-        self.next_train_set = BatchDataset(next_train_set, self.batch_size, max_seq_len=self.max_seq_len)
+        self.next_train_set = BatchDataset(
+            next_train_set, self.batch_size, max_seq_len=self.max_seq_len
+        )
         self.next_train_data_loader = BatchLoader(self.next_train_set)
 
-        self.train_set = BatchDataset(train_set, self.batch_size, max_seq_len=self.max_seq_len)
+        self.train_set = BatchDataset(
+            train_set, self.batch_size, max_seq_len=self.max_seq_len
+        )
         self.train_data_loader = BatchLoader(self.train_set)
 
         self.test_set = (
             []
             if test_set is None
-            else BatchDataset(test_set, batch_size=self.batch_size, max_seq_len=self.max_seq_len)
+            else BatchDataset(
+                test_set, batch_size=self.batch_size, max_seq_len=self.max_seq_len
+            )
         )
         self.test_data_loader = [] if test_set is None else BatchLoader(self.test_set)
 
@@ -1796,9 +1806,7 @@ def process(args):
             f"evaluation/{file_name}/{file.stem}.tsv", sep="\t", index=False
         )
 
-    result, raw = evaluate(
-        y, p, save_tmp, file_name, file, w_list
-    )
+    result, raw = evaluate(y, p, save_tmp, file_name, file, w_list)
     return result, raw
 
 

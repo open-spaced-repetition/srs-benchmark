@@ -72,7 +72,9 @@ def predict(w_list, testsets, file=None):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(w)
-        testset["stability"], testset["difficulty"] = my_collection.batch_predict(testset)
+        testset["stability"], testset["difficulty"] = my_collection.batch_predict(
+            testset
+        )
         testset["p"] = power_forgetting_curve(testset["delta_t"], testset["stability"])
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())

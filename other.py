@@ -18,6 +18,7 @@ import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier
 import multiprocessing as mp
+import ebisu
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -1286,6 +1287,15 @@ def sm2(r_history):
     return float(ivl)
 
 
+def ebisu_v2(sequence):
+    model = ebisu.defaultModel(7, alpha=1, beta=1)
+    for delta_t, rating in sequence:
+        model = ebisu.updateRecall(
+            model, successes=1 if rating > 1 else 0, total=1, tnow=max(delta_t, 0.001)
+        )
+    return model
+
+
 def lineToTensor(line: str) -> Tensor:
     ivl = line[0].split(",")
     response = line[1].split(",")
@@ -1525,8 +1535,7 @@ class Collection:
         return results
 
 
-def process_untrainable(file):
-    model_name = "SM2"
+def process_untrainable(file, model_name):
     dataset = pd.read_csv(file)
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
@@ -1542,14 +1551,21 @@ def process_untrainable(file):
     save_tmp = []
 
     for i, testset in enumerate(testsets):
-        testset["stability"] = testset["r_history"].map(sm2)
-        try:
+        if model_name == "SM2":
+            testset["stability"] = testset["sequence"].map(sm2)
             testset["p"] = np.exp(
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
             )
-        except Exception as e:
-            print(file)
-            print(e)
+        elif model_name == "Ebisu-v2":
+            try:
+                testset["model"] = testset["sequence"].map(ebisu_v2)
+                testset["p"] = testset.apply(
+                    lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
+                    axis=1,
+                )
+            except Exception as e:
+                print(file)
+                print(e.with_traceback())
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
@@ -1710,6 +1726,14 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
+    elif model_name == "SM2":
+        df["sequence"] = df["r_history"]
+    elif model_name.startswith("Ebisu"):
+        df["sequence"] = [
+            tuple(zip(t_item[:-1], r_item[:-1]))
+            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_item, r_item in zip(t_sublist, r_sublist)
+        ]
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
@@ -1734,8 +1758,8 @@ def create_features(df, model_name="FSRSv3"):
 def process(args):
     plt.close("all")
     file, model_name = args
-    if model_name == "SM2":
-        return process_untrainable(file)
+    if model_name == "SM2" or model_name.startswith("Ebisu"):
+        return process_untrainable(file, model_name)
     if model_name == "AVG":
         return baseline(file)
     dataset = pd.read_csv(file)

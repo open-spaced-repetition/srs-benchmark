@@ -108,6 +108,7 @@ if __name__ == "__main__":
             "HLR",
             "SM2",
             "Transformer",
+            "Ebisu-v2",
         ):
             print(f"Model: {model}")
             m = []
@@ -174,6 +175,7 @@ if __name__ == "__main__":
                 ("HLR", 3),
                 ("SM2", 0),
                 ("Transformer", 127),
+                ("Ebisu-v2", 0),
             ):
                 m = []
                 parameters = []

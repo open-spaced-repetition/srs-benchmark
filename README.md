@@ -57,7 +57,6 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 ### Weighted by the number of reviews
 
-
 | Model | #Params | LogLoss | RMSE(bins) | AUC |
 | --- | --- | --- | --- | --- |
 | **GRU-P-short** | 297 | **0.313±0.0051** | **0.0420±0.00085** | **0.707±0.0029** |
@@ -107,6 +106,14 @@ The following tables present the means and the 99% confidence intervals. The bes
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 
 Unweighted averages are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
+
+### Superiority
+
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower RMSE than algorithm B (column). For example, GRU-P-short has a 94.5% superiority over the Transformer, meaning that for 94.5% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer.
+
+![Superiority, 19990](https://github.com/user-attachments/assets/c968026f-e733-44ab-a05d-a5178745220d)
+
+### Statistical significance
 
 The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. Grey means that the p-value is >0.01, and we cannot conclude that one algorithm performs better than the other.
 

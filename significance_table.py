@@ -133,24 +133,28 @@ if __name__ == "__main__":
     sizes = []
     for model in models:
         print(f"Model: {model}")
-        RMSE = []
-        logloss = []
+        dictionary_RMSE = {}
         result_file = pathlib.Path(f"./result/{model}.jsonl")
         if not result_file.exists():
             continue
         with open(result_file, "r") as f:
             data = f.readlines()
         data = [json.loads(x) for x in data]
+
         for result in data:
-            logloss.append(result["metrics"]["LogLoss"])
-            RMSE.append(result["metrics"]["RMSE(bins)"])
+            RMSE = result["metrics"]["RMSE(bins)"]
+            user = result["user"]
+            dictionary_RMSE.update({user: RMSE})
             if model == models[0]:
                 sizes.append(result["size"])
 
-        series1 = pd.Series(logloss, name=f"{model}, LogLoss")
-        series2 = pd.Series(RMSE, name=f"{model}, RMSE (bins)")
-        df = pd.concat([df, series1], axis=1)
-        df = pd.concat([df, series2], axis=1)
+        sorted_dictionary_RMSE = dict(sorted(dictionary_RMSE.items()))
+        RMSE_list = list(sorted_dictionary_RMSE.values())
+        # user_list = list(sorted_dictionary_RMSE.keys())
+        # assert user_list == sorted(user_list)
+
+        series = pd.Series(RMSE_list, name=f"{model}, RMSE (bins)")
+        df = pd.concat([df, series], axis=1)
 
     df = pd.concat([df, pd.Series(sizes, name=f"Sizes")], axis=1)
     df.to_csv(csv_name)

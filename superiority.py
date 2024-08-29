@@ -5,7 +5,7 @@ import warnings
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -35,25 +35,33 @@ if __name__ == "__main__":
         "SM2",
     ]
     csv_name = f"{len(models)} models.csv"
-    print(f"Number of tests={(len(models)-1) ** 2}")
+
     df = pd.DataFrame()
     sizes = []
     for model in models:
         print(f"Model: {model}")
-        RMSE = []
+        dictionary_RMSE = {}
         result_file = pathlib.Path(f"./result/{model}.jsonl")
         if not result_file.exists():
             continue
         with open(result_file, "r") as f:
             data = f.readlines()
         data = [json.loads(x) for x in data]
+
         for result in data:
-            RMSE.append(result["metrics"]["RMSE(bins)"])
+            RMSE = result["metrics"]["RMSE(bins)"]
+            user = result["user"]
+            dictionary_RMSE.update({user: RMSE})
             if model == models[0]:
                 sizes.append(result["size"])
 
-        series2 = pd.Series(RMSE, name=f"{model}, RMSE (bins)")
-        df = pd.concat([df, series2], axis=1)
+        sorted_dictionary_RMSE = dict(sorted(dictionary_RMSE.items()))
+        RMSE_list = list(sorted_dictionary_RMSE.values())
+        # user_list = list(sorted_dictionary_RMSE.keys())
+        # assert user_list == sorted(user_list)
+
+        series = pd.Series(RMSE_list, name=f"{model}, RMSE (bins)")
+        df = pd.concat([df, series], axis=1)
 
     df = pd.concat([df, pd.Series(sizes, name=f"Sizes")], axis=1)
     df.to_csv(csv_name)

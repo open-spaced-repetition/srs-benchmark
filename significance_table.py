@@ -148,7 +148,7 @@ if __name__ == "__main__":
             if model == models[0]:
                 sizes.append(result["size"])
 
-        sorted_dictionary_RMSE = dict(sorted(dictionary_RMSE.items()))
+        sorted_dictionary_RMSE = dict(sorted(dictionary_RMSE.items()))  # this sorts by keys
         RMSE_list = list(sorted_dictionary_RMSE.values())
         # user_list = list(sorted_dictionary_RMSE.keys())
         # assert user_list == sorted(user_list)

@@ -57,7 +57,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 ### Weighted by the number of reviews
 
-| Model | #Params | LogLoss | RMSE(bins) | AUC |
+| Model | #Params | LogLoss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
 | **GRU-P-short** | 297 | **0.313±0.0051** | **0.0420±0.00085** | **0.707±0.0029** |
 | GRU-P | 297 | 0.318±0.0053 | 0.0435±0.00091 | 0.697±0.0027 |

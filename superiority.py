@@ -101,7 +101,7 @@ if __name__ == "__main__":
                 
                 up_down_error = abs(i_j_up   - true_i_j) + abs(j_i_down - true_j_i)  # sum of rounding errors
                 down_up_error = abs(i_j_down - true_i_j) + abs(j_i_up   - true_j_i)  # sum of rounding errors
-                if up_down_error < down_up_error:  # choose which combination of rounding results in the lowest total absolute error
+                if up_down_error < down_up_error:  # choose whichever combination of rounding results in the lowest total absolute error
                     percentages[i][j] = i_j_up
                     percentages[j][i] = j_i_down
                 else:

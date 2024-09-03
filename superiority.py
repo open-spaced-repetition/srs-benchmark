@@ -75,9 +75,10 @@ if __name__ == "__main__":
     percentages = [[-1 for i in range(n)] for j in range(n)]
     for i in range(n):
         for j in range(n):
-            if i == j:
-                # percentages[i][j] = float("NaN")
-                percentages[i][j] = -1
+            if i == j:  # diagonal
+                pass
+            elif percentages[i][j] > 0:  # we already calculated this one
+                pass
             else:
                 df1 = df[f"{models[i]}, RMSE (bins)"]
                 df2 = df[f"{models[j]}, RMSE (bins)"]
@@ -89,14 +90,23 @@ if __name__ == "__main__":
                         greater += 1
                     else:
                         lower += 1
-                percentages[i][j] = round(lower / (greater + lower), 3)
-                # deal with rounding errors
-                    if percentages[j][i] > -1:
-                        if percentages[i][j] + percentages[j][i] == 1.001:  # if there is a rounding error
-                            if percentages[i][j] > percentages[j][i]:
-                                percentages[i][j] += -0.001  # decrease the larger value
-                            else:
-                                percentages[j][i] += -0.001  # decrease the larger value
+                percentages[i][j] = lower / (greater + lower)
+                
+                true_i_j = percentages[i][j]
+                true_j_i = 1 - percentages[i][j]
+                true_i_j_up = math.ceil(true_i_j * 1000)/1000
+                true_i_j_down = math.floor(true_i_j * 1000)/1000
+                true_j_i_up = math.ceil(true_j_i * 1000)/1000
+                true_j_i_down = math.floor(true_j_i * 1000)/1000
+                
+                up_down_error = abs(true_i_j_up   - true_i_j) + abs(true_j_i_down - true_j_i)  # sum of rounding errors
+                down_up_error = abs(true_i_j_down - true_i_j) + abs(true_j_i_up   - true_j_i)  # sum of rounding errors
+                if up_down_error < down_up_error:  # choose which combination of rounding results in the lowest total error
+                    percentages[i][j] = true_i_j_up
+                    percentages[j][i] = true_j_i_down
+                else:
+                    percentages[i][j] = true_i_j_down
+                    percentages[j][i] = true_j_i_up
 
     # small changes to labels
     index_5_dry_run = models.index("FSRS-5-dry-run")

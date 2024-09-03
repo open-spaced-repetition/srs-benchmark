@@ -89,7 +89,14 @@ if __name__ == "__main__":
                         greater += 1
                     else:
                         lower += 1
-                percentages[i][j] = lower / (greater + lower)
+                percentages[i][j] = round(lower / (greater + lower), 3)
+                # deal with rounding errors
+                    if percentages[j][i] > -1:
+                        if percentages[i][j] + percentages[j][i] == 1.001:  # if there is a rounding error
+                            if percentages[i][j] > percentages[j][i]:
+                                percentages[i][j] += -0.001  # decrease the larger value
+                            else:
+                                percentages[j][i] += -0.001  # decrease the larger value
 
     # small changes to labels
     index_5_dry_run = models.index("FSRS-5-dry-run")

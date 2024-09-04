@@ -111,7 +111,7 @@ Unweighted averages are more representative of "average case" performance. In re
 
 The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower RMSE than algorithm B (column). For example, GRU-P-short has a 94.5% superiority over the Transformer, meaning that for 94.5% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer. This is based on 19,990 collections.
 
-![Superiority, 19990](./plots/Superiority,%2019990.png)
+![Superiority, 19990](https://github.com/user-attachments/assets/6c6cc891-59d9-4f23-b36d-cd240700b7ac)
 
 You may have noticed that FSRS-5 has a 99.0% superiority over SM-2, meaning that for 99.0% of users, RMSE will be lower with FSRS-5 than with SM-2. But please remember that SM-2 wasn’t designed to predict probabilities, and the only reason it does that in this benchmark is because extra formulas for converting intervals given by SM-2 into probabilities were added on top of it.
 

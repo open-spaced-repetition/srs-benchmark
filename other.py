@@ -1590,6 +1590,8 @@ def baseline(file):
 def create_features(df, model_name="FSRSv3"):
     df = df[df["rating"].isin([1, 2, 3, 4])]
     df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
+    if "delta_t" not in df.columns and "elapsed_days" in df.columns:
+        df["delta_t"] = df["elapsed_days"]
     if short_term is None:
         df = df[df["delta_t"] != 0].copy()
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))

@@ -124,6 +124,7 @@ if __name__ == "__main__":
         "AVG",
         "ACT-R",
         "HLR",
+        "SM2-short",
         "Transformer",
         "SM2",
     ]
@@ -156,16 +157,15 @@ if __name__ == "__main__":
 
     # you have to run the commented out code above first
     df = pd.read_csv(csv_name)
-    sizes = df["Sizes"]
 
     n_collections = len(df)
     print(n_collections)
     n = len(models)
-    wilcox = [[-1 for i in range(n)] for j in range(n)]
+    wilcox = np.full((n, n), -1.0)
     for i in range(n):
         for j in range(n):
             if i == j:
-                wilcox[i][j] = float("NaN")
+                wilcox[i, j] = np.nan
             else:
                 df1 = df[f"{models[i]}, RMSE (bins)"]
                 df2 = df[f"{models[j]}, RMSE (bins)"]
@@ -176,13 +176,13 @@ if __name__ == "__main__":
                     result = np.log10(
                         stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue
                     )
-                wilcox[i][j] = result
+                wilcox[i, j] = result
 
-    color_wilcox = [[-1 for i in range(n)] for j in range(n)]
+    color_wilcox = np.full((n, n), -1.0)
     for i in range(n):
         for j in range(n):
             if i == j:
-                color_wilcox[i][j] = float("NaN")
+                color_wilcox[i, j] = np.nan
             else:
                 df1 = df[f"{models[i]}, RMSE (bins)"]
                 df2 = df[f"{models[j]}, RMSE (bins)"]
@@ -198,12 +198,12 @@ if __name__ == "__main__":
 
                 if np.power(10, result) > 0.01:
                     # color for insignificant p-values
-                    color_wilcox[i][j] = 0.5
+                    color_wilcox[i, j] = 0.5
                 else:
                     if approx[1] == 0:
-                        color_wilcox[i][j] = 0
+                        color_wilcox[i, j] = 0
                     else:
-                        color_wilcox[i][j] = 1
+                        color_wilcox[i, j] = 1
 
     # small changes to labels
     index_5_dry_run = models.index("FSRS-5-dry-run")

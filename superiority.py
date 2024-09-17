@@ -8,7 +8,7 @@ from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
-from scipy import stats
+from scipy import stats  # type: ignore
 
 warnings.filterwarnings("ignore")
 
@@ -31,6 +31,7 @@ if __name__ == "__main__":
         "AVG",
         "ACT-R",
         "HLR",
+        "SM2-short",
         "Transformer",
         "SM2",
     ]
@@ -45,8 +46,7 @@ if __name__ == "__main__":
         if not result_file.exists():
             continue
         with open(result_file, "r") as f:
-            data = f.readlines()
-        data = [json.loads(x) for x in data]
+            data = [json.loads(x) for x in f.readlines()]
 
         for result in data:
             RMSE = result["metrics"]["RMSE(bins)"]
@@ -67,17 +67,16 @@ if __name__ == "__main__":
     df.to_csv(csv_name)
 
     df = pd.read_csv(csv_name)
-    sizes = df["Sizes"]
 
     n_collections = len(df)
     print(n_collections)
     n = len(models)
-    percentages = [[-1 for i in range(n)] for j in range(n)]
+    percentages = np.full((n, n), -1.0)
     for i in range(n):
         for j in range(n):
             if i == j:  # diagonal
                 pass
-            elif percentages[i][j] > 0:  # we already calculated this one
+            elif percentages[i, j] > 0:  # we already calculated this one
                 pass
             else:
                 df1 = df[f"{models[i]}, RMSE (bins)"]
@@ -90,23 +89,29 @@ if __name__ == "__main__":
                         greater += 1
                     else:
                         lower += 1
-                percentages[i][j] = lower / (greater + lower)
-                
-                true_i_j = percentages[i][j]
-                true_j_i = 1 - percentages[i][j]
-                i_j_up = math.ceil(true_i_j * 1000)/1000
-                i_j_down = math.floor(true_i_j * 1000)/1000
-                j_i_up = math.ceil(true_j_i * 1000)/1000
-                j_i_down = math.floor(true_j_i * 1000)/1000
-                
-                up_down_error = abs(i_j_up   - true_i_j) + abs(j_i_down - true_j_i)  # sum of rounding errors
-                down_up_error = abs(i_j_down - true_i_j) + abs(j_i_up   - true_j_i)  # sum of rounding errors
-                if up_down_error < down_up_error:  # choose whichever combination of rounding results in the lowest total absolute error
-                    percentages[i][j] = i_j_up
-                    percentages[j][i] = j_i_down
+                percentages[i, j] = lower / (greater + lower)
+
+                true_i_j = percentages[i, j]
+                true_j_i = 1 - percentages[i, j]
+                i_j_up = math.ceil(true_i_j * 1000) / 1000
+                i_j_down = math.floor(true_i_j * 1000) / 1000
+                j_i_up = math.ceil(true_j_i * 1000) / 1000
+                j_i_down = math.floor(true_j_i * 1000) / 1000
+
+                up_down_error = abs(i_j_up - true_i_j) + abs(
+                    j_i_down - true_j_i
+                )  # sum of rounding errors
+                down_up_error = abs(i_j_down - true_i_j) + abs(
+                    j_i_up - true_j_i
+                )  # sum of rounding errors
+                if (
+                    up_down_error < down_up_error
+                ):  # choose whichever combination of rounding results in the lowest total absolute error
+                    percentages[i, j] = i_j_up
+                    percentages[j, i] = j_i_down
                 else:
-                    percentages[i][j] = i_j_down
-                    percentages[j][i] = j_i_up
+                    percentages[i, j] = i_j_down
+                    percentages[j, i] = j_i_up
 
     # small changes to labels
     index_5_dry_run = models.index("FSRS-5-dry-run")
@@ -128,31 +133,39 @@ if __name__ == "__main__":
     )
 
     def rgb2hex(list):
-        return f'#{int(round(list[0])):02x}{int(round(list[1])):02x}{int(round(list[2])):02x}'
+        return f"#{int(round(list[0])):02x}{int(round(list[1])):02x}{int(round(list[2])):02x}"
 
     start_color = [255, 0, 0]
     end_color = [45, 180, 0]
     N = 256
     colors = ["white", rgb2hex(start_color)]
     positions = [0, 1e-6]
-    for i in range(1, N+1):
-        pos = i/N
+    for i in range(1, N + 1):
+        pos = i / N
         # this results in brighter colors than linear
-        quadratic_interp_R = np.sqrt(pos * np.power(end_color[0], 2) + (1 - pos) * np.power(start_color[0], 2))
-        quadratic_interp_G = np.sqrt(pos * np.power(end_color[1], 2) + (1 - pos) * np.power(start_color[1], 2))
-        quadratic_interp_B = np.sqrt(pos * np.power(end_color[2], 2) + (1 - pos) * np.power(start_color[2], 2))
+        quadratic_interp_R = np.sqrt(
+            pos * np.power(end_color[0], 2) + (1 - pos) * np.power(start_color[0], 2)
+        )
+        quadratic_interp_G = np.sqrt(
+            pos * np.power(end_color[1], 2) + (1 - pos) * np.power(start_color[1], 2)
+        )
+        quadratic_interp_B = np.sqrt(
+            pos * np.power(end_color[2], 2) + (1 - pos) * np.power(start_color[2], 2)
+        )
         RGB_list = [quadratic_interp_R, quadratic_interp_G, quadratic_interp_B]
         colors.append(rgb2hex(RGB_list))
         positions.append(pos)
-    cmap = LinearSegmentedColormap.from_list('custom_linear', list(zip(positions, colors)))
+    cmap = LinearSegmentedColormap.from_list(
+        "custom_linear", list(zip(positions, colors))
+    )
     plt.imshow(percentages, vmin=0, cmap=cmap)
 
     for i in range(n):
         for j in range(n):
-            if percentages[i][j] == -1:
+            if percentages[i, j] == -1:
                 pass
             else:
-                string = f"{100*percentages[i][j]:.1f}%"
+                string = f"{100*percentages[i, j]:.1f}%"
                 text = ax.text(
                     j,
                     i,

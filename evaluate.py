@@ -105,6 +105,7 @@ if __name__ == "__main__":
             "ACT-R",
             "AVG",
             "HLR",
+            "SM2-short",
             "SM2",
             "Transformer",
         ):
@@ -169,6 +170,7 @@ if __name__ == "__main__":
                 ("ACT-R", 5),
                 ("AVG", 0),
                 ("HLR", 3),
+                ("SM2-short", 0),
                 ("SM2", 0),
                 ("Transformer", 127),
             ):

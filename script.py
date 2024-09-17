@@ -3,12 +3,12 @@ import sys
 import json
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm  # type: ignore
 from pathlib import Path
 import matplotlib.pyplot as plt
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score
-from statsmodels.nonparametric.smoothers_lowess import lowess
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score  # type: ignore
+from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
 import torch
@@ -19,7 +19,7 @@ if dev_mode:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
-from fsrs_optimizer import (
+from fsrs_optimizer import ( # type: ignore
     Optimizer,
     Trainer,
     FSRS,
@@ -29,7 +29,7 @@ from fsrs_optimizer import (
     remove_non_continuous_rows,
     plot_brier,
     rmse_matrix,
-)
+) 
 
 
 model = FSRS

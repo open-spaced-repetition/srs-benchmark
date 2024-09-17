@@ -6,7 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy import stats
+from scipy import stats  # type: ignore
 
 warnings.filterwarnings("ignore")
 
@@ -139,8 +139,7 @@ if __name__ == "__main__":
         if not result_file.exists():
             continue
         with open(result_file, "r") as f:
-            data = f.readlines()
-        data = [json.loads(x) for x in data]
+            data = [json.loads(x) for x in f.readlines()]
         for result in data:
             logloss.append(result["metrics"]["LogLoss"])
             RMSE.append(result["metrics"]["RMSE(bins)"])

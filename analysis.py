@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 import pathlib
-from KDEpy import FFTKDE
-from fsrs_optimizer import DEFAULT_PARAMETER
+from KDEpy import FFTKDE  # type: ignore
+from fsrs_optimizer import DEFAULT_PARAMETER # type: ignore
 
 
 def chen_rule(data, weights=None):
@@ -202,9 +202,8 @@ def best_mode(a, weights):
 if __name__ == "__main__":
     model = "FSRS-5"
     with open(f"./result/{model}.jsonl", "r") as f:
-        data = f.readlines()
-    data = [json.loads(x) for x in data]
-    weights = []
+        data = [json.loads(x) for x in f.readlines()]
+    weights_list = []
     sizes = []
     n_params = len(DEFAULT_PARAMETER)
     for result in data:
@@ -213,10 +212,10 @@ if __name__ == "__main__":
                 # remove users who have parameters that are close to the default
                 break
         else:
-            weights.append(result["parameters"])
+            weights_list.append(result["parameters"])
             sizes.append(result["size"])
 
-    weights = np.array(weights)
+    weights = np.array(weights_list)
     # sizes = np.sqrt(np.array(sizes))
     print(weights.shape)
     pathlib.Path("./plots").mkdir(parents=True, exist_ok=True)

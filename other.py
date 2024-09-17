@@ -9,14 +9,14 @@ import json
 import os
 from torch import nn
 from torch import Tensor
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss
-from tqdm.auto import tqdm
-from scipy.optimize import minimize
-from statsmodels.nonparametric.smoothers_lowess import lowess
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # type: ignore
+from tqdm.auto import tqdm  # type: ignore
+from scipy.optimize import minimize  # type: ignore
+from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
-from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier
+from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
 import multiprocessing as mp
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -135,7 +135,7 @@ class FSRS3(nn.Module):
         new_s = new_s.clamp(0.1, 36500)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> Tensor:
+    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -269,7 +269,7 @@ class FSRS4(nn.Module):
         new_s = new_s.clamp(0.1, 36500)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> Tensor:
+    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -551,7 +551,7 @@ class FSRS4dot5(nn.Module):
         new_s = new_s.clamp(0.01, 36500)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> Tensor:
+    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -1290,9 +1290,9 @@ def lineToTensor(line: str) -> Tensor:
     ivl = line[0].split(",")
     response = line[1].split(",")
     tensor = torch.zeros(len(response), 2)
-    for li, response in enumerate(response):
-        tensor[li][0] = int(ivl[li])
-        tensor[li][1] = int(response)
+    for li, r in enumerate(response):
+        tensor[li][0] = int(float(ivl[li]))
+        tensor[li][1] = int(float(r))
     return tensor
 
 
@@ -1362,6 +1362,7 @@ def iter(model, batch):
 
 
 class Trainer:
+    optimizer: torch.optim.Optimizer
     def __init__(
         self,
         MODEL: nn.Module,
@@ -1399,8 +1400,8 @@ class Trainer:
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=self.batch_nums * n_epoch
         )
-        self.avg_train_losses = []
-        self.avg_eval_losses = []
+        self.avg_train_losses: list[float] = []
+        self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
@@ -1549,7 +1550,7 @@ def process_untrainable(file):
             )
         except Exception as e:
             print(file)
-            print(e)
+            print(e.with_traceback())
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
@@ -1787,7 +1788,7 @@ def process(args):
             w_list.append(trainer.train())
         except Exception as e:
             print(file)
-            print(e)
+            print(e.with_traceback())
             w_list.append(model().state_dict())
 
     p = []

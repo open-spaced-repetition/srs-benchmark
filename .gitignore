@@ -148,6 +148,7 @@ dataset/*.csv
 
 # Raw results
 raw/
+evaluation/
 
 # Weights
 weights/

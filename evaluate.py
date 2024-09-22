@@ -1,7 +1,7 @@
 import pathlib
 import json
 import numpy as np
-import scipy
+import scipy  # type: ignore
 import math
 import argparse
 
@@ -79,10 +79,9 @@ if __name__ == "__main__":
     dev_file = pathlib.Path(f"./result/{dev_mode_name}.jsonl")
     if dev_file.exists():
         with open(dev_file, "r") as f:
-            data = f.readlines()
-        common_set = set([json.loads(x)["user"] for x in data])
+            common_set = set([json.loads(x)["user"] for x in f.readlines()])
     else:
-        common_set = None
+        common_set = set()
     parser = argparse.ArgumentParser()
     parser.add_argument("--fast", action="store_true")
     args = parser.parse_args()
@@ -106,6 +105,7 @@ if __name__ == "__main__":
             "ACT-R",
             "AVG",
             "HLR",
+            "SM2-short",
             "SM2",
             "Transformer",
             "Ebisu-v2",
@@ -118,10 +118,9 @@ if __name__ == "__main__":
             if not result_file.exists():
                 continue
             with open(result_file, "r") as f:
-                data = f.readlines()
-            data = [json.loads(x) for x in data]
+                data = [json.loads(x) for x in f.readlines()]
             for result in data:
-                if common_set and result["user"] not in common_set:
+                if result["user"] not in common_set:
                     continue
                 m.append(result["metrics"])
                 sizes.append(result["size"])
@@ -130,8 +129,7 @@ if __name__ == "__main__":
             if len(sizes) == 0:
                 continue
             print(f"Total number of users: {len(sizes)}")
-            sizes = np.array(sizes)
-            print(f"Total number of reviews: {sizes.sum()}")
+            print(f"Total number of reviews: {sum(sizes)}")
             for scale, size in (
                 ("reviews", np.array(sizes)),
                 ("log(reviews)", np.log(sizes)),
@@ -173,6 +171,7 @@ if __name__ == "__main__":
                 ("ACT-R", 5),
                 ("AVG", 0),
                 ("HLR", 3),
+                ("SM2-short", 0),
                 ("SM2", 0),
                 ("Transformer", 127),
                 ("Ebisu-v2", 0),
@@ -184,8 +183,7 @@ if __name__ == "__main__":
                 if not result_file.exists():
                     continue
                 with open(result_file, "r") as f:
-                    data = f.readlines()
-                data = [json.loads(x) for x in data]
+                    data = [json.loads(x) for x in f.readlines()]
                 for result in data:
                     if common_set and result["user"] not in common_set:
                         continue

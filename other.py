@@ -1,3 +1,4 @@
+import sys
 import pandas as pd
 import numpy as np
 from typing import List, Optional
@@ -9,14 +10,14 @@ import json
 import os
 from torch import nn
 from torch import Tensor
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss
-from tqdm.auto import tqdm
-from scipy.optimize import minimize
-from statsmodels.nonparametric.smoothers_lowess import lowess
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # type: ignore
+from tqdm.auto import tqdm  # type: ignore
+from scipy.optimize import minimize  # type: ignore
+from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
-from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier
+from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
 import multiprocessing as mp
 import ebisu
 
@@ -33,7 +34,13 @@ verbose: bool = False
 
 model_name = os.environ.get("MODEL", "FSRSv3")
 short_term = os.environ.get("SHORT")
-file_name = model_name + ("-short" if short_term else "")
+secs_ivl = os.environ.get("SECS_IVL")
+file_name = (
+    model_name + ("-short" if short_term else "") + ("-secs" if secs_ivl else "")
+)
+
+INIT_S_MAX = 100 * 86400 if secs_ivl else 100
+S_MAX = 36500 * 86400 if secs_ivl else 36500
 
 
 class FSRS3ParameterClipper:
@@ -133,10 +140,12 @@ class FSRS3(nn.Module):
                 self.stability_after_success(state, new_d, r),
                 self.stability_after_failure(state, new_d, r),
             )
-        new_s = new_s.clamp(0.1, 36500)
+        new_s = new_s.clamp(0.1, S_MAX)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -267,10 +276,12 @@ class FSRS4(nn.Module):
             new_d = state[:, 1] - self.w[6] * (X[:, 1] - 3)
             new_d = self.mean_reversion(self.w[4], new_d)
             new_d = new_d.clamp(1, 10)
-        new_s = new_s.clamp(0.1, 36500)
+        new_s = new_s.clamp(0.1, S_MAX)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -335,7 +346,7 @@ class FSRS4(nn.Module):
             res = minimize(
                 loss,
                 x0=init_s0,
-                bounds=((0.1, 365),),
+                bounds=((0.1, INIT_S_MAX),),
                 options={"maxiter": int(np.sqrt(total_count))},
             )
             params = res.x
@@ -438,7 +449,9 @@ class FSRS4(nn.Module):
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
 
-        self.w.data[0:4] = Tensor(list(map(lambda x: max(min(100, x), 0.01), init_s0)))
+        self.w.data[0:4] = Tensor(
+            list(map(lambda x: max(min(INIT_S_MAX, x), 0.01), init_s0))
+        )
 
 
 class FSRS4dot5ParameterClipper:
@@ -470,25 +483,47 @@ FACTOR = 0.9 ** (1 / DECAY) - 1
 
 class FSRS4dot5(nn.Module):
     # 17 params
-    init_w = [
-        0.4872,
-        1.4003,
-        3.7145,
-        13.8206,
-        5.1618,
-        1.2298,
-        0.8975,
-        0.031,
-        1.6474,
-        0.1367,
-        1.0461,
-        2.1072,
-        0.0793,
-        0.3246,
-        1.587,
-        0.2272,
-        2.8755,
-    ]
+    init_w = (
+        [
+            0.4872,
+            1.4003,
+            3.7145,
+            13.8206,
+            5.1618,
+            1.2298,
+            0.8975,
+            0.031,
+            1.6474,
+            0.1367,
+            1.0461,
+            2.1072,
+            0.0793,
+            0.3246,
+            1.587,
+            0.2272,
+            2.8755,
+        ]
+        if not secs_ivl
+        else [
+            90.7882,
+            6232.9404,
+            83142.7578,
+            776078.0625,
+            3.5651,
+            0.1144,
+            0.5854,
+            0.0993,
+            3.5207,
+            0.2198,
+            2.3533,
+            2.3831,
+            0.1069,
+            0.6711,
+            1.8232,
+            0.2099,
+            4.1395,
+        ]
+    )
     clipper = FSRS4dot5ParameterClipper()
     lr: float = 4e-2
     wd: float = 1e-5
@@ -549,10 +584,12 @@ class FSRS4dot5(nn.Module):
             new_d = state[:, 1] - self.w[6] * (X[:, 1] - 3)
             new_d = self.mean_reversion(self.w[4], new_d)
             new_d = new_d.clamp(1, 10)
-        new_s = new_s.clamp(0.01, 36500)
+        new_s = new_s.clamp(0.01, S_MAX)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -599,9 +636,12 @@ class FSRS4dot5(nn.Module):
                     )
                 continue
             delta_t = group["delta_t"]
-            recall = (group["y"]["mean"] * group["y"]["count"] + average_recall * 1) / (
-                group["y"]["count"] + 1
-            )
+            if secs_ivl:
+                recall = group["y"]["mean"]
+            else:
+                recall = (
+                    group["y"]["mean"] * group["y"]["count"] + average_recall * 1
+                ) / (group["y"]["count"] + 1)
             count = group["y"]["count"]
 
             init_s0 = r_s0_default[first_rating]
@@ -612,13 +652,13 @@ class FSRS4dot5(nn.Module):
                     -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
                     * count
                 )
-                l1 = np.abs(stability - init_s0) / 16
+                l1 = np.abs(stability - init_s0) / 16 if not secs_ivl else 0
                 return logloss + l1
 
             res = minimize(
                 loss,
                 x0=init_s0,
-                bounds=((0.01, 100),),
+                bounds=((0.01, INIT_S_MAX),),
                 options={"maxiter": int(sum(count))},
             )
             params = res.x
@@ -722,7 +762,9 @@ class FSRS4dot5(nn.Module):
             init_s0 = [
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
-        self.w.data[0:4] = Tensor(list(map(lambda x: max(min(100, x), 0.01), init_s0)))
+        self.w.data[0:4] = Tensor(
+            list(map(lambda x: max(min(INIT_S_MAX, x), 0.01), init_s0))
+        )
 
 
 network = "GRU"
@@ -1300,9 +1342,9 @@ def lineToTensor(line: str) -> Tensor:
     ivl = line[0].split(",")
     response = line[1].split(",")
     tensor = torch.zeros(len(response), 2)
-    for li, response in enumerate(response):
-        tensor[li][0] = int(ivl[li])
-        tensor[li][1] = int(response)
+    for li, r in enumerate(response):
+        tensor[li][0] = int(float(ivl[li]))
+        tensor[li][1] = int(float(r))
     return tensor
 
 
@@ -1323,16 +1365,18 @@ def iter(model, batch):
     labels = labels.to(device=device)
     seq_lens = seq_lens.to(device=device)
     real_batch_size = seq_lens.shape[0]
+    result = {"labels": labels}
+
     if isinstance(model, ACT_R):
         outputs = model(sequences)
-        retentions = outputs[
+        result["retentions"] = outputs[
             seq_lens - 2, torch.arange(real_batch_size, device=device), 0
         ]
     elif isinstance(model, DASH_ACTR):
-        retentions = model(sequences)
+        result["retentions"] = model(sequences)
     elif isinstance(model, DASH):
         outputs = model(sequences.transpose(0, 1))
-        retentions = outputs.squeeze(1)
+        result["retentions"] = outputs.squeeze(1)
     elif isinstance(model, NN_17):
         outputs, _ = model(sequences)
         stabilities = outputs[
@@ -1346,12 +1390,13 @@ def iter(model, batch):
             1,
         ]
         theoretical_r = model.forgetting_curve(delta_ts, stabilities)
-        retentions = model.rw(
+        result["retentions"] = model.rw(
             torch.stack([difficulties, stabilities, theoretical_r], dim=1)
         ).squeeze(1)
+        result["stabilities"] = stabilities
     elif isinstance(model, GRU_P):
         outputs, _ = model(sequences)
-        retentions = outputs[
+        result["retentions"] = outputs[
             seq_lens - 1,
             torch.arange(real_batch_size, device=device),
             0,
@@ -1367,11 +1412,15 @@ def iter(model, batch):
                 torch.arange(real_batch_size, device=device),
                 0,
             ]
-        retentions = model.forgetting_curve(delta_ts, stabilities)
-    return retentions, labels
+        result["retentions"] = model.forgetting_curve(delta_ts, stabilities)
+        result["stabilities"] = stabilities
+
+    return result
 
 
 class Trainer:
+    optimizer: torch.optim.Optimizer
+
     def __init__(
         self,
         MODEL: nn.Module,
@@ -1409,8 +1458,8 @@ class Trainer:
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, T_max=self.batch_nums * n_epoch
         )
-        self.avg_train_losses = []
-        self.avg_eval_losses = []
+        self.avg_train_losses: list[float] = []
+        self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
@@ -1454,8 +1503,8 @@ class Trainer:
             ):
                 self.model.train()
                 self.optimizer.zero_grad()
-                retentions, labels = iter(self.model, batch)
-                loss = self.loss_fn(retentions, labels).sum()
+                result = iter(self.model, batch)
+                loss = self.loss_fn(result["retentions"], result["labels"]).sum()
                 loss.backward()
                 if isinstance(
                     self.model, (FSRS4, FSRS4dot5)
@@ -1483,8 +1532,13 @@ class Trainer:
                 loss = 0
                 total = 0
                 for batch in data_loader:
-                    retentions, labels = iter(self.model, batch)
-                    loss += self.loss_fn(retentions, labels).sum().detach().item()
+                    result = iter(self.model, batch)
+                    loss += (
+                        self.loss_fn(result["retentions"], result["labels"])
+                        .sum()
+                        .detach()
+                        .item()
+                    )
                     total += batch[3].shape[0]
                 losses.append(loss / total)
             self.avg_train_losses.append(losses[0])
@@ -1527,12 +1581,16 @@ class Collection:
     def batch_predict(self, dataset):
         batch_dataset = BatchDataset(dataset, batch_size=8192, sort_by_length=False)
         batch_loader = BatchLoader(batch_dataset, shuffle=False)
-        results = []
+        retentions = []
+        stabilities = []
         with torch.no_grad():
             for batch in batch_loader:
-                retentions, _ = iter(self.model, batch)
-                results.extend(retentions.cpu().tolist())
-        return results
+                result = iter(self.model, batch)
+                retentions.extend(result["retentions"].cpu().tolist())
+                if "stabilities" in result:
+                    stabilities.extend(result["stabilities"].cpu().tolist())
+
+        return retentions, stabilities
 
 
 def process_untrainable(file, model_name):
@@ -1565,7 +1623,8 @@ def process_untrainable(file, model_name):
                 )
             except Exception as e:
                 print(file)
-                print(e.with_traceback())
+                tb = sys.exc_info()[2]
+                print(e.with_traceback(tb))
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
@@ -1606,6 +1665,15 @@ def baseline(file):
 def create_features(df, model_name="FSRSv3"):
     df = df[df["rating"].isin([1, 2, 3, 4])]
     df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
+    if (
+        "delta_t" not in df.columns
+        and "elapsed_days" in df.columns
+        and "elapsed_seconds" in df.columns
+    ):
+        if secs_ivl:
+            df["delta_t"] = df["elapsed_seconds"]
+        else:
+            df["delta_t"] = df["elapsed_days"]
     if short_term is None:
         df = df[df["delta_t"] != 0].copy()
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
@@ -1663,7 +1731,7 @@ def create_features(df, model_name="FSRSv3"):
             features = np.zeros(8)
             r_history = np.array(r_history) > 1
             tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426])
-            time_windows = np.array([1, 7, 30, np.inf])
+            time_windows = np.array([1, 7, 30, np.inf]) * (86400 if secs_ivl else 1)
 
             # Compute the cumulative sum of t_history in reverse order
             cumulative_times = np.cumsum(t_history[::-1])[::-1]
@@ -1740,18 +1808,19 @@ def create_features(df, model_name="FSRSv3"):
     if short_term:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
         df["i"] = df.groupby("card_id").cumcount() + 1
-    filtered_dataset = (
-        df[df["i"] == 2]
-        .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
-        .apply(remove_outliers)
-    )
-    if filtered_dataset.empty:
-        return pd.DataFrame()
-    df[df["i"] == 2] = filtered_dataset
-    df.dropna(inplace=True)
-    df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
-        remove_non_continuous_rows
-    )
+    if not secs_ivl:
+        filtered_dataset = (
+            df[df["i"] == 2]
+            .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
+            .apply(remove_outliers)
+        )
+        if filtered_dataset.empty:
+            return pd.DataFrame()
+        df[df["i"] == 2] = filtered_dataset
+        df.dropna(inplace=True)
+        df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
+            remove_non_continuous_rows
+        )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
@@ -1809,7 +1878,8 @@ def process(args):
             w_list.append(trainer.train())
         except Exception as e:
             print(file)
-            print(e)
+            tb = sys.exc_info()[2]
+            print(e.with_traceback(tb))
             w_list.append(model().state_dict())
 
     p = []
@@ -1818,8 +1888,11 @@ def process(args):
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(model(w))
-        testset["p"] = my_collection.batch_predict(testset)
-        p.extend(testset["p"].tolist())
+        retentions, stabilities = my_collection.batch_predict(testset)
+        testset["p"] = retentions
+        if stabilities:
+            testset["s"] = stabilities
+        p.extend(retentions)
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
 

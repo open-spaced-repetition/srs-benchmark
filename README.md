@@ -30,8 +30,8 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 
 - FSRS v3: the first version of the FSRS algorithm that people actually used.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
-- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed. This benchmark also includes FSRS-4.5 with default parameters (which have been obtained by running FSRS-4.5 on all 20 thousand collections) and FSRS-4.5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
-- FSRS-5: the latest version of FSRS. Unlike the previous versions, it takes into account same-day reviews. Same-day reviews are used only for training, and not for evaluation.
+- FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
+- FSRS-5: the latest version of FSRS. Unlike the previous versions, it takes into account same-day reviews. Same-day reviews are used only for training, and not for evaluation. This benchmark also includes FSRS-5 with default parameters (which have been obtained by running FSRS-5 on all 20 thousand collections) and FSRS-5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default, which is called "pretrain".
 - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
     - GRU-P: a variant of GRU that removes the forgetting curve and predicts the probability of recall directly.
@@ -41,6 +41,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
 - Transformer: a type of neural network that has gained popularity in recent years due to its superior performance in natural language processing. ChatGPT is based on this architecture. Both GRU and Transformer use the same power forgetting curve as FSRS-4.5 and FSRS-5 to make the comparison more fair.
 - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve.
+    - SM-2-short: a modified implementation that also uses same-day reviews.
 - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.
 
@@ -51,33 +52,33 @@ For further information regarding the FSRS algorithm, please refer to the follow
 Total number of users: 19,990.
 
 Total number of reviews for evaluation: 702,721,850.
-Same-day reviews are excluded except in FSRS-5 and GRU-P-short, i.e., each algorithm uses only one review per day (the first, chronologically). Some reviews are filtered out, for example, the revlog entries created by changing the due date manually or reviewing cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 1.7 billion mentioned earlier. 
+Same-day reviews are excluded except in FSRS-5, GRU-P-short and SM-2-short, i.e., each algorithm uses only one review per day (the first, chronologically). Some reviews are filtered out, for example, the revlog entries created by changing the due date manually or reviewing cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 1.7 billion mentioned earlier. 
 
 The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
 ### Weighted by the number of reviews
 
-
-| Model | #Params | LogLoss | RMSE(bins) | AUC |
+| Model | Parameters | LogLoss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
 | **GRU-P-short** | 297 | **0.313±0.0051** | **0.0420±0.00085** | **0.707±0.0029** |
 | GRU-P | 297 | 0.318±0.0053 | 0.0435±0.00091 | 0.697±0.0027 |
 | FSRS-5 | 19 | 0.320±0.0052 | 0.050±0.0010 | 0.700±0.0028 |
 | FSRS-rs | 19 | 0.322±0.0053 | 0.052±0.0011 | 0.692±0.0029 |
 | FSRS-4.5 | 17 | 0.324±0.0053 | 0.052±0.0011 | 0.693±0.0027 |
-| FSRSv4 | 17 | 0.329±0.0056 | 0.057±0.0012 | 0.690±0.0027 |
+| FSRS v4 | 17 | 0.329±0.0056 | 0.057±0.0012 | 0.690±0.0027 |
 | DASH | 9 | 0.331±0.0053 | 0.060±0.0010 | 0.642±0.0031 |
 | DASH[MCM] | 9 | 0.331±0.0054 | 0.062±0.0011 | 0.644±0.0030 |
 | GRU | 39 | 0.337±0.0056 | 0.062±0.0012 | 0.672±0.0028 |
 | DASH[ACT-R] | 5 | 0.334±0.0055 | 0.065±0.0012 | 0.632±0.0031 |
-| FSRSv3 | 13 | 0.360±0.0068 | 0.070±0.0015 | 0.667±0.0029 |
-| FSRS-5-pretrain | 4 | 0.338±0.0058 | 0.072±0.0016 | 0.685±0.0028 |
+| FSRS v3 | 13 | 0.360±0.0068 | 0.070±0.0015 | 0.667±0.0029 |
+| FSRS-5 pretrain | 4 | 0.338±0.0058 | 0.072±0.0016 | 0.685±0.0028 |
 | NN-17 | 39 | 0.346±0.0069 | 0.075±0.0015 | 0.595±0.0031 |
-| FSRS-5-dry-run | 0 | 0.346±0.0060 | 0.081±0.0017 | 0.681±0.0028 |
+| FSRS-5 default param. | 0 | 0.346±0.0060 | 0.081±0.0017 | 0.681±0.0028 |
 | ACT-R | 5 | 0.354±0.0057 | 0.084±0.0019 | 0.536±0.0030 |
 | AVG | 0 | 0.354±0.0059 | 0.085±0.0019 | 0.508±0.0029 |
 | HLR | 3 | 0.404±0.0079 | 0.102±0.0020 | 0.632±0.0034 |
-| SM2 | 0 | 0.54±0.012 | 0.147±0.0029 | 0.599±0.0031 |
+| SM-2-short | 0 | 0.50±0.011 | 0.124±0.0028 | 0.592±0.0032 |
+| SM-2 | 0 | 0.54±0.012 | 0.147±0.0029 | 0.599±0.0031 |
 | Transformer | 127 | 0.439±0.0078 | 0.164±0.0031 | 0.516±0.0043 |
 | Ebisu-v2 | 0 | 0.677±0.0076 | 0.340±0.0034 | 0.600±0.0033 |
 
@@ -91,24 +92,35 @@ The following tables present the means and the 99% confidence intervals. The bes
 | FSRS-rs | 19 | 0.348±0.0031 | 0.0726±0.00086 | 0.693±0.0017 |
 | FSRS-4.5 | 17 | 0.352±0.0032 | 0.0742±0.00088 | 0.688±0.0017 |
 | DASH | 9 | 0.358±0.0031 | 0.0810±0.00095 | 0.632±0.0018 |
-| FSRSv4 | 17 | 0.362±0.0033 | 0.082±0.0010 | 0.685±0.0016 |
+| FSRS v4 | 17 | 0.362±0.0033 | 0.082±0.0010 | 0.685±0.0016 |
 | DASH[MCM] | 9 | 0.358±0.0030 | 0.0831±0.00094 | 0.636±0.0019 |
 | DASH[ACT-R] | 5 | 0.362±0.0033 | 0.086±0.0011 | 0.627±0.0019 |
-| FSRS-5-pretrain | 4 | 0.359±0.0032 | 0.0866±0.00091 | 0.692±0.0016 |
+| FSRS-5 pretrain | 4 | 0.359±0.0032 | 0.0866±0.00091 | 0.692±0.0016 |
 | GRU | 39 | 0.373±0.0033 | 0.089±0.0010 | 0.660±0.0017 |
 | NN-17 | 39 | 0.380±0.0035 | 0.100±0.0013 | 0.570±0.0018 |
-| FSRS-5-dry-run | 0 | 0.373±0.0032 | 0.101±0.0011 | 0.691±0.0016 |
+| FSRS-5 default param. | 0 | 0.373±0.0032 | 0.101±0.0011 | 0.691±0.0016 |
 | AVG | 0 | 0.385±0.0036 | 0.101±0.0011 | 0.500±0.0018 |
 | ACT-R | 5 | 0.395±0.0040 | 0.106±0.0012 | 0.524±0.0018 |
-| FSRSv3 | 13 | 0.422±0.0046 | 0.106±0.0013 | 0.661±0.0017 |
+| FSRS v3 | 13 | 0.422±0.0046 | 0.106±0.0013 | 0.661±0.0017 |
 | HLR | 3 | 0.456±0.0051 | 0.124±0.0013 | 0.636±0.0018 |
 | Transformer | 127 | 0.468±0.0047 | 0.164±0.0016 | 0.527±0.0021 |
-| SM2 | 0 | 0.71±0.013 | 0.199±0.0021 | 0.604±0.0018 |
+| SM-2-short | 0 | 0.63±0.011 | 0.166±0.0019 | 0.594±0.0019 |
+| SM-2 | 0 | 0.71±0.013 | 0.199±0.0021 | 0.604±0.0018 |
 | Ebisu-v2 | 0 | 0.725±0.0041 | 0.350±0.0018 | 0.605±0.0018 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 
 Unweighted averages are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
+
+### Superiority
+
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower RMSE than algorithm B (column). For example, GRU-P-short has a 94.5% superiority over the Transformer, meaning that for 94.5% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer. This is based on 19,990 collections.
+
+![Superiority, 19990](./plots/Superiority,%2019990.png)
+
+You may have noticed that FSRS-5 has a 99.0% superiority over SM-2, meaning that for 99.0% of users, RMSE will be lower with FSRS-5 than with SM-2. But please remember that SM-2 wasn’t designed to predict probabilities, and the only reason it does that in this benchmark is because extra formulas were added on top of it.
+
+### Statistical significance
 
 The image below shows the p-values obtained by running the Wilcoxon signed-rank test on the RMSE of all pairs of algorithms. Red means that the row algorithm performs worse than the corresponding column algorithm, and green means that the row algorithm performs better than the corresponding column algorithm. Grey means that the p-value is >0.01, and we cannot conclude that one algorithm performs better than the other.
 

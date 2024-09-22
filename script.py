@@ -3,12 +3,12 @@ import sys
 import json
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm  # type: ignore
 from pathlib import Path
 import matplotlib.pyplot as plt
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score
-from statsmodels.nonparametric.smoothers_lowess import lowess
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score  # type: ignore
+from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
 import torch
@@ -19,7 +19,7 @@ if dev_mode:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
-from fsrs_optimizer import (
+from fsrs_optimizer import (  # type: ignore
     Optimizer,
     Trainer,
     FSRS,
@@ -44,6 +44,7 @@ do_fullinfo_stats: bool = False
 
 dry_run = os.environ.get("DRY_RUN")
 only_pretrain = os.environ.get("PRETRAIN")
+secs_ivl = os.environ.get("SECS_IVL")
 rust = os.environ.get("FSRS_RS")
 if rust:
     path = "FSRS-rs"
@@ -63,6 +64,8 @@ else:
         path += "-dev"
     if do_fullinfo_stats:
         path += "-fullinfo"
+    if secs_ivl:
+        path += f"-secs"
 
 
 def predict(w_list, testsets, file=None):
@@ -127,6 +130,15 @@ def cum_concat(x):
 def create_time_series(df):
     df = df[df["rating"].isin([1, 2, 3, 4])]
     df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
+    if (
+        "delta_t" not in df.columns
+        and "elapsed_days" in df.columns
+        and "elapsed_seconds" in df.columns
+    ):
+        if secs_ivl:
+            df["delta_t"] = df["elapsed_seconds"]
+        else:
+            df["delta_t"] = df["elapsed_days"]
     df["i"] = df.groupby("card_id").cumcount() + 1
     t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[max(0, i)] for i in x])
@@ -254,7 +266,8 @@ def process(file):
                 if verbose_inadequate_data:
                     print("Skipping - Inadequate data")
             else:
-                print("User:", file.stem, "Error:", e)
+                tb = sys.exc_info()[2]
+                print("User:", file.stem, "Error:", e.with_traceback(tb))
             if not do_fullinfo_stats:
                 # Default behavior is to use the default parameters if it cannot optimise
                 w_list.append(optimizer.init_w)
@@ -418,7 +431,8 @@ if __name__ == "__main__":
                         f.write(json.dumps(raw, ensure_ascii=False) + "\n")
                 pbar.set_description(f"Processed {result['user']}")
             except Exception as e:
-                tqdm.write(str(e))
+                tb = sys.exc_info()[2]
+                tqdm.write(str(e.with_traceback(tb)))
 
     sort_jsonl(result_file)
     if os.environ.get("RAW"):

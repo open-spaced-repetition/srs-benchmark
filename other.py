@@ -767,9 +767,6 @@ class FSRS4dot5(nn.Module):
         )
 
 
-network = "GRU"
-
-
 class RNN(nn.Module):
     # 39 params with default settings
     lr: float = 4e-2
@@ -782,7 +779,7 @@ class RNN(nn.Module):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
-        if network == "GRU":
+        if model_name == "GRU":
             self.rnn = nn.GRU(
                 input_size=self.n_input,
                 hidden_size=self.n_hidden,
@@ -792,7 +789,7 @@ class RNN(nn.Module):
             nn.init.orthogonal_(self.rnn.weight_hh_l0)
             self.rnn.bias_ih_l0.data.fill_(0)
             self.rnn.bias_hh_l0.data.fill_(0)
-        elif network == "LSTM":
+        elif model_name == "LSTM":
             self.rnn = nn.LSTM(
                 input_size=self.n_input,
                 hidden_size=self.n_hidden,
@@ -813,7 +810,7 @@ class RNN(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{network}_pretrain.pth",
+                        f"./{file_name}_pretrain.pth",
                         weights_only=True,
                         map_location=device,
                     )
@@ -863,7 +860,9 @@ class GRU_P(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./GRU-P_pretrain.pth", weights_only=True, map_location=device
+                        f"./{file_name}_pretrain.pth",
+                        weights_only=True,
+                        map_location=device,
                     )
                 )
             except FileNotFoundError:
@@ -902,7 +901,7 @@ class Transformer(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{model_name}_pretrain.pth",
+                        f"./{file_name}_pretrain.pth",
                         weights_only=True,
                         map_location=device,
                     )
@@ -1107,10 +1106,10 @@ class NN_17ParameterClipper:
     def __call__(self, module):
         if hasattr(module, "S0"):
             w = module.S0.data
-            w[0] = w[0].clamp(0.01, 365)
-            w[1] = w[1].clamp(0.01, 365)
-            w[2] = w[2].clamp(0.01, 365)
-            w[3] = w[3].clamp(0.01, 365)
+            w[0] = w[0].clamp(0.01, INIT_S_MAX)
+            w[1] = w[1].clamp(0.01, INIT_S_MAX)
+            w[2] = w[2].clamp(0.01, INIT_S_MAX)
+            w[3] = w[3].clamp(0.01, INIT_S_MAX)
             module.S0.data = w
 
         if hasattr(module, "D0"):
@@ -1211,7 +1210,7 @@ class NN_17(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{model_name}_pretrain.pth",
+                        f"./{file_name}_pretrain.pth",
                         weights_only=True,
                         map_location=device,
                     )
@@ -1268,7 +1267,7 @@ class NN_17(nn.Module):
 
             # S that corresponds to Rw
             sr = self.inverse_forgetting_curve(rw, delta_t)
-            sr = sr.clamp(0.01, 36500)
+            sr = sr.clamp(0.01, S_MAX)
 
             # Difficulty
             next_d_input = torch.concat([last_d, rw, rating], dim=1)
@@ -1277,7 +1276,7 @@ class NN_17(nn.Module):
             # Post-lapse stability
             pls_input = torch.concat([rw, lapses], dim=1)
             pls = self.pls(pls_input)
-            pls = pls.clamp(0.01, 36500)
+            pls = pls.clamp(0.01, S_MAX)
 
             # SInc
             sinc_t = 1 + torch.exp(self.sinc_w[0]) * (5 * (1 - new_d) + 1) * torch.pow(
@@ -1296,7 +1295,7 @@ class NN_17(nn.Module):
                 pls,
             )
 
-        new_s = new_s.clamp(0.01, 36500)
+        new_s = new_s.clamp(0.01, S_MAX)
         next_state = torch.concat([new_s, new_d], dim=1)
         return next_state
 
@@ -1328,7 +1327,7 @@ def sm2(r_history):
             ivl = 1
             reps = 0
         ef = max(1.3, ef + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)))
-        ivl = min(max(1, round(ivl + 0.01)), 36500)
+        ivl = min(max(1, round(ivl + 0.01)), S_MAX)
     return float(ivl)
 
 
@@ -1696,7 +1695,7 @@ def create_features(df, model_name="FSRSv3"):
     df["t_history"] = [
         ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
     ]
-    if model_name.startswith("FSRS") or model_name in ("GRU", "Transformer"):
+    if model_name.startswith("FSRS") or model_name in ("RNN", "LSTM", "GRU", "Transformer"):
         dtype = torch.int if model_name.startswith("FSRS") else torch.float32
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=dtype).transpose(0, 1)
@@ -1838,7 +1837,7 @@ def process(args):
     if model_name == "AVG":
         return baseline(file)
     dataset = pd.read_csv(file)
-    if model_name == "GRU":
+    if model_name in ("RNN", "LSTM", "GRU"):
         model = RNN
     elif model_name == "GRU-P":
         model = GRU_P

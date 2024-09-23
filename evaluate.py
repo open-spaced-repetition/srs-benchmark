@@ -105,6 +105,7 @@ if __name__ == "__main__":
             "ACT-R",
             "AVG",
             "HLR",
+            "Ebisu-v2",
             "SM2-short",
             "SM2",
             "Transformer",
@@ -119,7 +120,7 @@ if __name__ == "__main__":
             with open(result_file, "r") as f:
                 data = [json.loads(x) for x in f.readlines()]
             for result in data:
-                if result["user"] not in common_set:
+                if common_set and result["user"] not in common_set:
                     continue
                 m.append(result["metrics"])
                 sizes.append(result["size"])
@@ -171,6 +172,7 @@ if __name__ == "__main__":
                 ("AVG", 0),
                 ("HLR", 3),
                 ("SM2-short", 0),
+                ("Ebisu-v2", 0),
                 ("SM2", 0),
                 ("Transformer", 127),
             ):

@@ -125,6 +125,7 @@ if __name__ == "__main__":
         "ACT-R",
         "HLR",
         "SM2-short",
+        "Ebisu-v2",
         "Transformer",
         "SM2",
     ]

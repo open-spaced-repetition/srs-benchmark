@@ -114,6 +114,7 @@ if __name__ == "__main__":
         "FSRS-4.5",
         "FSRSv4",
         "DASH",
+        "DASH-short",
         "DASH[MCM]",
         "DASH[ACT-R]",
         "FSRS-5-pretrain",
@@ -220,7 +221,7 @@ if __name__ == "__main__":
     models[index_sm2] = "SM-2"
     models[index_sm2_short] = "SM-2-short"
 
-    fig, ax = plt.subplots(figsize=(14, 14), dpi=200)
+    fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
         f"Wilcoxon signed-rank test, p-values ({n_collections} collections)",
         fontsize=24,

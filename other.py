@@ -19,7 +19,7 @@ import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
 import multiprocessing as mp
-import ebisu
+import ebisu  # type: ignore
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -1330,7 +1330,10 @@ def sm2(r_history):
 
 
 def ebisu_v2(sequence):
-    model = ebisu.defaultModel(7, alpha=1, beta=1)
+    init_ivl = 512
+    alpha = 0.2
+    beta = 0.2
+    model = ebisu.defaultModel(init_ivl, alpha, beta)
     for delta_t, rating in sequence:
         model = ebisu.updateRecall(
             model, successes=1 if rating > 1 else 0, total=1, tnow=max(delta_t, 0.001)

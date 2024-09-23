@@ -79,8 +79,8 @@ The following tables present the means and the 99% confidence intervals. The bes
 | HLR | 3 | 0.404±0.0079 | 0.102±0.0020 | 0.632±0.0034 |
 | SM-2-short | 0 | 0.50±0.011 | 0.124±0.0028 | 0.592±0.0032 |
 | SM-2 | 0 | 0.54±0.012 | 0.147±0.0029 | 0.599±0.0031 |
+| Ebisu-v2 | 0 | 0.445±0.0081 | 0.157±0.0025 | 0.592±0.0033 |
 | Transformer | 127 | 0.439±0.0078 | 0.164±0.0031 | 0.516±0.0043 |
-| Ebisu-v2 | 0 | 0.677±0.0076 | 0.340±0.0034 | 0.600±0.0033 |
 
 ### Unweighted
 
@@ -103,10 +103,10 @@ The following tables present the means and the 99% confidence intervals. The bes
 | ACT-R | 5 | 0.395±0.0040 | 0.106±0.0012 | 0.524±0.0018 |
 | FSRS v3 | 13 | 0.422±0.0046 | 0.106±0.0013 | 0.661±0.0017 |
 | HLR | 3 | 0.456±0.0051 | 0.124±0.0013 | 0.636±0.0018 |
+| Ebisu-v2 | 0 | 0.482±0.0053 | 0.159±0.0015 | 0.602±0.0018 |
 | Transformer | 127 | 0.468±0.0047 | 0.164±0.0016 | 0.527±0.0021 |
 | SM-2-short | 0 | 0.63±0.011 | 0.166±0.0019 | 0.594±0.0019 |
 | SM-2 | 0 | 0.71±0.013 | 0.199±0.0021 | 0.604±0.0018 |
-| Ebisu-v2 | 0 | 0.725±0.0041 | 0.350±0.0018 | 0.605±0.0018 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 

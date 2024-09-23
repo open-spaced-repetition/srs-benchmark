@@ -125,9 +125,9 @@ if __name__ == "__main__":
         "ACT-R",
         "HLR",
         "SM2-short",
+        "Ebisu-v2",
         "Transformer",
         "SM2",
-        "Ebisu-v2",
     ]
     csv_name = f"{len(models)} models.csv"
     print(f"Number of tests={(len(models)-1) ** 2}")

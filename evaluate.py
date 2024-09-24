@@ -84,33 +84,46 @@ if __name__ == "__main__":
         common_set = set()
     parser = argparse.ArgumentParser()
     parser.add_argument("--fast", action="store_true")
+    parser.add_argument("--secs", action="store_true")
     args = parser.parse_args()
+
+    models = (
+        [
+            (dev_mode_name, None),
+            ("GRU-P-short", 297),
+            ("GRU-P", 297),
+            ("FSRS-5", 19),
+            ("FSRS-rs", 19),
+            ("FSRS-4.5", 17),
+            ("FSRSv4", 17),
+            ("DASH", 9),
+            ("DASH-short", 9),
+            ("DASH[MCM]", 9),
+            ("DASH[ACT-R]", 5),
+            ("FSRSv3", 13),
+            ("FSRS-5-pretrain", 4),
+            ("NN-17", 39),
+            ("GRU", 39),
+            ("FSRS-5-dry-run", 0),
+            ("ACT-R", 5),
+            ("AVG", 0),
+            ("HLR", 3),
+            ("SM2-short", 0),
+            ("Ebisu-v2", 0),
+            ("SM2", 0),
+            ("Transformer", 127),
+        ]
+        if not args.secs
+        else [
+            (dev_mode_name, None),
+            ("GRU-P-secs", 297),
+            ("DASH-secs", 9),
+            ("FSRS-4.5-secs", 17),
+            ("GRU-secs", 39),
+        ]
+    )
     if args.fast:
-        for model in (
-            dev_mode_name,
-            "GRU-P-short",
-            "GRU-P",
-            "FSRS-5",
-            "FSRS-rs",
-            "FSRS-4.5",
-            "FSRSv4",
-            "DASH",
-            "DASH-short",
-            "DASH[MCM]",
-            "DASH[ACT-R]",
-            "FSRSv3",
-            "FSRS-5-pretrain",
-            "NN-17",
-            "GRU",
-            "FSRS-5-dry-run",
-            "ACT-R",
-            "AVG",
-            "HLR",
-            "Ebisu-v2",
-            "SM2-short",
-            "SM2",
-            "Transformer",
-        ):
+        for model, _ in models:
             print(f"Model: {model}")
             m = []
             parameters = []
@@ -153,31 +166,7 @@ if __name__ == "__main__":
             print(f"Weighted by number of {scale}\n")
             print("| Model | #Params | LogLoss | RMSE(bins) | AUC |")
             print("| --- | --- | --- | --- | --- |")
-            for model, n_param in (
-                (dev_mode_name, None),
-                ("GRU-P-short", 297),
-                ("GRU-P", 297),
-                ("FSRS-5", 19),
-                ("FSRS-rs", 19),
-                ("FSRS-4.5", 17),
-                ("FSRSv4", 17),
-                ("DASH", 9),
-                ("DASH-short", 9),
-                ("DASH[MCM]", 9),
-                ("DASH[ACT-R]", 5),
-                ("FSRSv3", 13),
-                ("FSRS-5-pretrain", 4),
-                ("NN-17", 39),
-                ("GRU", 39),
-                ("FSRS-5-dry-run", 0),
-                ("ACT-R", 5),
-                ("AVG", 0),
-                ("HLR", 3),
-                ("SM2-short", 0),
-                ("Ebisu-v2", 0),
-                ("SM2", 0),
-                ("Transformer", 127),
-            ):
+            for model, n_param in ((dev_mode_name, None),):
                 m = []
                 parameters = []
                 sizes = []

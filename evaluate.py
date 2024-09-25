@@ -119,6 +119,7 @@ if __name__ == "__main__":
             ("DASH-secs", 9),
             ("FSRS-4.5-secs", 17),
             ("GRU-P-secs", 297),
+            ("ACT-R-secs", 5),
             ("AVG-secs", 0),
             ("GRU-secs", 39),
         ]

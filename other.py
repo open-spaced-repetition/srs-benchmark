@@ -39,8 +39,9 @@ file_name = (
     model_name + ("-short" if short_term else "") + ("-secs" if secs_ivl else "")
 )
 
-INIT_S_MAX = 100 * 86400 if secs_ivl else 100
-S_MAX = 36500 * 86400 if secs_ivl else 36500
+S_MIN = 1e-6 if secs_ivl else 0.1
+INIT_S_MAX = 128
+S_MAX = 36500
 
 
 class FSRS3ParameterClipper:
@@ -140,7 +141,7 @@ class FSRS3(nn.Module):
                 self.stability_after_success(state, new_d, r),
                 self.stability_after_failure(state, new_d, r),
             )
-        new_s = new_s.clamp(0.1, S_MAX)
+        new_s = new_s.clamp(S_MIN, S_MAX)
         return torch.stack([new_s, new_d], dim=1)
 
     def forward(
@@ -276,7 +277,7 @@ class FSRS4(nn.Module):
             new_d = state[:, 1] - self.w[6] * (X[:, 1] - 3)
             new_d = self.mean_reversion(self.w[4], new_d)
             new_d = new_d.clamp(1, 10)
-        new_s = new_s.clamp(0.1, S_MAX)
+        new_s = new_s.clamp(S_MIN, S_MAX)
         return torch.stack([new_s, new_d], dim=1)
 
     def forward(
@@ -346,7 +347,7 @@ class FSRS4(nn.Module):
             res = minimize(
                 loss,
                 x0=init_s0,
-                bounds=((0.1, INIT_S_MAX),),
+                bounds=((S_MIN, INIT_S_MAX),),
                 options={"maxiter": int(np.sqrt(total_count))},
             )
             params = res.x
@@ -450,7 +451,7 @@ class FSRS4(nn.Module):
             ]
 
         self.w.data[0:4] = Tensor(
-            list(map(lambda x: max(min(INIT_S_MAX, x), 0.01), init_s0))
+            list(map(lambda x: max(min(INIT_S_MAX, x), S_MIN), init_s0))
         )
 
 
@@ -461,19 +462,19 @@ class FSRS4dot5ParameterClipper:
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
-            w[4] = w[4].clamp(1, 10)
-            w[5] = w[5].clamp(0.1, 5)
-            w[6] = w[6].clamp(0.1, 5)
-            w[7] = w[7].clamp(0, 0.75)
-            w[8] = w[8].clamp(0, 4)
+            w[4] = w[4].clamp(0, 10)
+            w[5] = w[5].clamp(0.01, 5)
+            w[6] = w[6].clamp(0.01, 5)
+            w[7] = w[7].clamp(0, 0.8)
+            w[8] = w[8].clamp(0, 6)
             w[9] = w[9].clamp(0, 0.8)
-            w[10] = w[10].clamp(0.01, 3)
-            w[11] = w[11].clamp(0.5, 5)
-            w[12] = w[12].clamp(0.01, 0.2)
+            w[10] = w[10].clamp(0.01, 5)
+            w[11] = w[11].clamp(0.2, 6)
+            w[12] = w[12].clamp(0.01, 0.4)
             w[13] = w[13].clamp(0.01, 0.9)
-            w[14] = w[14].clamp(0.01, 3)
+            w[14] = w[14].clamp(0.01, 4)
             w[15] = w[15].clamp(0, 1)
-            w[16] = w[16].clamp(1, 6)
+            w[16] = w[16].clamp(1, 10)
             module.w.data = w
 
 
@@ -505,23 +506,23 @@ class FSRS4dot5(nn.Module):
         ]
         if not secs_ivl
         else [
-            90.7882,
-            6232.9404,
-            83142.7578,
-            776078.0625,
-            3.5651,
-            0.1144,
-            0.5854,
-            0.0993,
-            3.5207,
-            0.2198,
-            2.3533,
-            2.3831,
-            0.1069,
-            0.6711,
-            1.8232,
-            0.2099,
-            4.1395,
+            0.0012,
+            0.0826,
+            0.8382,
+            26.2146,
+            4.8622,
+            1.0311,
+            0.8295,
+            0.0379,
+            2.0884,
+            0.4704,
+            1.2009,
+            1.7196,
+            0.1874,
+            0.1593,
+            1.5636,
+            0.2358,
+            3.3175,
         ]
     )
     clipper = FSRS4dot5ParameterClipper()
@@ -584,7 +585,7 @@ class FSRS4dot5(nn.Module):
             new_d = state[:, 1] - self.w[6] * (X[:, 1] - 3)
             new_d = self.mean_reversion(self.w[4], new_d)
             new_d = new_d.clamp(1, 10)
-        new_s = new_s.clamp(0.01, S_MAX)
+        new_s = new_s.clamp(S_MIN, S_MAX)
         return torch.stack([new_s, new_d], dim=1)
 
     def forward(
@@ -610,7 +611,7 @@ class FSRS4dot5(nn.Module):
     def state_dict(self):
         return list(
             map(
-                lambda x: round(float(x), 4),
+                lambda x: round(float(x), 6),
                 dict(self.named_parameters())["w"].data,
             )
         )
@@ -658,7 +659,7 @@ class FSRS4dot5(nn.Module):
             res = minimize(
                 loss,
                 x0=init_s0,
-                bounds=((0.01, INIT_S_MAX),),
+                bounds=((S_MIN, INIT_S_MAX),),
                 options={"maxiter": int(sum(count))},
             )
             params = res.x
@@ -763,7 +764,7 @@ class FSRS4dot5(nn.Module):
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         self.w.data[0:4] = Tensor(
-            list(map(lambda x: max(min(INIT_S_MAX, x), 0.01), init_s0))
+            list(map(lambda x: max(min(INIT_S_MAX, x), S_MIN), init_s0))
         )
 
 
@@ -1013,7 +1014,17 @@ class ACT_R(nn.Module):
 class DASH(nn.Module):
     # 9 params
     if short_term:
-        init_w = [-0.1766, 0.4483, -0.3618, 0.5953, -0.5104, 0.8609, -0.3643, 0.6447, 1.2815]
+        init_w = [
+            -0.1766,
+            0.4483,
+            -0.3618,
+            0.5953,
+            -0.5104,
+            0.8609,
+            -0.3643,
+            0.6447,
+            1.2815,
+        ]
     else:
         init_w = (
             [0.2024, 0.5967, 0.1255, 0.6039, -0.1485, 0.572, 0.0933, 0.4801, 0.787]
@@ -1106,10 +1117,10 @@ class NN_17ParameterClipper:
     def __call__(self, module):
         if hasattr(module, "S0"):
             w = module.S0.data
-            w[0] = w[0].clamp(0.01, INIT_S_MAX)
-            w[1] = w[1].clamp(0.01, INIT_S_MAX)
-            w[2] = w[2].clamp(0.01, INIT_S_MAX)
-            w[3] = w[3].clamp(0.01, INIT_S_MAX)
+            w[0] = w[0].clamp(S_MIN, INIT_S_MAX)
+            w[1] = w[1].clamp(S_MIN, INIT_S_MAX)
+            w[2] = w[2].clamp(S_MIN, INIT_S_MAX)
+            w[3] = w[3].clamp(S_MIN, INIT_S_MAX)
             module.S0.data = w
 
         if hasattr(module, "D0"):
@@ -1267,7 +1278,7 @@ class NN_17(nn.Module):
 
             # S that corresponds to Rw
             sr = self.inverse_forgetting_curve(rw, delta_t)
-            sr = sr.clamp(0.01, S_MAX)
+            sr = sr.clamp(S_MIN, S_MAX)
 
             # Difficulty
             next_d_input = torch.concat([last_d, rw, rating], dim=1)
@@ -1276,7 +1287,7 @@ class NN_17(nn.Module):
             # Post-lapse stability
             pls_input = torch.concat([rw, lapses], dim=1)
             pls = self.pls(pls_input)
-            pls = pls.clamp(0.01, S_MAX)
+            pls = pls.clamp(S_MIN, S_MAX)
 
             # SInc
             sinc_t = 1 + torch.exp(self.sinc_w[0]) * (5 * (1 - new_d) + 1) * torch.pow(
@@ -1295,7 +1306,7 @@ class NN_17(nn.Module):
                 pls,
             )
 
-        new_s = new_s.clamp(0.01, S_MAX)
+        new_s = new_s.clamp(S_MIN, S_MAX)
         next_state = torch.concat([new_s, new_d], dim=1)
         return next_state
 
@@ -1552,7 +1563,7 @@ class Trainer:
             if isinstance(self.model, (FSRS3, FSRS4, FSRS4dot5, ACT_R, DASH_ACTR)):
                 w = list(
                     map(
-                        lambda x: round(float(x), 4),
+                        lambda x: round(float(x), 6),
                         dict(self.model.named_parameters())["w"].data,
                     )
                 )
@@ -1676,7 +1687,7 @@ def create_features(df, model_name="FSRSv3"):
         and "elapsed_seconds" in df.columns
     ):
         if secs_ivl:
-            df["delta_t"] = df["elapsed_seconds"]
+            df["delta_t"] = df["elapsed_seconds"] / 86400
         else:
             df["delta_t"] = df["elapsed_days"]
     if short_term is None:
@@ -1695,10 +1706,16 @@ def create_features(df, model_name="FSRSv3"):
     df["t_history"] = [
         ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
     ]
-    if model_name.startswith("FSRS") or model_name in ("RNN", "LSTM", "GRU", "Transformer"):
-        dtype = torch.int if model_name.startswith("FSRS") else torch.float32
+    if model_name.startswith("FSRS") or model_name in (
+        "RNN",
+        "LSTM",
+        "GRU",
+        "Transformer",
+    ):
         df["tensor"] = [
-            torch.tensor((t_item[:-1], r_item[:-1]), dtype=dtype).transpose(0, 1)
+            torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
+                0, 1
+            )
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
@@ -1736,7 +1753,7 @@ def create_features(df, model_name="FSRSv3"):
             features = np.zeros(8)
             r_history = np.array(r_history) > 1
             tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426])
-            time_windows = np.array([1, 7, 30, np.inf]) * (86400 if secs_ivl else 1)
+            time_windows = np.array([1, 7, 30, np.inf])
 
             # Compute the cumulative sum of t_history in reverse order
             cumulative_times = np.cumsum(t_history[::-1])[::-1]
@@ -1940,7 +1957,7 @@ def evaluate(y, p, df, file_name, file, w_list=None):
         "size": len(y),
     }
     if w_list and type(w_list[0]) == list:
-        result["parameters"] = list(map(lambda x: round(x, 4), w_list[-1]))
+        result["parameters"] = list(map(lambda x: round(x, 6), w_list[-1]))
     elif os.environ.get("WEIGHTS"):
         torch.save(w_list[-1], f"weights/{file_name}/{file.stem}.pth")
     if os.environ.get("RAW"):

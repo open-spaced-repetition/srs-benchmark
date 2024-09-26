@@ -161,14 +161,14 @@ if __name__ == "__main__":
                 print()
 
             if len(parameters) > 0:
-                print(f"parameters: {np.median(parameters, axis=0).round(4).tolist()}")
+                print(f"parameters: {np.median(parameters, axis=0).round(6).tolist()}")
 
     else:
         for scale in ("reviews", "users"):
             print(f"Weighted by number of {scale}\n")
             print("| Model | #Params | LogLoss | RMSE(bins) | AUC |")
             print("| --- | --- | --- | --- | --- |")
-            for model, n_param in ((dev_mode_name, None),):
+            for model, n_param in models:
                 m = []
                 parameters = []
                 sizes = []

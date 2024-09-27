@@ -118,6 +118,7 @@ if __name__ == "__main__":
             (dev_mode_name, None),
             ("GRU-P-secs", 297),
             ("DASH-secs", 9),
+            ("DASH[MCM]-secs", 9),
             ("FSRS-4.5-secs", 17),
             ("ACT-R-secs", 5),
             ("AVG-secs", 0),

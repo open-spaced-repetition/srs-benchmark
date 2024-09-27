@@ -116,9 +116,9 @@ if __name__ == "__main__":
         if not args.secs
         else [
             (dev_mode_name, None),
+            ("GRU-P-secs", 297),
             ("DASH-secs", 9),
             ("FSRS-4.5-secs", 17),
-            ("GRU-P-secs", 297),
             ("ACT-R-secs", 5),
             ("AVG-secs", 0),
             ("GRU-secs", 39),

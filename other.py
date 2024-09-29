@@ -1230,7 +1230,7 @@ class NN_17(nn.Module):
                 pass
 
     def forward(self, inputs):
-        state = torch.ones((inputs.shape[1], 2))
+        state = torch.ones((inputs.shape[1], 2), device=device)
         outputs = []
         for X in inputs:
             state = self.step(X, state)
@@ -1254,7 +1254,7 @@ class NN_17(nn.Module):
 
         if torch.equal(state, torch.ones_like(state)):
             # first review
-            keys = torch.tensor([1, 2, 3, 4])
+            keys = torch.tensor([1, 2, 3, 4], device=device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             new_s = torch.zeros_like(state[:, 0])

@@ -112,6 +112,7 @@ if __name__ == "__main__":
         "FSRS-5",
         "FSRS-rs",
         "FSRS-4.5",
+        "FSRS-5-binary",
         "FSRSv4",
         "DASH",
         "DASH-short",

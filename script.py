@@ -45,6 +45,7 @@ do_fullinfo_stats: bool = False
 dry_run = os.environ.get("DRY_RUN")
 only_pretrain = os.environ.get("PRETRAIN")
 secs_ivl = os.environ.get("SECS_IVL")
+binary = os.environ.get("BINARY")
 rust = os.environ.get("FSRS_RS")
 if rust:
     path = "FSRS-rs"
@@ -66,6 +67,8 @@ else:
         path += "-fullinfo"
     if secs_ivl:
         path += f"-secs"
+    if binary:
+        path += "-binary"
 
 
 def predict(w_list, testsets, file=None):
@@ -129,6 +132,9 @@ def cum_concat(x):
 
 def create_time_series(df):
     df = df[df["rating"].isin([1, 2, 3, 4])]
+    card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
+    if binary:
+        df.loc[:, "rating"] = df.loc[:, "rating"].map({1: 1, 2: 3, 3: 3, 4: 3})
     df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
     if (
         "delta_t" not in df.columns
@@ -172,7 +178,7 @@ def create_time_series(df):
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     df = df[df["delta_t"] != 0].copy()
     df["i"] = df.groupby("card_id").cumcount() + 1
-    df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
+    df["first_rating"] = df["card_id"].map(card_id_to_first_rating).astype(str)
     filtered_dataset = (
         df[df["i"] == 2]
         .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
@@ -185,6 +191,8 @@ def create_time_series(df):
     df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
         remove_non_continuous_rows
     )
+    if binary:
+        df["first_rating"] = df["first_rating"].map(lambda x: "1" if x == 1 else "3")
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 

@@ -95,6 +95,7 @@ if __name__ == "__main__":
             ("FSRS-5", 19),
             ("FSRS-rs", 19),
             ("FSRS-4.5", 17),
+            ("FSRS-5-binary", 15),
             ("FSRSv4", 17),
             ("DASH", 9),
             ("DASH-short", 9),

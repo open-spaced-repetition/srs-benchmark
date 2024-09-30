@@ -31,7 +31,10 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - FSRS v3: the first version of the FSRS algorithm that people actually used.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
-- FSRS-5: the latest version of FSRS. Unlike the previous versions, it takes into account same-day reviews. Same-day reviews are used only for training, and not for evaluation. This benchmark also includes FSRS-5 with default parameters (which have been obtained by running FSRS-5 on all 20 thousand collections) and FSRS-5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default, which is called "pretrain".
+- FSRS-5: the latest version of FSRS. Unlike the previous versions, it takes into account same-day reviews. Same-day reviews are used only for training, and not for evaluation.
+    - FSRS-5 default param.: FSRS-5 with default parameters (which have been obtained by running FSRS-5 on all 20 thousand collections).
+    - FSRS-5 pretrain: FSRS-5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
+    - FSRS-5 binary: FSRS which treats `hard` and `easy` ratings as `good`.
 - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
     - GRU-P: a variant of GRU that removes the forgetting curve and predicts the probability of recall directly.
@@ -65,6 +68,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 | FSRS-5 | 19 | 0.320±0.0052 | 0.050±0.0010 | 0.700±0.0028 |
 | FSRS-rs | 19 | 0.322±0.0053 | 0.052±0.0011 | 0.692±0.0029 |
 | FSRS-4.5 | 17 | 0.324±0.0053 | 0.052±0.0011 | 0.693±0.0027 |
+| FSRS-5 binary | 15 | 0.325±0.0053 | 0.054±0.0011 | 0.679±0.0032 |
 | FSRS v4 | 17 | 0.329±0.0056 | 0.057±0.0012 | 0.690±0.0027 |
 | DASH | 9 | 0.331±0.0053 | 0.060±0.0010 | 0.642±0.0031 |
 | DASH[MCM] | 9 | 0.331±0.0054 | 0.062±0.0011 | 0.644±0.0030 |
@@ -91,6 +95,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 | FSRS-5 | 19 | 0.346±0.0031 | 0.0712±0.00084 | **0.697±0.0017** |
 | FSRS-rs | 19 | 0.348±0.0031 | 0.0726±0.00086 | 0.693±0.0017 |
 | FSRS-4.5 | 17 | 0.352±0.0032 | 0.0742±0.00088 | 0.688±0.0017 |
+| FSRS-5-binary | 15 | 0.355±0.0032 | 0.0773±0.00093 | 0.673±0.0019 |
 | DASH | 9 | 0.358±0.0031 | 0.0810±0.00095 | 0.632±0.0018 |
 | FSRS v4 | 17 | 0.362±0.0033 | 0.082±0.0010 | 0.685±0.0016 |
 | DASH[MCM] | 9 | 0.358±0.0030 | 0.0831±0.00094 | 0.636±0.0019 |

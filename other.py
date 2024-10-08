@@ -1711,13 +1711,32 @@ def create_features(df, model_name="FSRSv3"):
     r_history = df.groupby("card_id", group_keys=False)["rating"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
+    hour_offset_history = df.groupby("card_id", group_keys=False)["hour_offset"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    workload_history = df.groupby("card_id", group_keys=False)["workload"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
     df["r_history"] = [
         ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
     ]
     df["t_history"] = [
         ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
     ]
-    if model_name.startswith("FSRS") or model_name in (
+    if model_name == "FSRS-fatigue":
+        df["tensor"] = [
+            torch.tensor(
+                (t_item[:-1], r_item[:-1], hour_offset_item[:-1], workload_item[:-1]),
+                dtype=torch.float32,
+            ).transpose(0, 1)
+            for t_sublist, r_sublist, hour_offset_sublist, workload_sublist in zip(
+                t_history, r_history, hour_offset_history, workload_history
+            )
+            for t_item, r_item, hour_offset_item, workload_item in zip(
+                t_sublist, r_sublist, hour_offset_sublist, workload_sublist
+            )
+        ]
+    elif model_name.startswith("FSRS") or model_name in (
         "RNN",
         "LSTM",
         "GRU",
@@ -1730,7 +1749,7 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
-    if model_name == "GRU-P":
+    elif model_name == "GRU-P":
         df["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)

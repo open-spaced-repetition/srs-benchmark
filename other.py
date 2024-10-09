@@ -510,23 +510,32 @@ class FSRS4dot5(FSRS):
         ]
         if not secs_ivl
         else [
-            0.0012,
-            0.0826,
-            0.8382,
-            26.2146,
-            4.8622,
-            1.0311,
+            0.001067,
+            0.113122,
+            0.879466,
+            23.650629,
+            4.777555,
+            1.271812,
             0.8295,
-            0.0379,
-            2.0884,
-            0.4704,
-            1.2009,
-            1.7196,
-            0.1874,
-            0.1593,
-            1.5636,
-            0.2358,
+            0.061578,
+            1.942751,
+            0.392099,
+            1.073524,
+            1.398776,
+            0.368766,
+            0.125962,
+            1.512275,
+            0.238395,
             3.3175,
+            2.650322,
+            0.415462,
+            1.48838,
+            1.616656,
+            0.295,
+            0.21466,
+            2.202775,
+            0.237024,
+            3.752134,
         ]
     )
     clipper = FSRS4dot5ParameterClipper()
@@ -563,6 +572,31 @@ class FSRS4dot5(FSRS):
         )
         return torch.minimum(new_s, state[:, 0])
 
+    def stability_after_success_short_term(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> Tensor:
+        hard_penalty = torch.where(rating == 2, self.w[24], 1)
+        easy_bonus = torch.where(rating == 4, self.w[25], 1)
+        new_s = state[:, 0] * (
+            1
+            + torch.exp(self.w[17])
+            * (11 - state[:, 1])
+            * torch.pow(state[:, 0], -self.w[18])
+            * (torch.exp((1 - r) * self.w[19]) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
+        return new_s
+
+    def stability_after_failure_short_term(self, state: Tensor, r: Tensor) -> Tensor:
+        new_s = (
+            self.w[20]
+            * torch.pow(state[:, 1], -self.w[21])
+            * (torch.pow(state[:, 0] + 1, self.w[22]) - 1)
+            * torch.exp((1 - r) * self.w[23])
+        )
+        return torch.minimum(new_s, state[:, 0])
+
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
@@ -580,11 +614,20 @@ class FSRS4dot5(FSRS):
             new_d = new_d.clamp(1, 10)
         else:
             r = self.forgetting_curve(X[:, 0], state[:, 0])
-            condition = X[:, 1] > 1
+            recall_or_not = X[:, 1] > 1
+            short_term_or_not = X[:, 0] < 0.5
             new_s = torch.where(
-                condition,
-                self.stability_after_success(state, r, X[:, 1]),
-                self.stability_after_failure(state, r),
+                recall_or_not,
+                torch.where(
+                    short_term_or_not,
+                    self.stability_after_success_short_term(state, r, X[:, 1]),
+                    self.stability_after_success(state, r, X[:, 1]),
+                ),
+                torch.where(
+                    short_term_or_not,
+                    self.stability_after_failure_short_term(state, r),
+                    self.stability_after_failure(state, r),
+                ),
             )
             new_d = state[:, 1] - self.w[6] * (X[:, 1] - 3)
             new_d = self.mean_reversion(self.w[4], new_d)

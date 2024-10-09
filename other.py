@@ -650,7 +650,7 @@ class FSRS5ParameterClipper:
             module.w.data = w
 
 
-class FSRS5(FSRS):
+class FSRS_fatigue(FSRS):
     init_w = [
         0.4072,
         1.1829,
@@ -678,7 +678,7 @@ class FSRS5(FSRS):
     n_epoch: int = 5
 
     def __init__(self, w: List[float] = init_w):
-        super(FSRS5, self).__init__()
+        super(FSRS_fatigue, self).__init__()
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
     def forgetting_curve(self, t, s):
@@ -1462,7 +1462,7 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.model = MODEL.to(device=device)
-        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
+        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS_fatigue)):
             self.model.pretrain(train_set)
         if isinstance(MODEL, (RNN, Transformer, GRU_P)):
             self.optimizer = torch.optim.AdamW(
@@ -1473,7 +1473,7 @@ class Trainer:
         self.clipper = (
             MODEL.clipper
             if isinstance(
-                MODEL, (FSRS3, FSRS4, FSRS4dot5, FSRS5, ACT_R, DASH_ACTR, NN_17)
+                MODEL, (FSRS3, FSRS4, FSRS4dot5, FSRS_fatigue, ACT_R, DASH_ACTR, NN_17)
             )
             else None
         )
@@ -1894,10 +1894,10 @@ def process(args):
         model = FSRS4
     elif model_name == "FSRS-4.5":
         model = FSRS4dot5
-    elif model_name == "FSRS-5":
+    elif model_name == "FSRS-fatigue":
         global short_term
         short_term = "1"
-        model = FSRS5
+        model = FSRS_fatigue
     elif model_name == "HLR":
         model = HLR
     elif model_name == "Transformer":

@@ -200,7 +200,7 @@ def best_mode(a, weights):
 
 
 if __name__ == "__main__":
-    model = "FSRS-5"
+    model = "FSRS-rs"
     with open(f"./result/{model}.jsonl", "r") as f:
         data = [json.loads(x) for x in f.readlines()]
     weights_list = []

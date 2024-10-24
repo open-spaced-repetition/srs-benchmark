@@ -424,7 +424,7 @@ if __name__ == "__main__":
 
     unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
 
-    num_threads = int(os.environ.get("THREADS", "4"))
+    num_threads = int(os.environ.get("THREADS", "8"))
     with ProcessPoolExecutor(max_workers=num_threads) as executor:
         futures = [executor.submit(process, file) for file in unprocessed_files]
         for future in (

@@ -121,6 +121,7 @@ if __name__ == "__main__":
             ("DASH-secs", 9),
             ("DASH[MCM]-secs", 9),
             ("FSRS-4.5-secs", 17),
+            ("NN-17-secs", 39),
             ("DASH[ACT-R]-secs", 5),
             ("ACT-R-secs", 5),
             ("AVG-secs", 0),

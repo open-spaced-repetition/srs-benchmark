@@ -51,9 +51,8 @@ if rust:
     path = "FSRS-rs"
     if do_fullinfo_stats:
         path += "-fullinfo"
-    from anki._backend import RustBackend
-
-    backend = RustBackend()
+    from fsrs_rs_python import FSRS  # type: ignore
+    backend = FSRS(parameters=[])
 
 else:
     path = "FSRS-5"
@@ -95,8 +94,8 @@ def predict(w_list, testsets, file=None):
     return p, y, save_tmp
 
 
-def convert_to_items(df):  # -> list[FsrsItem]
-    from anki.collection import FsrsItem, FsrsReview
+def convert_to_items(df):  # -> list[FSRSItem]
+    from fsrs_rs_python import FSRSItem, FSRSReview
 
     def accumulate(group):
         items = []
@@ -106,9 +105,9 @@ def convert_to_items(df):  # -> list[FsrsItem]
             ]
             r_history = [int(t) for t in row["r_history"].split(",")] + [row["rating"]]
             items.append(
-                FsrsItem(
+                FSRSItem(
                     reviews=[
-                        FsrsReview(delta_t=int(x[0]), rating=int(x[1]))
+                        FSRSReview(delta_t=int(x[0]), rating=int(x[1]))
                         for x in zip(t_history, r_history)
                     ]
                 )

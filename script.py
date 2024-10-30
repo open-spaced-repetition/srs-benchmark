@@ -11,8 +11,11 @@ from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score  # 
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
+import pyarrow.parquet as pq  # type: ignore
 import torch
 
+
+dataset_path = "../anki-revlogs-10k/revlogs"
 dev_mode = os.environ.get("DEV_MODE")
 
 if dev_mode:
@@ -52,6 +55,7 @@ if rust:
     if do_fullinfo_stats:
         path += "-fullinfo"
     from fsrs_rs_python import FSRS  # type: ignore
+
     backend = FSRS(parameters=[])
 
 else:
@@ -70,10 +74,10 @@ else:
         path += "-binary"
 
 
-def predict(w_list, testsets, file=None):
+def predict(w_list, testsets, user_id=None):
     p = []
     y = []
-    save_tmp = [] if file else None
+    save_tmp = [] if user_id else None
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         my_collection = Collection(w)
@@ -83,13 +87,13 @@ def predict(w_list, testsets, file=None):
         testset["p"] = power_forgetting_curve(testset["delta_t"], testset["stability"])
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
-        if file:
+        if user_id:
             save_tmp.append(testset)
-    if file:
+    if user_id:
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
         if os.environ.get("FILE"):
-            save_tmp.to_csv(f"evaluation/{path}/{file.stem}.tsv", sep="\t", index=False)
+            save_tmp.to_csv(f"evaluation/{path}/{user_id}.tsv", sep="\t", index=False)
 
     return p, y, save_tmp
 
@@ -130,6 +134,8 @@ def cum_concat(x):
 
 
 def create_time_series(df):
+    df["review_th"] = range(1, df.shape[0] + 1)
+    df.sort_values(by=["card_id", "review_th"], inplace=True)
     df = df[df["rating"].isin([1, 2, 3, 4])]
     card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
     if binary:
@@ -195,12 +201,12 @@ def create_time_series(df):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
-def process(file):
+def process(user_id):
     plt.close("all")
-    dataset = pd.read_csv(file)
+    dataset = pd.read_parquet(dataset_path, filters=[("user_id", "=", user_id)])
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
-        raise Exception(f"{file.stem} does not have enough data.")
+        raise Exception(f"{user_id} does not have enough data.")
     w_list = []
     trainsets = []
     testsets = []
@@ -274,7 +280,7 @@ def process(file):
                     print("Skipping - Inadequate data")
             else:
                 tb = sys.exc_info()[2]
-                print("User:", file.stem, "Error:", e.with_traceback(tb))
+                print("User:", user_id, "Error:", e.with_traceback(tb))
             if not do_fullinfo_stats:
                 # Default behavior is to use the default parameters if it cannot optimise
                 w_list.append(optimizer.init_w)
@@ -287,7 +293,7 @@ def process(file):
                 pass
 
     if len(w_list) == 0:
-        print("No data for", file.stem)
+        print("No data for", user_id)
         return
 
     if do_fullinfo_stats:
@@ -296,7 +302,7 @@ def process(file):
         all_evaluation = []
         last_y = []
         for i in range(len(w_list)):
-            p, y, evaluation = predict([w_list[i]], [testsets[i]], file=file)
+            p, y, evaluation = predict([w_list[i]], [testsets[i]], user_id)
             all_p.append(p)
             all_y.append(y)
             all_evaluation.append(evaluation)
@@ -317,7 +323,7 @@ def process(file):
         all_y = []
         all_evaluation = []
         for i in range(len(w_list)):
-            p, y, evaluation = predict([w_list[i]], [trainsets[i]], file=file)
+            p, y, evaluation = predict([w_list[i]], [trainsets[i]], user_id)
             all_p.append(p)
             all_y.append(y)
             all_evaluation.append(evaluation)
@@ -333,13 +339,13 @@ def process(file):
         rmse_bins_train = [rmse_matrix(e) for e in all_evaluation]
 
     else:
-        p, y, evaluation = predict(w_list, testsets, file=file)
+        p, y, evaluation = predict(w_list, testsets, user_id)
         last_y = y
 
         if os.environ.get("PLOT"):
             fig = plt.figure()
             plot_brier(p, y, ax=fig.add_subplot(111))
-            fig.savefig(f"evaluation/{path}/{file.stem}.png")
+            fig.savefig(f"evaluation/{path}/{user_id}.png")
 
         p_calibrated = lowess(
             y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
@@ -364,7 +370,7 @@ def process(file):
             "ICI": round(ici, 6),
             "AUC": auc,
         },
-        "user": int(file.stem),
+        "user": user_id,
         "size": len(last_y),
         "parameters": list(map(lambda x: round(x, 4), w_list[-1])),
     }
@@ -377,7 +383,7 @@ def process(file):
 
     if os.environ.get("RAW"):
         raw = {
-            "user": int(file.stem),
+            "user": user_id,
             "p": list(map(lambda x: round(x, 4), p)),
             "y": list(map(int, y)),
         }
@@ -397,10 +403,8 @@ def sort_jsonl(file):
 
 
 if __name__ == "__main__":
-    unprocessed_files = []
-    dataset_path0 = "./dataset/"
-    dataset_path1 = "../FSRS-Anki-20k/dataset/1/"
-    dataset_path2 = "../FSRS-Anki-20k/dataset/2/"
+    unprocessed_users = []
+    dataset = pq.ParquetDataset(dataset_path)
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)
@@ -415,17 +419,22 @@ if __name__ == "__main__":
     if os.environ.get("RAW") and raw_file.exists():
         sort_jsonl(raw_file)
 
-    for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:
-        for file in Path(dataset_path).glob("*.csv"):
-            if int(file.stem) in processed_user:
-                continue
-            unprocessed_files.append(file)
+    for user_id in dataset.partitioning.dictionaries[0]:
+        if user_id.as_py() in processed_user:
+            continue
+        unprocessed_users.append(user_id.as_py())
 
-    unprocessed_files.sort(key=lambda x: int(x.stem), reverse=False)
+    unprocessed_users.sort()
 
     num_threads = int(os.environ.get("THREADS", "8"))
     with ProcessPoolExecutor(max_workers=num_threads) as executor:
-        futures = [executor.submit(process, file) for file in unprocessed_files]
+        futures = [
+            executor.submit(
+                process,
+                user_id,
+            )
+            for user_id in unprocessed_users
+        ]
         for future in (
             pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):

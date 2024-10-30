@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import root_mean_squared_error
+from sklearn.metrics import root_mean_squared_error  # type: ignore
 
 
 def cross_comparison(revlogs, algoA, algoB, graph=False):

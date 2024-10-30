@@ -2,6 +2,7 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
+import torch.nn as nn
 import os
 from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P
 
@@ -12,14 +13,16 @@ file_name = (
     model_name + ("-short" if short_term else "") + ("-secs" if secs_ivl else "")
 )
 
+model: nn.Module
+
 if model_name == "GRU":
-    model = RNN
+    model = RNN()
 elif model_name == "GRU-P":
-    model = GRU_P
+    model = GRU_P()
 elif model_name == "Transformer":
-    model = Transformer
+    model = Transformer()
 elif model_name == "NN-17":
-    model = NN_17
+    model = NN_17()
 
 total = 0
 for param in model().parameters():
@@ -38,7 +41,7 @@ for i in tqdm(range(1, 101)):
 df = pd.concat(df_list, axis=0)
 
 trainer = Trainer(
-    model(),
+    model,
     df,
     None,
     n_epoch=32,

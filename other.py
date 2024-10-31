@@ -18,7 +18,6 @@ import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
 import multiprocessing as mp
-import ebisu  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser
 
@@ -35,6 +34,9 @@ WEIGHTS = args.weights
 RAW = args.raw
 THREADS = args.threads
 DATA_PATH = args.data
+
+if MODEL_NAME.startswith("Ebisu"):
+    import ebisu  # type: ignore
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -1657,16 +1659,11 @@ def process_untrainable(user_id):
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
             )
         elif MODEL_NAME == "Ebisu-v2":
-            try:
-                testset["model"] = testset["sequence"].map(ebisu_v2)
-                testset["p"] = testset.apply(
-                    lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
-                    axis=1,
-                )
-            except Exception as e:
-                print(user_id)
-                tb = sys.exc_info()[2]
-                print(e.with_traceback(tb))
+            testset["model"] = testset["sequence"].map(ebisu_v2)
+            testset["p"] = testset.apply(
+                lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
+                axis=1,
+            )
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
@@ -1675,9 +1672,9 @@ def process_untrainable(user_id):
     return result, raw
 
 
-def baseline(file):
+def baseline(user_id):
     model_name = "AVG"
-    dataset = pd.read_csv(file)
+    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
@@ -1700,7 +1697,7 @@ def baseline(file):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    result, raw = evaluate(y, p, save_tmp, model_name, file)
+    result, raw = evaluate(y, p, save_tmp, model_name, user_id)
     return result, raw
 
 
@@ -1893,7 +1890,7 @@ def process(user_id):
         model = FSRS4dot5
     elif MODEL_NAME == "FSRS-5":
         global SHORT_TERM
-        SHORT_TERM = "1"
+        SHORT_TERM = True
         model = FSRS5
     elif MODEL_NAME == "HLR":
         model = HLR

@@ -13,12 +13,24 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
 import pyarrow.parquet as pq  # type: ignore
 import torch
+from config import create_parser
 
+parser = create_parser()
+args = parser.parse_args()
 
-dataset_path = "../anki-revlogs-10k/revlogs"
-dev_mode = os.environ.get("DEV_MODE")
+DEV_MODE = args.dev
+DRY_RUN = args.dry
+ONLY_PRETRAIN = args.pretrain
+SECS_IVL = args.secs
+BINARY = args.binary
+RUST = args.rust
+FILE = args.file
+PLOT = args.plot
+RAW = args.raw
+THREADS = args.threads
+DATA_PATH = args.data
 
-if dev_mode:
+if DEV_MODE:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
@@ -45,12 +57,9 @@ verbose: bool = False
 verbose_inadequate_data: bool = False
 do_fullinfo_stats: bool = False
 
-dry_run = os.environ.get("DRY_RUN")
-only_pretrain = os.environ.get("PRETRAIN")
-secs_ivl = os.environ.get("SECS_IVL")
-binary = os.environ.get("BINARY")
-rust = os.environ.get("FSRS_RS")
-if rust:
+
+if RUST:
+    os.environ["FSRS_NO_OUTLIER"] = "1"
     path = "FSRS-rs"
     if do_fullinfo_stats:
         path += "-fullinfo"
@@ -60,17 +69,17 @@ if rust:
 
 else:
     path = "FSRS-5"
-    if dry_run:
+    if DRY_RUN:
         path += "-dry-run"
-    if only_pretrain:
+    if ONLY_PRETRAIN:
         path += "-pretrain"
-    if dev_mode:
+    if DEV_MODE:
         path += "-dev"
     if do_fullinfo_stats:
         path += "-fullinfo"
-    if secs_ivl:
+    if SECS_IVL:
         path += f"-secs"
-    if binary:
+    if BINARY:
         path += "-binary"
 
 
@@ -92,7 +101,7 @@ def predict(w_list, testsets, user_id=None):
     if user_id:
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
-        if os.environ.get("FILE"):
+        if FILE:
             save_tmp.to_csv(f"evaluation/{path}/{user_id}.tsv", sep="\t", index=False)
 
     return p, y, save_tmp
@@ -138,7 +147,7 @@ def create_time_series(df):
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df = df[df["rating"].isin([1, 2, 3, 4])]
     card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
-    if binary:
+    if BINARY:
         df.loc[:, "rating"] = df.loc[:, "rating"].map({1: 1, 2: 3, 3: 3, 4: 3})
     df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
     if (
@@ -146,7 +155,7 @@ def create_time_series(df):
         and "elapsed_days" in df.columns
         and "elapsed_seconds" in df.columns
     ):
-        if secs_ivl:
+        if SECS_IVL:
             df["delta_t"] = df["elapsed_seconds"]
         else:
             df["delta_t"] = df["elapsed_days"]
@@ -196,14 +205,14 @@ def create_time_series(df):
     df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
         remove_non_continuous_rows
     )
-    if binary:
+    if BINARY:
         df["first_rating"] = df["first_rating"].map(lambda x: "1" if x == 1 else "3")
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
 def process(user_id):
     plt.close("all")
-    dataset = pd.read_parquet(dataset_path, filters=[("user_id", "=", user_id)])
+    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
@@ -235,7 +244,7 @@ def process(user_id):
         optimizer.define_model()
         test_set = dataset.iloc[test_index].copy()
         train_set = dataset.iloc[train_index].copy()
-        if dry_run:
+        if DRY_RUN:
             w_list.append(optimizer.init_w)
             sizes.append(len(train_index))
             testsets.append(test_set)
@@ -244,7 +253,7 @@ def process(user_id):
             continue
         # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
         try:
-            if rust:
+            if RUST:
                 train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
                 parameters = backend.benchmark(train_set_items)
                 w_list.append(parameters)
@@ -257,7 +266,7 @@ def process(user_id):
                     .reset_index()
                 )
                 _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
-                if only_pretrain:
+                if ONLY_PRETRAIN:
                     w_list.append(optimizer.init_w)
                 else:
                     trainer = Trainer(
@@ -342,7 +351,7 @@ def process(user_id):
         p, y, evaluation = predict(w_list, testsets, user_id)
         last_y = y
 
-        if os.environ.get("PLOT"):
+        if PLOT:
             fig = plt.figure()
             plot_brier(p, y, ax=fig.add_subplot(111))
             fig.savefig(f"evaluation/{path}/{user_id}.png")
@@ -381,7 +390,7 @@ def process(user_id):
         result["metrics"]["RMSE(bins)Train"] = round(rmse_bins_train, 6)
         result["allparameters"] = [list(w) for w in w_list]
 
-    if os.environ.get("RAW"):
+    if RAW:
         raw = {
             "user": user_id,
             "p": list(map(lambda x: round(x, 4), p)),
@@ -404,7 +413,7 @@ def sort_jsonl(file):
 
 if __name__ == "__main__":
     unprocessed_users = []
-    dataset = pq.ParquetDataset(dataset_path)
+    dataset = pq.ParquetDataset(DATA_PATH)
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)
@@ -416,7 +425,7 @@ if __name__ == "__main__":
     else:
         processed_user = set()
 
-    if os.environ.get("RAW") and raw_file.exists():
+    if RAW and raw_file.exists():
         sort_jsonl(raw_file)
 
     for user_id in dataset.partitioning.dictionaries[0]:
@@ -426,8 +435,7 @@ if __name__ == "__main__":
 
     unprocessed_users.sort()
 
-    num_threads = int(os.environ.get("THREADS", "8"))
-    with ProcessPoolExecutor(max_workers=num_threads) as executor:
+    with ProcessPoolExecutor(max_workers=THREADS) as executor:
         futures = [
             executor.submit(
                 process,
@@ -451,5 +459,5 @@ if __name__ == "__main__":
                 tqdm.write(str(e.with_traceback(tb)))
 
     sort_jsonl(result_file)
-    if os.environ.get("RAW"):
+    if RAW:
         sort_jsonl(raw_file)

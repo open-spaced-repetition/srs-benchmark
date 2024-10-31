@@ -20,21 +20,21 @@ from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  #
 import multiprocessing as mp
 import ebisu  # type: ignore
 import pyarrow.parquet as pq  # type: ignore
-import argparse
+from config import create_parser
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--model", default="FSRSv3")
-parser.add_argument("--short", action="store_true")
-parser.add_argument("--secs", action="store_true")
-parser.add_argument("--file", action="store_true")
-parser.add_argument("--plot", action="store_true")
-parser.add_argument("--weights", action="store_true")
-parser.add_argument("--raw", action="store_true")
-parser.add_argument("--threads", default=8, type=int)
-parser.add_argument("--data", default="../anki-revlogs-10k/revlogs")
-
+parser = create_parser()
 args = parser.parse_args()
+
+MODEL_NAME = args.model
+SHORT_TERM = args.short
+SECS_IVL = args.secs
+FILE = args.file
+PLOT = args.plot
+WEIGHTS = args.weights
+RAW = args.raw
+THREADS = args.threads
+DATA_PATH = args.data
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -48,17 +48,7 @@ batch_size: int = 512
 verbose: bool = False
 verbose_inadequate_data: bool = False
 
-MODEL_NAME = args.model
-SHORT_TERM = args.short
-SECS_IVL = args.secs
-FILE = args.file
-PLOT = args.plot
-WEIGHTS = args.weights
-RAW = args.raw
-THREADS = args.threads
-DATA_PATH = args.data
-
-file_name = (
+FILE_NAME = (
     MODEL_NAME + ("-short" if SHORT_TERM else "") + ("-secs" if SECS_IVL else "")
 )
 
@@ -847,7 +837,7 @@ class RNN(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{file_name}_pretrain.pth",
+                        f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=device,
                     )
@@ -897,7 +887,7 @@ class GRU_P(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{file_name}_pretrain.pth",
+                        f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=device,
                     )
@@ -938,7 +928,7 @@ class Transformer(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{file_name}_pretrain.pth",
+                        f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=device,
                     )
@@ -1257,7 +1247,7 @@ class NN_17(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{file_name}_pretrain.pth",
+                        f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=device,
                     )
@@ -1966,9 +1956,9 @@ def process(user_id):
     save_tmp = pd.concat(save_tmp)
     del save_tmp["tensor"]
     if FILE:
-        save_tmp.to_csv(f"evaluation/{file_name}/{user_id}.tsv", sep="\t", index=False)
+        save_tmp.to_csv(f"evaluation/{FILE_NAME}/{user_id}.tsv", sep="\t", index=False)
 
-    result, raw = evaluate(y, p, save_tmp, file_name, user_id, w_list)
+    result, raw = evaluate(y, p, save_tmp, FILE_NAME, user_id, w_list)
     return result, raw
 
 
@@ -2018,11 +2008,11 @@ if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     unprocessed_users = []
     dataset = pq.ParquetDataset(DATA_PATH)
-    Path(f"evaluation/{file_name}").mkdir(parents=True, exist_ok=True)
+    Path(f"evaluation/{FILE_NAME}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)
-    result_file = Path(f"result/{file_name}.jsonl")
-    raw_file = Path(f"raw/{file_name}.jsonl")
+    result_file = Path(f"result/{FILE_NAME}.jsonl")
+    raw_file = Path(f"raw/{FILE_NAME}.jsonl")
     if result_file.exists():
         data = sort_jsonl(result_file)
         processed_user = set(map(lambda x: x["user"], data))

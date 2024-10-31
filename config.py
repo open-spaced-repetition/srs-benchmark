@@ -5,6 +5,7 @@ def create_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--threads", default=8, type=int, help="number of threads")
+    parser.add_argument("--dev", action="store_true", help="for local development")
 
     # download revlogs from huggingface
     parser.add_argument(
@@ -45,5 +46,4 @@ def create_parser():
         "--binary", action="store_true", help="FSRS-5 with binary ratings"
     )
     parser.add_argument("--rust", action="store_true", help="FSRS-rs")
-    parser.add_argument("--dev", action="store_true", help="for local development")
     return parser

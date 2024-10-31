@@ -1,4 +1,5 @@
 import sys
+import os
 import pandas as pd
 import numpy as np
 from typing import List, Optional, Union
@@ -16,15 +17,14 @@ from scipy.optimize import minimize  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
-from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser
 
-
 parser = create_parser()
 args = parser.parse_args()
 
+DEV_MODE = args.dev
 MODEL_NAME = args.model
 SHORT_TERM = args.short
 SECS_IVL = args.secs
@@ -35,6 +35,11 @@ RAW = args.raw
 THREADS = args.threads
 DATA_PATH = args.data
 
+if DEV_MODE:
+    sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
+
+from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
+
 if MODEL_NAME.startswith("Ebisu"):
     import ebisu  # type: ignore
 
@@ -42,7 +47,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
 tqdm.pandas()
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 n_splits: int = 5
@@ -426,11 +431,11 @@ class FSRS4(FSRS):
         :return state:
         """
         if torch.equal(state, torch.zeros_like(state)):
-            keys = torch.tensor([1, 2, 3, 4], device=device)
+            keys = torch.tensor([1, 2, 3, 4], device=DEVICE)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
-            new_s = torch.ones_like(state[:, 0], device=device)
+            new_s = torch.ones_like(state[:, 0], device=DEVICE)
             new_s[index[0]] = self.w[index[1]]
             new_d = self.w[4] - self.w[5] * (X[:, 1] - 3)
             new_d = new_d.clamp(1, 10)
@@ -841,7 +846,7 @@ class RNN(nn.Module):
                     torch.load(
                         f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
-                        map_location=device,
+                        map_location=DEVICE,
                     )
                 )
             except FileNotFoundError:
@@ -891,7 +896,7 @@ class GRU_P(nn.Module):
                     torch.load(
                         f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
-                        map_location=device,
+                        map_location=DEVICE,
                     )
                 )
             except FileNotFoundError:
@@ -932,14 +937,14 @@ class Transformer(nn.Module):
                     torch.load(
                         f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
-                        map_location=device,
+                        map_location=DEVICE,
                     )
                 )
             except FileNotFoundError:
                 pass
 
     def forward(self, src):
-        tgt = torch.zeros(1, src.shape[1], self.n_input).to(device=device)
+        tgt = torch.zeros(1, src.shape[1], self.n_input).to(device=DEVICE)
         output = self.transformer(src, tgt)
         output = self.fc(output)
         output = torch.exp(output).repeat(src.shape[0], 1, 1)
@@ -1251,14 +1256,14 @@ class NN_17(nn.Module):
                     torch.load(
                         f"./{FILE_NAME}_pretrain.pth",
                         weights_only=True,
-                        map_location=device,
+                        map_location=DEVICE,
                     )
                 )
             except FileNotFoundError:
                 pass
 
     def forward(self, inputs):
-        state = torch.ones((inputs.shape[1], 2), device=device)
+        state = torch.ones((inputs.shape[1], 2), device=DEVICE)
         outputs = []
         for X in inputs:
             state = self.step(X, state)
@@ -1282,7 +1287,7 @@ class NN_17(nn.Module):
 
         if torch.equal(state, torch.ones_like(state)):
             # first review
-            keys = torch.tensor([1, 2, 3, 4], device=device)
+            keys = torch.tensor([1, 2, 3, 4], device=DEVICE)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             new_s = torch.zeros_like(state[:, 0])
@@ -1404,17 +1409,13 @@ def lineToTensorRNN(line):
 
 def iter(model, batch):
     sequences, delta_ts, labels, seq_lens = batch
-    sequences = sequences.to(device=device)
-    delta_ts = delta_ts.to(device=device)
-    labels = labels.to(device=device)
-    seq_lens = seq_lens.to(device=device)
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels}
 
     if isinstance(model, ACT_R):
         outputs = model(sequences)
         result["retentions"] = outputs[
-            seq_lens - 2, torch.arange(real_batch_size, device=device), 0
+            seq_lens - 2, torch.arange(real_batch_size, device=DEVICE), 0
         ]
     elif isinstance(model, DASH_ACTR):
         result["retentions"] = model(sequences)
@@ -1425,12 +1426,12 @@ def iter(model, batch):
         outputs, _ = model(sequences)
         stabilities = outputs[
             seq_lens - 1,
-            torch.arange(real_batch_size, device=device),
+            torch.arange(real_batch_size, device=DEVICE),
             0,
         ]
         difficulties = outputs[
             seq_lens - 1,
-            torch.arange(real_batch_size, device=device),
+            torch.arange(real_batch_size, device=DEVICE),
             1,
         ]
         theoretical_r = model.forgetting_curve(delta_ts, stabilities)
@@ -1442,7 +1443,7 @@ def iter(model, batch):
         outputs, _ = model(sequences)
         result["retentions"] = outputs[
             seq_lens - 1,
-            torch.arange(real_batch_size, device=device),
+            torch.arange(real_batch_size, device=DEVICE),
             0,
         ]
     else:
@@ -1453,7 +1454,7 @@ def iter(model, batch):
             outputs, _ = model(sequences)
             stabilities = outputs[
                 seq_lens - 1,
-                torch.arange(real_batch_size, device=device),
+                torch.arange(real_batch_size, device=DEVICE),
                 0,
             ]
         result["retentions"] = model.forgetting_curve(delta_ts, stabilities)
@@ -1476,7 +1477,7 @@ class Trainer:
         batch_size: int = 256,
         max_seq_len: int = 64,
     ) -> None:
-        self.model = MODEL.to(device=device)
+        self.model = MODEL.to(device=DEVICE)
         if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
             self.model.pretrain(train_set)
         if isinstance(MODEL, (RNN, Transformer, GRU_P)):
@@ -1511,18 +1512,27 @@ class Trainer:
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         pre_train_set = train_set[train_set["i"] == 2]
         self.pre_train_set = BatchDataset(
-            pre_train_set.copy(), self.batch_size, max_seq_len=self.max_seq_len
+            pre_train_set.copy(),
+            self.batch_size,
+            max_seq_len=self.max_seq_len,
+            device=DEVICE,
         )
         self.pre_train_data_loader = BatchLoader(self.pre_train_set)
 
         next_train_set = train_set[train_set["i"] > 2]
         self.next_train_set = BatchDataset(
-            next_train_set.copy(), self.batch_size, max_seq_len=self.max_seq_len
+            next_train_set.copy(),
+            self.batch_size,
+            max_seq_len=self.max_seq_len,
+            device=DEVICE,
         )
         self.next_train_data_loader = BatchLoader(self.next_train_set)
 
         self.train_set = BatchDataset(
-            train_set.copy(), self.batch_size, max_seq_len=self.max_seq_len
+            train_set.copy(),
+            self.batch_size,
+            max_seq_len=self.max_seq_len,
+            device=DEVICE,
         )
         self.train_data_loader = BatchLoader(self.train_set)
 
@@ -1533,6 +1543,7 @@ class Trainer:
                 test_set.copy(),
                 batch_size=self.batch_size,
                 max_seq_len=self.max_seq_len,
+                device=DEVICE,
             )
         )
         self.test_data_loader = (
@@ -1619,11 +1630,13 @@ class Trainer:
 
 class Collection:
     def __init__(self, MODEL) -> None:
-        self.model = MODEL.to(device=device)
+        self.model = MODEL.to(device=DEVICE)
         self.model.eval()
 
     def batch_predict(self, dataset):
-        batch_dataset = BatchDataset(dataset, batch_size=8192, sort_by_length=False)
+        batch_dataset = BatchDataset(
+            dataset, batch_size=8192, sort_by_length=False, device=DEVICE
+        )
         batch_loader = BatchLoader(batch_dataset, shuffle=False)
         retentions = []
         stabilities = []
@@ -1668,8 +1681,8 @@ def process_untrainable(user_id):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    result, raw = evaluate(y, p, save_tmp, MODEL_NAME, user_id)
-    return result, raw
+    stats, raw = evaluate(y, p, save_tmp, MODEL_NAME, user_id)
+    return stats, raw
 
 
 def baseline(user_id):
@@ -1697,8 +1710,8 @@ def baseline(user_id):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    result, raw = evaluate(y, p, save_tmp, model_name, user_id)
-    return result, raw
+    stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
+    return stats, raw
 
 
 def create_features(df, model_name="FSRSv3"):
@@ -1871,6 +1884,22 @@ def create_features(df, model_name="FSRSv3"):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
+import traceback
+from functools import wraps
+
+
+def catch_exceptions(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs), None
+        except Exception as e:
+            return None, traceback.format_exc()
+
+    return wrapper
+
+
+@catch_exceptions
 def process(user_id):
     plt.close("all")
     if MODEL_NAME == "SM2" or MODEL_NAME.startswith("Ebisu"):
@@ -1955,8 +1984,8 @@ def process(user_id):
     if FILE:
         save_tmp.to_csv(f"evaluation/{FILE_NAME}/{user_id}.tsv", sep="\t", index=False)
 
-    result, raw = evaluate(y, p, save_tmp, FILE_NAME, user_id, w_list)
-    return result, raw
+    stats, raw = evaluate(y, p, save_tmp, FILE_NAME, user_id, w_list)
+    return stats, raw
 
 
 def evaluate(y, p, df, file_name, user_id, w_list=None):
@@ -1975,7 +2004,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
     except:
         auc = None
-    result = {
+    stats = {
         "metrics": {
             "RMSE": round(rmse_raw, 6),
             "LogLoss": round(logloss, 6),
@@ -1987,7 +2016,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
         "size": len(y),
     }
     if w_list and type(w_list[0]) == list:
-        result["parameters"] = list(map(lambda x: round(x, 6), w_list[-1]))
+        stats["parameters"] = list(map(lambda x: round(x, 6), w_list[-1]))
     elif WEIGHTS:
         torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
     if RAW:
@@ -1998,7 +2027,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
         }
     else:
         raw = None
-    return result, raw
+    return stats, raw
 
 
 if __name__ == "__main__":
@@ -2038,13 +2067,17 @@ if __name__ == "__main__":
             pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
             try:
-                result, raw = future.result()
-                with open(result_file, "a") as f:
-                    f.write(json.dumps(result, ensure_ascii=False) + "\n")
-                if raw:
-                    with open(raw_file, "a") as f:
-                        f.write(json.dumps(raw, ensure_ascii=False) + "\n")
-                pbar.set_description(f"Processed {result['user']}")
+                result, error = future.result()
+                if error:
+                    tqdm.write(error)
+                else:
+                    stats, raw = result
+                    with open(result_file, "a") as f:
+                        f.write(json.dumps(stats, ensure_ascii=False) + "\n")
+                    if raw:
+                        with open(raw_file, "a") as f:
+                            f.write(json.dumps(raw, ensure_ascii=False) + "\n")
+                    pbar.set_description(f"Processed {stats['user']}")
             except Exception as e:
                 tqdm.write(str(e))
 

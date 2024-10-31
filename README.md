@@ -182,59 +182,65 @@ python script.py
 FSRS-5 with default parameters:
 
 ```bash
-DRY_RUN=1 python script.py
+python script.py --dry
 ```
 
 FSRS-5 with only the first 4 parameters optimized:
 
 ```bash
-PRETRAIN=1 python script.py
+python script.py --pretrain
 ```
 
 FSRS-rs:
 
+It requires `fsrs_rs_python` to be installed.
+
 ```bash
-FSRS_RS=1 FSRS_NO_OUTLIER=1 PYTHONPATH=~/Codes/anki/out/pylib:~/Codes/anki/pylib python script.py
+pip install fsrs_rs_python
 ```
 
-> Please change the `PYTHONPATH` variable to the path of your Anki source code.
+Then run the following command:
+
+```bash
+python script.py --rust
+```
 
 Dev model in fsrs-optimizer:
 
 ```bash
-DEV_MODE=1 python script.py
+python script.py --dev
 ```
 
-> Please place the fsrs-optimizer repository in the same directory as this repository.
+> Please place the [fsrs-optimizer repository](https://github.com/open-spaced-repetition/fsrs-optimizer) in the same directory as this repository.
 
 Set the number of threads:
 
 ```bash
-THREADS=4 python script.py
+python script.py --threads 4
 ```
 
 Save the raw predictions:
 
 ```bash
-RAW=1 python script.py
+python script.py --raw
 ```
 
 Save the detailed results:
 
 ```bash
-FILE=1 python script.py
+python script.py --file
 ```
 
 Save the analyzing charts:
 
 ```bash
-PLOT=1 python script.py
+python script.py --plot
 ```
 
 Benchmark FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
-MODEL=FSRSv4 python other.py
+python other.py --model FSRSv4
 ```
 
-> Please change the `MODEL` variable to `FSRSv3`, `HLR`, `GRU`, or `SM2` to run the corresponding model.
+> Please change the `--model` argument to `FSRSv3`, `HLR`, `GRU`, or `SM2` to run the corresponding model.

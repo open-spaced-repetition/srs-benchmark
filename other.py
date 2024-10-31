@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 import json
-import os
 from torch import nn
 from torch import Tensor
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
@@ -20,6 +19,22 @@ from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort
 from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
 import multiprocessing as mp
 import ebisu  # type: ignore
+import pyarrow.parquet as pq  # type: ignore
+import argparse
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model", default="FSRSv3")
+parser.add_argument("--short", action="store_true")
+parser.add_argument("--secs", action="store_true")
+parser.add_argument("--file", action="store_true")
+parser.add_argument("--plot", action="store_true")
+parser.add_argument("--weights", action="store_true")
+parser.add_argument("--raw", action="store_true")
+parser.add_argument("--threads", default=8, type=int)
+parser.add_argument("--data", default="../anki-revlogs-10k/revlogs")
+
+args = parser.parse_args()
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
@@ -31,15 +46,23 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 n_splits: int = 5
 batch_size: int = 512
 verbose: bool = False
+verbose_inadequate_data: bool = False
 
-model_name = os.environ.get("MODEL", "FSRSv3")
-short_term = os.environ.get("SHORT")
-secs_ivl = os.environ.get("SECS_IVL")
+MODEL_NAME = args.model
+SHORT_TERM = args.short
+SECS_IVL = args.secs
+FILE = args.file
+PLOT = args.plot
+WEIGHTS = args.weights
+RAW = args.raw
+THREADS = args.threads
+DATA_PATH = args.data
+
 file_name = (
-    model_name + ("-short" if short_term else "") + ("-secs" if secs_ivl else "")
+    MODEL_NAME + ("-short" if SHORT_TERM else "") + ("-secs" if SECS_IVL else "")
 )
 
-S_MIN = 1e-6 if secs_ivl else 0.01
+S_MIN = 1e-6 if SECS_IVL else 0.01
 INIT_S_MAX = 100
 S_MAX = 36500
 
@@ -192,7 +215,7 @@ class FSRS(nn.Module):
                     )
                 continue
             delta_t = group["delta_t"]
-            if secs_ivl:
+            if SECS_IVL:
                 recall = group["y"]["mean"]
             else:
                 recall = (
@@ -208,7 +231,7 @@ class FSRS(nn.Module):
                     -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
                     * count
                 )
-                l1 = np.abs(stability - init_s0) / 16 if not secs_ivl else 0
+                l1 = np.abs(stability - init_s0) / 16 if not SECS_IVL else 0
                 return logloss + l1
 
             res = minimize(
@@ -508,7 +531,7 @@ class FSRS4dot5(FSRS):
             0.2272,
             2.8755,
         ]
-        if not secs_ivl
+        if not SECS_IVL
         else [
             0.0012,
             0.0826,
@@ -793,7 +816,7 @@ class RNN(nn.Module):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
-        if model_name == "GRU":
+        if MODEL_NAME == "GRU":
             self.rnn = nn.GRU(
                 input_size=self.n_input,
                 hidden_size=self.n_hidden,
@@ -803,7 +826,7 @@ class RNN(nn.Module):
             nn.init.orthogonal_(self.rnn.weight_hh_l0)
             self.rnn.bias_ih_l0.data.fill_(0)
             self.rnn.bias_hh_l0.data.fill_(0)
-        elif model_name == "LSTM":
+        elif MODEL_NAME == "LSTM":
             self.rnn = nn.LSTM(
                 input_size=self.n_input,
                 hidden_size=self.n_hidden,
@@ -1026,7 +1049,7 @@ class ACT_R(nn.Module):
 
 class DASH(nn.Module):
     # 9 params
-    if short_term:
+    if SHORT_TERM:
         init_w = [
             -0.1766,
             0.4483,
@@ -1041,7 +1064,7 @@ class DASH(nn.Module):
     else:
         init_w = (
             [0.2024, 0.5967, 0.1255, 0.6039, -0.1485, 0.572, 0.0933, 0.4801, 0.787]
-            if "MCM" not in model_name
+            if "MCM" not in MODEL_NAME
             else [0.2783, 0.8131, 0.4252, 1.0056, -0.1527, 0.6455, 0.1409, 0.669, 0.843]
         )
     lr: float = 4e-2
@@ -1496,18 +1519,18 @@ class Trainer:
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         pre_train_set = train_set[train_set["i"] == 2]
         self.pre_train_set = BatchDataset(
-            pre_train_set, self.batch_size, max_seq_len=self.max_seq_len
+            pre_train_set.copy(), self.batch_size, max_seq_len=self.max_seq_len
         )
         self.pre_train_data_loader = BatchLoader(self.pre_train_set)
 
         next_train_set = train_set[train_set["i"] > 2]
         self.next_train_set = BatchDataset(
-            next_train_set, self.batch_size, max_seq_len=self.max_seq_len
+            next_train_set.copy(), self.batch_size, max_seq_len=self.max_seq_len
         )
         self.next_train_data_loader = BatchLoader(self.next_train_set)
 
         self.train_set = BatchDataset(
-            train_set, self.batch_size, max_seq_len=self.max_seq_len
+            train_set.copy(), self.batch_size, max_seq_len=self.max_seq_len
         )
         self.train_data_loader = BatchLoader(self.train_set)
 
@@ -1515,7 +1538,9 @@ class Trainer:
             []
             if test_set is None
             else BatchDataset(
-                test_set, batch_size=self.batch_size, max_seq_len=self.max_seq_len
+                test_set.copy(),
+                batch_size=self.batch_size,
+                max_seq_len=self.max_seq_len,
             )
         )
         self.test_data_loader = (
@@ -1620,9 +1645,9 @@ class Collection:
         return retentions, stabilities
 
 
-def process_untrainable(file, model_name):
-    dataset = pd.read_csv(file)
-    dataset = create_features(dataset, model_name)
+def process_untrainable(user_id):
+    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
+    dataset = create_features(dataset, MODEL_NAME)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
     testsets = []
@@ -1636,12 +1661,12 @@ def process_untrainable(file, model_name):
     save_tmp = []
 
     for i, testset in enumerate(testsets):
-        if model_name == "SM2":
+        if MODEL_NAME == "SM2":
             testset["stability"] = testset["sequence"].map(sm2)
             testset["p"] = np.exp(
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
             )
-        elif model_name == "Ebisu-v2":
+        elif MODEL_NAME == "Ebisu-v2":
             try:
                 testset["model"] = testset["sequence"].map(ebisu_v2)
                 testset["p"] = testset.apply(
@@ -1649,14 +1674,14 @@ def process_untrainable(file, model_name):
                     axis=1,
                 )
             except Exception as e:
-                print(file)
+                print(user_id)
                 tb = sys.exc_info()[2]
                 print(e.with_traceback(tb))
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    result, raw = evaluate(y, p, save_tmp, model_name, file)
+    result, raw = evaluate(y, p, save_tmp, MODEL_NAME, user_id)
     return result, raw
 
 
@@ -1690,6 +1715,8 @@ def baseline(file):
 
 
 def create_features(df, model_name="FSRSv3"):
+    df["review_th"] = range(1, df.shape[0] + 1)
+    df.sort_values(by=["card_id", "review_th"], inplace=True)
     df = df[df["rating"].isin([1, 2, 3, 4])]
     df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
     if (
@@ -1697,11 +1724,11 @@ def create_features(df, model_name="FSRSv3"):
         and "elapsed_days" in df.columns
         and "elapsed_seconds" in df.columns
     ):
-        if secs_ivl:
+        if SECS_IVL:
             df["delta_t"] = df["elapsed_seconds"] / 86400
         else:
             df["delta_t"] = df["elapsed_days"]
-    if short_term is None:
+    if SHORT_TERM is None:
         df = df[df["delta_t"] != 0].copy()
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
     df["i"] = df.groupby("card_id").cumcount() + 1
@@ -1838,10 +1865,10 @@ def create_features(df, model_name="FSRSv3"):
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    if short_term:
+    if SHORT_TERM:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
         df["i"] = df.groupby("card_id").cumcount() + 1
-    if not secs_ivl:
+    if not SECS_IVL:
         filtered_dataset = (
             df[df["i"] == 2]
             .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
@@ -1857,44 +1884,43 @@ def create_features(df, model_name="FSRSv3"):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
-def process(args):
+def process(user_id):
     plt.close("all")
-    file, model_name = args
-    if model_name == "SM2" or model_name.startswith("Ebisu"):
-        return process_untrainable(file, model_name)
-    if model_name == "AVG":
-        return baseline(file)
-    dataset = pd.read_csv(file)
-    if model_name in ("RNN", "LSTM", "GRU"):
+    if MODEL_NAME == "SM2" or MODEL_NAME.startswith("Ebisu"):
+        return process_untrainable(user_id)
+    if MODEL_NAME == "AVG":
+        return baseline(user_id)
+    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
+    if MODEL_NAME in ("RNN", "LSTM", "GRU"):
         model = RNN
-    elif model_name == "GRU-P":
+    elif MODEL_NAME == "GRU-P":
         model = GRU_P
-    elif model_name == "FSRSv3":
+    elif MODEL_NAME == "FSRSv3":
         model = FSRS3
-    elif model_name == "FSRSv4":
+    elif MODEL_NAME == "FSRSv4":
         model = FSRS4
-    elif model_name == "FSRS-4.5":
+    elif MODEL_NAME == "FSRS-4.5":
         model = FSRS4dot5
-    elif model_name == "FSRS-5":
-        global short_term
-        short_term = "1"
+    elif MODEL_NAME == "FSRS-5":
+        global SHORT_TERM
+        SHORT_TERM = "1"
         model = FSRS5
-    elif model_name == "HLR":
+    elif MODEL_NAME == "HLR":
         model = HLR
-    elif model_name == "Transformer":
+    elif MODEL_NAME == "Transformer":
         model = Transformer
-    elif model_name == "ACT-R":
+    elif MODEL_NAME == "ACT-R":
         model = ACT_R
-    elif model_name in ("DASH", "DASH[MCM]"):
+    elif MODEL_NAME in ("DASH", "DASH[MCM]"):
         model = DASH
-    elif model_name == "DASH[ACT-R]":
+    elif MODEL_NAME == "DASH[ACT-R]":
         model = DASH_ACTR
-    elif model_name == "NN-17":
+    elif MODEL_NAME == "NN-17":
         model = NN_17
 
-    dataset = create_features(dataset, model_name)
+    dataset = create_features(dataset, MODEL_NAME)
     if dataset.shape[0] < 6:
-        raise Exception(f"{file.stem} does not have enough data.")
+        raise Exception(f"{user_id} does not have enough data.")
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
@@ -1914,9 +1940,13 @@ def process(args):
             )
             w_list.append(trainer.train())
         except Exception as e:
-            print(file)
-            tb = sys.exc_info()[2]
-            print(e.with_traceback(tb))
+            if str(e).endswith("inadequate."):
+                if verbose_inadequate_data:
+                    print("Skipping - Inadequate data")
+            else:
+                print(user_id)
+                tb = sys.exc_info()[2]
+                print(e.with_traceback(tb))
             w_list.append(model().state_dict())
 
     p = []
@@ -1935,20 +1965,18 @@ def process(args):
 
     save_tmp = pd.concat(save_tmp)
     del save_tmp["tensor"]
-    if os.environ.get("FILE"):
-        save_tmp.to_csv(
-            f"evaluation/{file_name}/{file.stem}.tsv", sep="\t", index=False
-        )
+    if FILE:
+        save_tmp.to_csv(f"evaluation/{file_name}/{user_id}.tsv", sep="\t", index=False)
 
-    result, raw = evaluate(y, p, save_tmp, file_name, file, w_list)
+    result, raw = evaluate(y, p, save_tmp, file_name, user_id, w_list)
     return result, raw
 
 
-def evaluate(y, p, df, file_name, file, w_list=None):
-    if os.environ.get("PLOT"):
+def evaluate(y, p, df, file_name, user_id, w_list=None):
+    if PLOT:
         fig = plt.figure()
         plot_brier(p, y, ax=fig.add_subplot(111))
-        fig.savefig(f"evaluation/{file_name}/{file.stem}.png")
+        fig.savefig(f"evaluation/{file_name}/{user_id}.png")
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )
@@ -1968,16 +1996,16 @@ def evaluate(y, p, df, file_name, file, w_list=None):
             "ICI": round(ici, 6),
             "AUC": auc,
         },
-        "user": int(file.stem),
+        "user": int(user_id),
         "size": len(y),
     }
     if w_list and type(w_list[0]) == list:
         result["parameters"] = list(map(lambda x: round(x, 6), w_list[-1]))
-    elif os.environ.get("WEIGHTS"):
-        torch.save(w_list[-1], f"weights/{file_name}/{file.stem}.pth")
-    if os.environ.get("RAW"):
+    elif WEIGHTS:
+        torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
+    if RAW:
         raw = {
-            "user": int(file.stem),
+            "user": int(user_id),
             "p": list(map(lambda x: round(x, 4), p)),
             "y": list(map(int, y)),
         }
@@ -1988,10 +2016,8 @@ def evaluate(y, p, df, file_name, file, w_list=None):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
-    unprocessed_files = []
-    dataset_path0 = "./dataset/"
-    dataset_path1 = "../FSRS-Anki-20k/dataset/1/"
-    dataset_path2 = "../FSRS-Anki-20k/dataset/2/"
+    unprocessed_users = []
+    dataset = pq.ParquetDataset(DATA_PATH)
     Path(f"evaluation/{file_name}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)
@@ -2003,20 +2029,24 @@ if __name__ == "__main__":
     else:
         processed_user = set()
 
-    if os.environ.get("RAW") and raw_file.exists():
+    if RAW and raw_file.exists():
         sort_jsonl(raw_file)
 
-    for dataset_path in [dataset_path0, dataset_path1, dataset_path2]:
-        for file in Path(dataset_path).glob("*.csv"):
-            if int(file.stem) in processed_user:
-                continue
-            unprocessed_files.append((file, model_name))
+    for user_id in dataset.partitioning.dictionaries[0]:
+        if user_id.as_py() in processed_user:
+            continue
+        unprocessed_users.append(user_id.as_py())
 
-    unprocessed_files.sort(key=lambda x: int(x[0].stem), reverse=False)
+    unprocessed_users.sort()
 
-    num_threads = int(os.environ.get("THREADS", "8"))
-    with ProcessPoolExecutor(max_workers=num_threads) as executor:
-        futures = [executor.submit(process, file) for file in unprocessed_files]
+    with ProcessPoolExecutor(max_workers=THREADS) as executor:
+        futures = [
+            executor.submit(
+                process,
+                user_id,
+            )
+            for user_id in unprocessed_users
+        ]
         for future in (
             pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
@@ -2032,5 +2062,5 @@ if __name__ == "__main__":
                 tqdm.write(str(e))
 
     sort_jsonl(result_file)
-    if os.environ.get("RAW"):
+    if RAW:
         sort_jsonl(raw_file)

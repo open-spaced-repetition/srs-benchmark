@@ -48,7 +48,7 @@ torch.manual_seed(42)
 tqdm.pandas()
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+# DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 n_splits: int = 5
 batch_size: int = 512
@@ -1757,7 +1757,7 @@ def create_features(df, model_name="FSRSv3"):
             for t_sublist, r_sublist in zip(t_history, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
-    if model_name == "GRU-P":
+    elif model_name == "GRU-P":
         df["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history, r_history)
@@ -1865,7 +1865,7 @@ def create_features(df, model_name="FSRSv3"):
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    if SHORT_TERM:
+    if not SHORT_TERM:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
         df["i"] = df.groupby("card_id").cumcount() + 1
     if not SECS_IVL:

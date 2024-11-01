@@ -1,11 +1,10 @@
-from pathlib import Path
 import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
 import torch.nn as nn
 from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P
 from config import create_parser
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 parser = create_parser()
 args = parser.parse_args()
@@ -16,7 +15,6 @@ SECS_IVL = args.secs
 FILE_NAME = (
     MODEL_NAME + ("-short" if SHORT_TERM else "") + ("-secs" if SECS_IVL else "")
 )
-THREADS = args.threads
 DATA_PATH = args.data
 
 
@@ -45,7 +43,7 @@ if __name__ == "__main__":
 
     df_dict = {}
 
-    with ProcessPoolExecutor(max_workers=THREADS) as executor:
+    with ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(
                 process_user,

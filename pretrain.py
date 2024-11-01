@@ -3,39 +3,42 @@ import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
 import torch.nn as nn
-import os
 from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P
+from config import create_parser
 
-model_name = os.environ.get("MODEL", "FSRSv3")
-short_term = os.environ.get("SHORT")
-secs_ivl = os.environ.get("SECS_IVL")
-file_name = (
-    model_name + ("-short" if short_term else "") + ("-secs" if secs_ivl else "")
+parser = create_parser()
+args = parser.parse_args()
+
+MODEL_NAME = args.model
+SHORT_TERM = args.short
+SECS_IVL = args.secs
+FILE_NAME = (
+    MODEL_NAME + ("-short" if SHORT_TERM else "") + ("-secs" if SECS_IVL else "")
 )
+DATA_PATH = args.data
 
 model: nn.Module
 
-if model_name == "GRU":
+if MODEL_NAME == "GRU":
     model = RNN()
-elif model_name == "GRU-P":
+elif MODEL_NAME == "GRU-P":
     model = GRU_P()
-elif model_name == "Transformer":
+elif MODEL_NAME == "Transformer":
     model = Transformer()
-elif model_name == "NN-17":
+elif MODEL_NAME == "NN-17":
     model = NN_17()
 
 total = 0
-for param in model().parameters():
+for param in model.parameters():
     total += param.numel()
 
 print(total)
 
 df_list = []
 
-for i in tqdm(range(1, 101)):
-    file = Path(f"../FSRS-Anki-20k/dataset/1/{i}.csv")
-    dataset = pd.read_csv(file)
-    dataset = create_features(dataset, model_name=model_name)
+for user_id in tqdm(range(1, 101)):
+    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
+    dataset = create_features(dataset, model_name=MODEL_NAME)
     df_list.append(dataset)
 
 df = pd.concat(df_list, axis=0)
@@ -51,4 +54,4 @@ trainer = Trainer(
 )
 trainer.train()
 
-torch.save(trainer.model.state_dict(), f"./{file_name}_pretrain.pth")
+torch.save(trainer.model.state_dict(), f"./{FILE_NAME}_pretrain.pth")

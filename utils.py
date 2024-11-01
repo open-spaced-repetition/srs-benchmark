@@ -1,6 +1,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import root_mean_squared_error  # type: ignore
+import traceback
+from functools import wraps
+
+
+def catch_exceptions(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs), None
+        except Exception as e:
+            return None, traceback.format_exc()
+
+    return wrapper
 
 
 def cross_comparison(revlogs, algoA, algoB, graph=False):

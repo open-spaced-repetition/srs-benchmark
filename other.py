@@ -20,6 +20,7 @@ from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser
+from utils import catch_exceptions
 
 parser = create_parser()
 args = parser.parse_args()
@@ -1882,21 +1883,6 @@ def create_features(df, model_name="FSRSv3"):
             remove_non_continuous_rows
         )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
-
-
-import traceback
-from functools import wraps
-
-
-def catch_exceptions(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs), None
-        except Exception as e:
-            return None, traceback.format_exc()
-
-    return wrapper
 
 
 @catch_exceptions

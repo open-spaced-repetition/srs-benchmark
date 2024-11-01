@@ -14,6 +14,7 @@ from itertools import accumulate
 import pyarrow.parquet as pq  # type: ignore
 import torch
 from config import create_parser
+from utils import catch_exceptions
 
 parser = create_parser()
 args = parser.parse_args()
@@ -210,6 +211,7 @@ def create_time_series(df):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
+@catch_exceptions
 def process(user_id):
     plt.close("all")
     dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
@@ -447,16 +449,19 @@ if __name__ == "__main__":
             pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
             try:
-                result, raw = future.result()
-                with open(result_file, "a") as f:
-                    f.write(json.dumps(result, ensure_ascii=False) + "\n")
-                if raw:
-                    with open(raw_file, "a") as f:
-                        f.write(json.dumps(raw, ensure_ascii=False) + "\n")
-                pbar.set_description(f"Processed {result['user']}")
+                result, error = future.result()
+                if error:
+                    tqdm.write(error)
+                else:
+                    result, raw = future.result()
+                    with open(result_file, "a") as f:
+                        f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                    if raw:
+                        with open(raw_file, "a") as f:
+                            f.write(json.dumps(raw, ensure_ascii=False) + "\n")
+                    pbar.set_description(f"Processed {result['user']}")
             except Exception as e:
-                tb = sys.exc_info()[2]
-                tqdm.write(str(e.with_traceback(tb)))
+                tqdm.write(str(e))
 
     sort_jsonl(result_file)
     if RAW:

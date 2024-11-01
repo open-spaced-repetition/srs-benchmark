@@ -1728,7 +1728,7 @@ def create_features(df, model_name="FSRSv3"):
             df["delta_t"] = df["elapsed_seconds"] / 86400
         else:
             df["delta_t"] = df["elapsed_days"]
-    if SHORT_TERM is None:
+    if not SHORT_TERM:
         df = df[df["delta_t"] != 0].copy()
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
     df["i"] = df.groupby("card_id").cumcount() + 1
@@ -1865,7 +1865,7 @@ def create_features(df, model_name="FSRSv3"):
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    if not SHORT_TERM:
+    if SHORT_TERM:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
         df["i"] = df.groupby("card_id").cumcount() + 1
     if not SECS_IVL:
@@ -2054,6 +2054,7 @@ if __name__ == "__main__":
         unprocessed_users.append(user_id.as_py())
 
     unprocessed_users.sort()
+    unprocessed_users = unprocessed_users[:16]
 
     with ProcessPoolExecutor(max_workers=THREADS) as executor:
         futures = [

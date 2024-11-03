@@ -1450,7 +1450,7 @@ def iter(model, batch):
     else:
         if isinstance(model, HLR):
             outputs = model(sequences.transpose(0, 1))
-            stabilities = outputs.squeeze()
+            stabilities = outputs.squeeze(1)
         else:
             outputs, _ = model(sequences)
             stabilities = outputs[

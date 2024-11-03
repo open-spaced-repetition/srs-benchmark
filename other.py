@@ -36,6 +36,30 @@ RAW = args.raw
 THREADS = args.threads
 DATA_PATH = args.data
 
+model_list = (
+    "FSRSv3",
+    "FSRSv4",
+    "FSRS-4.5",
+    "FSRS-5",
+    "Ebisu-v2",
+    "SM2",
+    "HLR",
+    "GRU",
+    "GRU-P",
+    "LSTM",
+    "RNN",
+    "AVG",
+    "DASH",
+    "DASH[MCM]",
+    "DASH[ACT-R]",
+    "ACT-R",
+    "NN-17",
+    "Transformer",
+)
+
+if MODEL_NAME not in model_list:
+    raise ValueError(f"Model name must be one of {model_list}")
+
 if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 

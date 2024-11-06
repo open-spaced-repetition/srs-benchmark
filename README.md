@@ -151,7 +151,7 @@ For both visualizations, the colors indicate:
   - Green: medium effect (0.5 ≥ r > 0.2 or 0.5 ≥ d > 0.2) 
   - Light green: small effect (r ≤ 0.2 or d ≤ 0.2)
 
-- Grey indicates that p-value is greater than 0.01, meaning we cannot conclude which algorithm performs better.
+- Grey indicates that the p-value is greater than 0.01, meaning we cannot conclude which algorithm performs better.
 
 The Wilcoxon test is non-parametric and considers both the sign and rank of differences between pairs, while the t-test assumes normality and provides Cohen's d as a standardized measure of the difference between means. Both tests are paired, comparing algorithms' performance on the same collections, but do not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
 

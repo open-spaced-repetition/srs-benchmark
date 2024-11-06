@@ -158,7 +158,7 @@ The Wilcoxon test is non-parametric and considers both the sign and rank of diff
 ![Wilcoxon, 9999 collections](./plots/Wilcoxon-9999-collections.png)
 ![T-test, 9999 collections](./plots/T-test-9999-collections.png)
 
-Note: You may notice that the two tests don't completely agree on which algorithms are better or worse. This is because the Wilcoxon test only considers the sign and rank of differences, while the t-test considers not only the sign and rank but also the magnitude of differences.
+You may have noticed that the two tests don't always agree on which algorithms are better or worse. This is because the Wilcoxon test only considers the sign and rank of differences, while the t-test also considers the magnitude of differences.
 
 ## Default Parameters
 

@@ -61,7 +61,7 @@ Total number of users: 9,999.
 Total number of reviews for evaluation: 349,923,850.
 Same-day reviews are excluded except when optimizing FSRS-5 and algorithms that have "-short" at the end of their names. Each algorithm uses only one review per day (the first, chronologically). Some reviews are filtered out, for example, the revlog entries created by changing the due date manually or reviewing cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 727 million mentioned earlier. 
 
-The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The rightmost column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
+The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The "Parameters" column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
 ### Weighted by the number of reviews
 
@@ -154,14 +154,14 @@ For both visualizations, the colors indicate:
   - Green: medium effect (0.5 ≥ r > 0.2 or 0.5 ≥ d > 0.2) 
   - Light green: small effect (r ≤ 0.2 or d ≤ 0.2)
 
-- Grey indicates that p-value is greater than 0.01, meaning we cannot conclude which algorithm performs better.
+- Grey indicates that the p-value is greater than 0.01, meaning we cannot conclude which algorithm performs better.
 
 The Wilcoxon test is non-parametric and considers both the sign and rank of differences between pairs, while the t-test assumes normality and provides Cohen's d as a standardized measure of the difference between means. Both tests are paired, comparing algorithms' performance on the same collections, but do not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
 
 ![Wilcoxon, 9999 collections](./plots/Wilcoxon-9999-collections.png)
 ![T-test, 9999 collections](./plots/T-test-9999-collections.png)
 
-Note: You may notice that the two tests don't completely agree on which algorithms are better or worse. This is because the Wilcoxon test only considers the sign and rank of differences, while the t-test considers not only the sign and rank but also the magnitude of differences.
+You may have noticed that the two tests don't always agree on which algorithms are better or worse. This is because the Wilcoxon test only considers the sign and rank of differences, while the t-test also considers the magnitude of differences.
 
 ## Default Parameters
 

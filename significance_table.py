@@ -204,7 +204,7 @@ if __name__ == "__main__":
         pad=30,
     )
     cmap = matplotlib.colors.ListedColormap(
-        ["darkred", "red", "coral", "silver", "limegreen", "green", "darkgreen"]
+        ["darkred", "red", "coral", "silver", "limegreen", "#199819", "darkgreen"]
     )
     plt.imshow(color_wilcox, interpolation="none", vmin=0, cmap=cmap)
 

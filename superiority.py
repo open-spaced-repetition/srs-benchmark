@@ -21,18 +21,19 @@ if __name__ == "__main__":
         "FSRS-4.5",
         "FSRS-5-binary",
         "FSRSv4",
+        "GRU",
         "DASH",
+        "FSRS-5-pretrain",
         "DASH-short",
         "DASH[MCM]",
-        "FSRS-5-pretrain",
         "DASH[ACT-R]",
-        "GRU",
         "FSRS-5-dry-run",
         "FSRSv3",
         "NN-17",
         "AVG",
         "ACT-R",
         "HLR",
+        "HLR-short",
         "SM2-short",
         "Ebisu-v2",
         "Transformer",
@@ -178,11 +179,11 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=10.5,
+                    fontsize=9,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models, fontsize=12, rotation=45)
-    ax.set_yticks(np.arange(n), labels=models, fontsize=12)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=10, rotation=45)
+    ax.set_yticks(np.arange(n), labels=models, fontsize=10)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")
@@ -190,6 +191,6 @@ if __name__ == "__main__":
     for location in ["left", "right", "top", "bottom"]:
         ax.spines[location].set_linewidth(2)
 
-    title = f"Superiority, {n_collections}"
+    title = f"Superiority-{n_collections}"
     plt.savefig(f"./plots/{title}.png", bbox_inches="tight")
     # plt.show()

@@ -130,7 +130,7 @@ The metrics presented above can be difficult to interpret. In order to make it e
 
 ![Superiority, 9999](./plots/Superiority-9999.png)
 
-You may have noticed that FSRS-5 has a 99.0% superiority over SM-2, meaning that for 99.0% of users, RMSE will be lower with FSRS-5 than with SM-2. But please remember that SM-2 wasn’t designed to predict probabilities, and the only reason it does that in this benchmark is because extra formulas were added on top of it.
+You may have noticed that FSRS-5 has a 99.0% superiority over SM-2, meaning that for 99.0% of users, RMSE will be lower with FSRS-5 than with SM-2. But please remember that SM-2 wasn’t designed to predict probabilities, and the only reason it does that in this benchmark is because extra formulas were added to it.
 
 ### Statistical significance
 
@@ -151,7 +151,7 @@ For both visualizations, the colors indicate:
   - Green: medium effect (0.5 ≥ r > 0.2 or 0.5 ≥ d > 0.2) 
   - Light green: small effect (r ≤ 0.2 or d ≤ 0.2)
 
-- Grey indicates p-value > 0.01, meaning we cannot conclude which algorithm performs better
+- Grey indicates that p-value is greater than 0.01, meaning we cannot conclude which algorithm performs better.
 
 The Wilcoxon test is non-parametric and considers both the sign and rank of differences between pairs, while the t-test assumes normality and provides Cohen's d as a standardized measure of the difference between means. Both tests are paired, comparing algorithms' performance on the same collections, but do not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
 

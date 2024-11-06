@@ -55,6 +55,7 @@ model_list = (
     "ACT-R",
     "NN-17",
     "Transformer",
+    "SM2-trainable",
 )
 
 if MODEL_NAME not in model_list:
@@ -1376,6 +1377,86 @@ class NN_17(nn.Module):
         return log_09 / torch.log(r) * t
 
 
+class SM2ParameterClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data
+            w[0] = w[0].clamp(S_MIN, S_MAX)
+            w[1] = w[1].clamp(S_MIN, S_MAX)
+            w[2] = w[2].clamp(1.3, 10.0)
+            w[3] = w[3].clamp(0, None)
+            w[4] = w[4].clamp(5, None)
+            module.w.data = w
+
+
+class SM2(nn.Module):
+    init_w = [1, 6, 2.5, 0.02, 7, 0.18]
+    clipper = SM2ParameterClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
+
+    def __init__(self, w: List[float] = init_w):
+        super(SM2, self).__init__()
+        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def forward(self, inputs):
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        state = torch.zeros((inputs.shape[1], 3))  # [ivl, ef, reps]
+        state[:, 1] = self.w[2]
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def step(self, X: Tensor, state: Tensor) -> Tensor:
+        """
+        :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
+        :param state: shape[batch_size, 3], state[:,0] is ivl, state[:,1] is ef, state[:,2] is reps
+        :return state: shape[batch_size, 3], [new_ivl, new_ef, new_reps]
+        """
+        rating = X[:, 1]
+        ivl = state[:, 0]
+        ef = state[:, 1]
+        reps = state[:, 2]
+        success = rating > 1
+
+        new_reps = torch.where(success, reps + 1, torch.ones_like(reps))
+        new_ivl = torch.where(
+            new_reps == 1,
+            self.w[0] * torch.ones_like(ivl),
+            torch.where(
+                new_reps == 2,
+                self.w[1] * torch.ones_like(ivl),
+                ivl * ef,
+            ),
+        )
+        q = rating + 1  # 1-4 -> 2-5
+        # EF':=EF+(0.1-(5-q)*(0.08+(5-q)*0.02))
+        # -> EF - 0.02 * (q-7) ^ 2 + 0.18
+        new_ef = ef -self.w[3] * (q - self.w[4]) ** 2 + self.w[5]
+        new_ivl = new_ivl.clamp(S_MIN, S_MAX)
+        new_ef = new_ef.clamp(1.3, 10.0)
+        return torch.stack([new_ivl, new_ef, new_reps], dim=1)
+
+    def forgetting_curve(self, t, s):
+        return 0.9 ** (t / s)
+
+    def state_dict(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+
 def sm2(r_history):
     ivl = 0
     ef = 2.5
@@ -1475,6 +1556,7 @@ def iter(model, batch):
         if isinstance(model, HLR):
             outputs = model(sequences.transpose(0, 1))
             stabilities = outputs.squeeze(1)
+        # FSRS family, RNN family, SM2-trainable
         else:
             outputs, _ = model(sequences)
             stabilities = outputs[
@@ -1511,13 +1593,7 @@ class Trainer:
             )
         else:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
-        self.clipper = (
-            MODEL.clipper
-            if isinstance(
-                MODEL, (FSRS3, FSRS4, FSRS4dot5, FSRS5, ACT_R, DASH_ACTR, NN_17)
-            )
-            else None
-        )
+        self.clipper = MODEL.clipper if hasattr(MODEL, "clipper") else None
         self.batch_size = batch_size
         self.max_seq_len = max_seq_len
         self.build_dataset(train_set, test_set)
@@ -1774,6 +1850,7 @@ def create_features(df, model_name="FSRSv3"):
         "LSTM",
         "GRU",
         "Transformer",
+        "SM2-trainable",
     ):
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
@@ -1943,6 +2020,8 @@ def process(user_id):
         model = DASH_ACTR
     elif MODEL_NAME == "NN-17":
         model = NN_17
+    elif MODEL_NAME == "SM2-trainable":
+        model = SM2
 
     dataset = create_features(dataset, MODEL_NAME)
     if dataset.shape[0] < 6:

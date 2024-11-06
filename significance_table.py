@@ -86,6 +86,7 @@ if __name__ == "__main__":
         "ACT-R",
         "HLR",
         "HLR-short",
+        "SM2-trainable",
         "SM2-short",
         "Ebisu-v2",
         "Transformer",

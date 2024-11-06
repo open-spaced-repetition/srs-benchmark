@@ -136,23 +136,29 @@ You may have noticed that FSRS-5 has a 99.0% superiority over SM-2, meaning that
 
 ### Statistical significance
 
-The figure below shows the r-values (effect sizes) obtained from Wilcoxon signed-rank tests comparing the RMSE between all pairs of algorithms. The colors indicate:
+The figures below show two different statistical analyses comparing the RMSE between all pairs of algorithms:
+
+1. Wilcoxon signed-rank test r-values (effect sizes)
+2. Paired t-test Cohen's d values (effect sizes)
+
+For both visualizations, the colors indicate:
 
 - Red shades indicate the row algorithm performs worse than the column algorithm:
-  - Dark red: Large effect (r > 0.5)
-  - Red: Medium effect (0.2 < r ≤ 0.5) 
-  - Light red: Small effect (r ≤ 0.2)
+  - Dark red: Large effect (r > 0.5 or d > 0.5)
+  - Red: Medium effect (0.2 < r/d ≤ 0.5) 
+  - Light red: Small effect (r/d ≤ 0.2)
 
 - Green shades indicate the row algorithm performs better than the column algorithm:
-  - Dark green: Large effect (r > 0.5)
-  - Green: Medium effect (0.2 < r ≤ 0.5)
-  - Light green: Small effect (r ≤ 0.2)
+  - Dark green: Large effect (r > 0.5 or d > 0.5)
+  - Green: Medium effect (0.2 < r/d ≤ 0.5)
+  - Light green: Small effect (r/d ≤ 0.2)
 
 - Grey indicates p-value > 0.01, meaning we cannot conclude which algorithm performs better
 
-The effect size r is calculated from the Wilcoxon test statistic W by standardizing it and dividing by the square root of the sample size. This non-parametric paired test considers both the sign and rank of differences between pairs, but does not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
+The Wilcoxon test is non-parametric and considers both the sign and rank of differences between pairs, while the t-test assumes normality and provides Cohen's d as a standardized measure of the difference between means. Both tests are paired, comparing algorithms' performance on the same collections, but do not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
 
 ![Wilcoxon, 9999 collections](./plots/Wilcoxon-9999-collections.png)
+![T-test, 9999 collections](./plots/T-test-9999-collections.png)
 
 ## Default Parameters
 

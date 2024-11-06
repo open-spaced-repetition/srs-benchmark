@@ -143,13 +143,13 @@ For both visualizations, the colors indicate:
 
 - Red shades indicate the row algorithm performs worse than the column algorithm:
   - Dark red: large effect (r > 0.5 or d > 0.5)
-  - Red: medium effect (0.5 < r or d ≤ 0.5) 
-  - Light red: small effect (r or d ≤ 0.2)
+  - Red: medium effect (0.5 ≥ r > 0.2 or 0.5 ≥ d > 0.2) 
+  - Light red: small effect (r ≤ 0.2 or d ≤ 0.2)
 
 - Green shades indicate the row algorithm performs better than the column algorithm:
   - Dark green: large effect (r > 0.5 or d > 0.5)
-  - Green: medium effect (0.5 < r or d ≤ 0.5)
-  - Light green: small effect (r or d ≤ 0.2)
+  - Green: medium effect (0.5 ≥ r > 0.2 or 0.5 ≥ d > 0.2) 
+  - Light green: small effect (r ≤ 0.2 or d ≤ 0.2)
 
 - Grey indicates p-value > 0.01, meaning we cannot conclude which algorithm performs better
 

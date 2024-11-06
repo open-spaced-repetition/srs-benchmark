@@ -11,87 +11,33 @@ from scipy import stats  # type: ignore
 warnings.filterwarnings("ignore")
 
 
-def logp_wilcox(x, y, correction=False):
-    # method='wilcox'
-    # mode='approx'
-    # alternative='two-sided'
-    assert len(x) == len(y)
-    x = np.asarray(x)
-    y = np.asarray(y)
+def wilcoxon_effect_size(x, y):
+    """
+    Calculate the effect size r for Wilcoxon signed-rank test
+    """
+    wilcoxon_result = stats.wilcoxon(x, y, zero_method="wilcox", correction=False)
 
-    def rankdata(a, method="average"):
-        a = np.asarray(a)
-        if a.size == 0:
-            return np.empty(a.shape)
-        sorter = np.argsort(a)
-        inv = np.empty(sorter.size, dtype=np.intp)
-        inv[sorter] = np.arange(sorter.size, dtype=np.intp)
+    W = wilcoxon_result.statistic
+    p_value = wilcoxon_result.pvalue
 
-        if method == "ordinal":
-            result = inv + 1
-        else:
-            a = a[sorter]
-            obs = np.r_[True, a[1:] != a[:-1]]
-            dense = obs.cumsum()[inv]
+    differences = np.array(x) - np.array(y)
+    differences = differences[differences != 0]
+    n = len(differences)
 
-            if method == "dense":
-                result = dense
-            else:
-                # cumulative counts of each unique value
-                count = np.r_[np.nonzero(obs)[0], len(obs)]
+    mu = n * (n + 1) / 4
+    sigma = np.sqrt(n * (n + 1) * (2 * n + 1) / 24)
 
-                if method == "max":
-                    result = count[dense]
+    z = (W - mu) / sigma
 
-                if method == "min":
-                    result = count[dense - 1] + 1
+    r = z / np.sqrt(n)
 
-                if method == "average":
-                    result = 0.5 * (count[dense] + count[dense - 1] + 1)
-
-        return result
-
-    diff = x - y
-    count = diff.size
-
-    ranks = rankdata(abs(diff))
-    r_plus = np.sum((diff > 0) * ranks)
-    r_minus = np.sum((diff < 0) * ranks)
-    if r_plus > r_minus:
-        # x is greater than y
-        which_one = 0
-    else:
-        # y is greater than x
-        which_one = 1
-
-    T = min(r_plus, r_minus)
-
-    mn = count * (count + 1.0) * 0.25
-    se = count * (count + 1.0) * (2.0 * count + 1.0)
-
-    replist, repnum = stats.find_repeats(ranks)
-    if repnum.size != 0:
-        # correction for repeated elements.
-        se -= 0.5 * (repnum * (repnum * repnum - 1)).sum()
-
-    se = np.sqrt(se / 24)
-
-    # apply continuity correction if applicable
-    d = 0
-    if correction:
-        d = 0.5 * np.sign(T - mn)
-
-    # compute statistic
-    z = (T - mn - d) / se
-    if abs(z) > 37:
-        a = 0.62562732
-        b = 0.22875463
-        logp_approx = np.log1p(-np.exp(-a * abs(z))) - np.log(abs(z)) - (z**2) / 2 - b
-    else:
-        logp_approx = np.log(2.0 * stats.norm.sf(abs(z)))
-
-    # returns the decimal logarithm of the p-value
-    return np.log10(np.e) * logp_approx, which_one
+    return {
+        "W": W,
+        "p_value": p_value,
+        "z": z,
+        "r": abs(r),
+        "mid": np.median(differences),
+    }
 
 
 def format(exponent, n):
@@ -114,18 +60,19 @@ if __name__ == "__main__":
         "FSRS-4.5",
         "FSRS-5-binary",
         "FSRSv4",
+        "GRU",
         "DASH",
+        "FSRS-5-pretrain",
         "DASH-short",
         "DASH[MCM]",
-        "FSRS-5-pretrain",
         "DASH[ACT-R]",
-        "GRU",
         "FSRS-5-dry-run",
-        "NN-17",
         "FSRSv3",
+        "NN-17",
         "AVG",
         "ACT-R",
         "HLR",
+        "HLR-short",
         "SM2-short",
         "Ebisu-v2",
         "Transformer",
@@ -165,48 +112,37 @@ if __name__ == "__main__":
     print(n_collections)
     n = len(models)
     wilcox = np.full((n, n), -1.0)
-    for i in range(n):
-        for j in range(n):
-            if i == j:
-                wilcox[i, j] = np.nan
-            else:
-                df1 = df[f"{models[i]}, RMSE (bins)"]
-                df2 = df[f"{models[j]}, RMSE (bins)"]
-                if n_collections > 50:
-                    result = logp_wilcox(df1[:n_collections], df2[:n_collections])[0]
-                else:
-                    # use the exact result for small n
-                    result = np.log10(
-                        stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue
-                    )
-                wilcox[i, j] = result
-
     color_wilcox = np.full((n, n), -1.0)
     for i in range(n):
         for j in range(n):
             if i == j:
+                wilcox[i, j] = np.nan
                 color_wilcox[i, j] = np.nan
             else:
                 df1 = df[f"{models[i]}, RMSE (bins)"]
                 df2 = df[f"{models[j]}, RMSE (bins)"]
-                # we'll need the second value returned by my function to determine the color
-                approx = logp_wilcox(df1[:n_collections], df2[:n_collections])
-                if n_collections > 50:
-                    result = approx[0]
-                else:
-                    # use the exact result for small n
-                    result = np.log10(
-                        stats.wilcoxon(df1[:n_collections], df2[:n_collections]).pvalue
-                    )
+                result = wilcoxon_effect_size(df1[:n_collections], df2[:n_collections])
+                p_value = result["p_value"]
+                wilcox[i, j] = result["r"]
 
-                if np.power(10, result) > 0.01:
+                if p_value > 0.01:
                     # color for insignificant p-values
-                    color_wilcox[i, j] = 0.5
+                    color_wilcox[i, j] = 3
                 else:
-                    if approx[1] == 0:
-                        color_wilcox[i, j] = 0
+                    if result["mid"] > 0:
+                        if result["r"] > 0.5:
+                            color_wilcox[i, j] = 0
+                        elif result["r"] > 0.2:
+                            color_wilcox[i, j] = 1
+                        else:
+                            color_wilcox[i, j] = 2
                     else:
-                        color_wilcox[i, j] = 1
+                        if result["r"] > 0.5:
+                            color_wilcox[i, j] = 6
+                        elif result["r"] > 0.2:
+                            color_wilcox[i, j] = 5
+                        else:
+                            color_wilcox[i, j] = 4
 
     # small changes to labels
     index_5_dry_run = models.index("FSRS-5-dry-run")
@@ -224,11 +160,13 @@ if __name__ == "__main__":
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
-        f"Wilcoxon signed-rank test, p-values ({n_collections} collections)",
+        f"Wilcoxon signed-rank test, r-values ({n_collections} collections)",
         fontsize=24,
         pad=30,
     )
-    cmap = matplotlib.colors.ListedColormap(["red", "#989a98", "#2db300"])
+    cmap = matplotlib.colors.ListedColormap(
+        ["darkred", "red", "coral", "silver", "limegreen", "green", "darkgreen"]
+    )
     plt.imshow(color_wilcox, interpolation="none", vmin=0, cmap=cmap)
 
     for i in range(n):
@@ -236,20 +174,14 @@ if __name__ == "__main__":
             if math.isnan(wilcox[i][j]):
                 pass
             else:
-                if 10 ** wilcox[i][j] > 0.1:
-                    string = f"{10 ** wilcox[i][j]:.2f}"
-                elif 10 ** wilcox[i][j] > 0.01:
-                    string = f"{10 ** wilcox[i][j]:.3f}"
-                else:
-                    string = format(wilcox[i][j], 0)
                 text = ax.text(
                     j,
                     i,
-                    string,
+                    f"{wilcox[i][j]:.2f}",
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=7,
+                    fontsize=9,
                 )
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=10, rotation=45)

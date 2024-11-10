@@ -120,14 +120,14 @@ if __name__ == "__main__":
         else [
             (dev_mode_name, None),
             ("GRU-P-secs", 297),
-            ("DASH-secs", 9),
             ("DASH[MCM]-secs", 9),
-            ("FSRS-4.5-secs", 17),
+            ("DASH-secs", 9),
             ("NN-17-secs", 39),
+            ("FSRS-4.5-secs", 17),
+            ("GRU-secs", 39),
             ("DASH[ACT-R]-secs", 5),
             ("ACT-R-secs", 5),
             ("AVG-secs", 0),
-            ("GRU-secs", 39),
         ]
     )
     if args.fast:

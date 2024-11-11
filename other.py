@@ -1497,26 +1497,6 @@ def ebisu_v2(sequence):
     return model
 
 
-def lineToTensor(line: str) -> Tensor:
-    ivl = line[0].split(",")
-    response = line[1].split(",")
-    tensor = torch.zeros(len(response), 2)
-    for li, r in enumerate(response):
-        tensor[li][0] = int(float(ivl[li]))
-        tensor[li][1] = int(float(r))
-    return tensor
-
-
-def lineToTensorRNN(line):
-    ivl = line[0].split(",")
-    response = line[1].split(",")
-    tensor = torch.zeros(len(response), 5, dtype=torch.float32)
-    for li, response in enumerate(response):
-        tensor[li][0] = int(ivl[li])
-        tensor[li][int(response)] = 1
-    return tensor
-
-
 def iter(model, batch):
     sequences, delta_ts, labels, seq_lens = batch
     real_batch_size = seq_lens.shape[0]

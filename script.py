@@ -453,13 +453,13 @@ if __name__ == "__main__":
                 if error:
                     tqdm.write(error)
                 else:
-                    result, raw = future.result()
+                    stats, raw = result
                     with open(result_file, "a") as f:
-                        f.write(json.dumps(result, ensure_ascii=False) + "\n")
+                        f.write(json.dumps(stats, ensure_ascii=False) + "\n")
                     if raw:
                         with open(raw_file, "a") as f:
                             f.write(json.dumps(raw, ensure_ascii=False) + "\n")
-                    pbar.set_description(f"Processed {result['user']}")
+                    pbar.set_description(f"Processed {stats['user']}")
             except Exception as e:
                 tqdm.write(str(e))
 

@@ -679,16 +679,16 @@ class FSRS5ParameterClipper:
             w[2] = w[2].clamp(S_MIN, 100)
             w[3] = w[3].clamp(S_MIN, 100)
             w[4] = w[4].clamp(1, 10)
-            w[5] = w[5].clamp(0.01, 4)
-            w[6] = w[6].clamp(0.01, 4)
-            w[7] = w[7].clamp(0, 0.75)
+            w[5] = w[5].clamp(0.001, 4)
+            w[6] = w[6].clamp(0.001, 4)
+            w[7] = w[7].clamp(0.001, 0.75)
             w[8] = w[8].clamp(0, 4.5)
             w[9] = w[9].clamp(0, 0.8)
-            w[10] = w[10].clamp(0.01, 3.5)
-            w[11] = w[11].clamp(0.1, 5)
-            w[12] = w[12].clamp(0.01, 0.25)
-            w[13] = w[13].clamp(0.01, 0.9)
-            w[14] = w[14].clamp(0.01, 4)
+            w[10] = w[10].clamp(0.001, 3.5)
+            w[11] = w[11].clamp(0.001, 5)
+            w[12] = w[12].clamp(0.001, 0.25)
+            w[13] = w[13].clamp(0.001, 0.9)
+            w[14] = w[14].clamp(0, 4)
             w[15] = w[15].clamp(0, 1)
             w[16] = w[16].clamp(1, 6)
             w[17] = w[17].clamp(0, 2)
@@ -698,25 +698,25 @@ class FSRS5ParameterClipper:
 
 class FSRS5(FSRS):
     init_w = [
-        0.4072,
-        1.1829,
-        3.1262,
-        15.4722,
-        7.2102,
-        0.5316,
-        1.0651,
-        0.0234,
-        1.616,
-        0.1544,
-        1.0824,
-        1.9813,
-        0.0953,
-        0.2975,
-        2.2042,
-        0.2407,
-        2.9466,
-        0.5034,
-        0.6567,
+        0.40255,
+        1.18385,
+        3.173,
+        15.69105,
+        7.1949,
+        0.5345,
+        1.4604,
+        0.0046,
+        1.54575,
+        0.1192,
+        1.01925,
+        1.9395,
+        0.11,
+        0.29605,
+        2.2698,
+        0.2315,
+        2.9898,
+        0.51655,
+        0.6621,
     ]
     clipper = FSRS5ParameterClipper()
     lr: float = 4e-2
@@ -763,8 +763,12 @@ class FSRS5(FSRS):
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
+    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+        return delta_d * (10 - old_d) / 9
+
     def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
-        new_d = state[:, 1] - self.w[6] * (rating - 3)
+        delta_d = -self.w[6] * (rating - 3)
+        new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
         new_d = self.mean_reversion(self.init_d(4), new_d)
         return new_d
 
@@ -1440,7 +1444,7 @@ class SM2(nn.Module):
         q = rating + 1  # 1-4 -> 2-5
         # EF':=EF+(0.1-(5-q)*(0.08+(5-q)*0.02))
         # -> EF - 0.02 * (q-7) ^ 2 + 0.18
-        new_ef = ef -self.w[3] * (q - self.w[4]) ** 2 + self.w[5]
+        new_ef = ef - self.w[3] * (q - self.w[4]) ** 2 + self.w[5]
         new_ivl = new_ivl.clamp(S_MIN, S_MAX)
         new_ef = new_ef.clamp(1.3, 10.0)
         return torch.stack([new_ivl, new_ef, new_reps], dim=1)

@@ -217,6 +217,22 @@ class FSRS3(nn.Module):
 
 
 class FSRS(nn.Module):
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=DEVICE),
+            0,
+        ]
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {"retentions": retentions, "stabilities": stabilities}
+
     def pretrain(self, train_set):
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
@@ -887,6 +903,22 @@ class RNN(nn.Module):
         output = torch.exp(self.fc(x))
         return output, h
 
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=DEVICE),
+            0,
+        ]
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {"retentions": retentions, "stabilities": stabilities}
+
     def full_connect(self, h):
         return self.fc(h)
 
@@ -937,6 +969,20 @@ class GRU_P(nn.Module):
         output = torch.sigmoid(self.fc(x))
         return output, h
 
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        return {
+            "retentions": outputs[
+                seq_lens - 1, torch.arange(real_batch_size, device=DEVICE), 0
+            ]
+        }
+
 
 class Transformer(nn.Module):
     # 127 params with default settings
@@ -980,6 +1026,22 @@ class Transformer(nn.Module):
         output = torch.exp(output).repeat(src.shape[0], 1, 1)
         return output, None
 
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=DEVICE),
+            0,
+        ]
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {"retentions": retentions, "stabilities": stabilities}
+
     def forgetting_curve(self, t, s):
         return (1 + FACTOR * t / s) ** DECAY
 
@@ -1003,6 +1065,18 @@ class HLR(nn.Module):
     def forward(self, x):
         dp = self.fc(x)
         return 2**dp
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs = self.forward(sequences.transpose(0, 1))
+        stabilities = outputs.squeeze(1)
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {"retentions": retentions, "stabilities": stabilities}
 
     def forgetting_curve(self, t, s):
         return 0.5 ** (t / s)
@@ -1062,6 +1136,20 @@ class ACT_R(nn.Module):
             m[i] = act
         return self.activation(m[1:])
 
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs = self.forward(sequences)
+        return {
+            "retentions": outputs[
+                seq_lens - 2, torch.arange(real_batch_size, device=DEVICE), 0
+            ]
+        }
+
     def activation(self, m):
         return 1 / (1 + torch.exp((self.w[3] - m) / self.w[2]))
 
@@ -1111,6 +1199,16 @@ class DASH(nn.Module):
         x = self.fc(x)
         x = self.sigmoid(x)
         return x
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs = self.forward(sequences.transpose(0, 1))
+        return {"retentions": outputs.squeeze(1)}
 
     def state_dict(self):
         return (
@@ -1163,6 +1261,16 @@ class DASH_ACTR(nn.Module):
             + self.w[4]
         )
         return retentions
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs = self.forward(sequences)
+        return {"retentions": outputs}
 
     def state_dict(self):
         return list(
@@ -1300,6 +1408,30 @@ class NN_17(nn.Module):
             outputs.append(state)
         return torch.stack(outputs), state
 
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=DEVICE),
+            0,
+        ]
+        difficulties = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=DEVICE),
+            1,
+        ]
+        theoretical_r = self.forgetting_curve(delta_ts, stabilities)
+        retentions = self.rw(
+            torch.stack([difficulties, stabilities, theoretical_r], dim=1)
+        ).squeeze(1)
+        return {"retentions": retentions, "stabilities": stabilities}
+
     def step(self, X, state):
         """
         :param input: shape[batch_size, 3]
@@ -1419,6 +1551,22 @@ class SM2(nn.Module):
             outputs.append(state)
         return torch.stack(outputs), state
 
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=DEVICE),
+            0,
+        ]
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {"retentions": retentions, "stabilities": stabilities}
+
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
@@ -1501,56 +1649,8 @@ def iter(model, batch):
     sequences, delta_ts, labels, seq_lens = batch
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels}
-
-    if isinstance(model, ACT_R):
-        outputs = model(sequences)
-        result["retentions"] = outputs[
-            seq_lens - 2, torch.arange(real_batch_size, device=DEVICE), 0
-        ]
-    elif isinstance(model, DASH_ACTR):
-        result["retentions"] = model(sequences)
-    elif isinstance(model, DASH):
-        outputs = model(sequences.transpose(0, 1))
-        result["retentions"] = outputs.squeeze(1)
-    elif isinstance(model, NN_17):
-        outputs, _ = model(sequences)
-        stabilities = outputs[
-            seq_lens - 1,
-            torch.arange(real_batch_size, device=DEVICE),
-            0,
-        ]
-        difficulties = outputs[
-            seq_lens - 1,
-            torch.arange(real_batch_size, device=DEVICE),
-            1,
-        ]
-        theoretical_r = model.forgetting_curve(delta_ts, stabilities)
-        result["retentions"] = model.rw(
-            torch.stack([difficulties, stabilities, theoretical_r], dim=1)
-        ).squeeze(1)
-        result["stabilities"] = stabilities
-    elif isinstance(model, GRU_P):
-        outputs, _ = model(sequences)
-        result["retentions"] = outputs[
-            seq_lens - 1,
-            torch.arange(real_batch_size, device=DEVICE),
-            0,
-        ]
-    else:
-        if isinstance(model, HLR):
-            outputs = model(sequences.transpose(0, 1))
-            stabilities = outputs.squeeze(1)
-        # FSRS family, RNN family, SM2-trainable
-        else:
-            outputs, _ = model(sequences)
-            stabilities = outputs[
-                seq_lens - 1,
-                torch.arange(real_batch_size, device=DEVICE),
-                0,
-            ]
-        result["retentions"] = model.forgetting_curve(delta_ts, stabilities)
-        result["stabilities"] = stabilities
-
+    outputs = model.iter(sequences, delta_ts, seq_lens, real_batch_size)
+    result.update(outputs)
     return result
 
 

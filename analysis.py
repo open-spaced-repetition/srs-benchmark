@@ -3,7 +3,7 @@ import numpy as np
 import json
 import pathlib
 from KDEpy import FFTKDE  # type: ignore
-from fsrs_optimizer import DEFAULT_PARAMETER # type: ignore
+from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
 
 
 def chen_rule(data, weights=None):

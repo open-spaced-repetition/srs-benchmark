@@ -36,6 +36,12 @@ def create_parser():
     parser.add_argument(
         "--weights", action="store_true", help="save neural network weights"
     )
+    parser.add_argument(
+        "--partitions",
+        default="none",
+        choices=["none", "deck", "preset"],
+        help="use partitions instead of presets",
+    )
 
     # script.py only
     parser.add_argument("--dry", action="store_true", help="FSRS-5 without training")

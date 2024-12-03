@@ -37,7 +37,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
     - FSRS-5 default param.: FSRS-5 with default parameters (which have been obtained by running FSRS-5 on all 20 thousand collections).
     - FSRS-5 pretrain: FSRS-5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
     - FSRS-5 binary: FSRS which treats `hard` and `easy` ratings as `good`.
-    - FSRS-5 oreset: FSRS-5 that uses different parameters for cards in different presets.
+    - FSRS-5 preset: FSRS-5 that uses different parameters for cards in different presets.
 - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
     - GRU-P: a variant of GRU that removes the forgetting curve and predicts the probability of recall directly.

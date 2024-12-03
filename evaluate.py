@@ -94,6 +94,7 @@ if __name__ == "__main__":
             ("GRU-P", 297),
             ("FSRS-5", 19),
             ("FSRS-rs", 19),
+            ("FSRS-5-preset", 19),
             ("FSRS-4.5", 17),
             ("FSRS-5-binary", 15),
             ("FSRSv4", 17),
@@ -147,7 +148,10 @@ if __name__ == "__main__":
                 m.append(result["metrics"])
                 sizes.append(result["size"])
                 if "parameters" in result:
-                    parameters.append(result["parameters"])
+                    if isinstance(result["parameters"], list):
+                        parameters.append(result["parameters"])
+                    else:
+                        parameters.extend(result["parameters"].values())
             if len(sizes) == 0:
                 continue
             print(f"Total number of users: {len(sizes)}")

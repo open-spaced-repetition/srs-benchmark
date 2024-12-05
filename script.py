@@ -194,18 +194,19 @@ def create_time_series(df):
     df = df[df["delta_t"] != 0].copy()
     df["i"] = df.groupby("card_id").cumcount() + 1
     df["first_rating"] = df["card_id"].map(card_id_to_first_rating).astype(str)
-    filtered_dataset = (
-        df[df["i"] == 2]
-        .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
-        .apply(remove_outliers)
-    )
-    if filtered_dataset.empty:
-        return pd.DataFrame()
-    df[df["i"] == 2] = filtered_dataset
-    df.dropna(inplace=True)
-    df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
-        remove_non_continuous_rows
-    )
+    if not SECS_IVL:
+        filtered_dataset = (
+            df[df["i"] == 2]
+            .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
+            .apply(remove_outliers)
+        )
+        if filtered_dataset.empty:
+            return pd.DataFrame()
+        df[df["i"] == 2] = filtered_dataset
+        df.dropna(inplace=True)
+        df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
+            remove_non_continuous_rows
+        )
     if BINARY:
         df["first_rating"] = df["first_rating"].map(lambda x: "1" if x == 1 else "3")
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])

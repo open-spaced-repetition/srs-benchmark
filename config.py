@@ -10,7 +10,7 @@ def create_parser():
     # download revlogs from huggingface
     parser.add_argument(
         "--data",
-        default="../anki-revlogs-10k/revlogs",
+        default="../anki-revlogs-10k",
         help="path to revlogs/*.parquet",
     )
 

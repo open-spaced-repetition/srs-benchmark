@@ -29,7 +29,7 @@ FILE = args.file
 PLOT = args.plot
 RAW = args.raw
 THREADS = args.threads
-DATA_PATH = args.data
+DATA_PATH = Path(args.data)
 
 if DEV_MODE:
     # for local development
@@ -214,7 +214,9 @@ def create_time_series(df):
 @catch_exceptions
 def process(user_id):
     plt.close("all")
-    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
+    dataset = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+    )
     dataset = create_time_series(dataset)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
@@ -415,7 +417,7 @@ def sort_jsonl(file):
 
 if __name__ == "__main__":
     unprocessed_users = []
-    dataset = pq.ParquetDataset(DATA_PATH)
+    dataset = pq.ParquetDataset(DATA_PATH / "revlogs")
     Path(f"evaluation/{path}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)

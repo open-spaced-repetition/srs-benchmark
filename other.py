@@ -35,7 +35,7 @@ WEIGHTS = args.weights
 PARTITIONS = args.partitions
 RAW = args.raw
 THREADS = args.threads
-DATA_PATH = args.data
+DATA_PATH = Path(args.data)
 
 model_list = (
     "FSRSv3",
@@ -1894,13 +1894,11 @@ class Collection:
 
 
 def process_untrainable(user_id):
-    df_revlogs = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
-    df_cards = pd.read_parquet(
-        "../anki-revlogs-10k/cards", filters=[("user_id", "=", user_id)]
+    df_revlogs = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    df_decks = pd.read_parquet(
-        "../anki-revlogs-10k/decks", filters=[("user_id", "=", user_id)]
-    )
+    df_cards = pd.read_parquet(DATA_PATH / "cards", filters=[("user_id", "=", user_id)])
+    df_decks = pd.read_parquet(DATA_PATH / "decks", filters=[("user_id", "=", user_id)])
     df_join = df_revlogs.merge(df_cards, on="card_id", how="left").merge(
         df_decks, on="deck_id", how="left"
     )
@@ -1940,7 +1938,9 @@ def process_untrainable(user_id):
 
 def baseline(user_id):
     model_name = "AVG"
-    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
+    dataset = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+    )
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
@@ -2145,7 +2145,9 @@ def process(user_id):
         return process_untrainable(user_id)
     if MODEL_NAME == "AVG":
         return baseline(user_id)
-    df_revlogs = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
+    df_revlogs = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+    )
     df_revlogs.drop(columns=["user_id"], inplace=True)
     df_cards = pd.read_parquet(
         "../anki-revlogs-10k/cards", filters=[("user_id", "=", user_id)]
@@ -2302,7 +2304,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     unprocessed_users = []
-    dataset = pq.ParquetDataset(DATA_PATH)
+    dataset = pq.ParquetDataset(DATA_PATH / "revlogs")
     Path(f"evaluation/{FILE_NAME}").mkdir(parents=True, exist_ok=True)
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)

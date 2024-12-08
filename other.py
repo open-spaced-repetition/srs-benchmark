@@ -1661,17 +1661,6 @@ def iter(model, batch):
 
 class Trainer:
     optimizer: torch.optim.Optimizer
-    schedulers: dict[int, torch.optim.lr_scheduler.CosineAnnealingLR]
-    models: dict[int, nn.Module]
-    optimizers: dict[int, torch.optim.Optimizer]
-    pre_train_sets: dict[int, BatchDataset]
-    pre_train_data_loaders: dict[int, BatchLoader]
-    next_train_sets: dict[int, BatchDataset]
-    next_train_data_loaders: dict[int, BatchLoader]
-    train_sets: dict[int, BatchDataset]
-    train_data_loaders: dict[int, BatchLoader]
-    test_sets: dict[int, list[BatchDataset]]
-    test_data_loaders: dict[int, list[BatchLoader]]
 
     def __init__(
         self,
@@ -1684,159 +1673,118 @@ class Trainer:
         batch_size: int = 256,
         max_seq_len: int = 64,
     ) -> None:
-        partitions = train_set["partition"].unique()
-        self.models = {}
-        self.optimizers = {}
-        for partition in partitions:
-            df_partition = train_set[train_set["partition"] == partition]
-            self.models[partition] = MODEL.to(device=DEVICE)
-            if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
-                self.models[partition].pretrain(df_partition)
-            if isinstance(MODEL, (RNN, Transformer, GRU_P)):
-                self.optimizers[partition] = torch.optim.AdamW(
-                    self.models[partition].parameters(), lr=lr, weight_decay=wd
-                )
-            else:
-                self.optimizers[partition] = torch.optim.Adam(  # type: ignore
-                    self.models[partition].parameters(), lr=lr
-                )
+        self.model = MODEL.to(device=DEVICE)
+        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
+            self.model.pretrain(train_set)
+        if isinstance(MODEL, (RNN, Transformer, GRU_P)):
+            self.optimizer = torch.optim.AdamW(
+                self.model.parameters(), lr=lr, weight_decay=wd
+            )
+        else:
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
         self.clipper = MODEL.clipper if hasattr(MODEL, "clipper") else None
         self.batch_size = batch_size
         self.max_seq_len = max_seq_len
         self.build_dataset(train_set, test_set)
         self.n_epoch = n_epoch
-        self.batch_nums = {}
-        for partition in partitions:
-            self.batch_nums[partition] = (
-                self.next_train_data_loaders[partition].batch_nums
-                if isinstance(MODEL, (FSRS4, FSRS4dot5))
-                else self.train_data_loaders[partition].batch_nums
-            )
-        self.schedulers = {}
-        for partition in partitions:
-            self.schedulers[partition] = torch.optim.lr_scheduler.CosineAnnealingLR(
-                self.optimizers[partition], T_max=self.batch_nums[partition] * n_epoch
-            )
+        self.batch_nums = (
+            self.next_train_data_loader.batch_nums
+            if isinstance(MODEL, (FSRS4, FSRS4dot5))
+            else self.train_data_loader.batch_nums
+        )
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer, T_max=self.batch_nums * n_epoch
+        )
         self.avg_train_losses: list[float] = []
         self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
-        self.pre_train_sets = {}
-        self.pre_train_data_loaders = {}
-        self.next_train_sets = {}
-        self.next_train_data_loaders = {}
-        self.train_sets = {}
-        self.train_data_loaders = {}
-        self.test_sets = {}
-        self.test_data_loaders = {}
-        for partition in self.models:
-            pre_train_set = train_set[train_set["partition"] == partition][
-                train_set["i"] == 2
-            ]
-            self.pre_train_sets[partition] = BatchDataset(
-                pre_train_set.copy(),
-                self.batch_size,
+        pre_train_set = train_set[train_set["i"] == 2]
+        self.pre_train_set = BatchDataset(
+            pre_train_set.copy(),
+            self.batch_size,
+            max_seq_len=self.max_seq_len,
+            device=DEVICE,
+        )
+        self.pre_train_data_loader = BatchLoader(self.pre_train_set)
+
+        next_train_set = train_set[train_set["i"] > 2]
+        self.next_train_set = BatchDataset(
+            next_train_set.copy(),
+            self.batch_size,
+            max_seq_len=self.max_seq_len,
+            device=DEVICE,
+        )
+        self.next_train_data_loader = BatchLoader(self.next_train_set)
+
+        self.train_set = BatchDataset(
+            train_set.copy(),
+            self.batch_size,
+            max_seq_len=self.max_seq_len,
+            device=DEVICE,
+        )
+        self.train_data_loader = BatchLoader(self.train_set)
+
+        self.test_set = (
+            []
+            if test_set is None
+            else BatchDataset(
+                test_set.copy(),
+                batch_size=self.batch_size,
                 max_seq_len=self.max_seq_len,
                 device=DEVICE,
             )
-            self.pre_train_data_loaders[partition] = BatchLoader(
-                self.pre_train_sets[partition]
-            )
+        )
+        self.test_data_loader = (
+            [] if test_set is None else BatchLoader(self.test_set, shuffle=False)
+        )
 
-            next_train_set = train_set[train_set["partition"] == partition][
-                train_set["i"] > 2
-            ]
-            self.next_train_sets[partition] = BatchDataset(
-                next_train_set.copy(),
-                self.batch_size,
-                max_seq_len=self.max_seq_len,
-                device=DEVICE,
-            )
-            self.next_train_data_loaders[partition] = BatchLoader(
-                self.next_train_sets[partition]
-            )
-
-            self.train_sets[partition] = BatchDataset(
-                train_set.copy(),
-                self.batch_size,
-                max_seq_len=self.max_seq_len,
-                device=DEVICE,
-            )
-            self.train_data_loaders[partition] = BatchLoader(self.train_sets[partition])
-
-            self.test_sets[partition] = (
-                []
-                if test_set is None
-                else BatchDataset(
-                    test_set.copy(),
-                    batch_size=self.batch_size,
-                    max_seq_len=self.max_seq_len,
-                    device=DEVICE,
-                )
-            )
-            self.test_data_loaders[partition] = (
-                []
-                if test_set is None
-                else BatchLoader(self.test_sets[partition], shuffle=False)
-            )
-
-    def train(self) -> dict[int, list[float]]:
-        partition_best_w = {}
-        for partition, model in self.models.items():
-            optimizer = self.optimizers[partition]
-            scheduler = self.schedulers[partition]
-            best_loss = np.inf
-            for k in range(self.n_epoch):
-                weighted_loss, w = self.eval(partition)
-                if weighted_loss < best_loss:
-                    best_loss = weighted_loss
-                    best_w = w
-                for i, batch in enumerate(
-                    self.train_data_loaders[partition]
-                    if not isinstance(model, (FSRS4, FSRS4dot5))
-                    else self.next_train_data_loaders[
-                        partition
-                    ]  # FSRS4 and FSRS-4.5 have two training stages
-                ):
-                    model.train()
-                    optimizer.zero_grad()
-                    result = iter(model, batch)
-                    loss = self.loss_fn(result["retentions"], result["labels"]).sum()
-                    loss.backward()
-                    if isinstance(
-                        model, (FSRS4, FSRS4dot5)
-                    ):  # the initial stability is not trainable
-                        for param in model.parameters():
-                            param.grad[:4] = torch.zeros(4)  # type: ignore
-                    optimizer.step()
-                    scheduler.step()
-                    if self.clipper:
-                        model.apply(self.clipper)
-            weighted_loss, w = self.eval(partition)
+    def train(self):
+        best_loss = np.inf
+        for k in range(self.n_epoch):
+            weighted_loss, w = self.eval()
             if weighted_loss < best_loss:
                 best_loss = weighted_loss
                 best_w = w
-            partition_best_w[partition] = best_w
-        return partition_best_w
+            for i, batch in enumerate(
+                self.train_data_loader
+                if not isinstance(self.model, (FSRS4, FSRS4dot5))
+                else self.next_train_data_loader  # FSRS4 and FSRS-4.5 have two training stages
+            ):
+                self.model.train()
+                self.optimizer.zero_grad()
+                result = iter(self.model, batch)
+                loss = self.loss_fn(result["retentions"], result["labels"]).sum()
+                loss.backward()
+                if isinstance(
+                    self.model, (FSRS4, FSRS4dot5)
+                ):  # the initial stability is not trainable
+                    for param in self.model.parameters():
+                        param.grad[:4] = torch.zeros(4)
+                self.optimizer.step()
+                self.scheduler.step()
+                if self.clipper:
+                    self.model.apply(self.clipper)
+        weighted_loss, w = self.eval()
+        if weighted_loss < best_loss:
+            best_loss = weighted_loss
+            best_w = w
+        return best_w
 
-    def eval(self, partition: int):
-        model = self.models[partition]
-        model.eval()
+    def eval(self):
+        self.model.eval()
         with torch.no_grad():
             losses = []
-            self.train_data_loaders[partition].shuffle = False
-            for data_loader in (
-                self.train_data_loaders[partition],
-                self.test_data_loaders[partition],
-            ):
+            self.train_data_loader.shuffle = False
+            for data_loader in (self.train_data_loader, self.test_data_loader):
                 if len(data_loader) == 0:
-                    losses.append(0.0)
+                    losses.append(0)
                     continue
                 loss = 0
                 total = 0
                 for batch in data_loader:
-                    result = iter(model, batch)
+                    result = iter(self.model, batch)
                     loss += (
                         self.loss_fn(result["retentions"], result["labels"])
                         .sum()
@@ -1845,16 +1793,15 @@ class Trainer:
                     )
                     total += batch[3].shape[0]
                 losses.append(loss / total)
-            self.train_data_loaders[partition].shuffle = True
+            self.train_data_loader.shuffle = True
             self.avg_train_losses.append(losses[0])
             self.avg_eval_losses.append(losses[1])
 
-            w = model.state_dict()
+            w = self.model.state_dict()
 
             weighted_loss = (
-                losses[0] * len(self.train_sets[partition])
-                + losses[1] * len(self.test_sets[partition])
-            ) / (len(self.train_sets[partition]) + len(self.test_sets[partition]))
+                losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
+            ) / (len(self.train_set) + len(self.test_set))
 
             return weighted_loss, w
 
@@ -2206,29 +2153,29 @@ def process(user_id):
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
         testsets.append(test_set)
-        try:
-            trainer = Trainer(
-                model(),
-                train_set,
-                None,
-                n_epoch=model.n_epoch,
-                lr=model.lr,
-                wd=model.wd,
-                batch_size=batch_size,
-            )
-            w_list.append(trainer.train())
-        except Exception as e:
-            if str(e).endswith("inadequate."):
-                if verbose_inadequate_data:
-                    print("Skipping - Inadequate data")
-            else:
-                print(user_id)
-                tb = sys.exc_info()[2]
-                print(e.with_traceback(tb))
-            partition_weights = {}
-            for partition in train_set["partition"].unique():
+        partition_weights = {}
+        for partition in train_set["partition"].unique():
+            try:
+                trainer = Trainer(
+                    model(),
+                    train_set[train_set["partition"] == partition],
+                    None,
+                    n_epoch=model.n_epoch,
+                    lr=model.lr,
+                    wd=model.wd,
+                    batch_size=batch_size,
+                )
+                partition_weights[partition] = trainer.train()
+            except Exception as e:
+                if str(e).endswith("inadequate."):
+                    if verbose_inadequate_data:
+                        print("Skipping - Inadequate data")
+                else:
+                    print(user_id)
+                    tb = sys.exc_info()[2]
+                    print(e.with_traceback(tb))
                 partition_weights[partition] = model().state_dict()
-            w_list.append(partition_weights)
+        w_list.append(partition_weights)
 
     p = []
     y = []

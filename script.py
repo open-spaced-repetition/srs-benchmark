@@ -75,14 +75,16 @@ else:
         path += "-dry-run"
     if ONLY_PRETRAIN:
         path += "-pretrain"
-    if DEV_MODE:
-        path += "-dev"
     if do_fullinfo_stats:
         path += "-fullinfo"
     if SECS_IVL:
         path += f"-secs"
+    if NO_TEST_SAME_DAY:
+        path += "-no_test_same_day"
     if BINARY:
         path += "-binary"
+    if DEV_MODE:
+        path += "-dev"
 
 
 def predict(w_list, testsets, user_id=None):

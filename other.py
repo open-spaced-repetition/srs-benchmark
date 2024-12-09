@@ -87,8 +87,9 @@ FILE_NAME = (
     MODEL_NAME
     + ("-short" if SHORT_TERM else "")
     + ("-secs" if SECS_IVL else "")
-    + ("-dev" if DEV_MODE else "")
+    + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
+    + ("-dev" if DEV_MODE else "")
 )
 
 S_MIN = 1e-6 if SECS_IVL else 0.01

@@ -29,6 +29,7 @@ DEV_MODE = args.dev
 MODEL_NAME = args.model
 SHORT_TERM = args.short
 SECS_IVL = args.secs
+NO_TEST_SAME_DAY = args.no_test_same_day
 FILE = args.file
 PLOT = args.plot
 WEIGHTS = args.weights
@@ -2152,6 +2153,8 @@ def process(user_id):
     for train_index, test_index in tscv.split(dataset):
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
+        if NO_TEST_SAME_DAY:
+            test_set = test_set[test_set["elapsed_days"] > 0].copy()
         testsets.append(test_set)
         partition_weights = {}
         for partition in train_set["partition"].unique():

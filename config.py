@@ -19,6 +19,12 @@ def create_parser():
         "--secs", action="store_true", help="use elapsed_seconds as interval"
     )
 
+    parser.add_argument(
+        "--no_test_same_day",
+        action="store_true",
+        help="exclude reviews with elapsed_days=0 from testset",
+    )
+
     # save detailed results
     parser.add_argument("--raw", action="store_true", help="save raw predictions")
     parser.add_argument(

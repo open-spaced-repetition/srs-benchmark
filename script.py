@@ -23,6 +23,7 @@ DEV_MODE = args.dev
 DRY_RUN = args.dry
 ONLY_PRETRAIN = args.pretrain
 SECS_IVL = args.secs
+NO_TEST_SAME_DAY = args.no_test_same_day
 BINARY = args.binary
 RUST = args.rust
 FILE = args.file
@@ -247,8 +248,10 @@ def process(user_id):
             train_index, test_index = loop_args  # type: ignore
 
         optimizer.define_model()
-        test_set = dataset.iloc[test_index].copy()
         train_set = dataset.iloc[train_index].copy()
+        test_set = dataset.iloc[test_index].copy()
+        if NO_TEST_SAME_DAY:
+            test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if DRY_RUN:
             w_list.append(optimizer.init_w)
             sizes.append(len(train_index))

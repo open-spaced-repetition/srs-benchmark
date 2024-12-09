@@ -157,7 +157,7 @@ def create_time_series(df):
         and "elapsed_seconds" in df.columns
     ):
         if SECS_IVL:
-            df["delta_t"] = df["elapsed_seconds"]
+            df["delta_t"] = df["elapsed_seconds"] / 86400
         else:
             df["delta_t"] = df["elapsed_days"]
     df["i"] = df.groupby("card_id").cumcount() + 1

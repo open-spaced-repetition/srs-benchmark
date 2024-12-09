@@ -68,6 +68,7 @@ if __name__ == "__main__":
     models = [
         "GRU-P-short",
         "GRU-P",
+        "FSRS-5-preset",
         "FSRS-5",
         "FSRS-rs",
         "FSRS-4.5",

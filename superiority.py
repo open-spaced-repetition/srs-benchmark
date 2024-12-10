@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
-        f"Fraction of cases where algorithm A (row) outperforms algorithm B (column)",
+        f"Percent of collections where algorithm A (row) outperforms algorithm B (column)",
         fontsize=22,
         pad=30,
     )

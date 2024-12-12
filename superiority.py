@@ -20,6 +20,7 @@ if __name__ == "__main__":
         "FSRS-5-preset",
         "FSRS-5",
         "FSRS-4.5",
+        "FSRS-5-deck",
         "FSRS-5-binary",
         "FSRSv4",
         "GRU",

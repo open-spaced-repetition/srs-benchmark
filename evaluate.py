@@ -95,6 +95,7 @@ if __name__ == "__main__":
             ("FSRS-5-preset", 19),
             ("FSRS-rs", 19),
             ("FSRS-5", 19),
+            ("FSRS-5-disable_short_term", 17),
             ("FSRS-4.5", 17),
             ("FSRS-5-deck", 19),
             ("FSRS-5-binary", 15),

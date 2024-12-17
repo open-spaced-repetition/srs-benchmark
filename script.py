@@ -31,6 +31,7 @@ PLOT = args.plot
 RAW = args.raw
 THREADS = args.threads
 DATA_PATH = Path(args.data)
+DISABLE_SHORT_TERM = args.disable_short_term
 
 if DEV_MODE:
     # for local development
@@ -79,12 +80,15 @@ else:
         path += "-fullinfo"
     if SECS_IVL:
         path += f"-secs"
-    if NO_TEST_SAME_DAY:
-        path += "-no_test_same_day"
-    if BINARY:
-        path += "-binary"
-    if DEV_MODE:
-        path += "-dev"
+
+if NO_TEST_SAME_DAY:
+    path += "-no_test_same_day"
+if BINARY:
+    path += "-binary"
+if DISABLE_SHORT_TERM:
+    path += "-disable_short_term"
+if DEV_MODE:
+    path += "-dev"
 
 
 def predict(w_list, testsets, user_id=None):
@@ -265,7 +269,9 @@ def process(user_id):
         try:
             if RUST:
                 train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
-                parameters = backend.benchmark(train_set_items)
+                parameters = backend.benchmark(
+                    train_set_items, enable_short_term=not DISABLE_SHORT_TERM
+                )
                 w_list.append(parameters)
             else:
                 optimizer.S0_dataset_group = (
@@ -286,6 +292,7 @@ def process(user_id):
                         n_epoch=n_epoch,
                         lr=lr,
                         batch_size=batch_size,
+                        enable_short_term=not DISABLE_SHORT_TERM,
                     )
                     w_list.append(trainer.train(verbose=verbose))
             # No error, so training data was adequate

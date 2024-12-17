@@ -58,4 +58,7 @@ def create_parser():
         "--binary", action="store_true", help="FSRS-5 with binary ratings"
     )
     parser.add_argument("--rust", action="store_true", help="FSRS-rs")
+    parser.add_argument(
+        "--disable_short_term", action="store_true", help="disable short-term memory"
+    )
     return parser

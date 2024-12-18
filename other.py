@@ -37,6 +37,7 @@ PARTITIONS = args.partitions
 RAW = args.raw
 THREADS = args.threads
 DATA_PATH = Path(args.data)
+RECENCY = args.recency
 
 model_list = (
     "FSRSv3",
@@ -87,6 +88,7 @@ FILE_NAME = (
     MODEL_NAME
     + ("-short" if SHORT_TERM else "")
     + ("-secs" if SECS_IVL else "")
+    + ("-recency" if RECENCY else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
     + ("-dev" if DEV_MODE else "")
@@ -1655,9 +1657,9 @@ def ebisu_v2(sequence):
 
 
 def iter(model, batch):
-    sequences, delta_ts, labels, seq_lens = batch
+    sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
-    result = {"labels": labels}
+    result = {"labels": labels, "weights": weights}
     outputs = model.iter(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     return result
@@ -1759,7 +1761,10 @@ class Trainer:
                 self.model.train()
                 self.optimizer.zero_grad()
                 result = iter(self.model, batch)
-                loss = self.loss_fn(result["retentions"], result["labels"]).sum()
+                loss = (
+                    self.loss_fn(result["retentions"], result["labels"])
+                    * result["weights"]
+                ).sum()
                 loss.backward()
                 if isinstance(
                     self.model, (FSRS4, FSRS4dot5)
@@ -1790,7 +1795,10 @@ class Trainer:
                 for batch in data_loader:
                     result = iter(self.model, batch)
                     loss += (
-                        self.loss_fn(result["retentions"], result["labels"])
+                        (
+                            self.loss_fn(result["retentions"], result["labels"])
+                            * result["weights"]
+                        )
                         .sum()
                         .detach()
                         .item()
@@ -2162,9 +2170,14 @@ def process(user_id):
         partition_weights = {}
         for partition in train_set["partition"].unique():
             try:
+                train_partition = train_set[train_set["partition"] == partition].copy()
+                if RECENCY:
+                    train_partition["weights"] = np.linspace(
+                        0.5, 1.5, len(train_partition)
+                    )
                 trainer = Trainer(
                     model(),
-                    train_set[train_set["partition"] == partition],
+                    train_partition,
                     None,
                     n_epoch=model.n_epoch,
                     lr=model.lr,

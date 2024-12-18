@@ -92,6 +92,7 @@ if __name__ == "__main__":
             (dev_mode_name, None),
             ("GRU-P-short", 297),
             ("GRU-P", 297),
+            ("FSRS-5-recency", 19),
             ("FSRS-5-preset", 19),
             ("FSRS-rs", 19),
             ("FSRS-5", 19),

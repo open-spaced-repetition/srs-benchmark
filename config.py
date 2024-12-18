@@ -48,6 +48,9 @@ def create_parser():
         choices=["none", "deck", "preset"],
         help="use partitions instead of presets",
     )
+    parser.add_argument(
+        "--recency", action="store_true", help="enable recency weighting"
+    )
 
     # script.py only
     parser.add_argument("--dry", action="store_true", help="FSRS-5 without training")

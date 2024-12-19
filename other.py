@@ -81,6 +81,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 n_splits: int = 5
 batch_size: int = 512
+max_seq_len: int = 64
 verbose: bool = False
 verbose_inadequate_data: bool = False
 
@@ -1929,8 +1930,9 @@ def baseline(user_id):
 def create_features(df, model_name="FSRSv3"):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
-    df = df[df["rating"].isin([1, 2, 3, 4])]
-    df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
+    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace = True)
+    df["i"] = df.groupby("card_id").cumcount() + 1
+    df.drop(df[df['i'] > max_seq_len].index, inplace = True)
     if (
         "delta_t" not in df.columns
         and "elapsed_days" in df.columns
@@ -1941,9 +1943,9 @@ def create_features(df, model_name="FSRSv3"):
         else:
             df["delta_t"] = df["elapsed_days"]
     if not SHORT_TERM:
-        df = df[df["delta_t"] != 0].copy()
+        df.drop(df[df["delta_t"] == 0].index, inplace = True)
+        df["i"] = df.groupby("card_id").cumcount() + 1
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
-    df["i"] = df.groupby("card_id").cumcount() + 1
     t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
@@ -2108,18 +2110,6 @@ def process(user_id):
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
-    df_cards = pd.read_parquet(
-        "../anki-revlogs-10k/cards", filters=[("user_id", "=", user_id)]
-    )
-    df_cards.drop(columns=["user_id"], inplace=True)
-    df_decks = pd.read_parquet(
-        "../anki-revlogs-10k/decks", filters=[("user_id", "=", user_id)]
-    )
-    df_decks.drop(columns=["user_id"], inplace=True)
-    df_join = df_revlogs.merge(df_cards, on="card_id", how="left").merge(
-        df_decks, on="deck_id", how="left"
-    )
-    df_join.fillna(-1, inplace=True)
     if MODEL_NAME in ("RNN", "LSTM", "GRU"):
         model = RNN
     elif MODEL_NAME == "GRU-P":
@@ -2149,21 +2139,34 @@ def process(user_id):
     elif MODEL_NAME == "SM2-trainable":
         model = SM2
 
-    dataset = create_features(df_join, MODEL_NAME)
+    dataset = create_features(df_revlogs, MODEL_NAME)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
-    if PARTITIONS == "preset":
-        dataset["partition"] = dataset["preset_id"].astype(int)
-    elif PARTITIONS == "deck":
-        dataset["partition"] = dataset["deck_id"].astype(int)
+    if PARTITIONS != "none":
+        df_cards = pd.read_parquet(
+            "../anki-revlogs-10k/cards", filters=[("user_id", "=", user_id)]
+        )
+        df_cards.drop(columns=["user_id"], inplace=True)
+        df_decks = pd.read_parquet(
+            "../anki-revlogs-10k/decks", filters=[("user_id", "=", user_id)]
+        )
+        df_decks.drop(columns=["user_id"], inplace=True)
+        dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
+            df_decks, on="deck_id", how="left"
+        )
+        dataset.fillna(-1, inplace=True)
+        if PARTITIONS == "preset":
+            dataset["partition"] = dataset["preset_id"].astype(int)
+        elif PARTITIONS == "deck":
+            dataset["partition"] = dataset["deck_id"].astype(int)
     else:
         dataset["partition"] = 0
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
     for train_index, test_index in tscv.split(dataset):
-        train_set = dataset.iloc[train_index].copy()
-        test_set = dataset.iloc[test_index].copy()
+        train_set = dataset.iloc[train_index]
+        test_set = dataset.iloc[test_index]
         if NO_TEST_SAME_DAY:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
         testsets.append(test_set)

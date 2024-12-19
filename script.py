@@ -56,6 +56,7 @@ lr: float = 4e-2
 n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
+max_seq_len: int = 64
 verbose: bool = False
 verbose_inadequate_data: bool = False
 do_fullinfo_stats: bool = False
@@ -153,11 +154,12 @@ def cum_concat(x):
 def create_time_series(df):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
-    df = df[df["rating"].isin([1, 2, 3, 4])]
+    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace = True)
+    df["i"] = df.groupby("card_id").cumcount() + 1
+    df.drop(df[df['i'] > max_seq_len].index, inplace = True)
     card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
     if BINARY:
         df.loc[:, "rating"] = df.loc[:, "rating"].map({1: 1, 2: 3, 3: 3, 4: 3})
-    df = df.groupby("card_id").apply(lambda x: x.head(128)).reset_index(drop=True)
     if (
         "delta_t" not in df.columns
         and "elapsed_days" in df.columns
@@ -167,7 +169,6 @@ def create_time_series(df):
             df["delta_t"] = df["elapsed_seconds"] / 86400
         else:
             df["delta_t"] = df["elapsed_days"]
-    df["i"] = df.groupby("card_id").cumcount() + 1
     t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[max(0, i)] for i in x])
     )
@@ -198,7 +199,7 @@ def create_time_series(df):
                 last_rating.append(r_history[0])
     df["last_rating"] = last_rating
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    df = df[df["delta_t"] != 0].copy()
+    df.drop(df[df["delta_t"] == 0].index, inplace = True)
     df["i"] = df.groupby("card_id").cumcount() + 1
     df["first_rating"] = df["card_id"].map(card_id_to_first_rating).astype(str)
     if not SECS_IVL:
@@ -292,6 +293,7 @@ def process(user_id):
                         n_epoch=n_epoch,
                         lr=lr,
                         batch_size=batch_size,
+                        max_seq_len=max_seq_len,
                         enable_short_term=not DISABLE_SHORT_TERM,
                     )
                     w_list.append(trainer.train(verbose=verbose))

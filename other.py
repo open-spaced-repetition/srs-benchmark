@@ -2249,7 +2249,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
         "user": int(user_id),
         "size": len(y),
     }
-    if w_list and type(w_list[0]) == dict:
+    if w_list and type(w_list[0]) == dict and all(isinstance(w, list) for w in w_list[0].values()):
         stats["parameters"] = {
             int(partition): list(map(lambda x: round(x, 6), w))
             for partition, w in w_list[-1].items()

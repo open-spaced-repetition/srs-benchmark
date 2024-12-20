@@ -34,7 +34,7 @@ DATA_PATH = Path(args.data)
 DISABLE_SHORT_TERM = args.disable_short_term
 
 torch.set_num_threads(3)
-torch.set_num_interop_threads(3)
+# torch.set_num_interop_threads(3)
 
 if DEV_MODE:
     # for local development

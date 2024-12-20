@@ -1935,7 +1935,7 @@ def create_features(df, model_name="FSRSv3"):
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace = True)
     df["i"] = df.groupby("card_id").cumcount() + 1
-    df.drop(df[df['i'] > max_seq_len].index, inplace = True)
+    df.drop(df[df['i'] > max_seq_len * 2].index, inplace = True)
     if (
         "delta_t" not in df.columns
         and "elapsed_days" in df.columns

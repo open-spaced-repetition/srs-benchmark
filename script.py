@@ -130,11 +130,14 @@ def convert_to_items(df):  # -> list[FSRSItem]
             ]
             r_history = [int(t) for t in row["r_history"].split(",")] + [row["rating"]]
             items.append(
-                FSRSItem(
-                    reviews=[
-                        FSRSReview(delta_t=int(x[0]), rating=int(x[1]))
-                        for x in zip(t_history, r_history)
-                    ]
+                (
+                    row["review_th"],
+                    FSRSItem(
+                        reviews=[
+                            FSRSReview(delta_t=int(x[0]), rating=int(x[1]))
+                            for x in zip(t_history, r_history)
+                        ]
+                    ),
                 )
             )
         return items
@@ -146,6 +149,7 @@ def convert_to_items(df):  # -> list[FSRSItem]
         .tolist(),
         [],
     )
+    result_list = list(map(lambda x: x[1], sorted(result_list, key=lambda x: x[0])))
 
     return result_list
 
@@ -157,9 +161,9 @@ def cum_concat(x):
 def create_time_series(df):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
-    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace = True)
+    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
     df["i"] = df.groupby("card_id").cumcount() + 1
-    df.drop(df[df['i'] > max_seq_len].index, inplace = True)
+    df.drop(df[df["i"] > max_seq_len * 2].index, inplace=True)
     card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
     if BINARY:
         df.loc[:, "rating"] = df.loc[:, "rating"].map({1: 1, 2: 3, 3: 3, 4: 3})
@@ -202,7 +206,7 @@ def create_time_series(df):
                 last_rating.append(r_history[0])
     df["last_rating"] = last_rating
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    df.drop(df[df["delta_t"] == 0].index, inplace = True)
+    df.drop(df[df["delta_t"] == 0].index, inplace=True)
     df["i"] = df.groupby("card_id").cumcount() + 1
     df["first_rating"] = df["card_id"].map(card_id_to_first_rating).astype(str)
     if not SECS_IVL:
@@ -273,9 +277,7 @@ def process(user_id):
         try:
             if RUST:
                 train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
-                parameters = backend.benchmark(
-                    train_set_items, enable_short_term=not DISABLE_SHORT_TERM
-                )
+                parameters = backend.benchmark(train_set_items)
                 w_list.append(parameters)
             else:
                 optimizer.S0_dataset_group = (

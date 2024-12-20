@@ -243,10 +243,10 @@ python script.py --dev
 
 > Please place the [fsrs-optimizer repository](https://github.com/open-spaced-repetition/fsrs-optimizer) in the same directory as this repository.
 
-Set the number of threads:
+Set the number of processes:
 
 ```bash
-python script.py --threads 4
+python script.py --processes 4
 ```
 
 Save the raw predictions:

@@ -4,7 +4,7 @@ import argparse
 def create_parser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--threads", default=8, type=int, help="number of threads")
+    parser.add_argument("--processes", default=8, type=int, help="set the number of processes")
     parser.add_argument("--dev", action="store_true", help="for local development")
 
     # download revlogs from huggingface

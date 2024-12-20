@@ -29,7 +29,7 @@ RUST = args.rust
 FILE = args.file
 PLOT = args.plot
 RAW = args.raw
-THREADS = args.threads
+PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 DISABLE_SHORT_TERM = args.disable_short_term
 
@@ -459,7 +459,7 @@ if __name__ == "__main__":
 
     unprocessed_users.sort()
 
-    with ProcessPoolExecutor(max_workers=THREADS) as executor:
+    with ProcessPoolExecutor(max_workers=PROCESSES) as executor:
         futures = [
             executor.submit(
                 process,

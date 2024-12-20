@@ -35,7 +35,7 @@ PLOT = args.plot
 WEIGHTS = args.weights
 PARTITIONS = args.partitions
 RAW = args.raw
-THREADS = args.threads
+PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 RECENCY = args.recency
 
@@ -2298,7 +2298,7 @@ if __name__ == "__main__":
 
     unprocessed_users.sort()
 
-    with ProcessPoolExecutor(max_workers=THREADS) as executor:
+    with ProcessPoolExecutor(max_workers=PROCESSES) as executor:
         futures = [
             executor.submit(
                 process,

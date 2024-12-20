@@ -25,6 +25,8 @@ ONLY_PRETRAIN = args.pretrain
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
 BINARY = args.binary
+PARTITIONS = args.partitions
+RECENCY = args.recency
 RUST = args.rust
 FILE = args.file
 PLOT = args.plot
@@ -62,14 +64,11 @@ batch_size: int = 512
 max_seq_len: int = 64
 verbose: bool = False
 verbose_inadequate_data: bool = False
-do_fullinfo_stats: bool = False
 
 
 if RUST:
     os.environ["FSRS_NO_OUTLIER"] = "1"
     path = "FSRS-rs"
-    if do_fullinfo_stats:
-        path += "-fullinfo"
     from fsrs_rs_python import FSRS  # type: ignore
 
     backend = FSRS(parameters=[])
@@ -80,15 +79,16 @@ else:
         path += "-dry-run"
     if ONLY_PRETRAIN:
         path += "-pretrain"
-    if do_fullinfo_stats:
-        path += "-fullinfo"
     if SECS_IVL:
         path += f"-secs"
-
+if RECENCY:
+    path += "-recency"
 if NO_TEST_SAME_DAY:
     path += "-no_test_same_day"
 if BINARY:
     path += "-binary"
+if PARTITIONS != "none":
+    path += f"-{PARTITIONS}"
 if DISABLE_SHORT_TERM:
     path += "-disable_short_term"
 if DEV_MODE:
@@ -101,15 +101,20 @@ def predict(w_list, testsets, user_id=None):
     save_tmp = [] if user_id else None
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
-        my_collection = Collection(w)
-        testset["stability"], testset["difficulty"] = my_collection.batch_predict(
-            testset
-        )
-        testset["p"] = power_forgetting_curve(testset["delta_t"], testset["stability"])
-        p.extend(testset["p"].tolist())
-        y.extend(testset["y"].tolist())
-        if user_id:
-            save_tmp.append(testset)
+        for partition in testset["partition"].unique():
+            partition_testset = testset[testset["partition"] == partition].copy()
+            weights = w.get(partition, None)
+            my_collection = Collection(weights)
+            partition_testset["stability"], partition_testset["difficulty"] = (
+                my_collection.batch_predict(partition_testset)
+            )
+            partition_testset["p"] = power_forgetting_curve(
+                partition_testset["delta_t"], partition_testset["stability"]
+            )
+            p.extend(partition_testset["p"].tolist())
+            y.extend(partition_testset["y"].tolist())
+            if user_id:
+                save_tmp.append(partition_testset)
     if user_id:
         save_tmp = pd.concat(save_tmp)
         del save_tmp["tensor"]
@@ -230,170 +235,108 @@ def create_time_series(df):
 @catch_exceptions
 def process(user_id):
     plt.close("all")
-    dataset = pd.read_parquet(
+    df_revlogs = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    dataset = create_time_series(dataset)
+    dataset = create_time_series(df_revlogs)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
-    w_list = []
-    trainsets = []
-    testsets = []
-    sizes = []
-
-    if do_fullinfo_stats:
-        loop = range(3, len(dataset))
+    if PARTITIONS != "none":
+        df_cards = pd.read_parquet(
+            "../anki-revlogs-10k/cards", filters=[("user_id", "=", user_id)]
+        )
+        df_cards.drop(columns=["user_id"], inplace=True)
+        df_decks = pd.read_parquet(
+            "../anki-revlogs-10k/decks", filters=[("user_id", "=", user_id)]
+        )
+        df_decks.drop(columns=["user_id"], inplace=True)
+        dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
+            df_decks, on="deck_id", how="left"
+        )
+        dataset.fillna(-1, inplace=True)
+        if PARTITIONS == "preset":
+            dataset["partition"] = dataset["preset_id"].astype(int)
+        elif PARTITIONS == "deck":
+            dataset["partition"] = dataset["deck_id"].astype(int)
     else:
-        tscv = TimeSeriesSplit(n_splits=n_splits)
-        loop = tscv.split(dataset)
-    for loop_args in loop:
-        if do_fullinfo_stats:
-            i: int = loop_args  # type: ignore
-            # Set this_train_size to be a power of 2
-            this_train_size = 2**i
-
-            train_index = np.array(list(range(this_train_size)))
-            test_index = np.array(
-                list(range(this_train_size, this_train_size + this_train_size // 4 + 1))
-            )
-            if test_index[-1] >= len(dataset):
-                break
-        else:
-            train_index, test_index = loop_args  # type: ignore
-
+        dataset["partition"] = 0
+    w_list = []
+    testsets = []
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    for train_index, test_index in tscv.split(dataset):
         optimizer.define_model()
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
         if NO_TEST_SAME_DAY:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
-        if DRY_RUN:
-            w_list.append(optimizer.init_w)
-            sizes.append(len(train_index))
-            testsets.append(test_set)
-            if do_fullinfo_stats:
-                trainsets.append(train_set)
-            continue
-        # train_set.loc[train_set["i"] == 2, "delta_t"] = train_set.loc[train_set["i"] == 2, "delta_t"].map(lambda x: max(1, round(x)))
-        try:
-            if RUST:
-                train_set_items = convert_to_items(train_set[train_set["i"] >= 2])
-                parameters = backend.benchmark(train_set_items)
-                w_list.append(parameters)
-            else:
-                optimizer.S0_dataset_group = (
-                    train_set[train_set["i"] == 2]
-                    .groupby(by=["first_rating", "delta_t"], group_keys=False)
-                    # .groupby(by=["r_history", "delta_t"], group_keys=False)
-                    .agg({"y": ["mean", "count"]})
-                    .reset_index()
-                )
-                _ = optimizer.pretrain(dataset=train_set, verbose=verbose)
-                if ONLY_PRETRAIN:
-                    w_list.append(optimizer.init_w)
-                else:
-                    trainer = Trainer(
-                        train_set,
-                        None,
-                        optimizer.init_w,
-                        n_epoch=n_epoch,
-                        lr=lr,
-                        batch_size=batch_size,
-                        max_seq_len=max_seq_len,
-                        enable_short_term=not DISABLE_SHORT_TERM,
+        testsets.append(test_set)
+        partition_weights = {}
+        for partition in train_set["partition"].unique():
+            try:
+                train_partition = train_set[train_set["partition"] == partition].copy()
+                if RECENCY:
+                    train_partition["weights"] = np.linspace(
+                        0.5, 1.5, len(train_partition)
                     )
-                    w_list.append(trainer.train(verbose=verbose))
-            # No error, so training data was adequate
-            sizes.append(len(train_set))
-            testsets.append(test_set)
-            if do_fullinfo_stats:
-                trainsets.append(train_set)
-        except Exception as e:
-            if str(e).endswith("inadequate."):
-                if verbose_inadequate_data:
-                    print("Skipping - Inadequate data")
-            else:
-                tb = sys.exc_info()[2]
-                print("User:", user_id, "Error:", e.with_traceback(tb))
-            if not do_fullinfo_stats:
-                # Default behavior is to use the default parameters if it cannot optimise
-                w_list.append(optimizer.init_w)
-                sizes.append(len(train_set))
-                testsets.append(test_set)
-                if do_fullinfo_stats:
-                    trainsets.append(train_set)  # Kept for readability
-            else:
-                # If we are doing fullinfo stats, we will be stricter - no default parameters are saved for optimised FSRS if optimisation fails
-                pass
+                if DRY_RUN:
+                    partition_weights[partition] = optimizer.init_w
+                    continue
+                if RUST:
+                    train_set_items = convert_to_items(
+                        train_partition[train_partition["i"] >= 2]
+                    )
+                    partition_weights[partition] = backend.benchmark(train_set_items)
+                else:
+                    optimizer.S0_dataset_group = (
+                        train_partition[train_partition["i"] == 2]
+                        .groupby(by=["first_rating", "delta_t"], group_keys=False)
+                        .agg({"y": ["mean", "count"]})
+                        .reset_index()
+                    )
+                    _ = optimizer.pretrain(dataset=train_partition, verbose=verbose)
+                    if ONLY_PRETRAIN:
+                        partition_weights[partition] = optimizer.init_w
+                    else:
+                        trainer = Trainer(
+                            train_partition,
+                            None,
+                            optimizer.init_w,
+                            n_epoch=n_epoch,
+                            lr=lr,
+                            batch_size=batch_size,
+                            max_seq_len=max_seq_len,
+                            enable_short_term=not DISABLE_SHORT_TERM,
+                        )
+                        partition_weights[partition] = trainer.train(verbose=verbose)
+            except Exception as e:
+                if str(e).endswith("inadequate."):
+                    if verbose_inadequate_data:
+                        print("Skipping - Inadequate data")
+                else:
+                    tb = sys.exc_info()[2]
+                    print("User:", user_id, "Error:", e.with_traceback(tb))
+                partition_weights[partition] = optimizer.init_w
+        w_list.append(partition_weights)
 
-    if len(w_list) == 0:
-        print("No data for", user_id)
-        return
+    p, y, evaluation = predict(w_list, testsets, user_id)
+    last_y = y
 
-    if do_fullinfo_stats:
-        all_p = []
-        all_y = []
-        all_evaluation = []
-        last_y = []
-        for i in range(len(w_list)):
-            p, y, evaluation = predict([w_list[i]], [testsets[i]], user_id)
-            all_p.append(p)
-            all_y.append(y)
-            all_evaluation.append(evaluation)
-            last_y = y
+    if PLOT:
+        fig = plt.figure()
+        plot_brier(p, y, ax=fig.add_subplot(111))
+        fig.savefig(f"evaluation/{path}/{user_id}.png")
 
-        ici = None
-        rmse_raw = [
-            root_mean_squared_error(y_true=e_t, y_pred=e_p)
-            for e_t, e_p in zip(all_y, all_p)
-        ]
-        logloss = [
-            log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1])
-            for e_t, e_p in zip(all_y, all_p)
-        ]
-        rmse_bins = [rmse_matrix(e) for e in all_evaluation]
-
-        all_p = []
-        all_y = []
-        all_evaluation = []
-        for i in range(len(w_list)):
-            p, y, evaluation = predict([w_list[i]], [trainsets[i]], user_id)
-            all_p.append(p)
-            all_y.append(y)
-            all_evaluation.append(evaluation)
-
-        rmse_raw_train = [
-            root_mean_squared_error(y_true=e_t, y_pred=e_p)
-            for e_t, e_p in zip(all_y, all_p)
-        ]
-        logloss_train = [
-            log_loss(y_true=e_t, y_pred=e_p, labels=[0, 1])
-            for e_t, e_p in zip(all_y, all_p)
-        ]
-        rmse_bins_train = [rmse_matrix(e) for e in all_evaluation]
-
-    else:
-        p, y, evaluation = predict(w_list, testsets, user_id)
-        last_y = y
-
-        if PLOT:
-            fig = plt.figure()
-            plot_brier(p, y, ax=fig.add_subplot(111))
-            fig.savefig(f"evaluation/{path}/{user_id}.png")
-
-        p_calibrated = lowess(
-            y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
-        )
-        ici = np.mean(np.abs(p_calibrated - p))
-        rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
-        logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-        rmse_bins = rmse_matrix(evaluation)
-        try:
-            auc = round(roc_auc_score(y_true=y, y_score=p), 6)
-        except:
-            auc = None
-        rmse_raw_train = None
-        logloss_train = None
-        rmse_bins_train = None
+    p_calibrated = lowess(
+        y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
+    )
+    ici = np.mean(np.abs(p_calibrated - p))
+    rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
+    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
+    rmse_bins = rmse_matrix(evaluation)
+    try:
+        auc = round(roc_auc_score(y_true=y, y_score=p), 6)
+    except:
+        auc = None
 
     result = {
         "metrics": {
@@ -405,14 +348,11 @@ def process(user_id):
         },
         "user": user_id,
         "size": len(last_y),
-        "parameters": list(map(lambda x: round(x, 4), w_list[-1])),
+        "parameters": {
+            int(partition): list(map(lambda x: round(x, 6), w))
+            for partition, w in w_list[-1].items()
+        },
     }
-    if do_fullinfo_stats:
-        result["metrics"]["TrainSizes"] = sizes
-        result["metrics"]["RMSETrain"] = round(rmse_raw_train, 6)
-        result["metrics"]["LogLossTrain"] = round(logloss_train, 6)
-        result["metrics"]["RMSE(bins)Train"] = round(rmse_bins_train, 6)
-        result["allparameters"] = [list(w) for w in w_list]
 
     if RAW:
         raw = {

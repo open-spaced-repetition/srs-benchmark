@@ -4,8 +4,20 @@ import argparse
 def create_parser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--processes", default=8, type=int, help="set the number of processes")
+    parser.add_argument(
+        "--processes", default=8, type=int, help="set the number of processes"
+    )
     parser.add_argument("--dev", action="store_true", help="for local development")
+
+    parser.add_argument(
+        "--partitions",
+        default="none",
+        choices=["none", "deck", "preset"],
+        help="use partitions instead of presets",
+    )
+    parser.add_argument(
+        "--recency", action="store_true", help="enable recency weighting"
+    )
 
     # download revlogs from huggingface
     parser.add_argument(
@@ -41,15 +53,6 @@ def create_parser():
     )
     parser.add_argument(
         "--weights", action="store_true", help="save neural network weights"
-    )
-    parser.add_argument(
-        "--partitions",
-        default="none",
-        choices=["none", "deck", "preset"],
-        help="use partitions instead of presets",
-    )
-    parser.add_argument(
-        "--recency", action="store_true", help="enable recency weighting"
     )
 
     # script.py only

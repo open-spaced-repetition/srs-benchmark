@@ -1933,9 +1933,9 @@ def baseline(user_id):
 def create_features(df, model_name="FSRSv3"):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
-    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace = True)
+    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
     df["i"] = df.groupby("card_id").cumcount() + 1
-    df.drop(df[df['i'] > max_seq_len * 2].index, inplace = True)
+    df.drop(df[df["i"] > max_seq_len * 2].index, inplace=True)
     if (
         "delta_t" not in df.columns
         and "elapsed_days" in df.columns
@@ -1946,7 +1946,7 @@ def create_features(df, model_name="FSRSv3"):
         else:
             df["delta_t"] = df["elapsed_days"]
     if not SHORT_TERM:
-        df.drop(df[df["delta_t"] == 0].index, inplace = True)
+        df.drop(df[df["delta_t"] == 0].index, inplace=True)
         df["i"] = df.groupby("card_id").cumcount() + 1
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
     t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
@@ -2196,9 +2196,8 @@ def process(user_id):
                     if verbose_inadequate_data:
                         print("Skipping - Inadequate data")
                 else:
-                    print(user_id)
                     tb = sys.exc_info()[2]
-                    print(e.with_traceback(tb))
+                    print("User:", user_id, "Error:", e.with_traceback(tb))
                 partition_weights[partition] = model().state_dict()
         w_list.append(partition_weights)
 
@@ -2255,7 +2254,11 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
         "user": int(user_id),
         "size": len(y),
     }
-    if w_list and type(w_list[0]) == dict and all(isinstance(w, list) for w in w_list[0].values()):
+    if (
+        w_list
+        and type(w_list[0]) == dict
+        and all(isinstance(w, list) for w in w_list[0].values())
+    ):
         stats["parameters"] = {
             int(partition): list(map(lambda x: round(x, 6), w))
             for partition, w in w_list[-1].items()

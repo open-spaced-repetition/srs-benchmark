@@ -39,6 +39,9 @@ THREADS = args.threads
 DATA_PATH = Path(args.data)
 RECENCY = args.recency
 
+torch.set_num_threads(3)
+torch.set_num_interop_threads(3)
+
 model_list = (
     "FSRSv3",
     "FSRSv4",

@@ -243,11 +243,11 @@ def process(user_id):
         raise Exception(f"{user_id} does not have enough data.")
     if PARTITIONS != "none":
         df_cards = pd.read_parquet(
-            "../anki-revlogs-10k/cards", filters=[("user_id", "=", user_id)]
+            DATA_PATH / "cards", filters=[("user_id", "=", user_id)]
         )
         df_cards.drop(columns=["user_id"], inplace=True)
         df_decks = pd.read_parquet(
-            "../anki-revlogs-10k/decks", filters=[("user_id", "=", user_id)]
+            DATA_PATH / "decks", filters=[("user_id", "=", user_id)]
         )
         df_decks.drop(columns=["user_id"], inplace=True)
         dataset = dataset.merge(df_cards, on="card_id", how="left").merge(

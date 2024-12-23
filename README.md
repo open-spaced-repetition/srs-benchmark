@@ -39,6 +39,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
     - FSRS-5 binary: FSRS which treats `hard` and `easy` ratings as `good`.
     - FSRS-5 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.
     - FSRS-5 deck: different parameters are used for each deck.
+    - FSRS-5 recency: FSRS-5 trained on recency weighted reviews.
 - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
     - GRU-P: a variant of GRU that removes the forgetting curve and predicts the probability of recall directly.
@@ -71,6 +72,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 | --- | --- | --- | --- | --- |
 | **GRU-P-short** | 297 | **0.320±0.0080** | **0.042±0.0013** | **0.710±0.0047** |
 | GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 |
+| FSRS-5 recency | 19 | 0.326±0.0080 | 0.049±0.0014 | 0.704±0.0042 |
 | FSRS-5 preset | 19 | 0.328±0.0083 | 0.051±0.0015 | 0.702±0.0043 |
 | FSRS-5 | 19 | 0.328±0.0082 | 0.052±0.0015 | 0.701±0.0044 |
 | FSRS-rs | 19 | 0.328±0.0082 | 0.052±0.0015 | 0.700±0.0043 |
@@ -103,6 +105,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 | --- | --- | --- | --- | --- |
 | **GRU-P-short** | 297 | **0.346±0.0042** | **0.062±0.0011** | 0.699±0.0026 |
 | GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 |
+| FSRS-5 recency | 19 | 0.355±0.0043 | 0.072±0.0012 | 0.701±0.0023 |
 | FSRS-rs | 19 | 0.356±0.0045 | 0.074±0.0012 | 0.698±0.0023 |
 | FSRS-5 | 19 | 0.357±0.0043 | 0.074±0.0012 | 0.699±0.0023 |
 | FSRS-5 preset | 19 | 0.358±0.0045 | 0.074±0.0012 | 0.699±0.0023 |

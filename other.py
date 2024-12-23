@@ -2178,9 +2178,8 @@ def process(user_id):
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
                 if RECENCY:
-                    train_partition["weights"] = np.linspace(
-                        0.5, 1.5, len(train_partition)
-                    )
+                    x = np.linspace(0, 1, len(train_partition))
+                    train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
                 trainer = Trainer(
                     model(),
                     train_partition,

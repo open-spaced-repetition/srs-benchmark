@@ -124,7 +124,7 @@ class FSRS(nn.Module):
     def pretrain(self, train_set):
         delta_t_col = "delta_t" if not SIBLINGS else "elapsed_days"
         S0_dataset_group = (
-            train_set[train_set["j"] == 2]
+            train_set[train_set["i"] == 2]
             .groupby(by=["first_rating", delta_t_col], group_keys=False)
             .agg({"y": ["mean", "count"]})
             .reset_index()
@@ -843,11 +843,12 @@ class FSRS5(FSRS):
                 self.w[19] * new_s + (1 - self.w[19]) * state[:, 0],
                 new_s,
             )
+            new_d = self.next_d(state, X[:, 1])
             new_d = torch.where(
                 is_sibling_review,
-                self.w[20] * self.next_d(state, X[:, 1])
+                self.w[20] * new_d
                 + (1 - self.w[20]) * state[:, 1],
-                self.next_d(state, X[:, 1]),
+                new_d,
             )
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(S_MIN, 36500)
@@ -2203,8 +2204,8 @@ def create_siblings_features(dataset):
     df["tensor"] = df.apply(
         lambda x: torch.tensor(
             (
-                tuple(map(int, x["n_r_history"].split(","))),
                 tuple(map(int, x["n_t_history"].split(","))),
+                tuple(map(int, x["n_r_history"].split(","))),
                 tuple(map(int, x["is_sibling_history"].split(","))),
             ),
             dtype=torch.float32,

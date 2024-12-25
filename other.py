@@ -38,6 +38,7 @@ RAW = args.raw
 PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 RECENCY = args.recency
+SIBLINGS = args.siblings
 
 torch.set_num_threads(3)
 # torch.set_num_interop_threads(3)
@@ -121,9 +122,10 @@ class FSRS(nn.Module):
         return {"retentions": retentions, "stabilities": stabilities}
 
     def pretrain(self, train_set):
+        delta_t_col = "delta_t" if not SIBLINGS else "elapsed_days"
         S0_dataset_group = (
-            train_set[train_set["i"] == 2]
-            .groupby(by=["first_rating", "delta_t"], group_keys=False)
+            train_set[train_set["j"] == 2]
+            .groupby(by=["first_rating", delta_t_col], group_keys=False)
             .agg({"y": ["mean", "count"]})
             .reset_index()
         )
@@ -140,7 +142,7 @@ class FSRS(nn.Module):
                         f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
                     )
                 continue
-            delta_t = group["delta_t"]
+            delta_t = group[delta_t_col]
             if SECS_IVL:
                 recall = group["y"]["mean"]
             else:
@@ -722,6 +724,8 @@ class FSRS5ParameterClipper:
             w[16] = w[16].clamp(1, 6)
             w[17] = w[17].clamp(0, 2)
             w[18] = w[18].clamp(0, 2)
+            w[19] = w[19].clamp(0, 1)
+            w[20] = w[20].clamp(0, 1)
             module.w.data = w
 
 
@@ -746,6 +750,8 @@ class FSRS5(FSRS):
         2.9898,
         0.51655,
         0.6621,
+        0,
+        0,
     ]
     clipper = FSRS5ParameterClipper()
     lr: float = 4e-2
@@ -822,6 +828,7 @@ class FSRS5(FSRS):
             r = self.forgetting_curve(X[:, 0], state[:, 0])
             short_term = X[:, 0] < 1
             success = X[:, 1] > 1
+            is_sibling_review = X[:, 2] == 1
             new_s = torch.where(
                 short_term,
                 self.stability_short_term(state, X[:, 1]),
@@ -831,7 +838,17 @@ class FSRS5(FSRS):
                     self.stability_after_failure(state, r),
                 ),
             )
-            new_d = self.next_d(state, X[:, 1])
+            new_s = torch.where(
+                is_sibling_review,
+                self.w[19] * new_s + (1 - self.w[19]) * state[:, 0],
+                new_s,
+            )
+            new_d = torch.where(
+                is_sibling_review,
+                self.w[20] * self.next_d(state, X[:, 1])
+                + (1 - self.w[20]) * state[:, 1],
+                self.next_d(state, X[:, 1]),
+            )
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(S_MIN, 36500)
         return torch.stack([new_s, new_d], dim=1)
@@ -2102,6 +2119,101 @@ def create_features(df, model_name="FSRSv3"):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
+def create_siblings_features(dataset):
+    dataset["review_th"] = range(1, dataset.shape[0] + 1)
+    dataset["note_id"] = dataset.apply(
+        lambda x: x["note_id"] if x["note_id"] != -1 else -x["card_id"], axis=1
+    )
+    dataset["sibling_cnt"] = dataset.groupby("note_id")["card_id"].transform("nunique")
+    dataset.sort_values(by=["card_id", "review_th"], inplace=True)
+    dataset.drop(dataset[~dataset["rating"].isin([1, 2, 3, 4])].index, inplace=True)
+    dataset["i"] = dataset.groupby("card_id").cumcount() + 1
+    dataset.drop(dataset[dataset["i"] > max_seq_len * 2].index, inplace=True)
+    dataset["delta_t"] = dataset["elapsed_days"].map(lambda x: max(0, x))
+    t_history = dataset.groupby("card_id", group_keys=False)["delta_t"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    r_history = dataset.groupby("card_id", group_keys=False)["rating"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    dataset["r_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+    ]
+    dataset["t_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+    ]
+    dataset["first_rating"] = dataset["r_history"].map(
+        lambda x: x[0] if len(x) > 0 else ""
+    )
+    dataset["y"] = dataset["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    tmp = dataset[(dataset["delta_t"] == 0) & (dataset["i"] != 1)].copy()
+    dataset = dataset.drop(tmp.index)
+    dataset["i"] = dataset.groupby("card_id").cumcount() + 1
+    filtered_dataset = (
+        dataset[dataset["i"] == 2]
+        .groupby(by=["first_rating"], as_index=False, group_keys=False)[dataset.columns]
+        .apply(remove_outliers)
+    )
+    dataset[dataset["i"] == 2] = filtered_dataset
+    dataset.dropna(inplace=True)
+    dataset = dataset.groupby("card_id", as_index=False, group_keys=False)[
+        dataset.columns
+    ].apply(remove_non_continuous_rows)
+    dataset = pd.concat([dataset, tmp])
+
+    df = dataset.sort_values(by=["note_id", "review_th"])
+    df["delta_t"] = df["day_offset"].diff().fillna(0).astype(int)
+    df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
+    df["j"] = df.groupby("note_id").cumcount() + 1
+    df.loc[df["j"] == 1, "delta_t"] = 0
+    t_history = df.groupby("note_id", group_keys=False)["delta_t"].apply(
+        lambda x: cum_concat([[int(i)] for i in x])
+    )
+    r_history = df.groupby("note_id", group_keys=False)["rating"].apply(
+        lambda x: cum_concat([[int(i)] for i in x])
+    )
+    cid_history = df.groupby("note_id", group_keys=False)["card_id"].apply(
+        lambda x: cum_concat([[int(i)] for i in x])
+    )
+    df["n_r_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+    ]
+    df["n_t_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+    ]
+    df["cid_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in cid_history for item in sublist
+    ]
+    df["is_sibling_history"] = df.apply(
+        lambda x: ",".join(
+            [
+                str(int(x["card_id"] != int(cid)))
+                for cid in x["cid_history"].split(",")
+                if cid != ""
+            ]
+        ),
+        axis=1,
+    )
+    del df["cid_history"]
+    df.drop(df[df["is_sibling_history"] == ""].index, inplace=True)
+    df["last_is_sibling"] = df.apply(
+        lambda x: x["is_sibling_history"].split(",")[-1], axis=1
+    )
+    df.drop(df[(df["elapsed_days"] <= 0)].index, inplace=True)
+    df["tensor"] = df.apply(
+        lambda x: torch.tensor(
+            (
+                tuple(map(int, x["n_r_history"].split(","))),
+                tuple(map(int, x["n_t_history"].split(","))),
+                tuple(map(int, x["is_sibling_history"].split(","))),
+            ),
+            dtype=torch.float32,
+        ).transpose(0, 1),
+        axis=1,
+    )
+    return df.sort_values(by=["review_th"])
+
+
 @catch_exceptions
 def process(user_id):
     plt.close("all")
@@ -2142,10 +2254,30 @@ def process(user_id):
     elif MODEL_NAME == "SM2-trainable":
         model = SM2
 
-    dataset = create_features(df_revlogs, MODEL_NAME)
-    if dataset.shape[0] < 6:
-        raise Exception(f"{user_id} does not have enough data.")
-    if PARTITIONS != "none":
+    if not SIBLINGS:
+        dataset = create_features(df_revlogs, MODEL_NAME)
+        if dataset.shape[0] < 6:
+            raise Exception(f"{user_id} does not have enough data.")
+        if PARTITIONS != "none":
+            df_cards = pd.read_parquet(
+                DATA_PATH / "cards", filters=[("user_id", "=", user_id)]
+            )
+            df_cards.drop(columns=["user_id"], inplace=True)
+            df_decks = pd.read_parquet(
+                DATA_PATH / "decks", filters=[("user_id", "=", user_id)]
+            )
+            df_decks.drop(columns=["user_id"], inplace=True)
+            dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
+                df_decks, on="deck_id", how="left"
+            )
+            dataset.fillna(-1, inplace=True)
+            if PARTITIONS == "preset":
+                dataset["partition"] = dataset["preset_id"].astype(int)
+            elif PARTITIONS == "deck":
+                dataset["partition"] = dataset["deck_id"].astype(int)
+        else:
+            dataset["partition"] = 0
+    else:
         df_cards = pd.read_parquet(
             DATA_PATH / "cards", filters=[("user_id", "=", user_id)]
         )
@@ -2154,16 +2286,15 @@ def process(user_id):
             DATA_PATH / "decks", filters=[("user_id", "=", user_id)]
         )
         df_decks.drop(columns=["user_id"], inplace=True)
-        dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
+        dataset = df_revlogs.merge(df_cards, on="card_id", how="left").merge(
             df_decks, on="deck_id", how="left"
         )
         dataset.fillna(-1, inplace=True)
-        if PARTITIONS == "preset":
-            dataset["partition"] = dataset["preset_id"].astype(int)
-        elif PARTITIONS == "deck":
-            dataset["partition"] = dataset["deck_id"].astype(int)
-    else:
+        dataset = create_siblings_features(dataset)
+        if dataset.shape[0] < 6:
+            raise Exception(f"{user_id} does not have enough data.")
         dataset["partition"] = 0
+
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
@@ -2237,6 +2368,8 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
     ici = np.mean(np.abs(p_calibrated - p))
     rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
+    if SIBLINGS:
+        df["delta_t"] = df["elapsed_days"]
     rmse_bins = rmse_matrix(df)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)

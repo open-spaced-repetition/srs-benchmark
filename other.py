@@ -122,10 +122,9 @@ class FSRS(nn.Module):
         return {"retentions": retentions, "stabilities": stabilities}
 
     def pretrain(self, train_set):
-        delta_t_col = "delta_t" if not SIBLINGS else "elapsed_days"
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
-            .groupby(by=["first_rating", delta_t_col], group_keys=False)
+            .groupby(by=["first_rating", "delta_t"], group_keys=False)
             .agg({"y": ["mean", "count"]})
             .reset_index()
         )
@@ -142,7 +141,7 @@ class FSRS(nn.Module):
                         f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
                     )
                 continue
-            delta_t = group[delta_t_col]
+            delta_t = group["delta_t"]
             if SECS_IVL:
                 recall = group["y"]["mean"]
             else:
@@ -726,6 +725,8 @@ class FSRS5ParameterClipper:
             w[18] = w[18].clamp(0, 2)
             w[19] = w[19].clamp(0, 1)
             w[20] = w[20].clamp(0, 1)
+            w[21] = w[21].clamp(0, 1)
+            w[22] = w[22].clamp(0, 1)
             module.w.data = w
 
 
@@ -750,6 +751,8 @@ class FSRS5(FSRS):
         2.9898,
         0.51655,
         0.6621,
+        0,
+        0,
         0,
         0,
     ]
@@ -829,25 +832,37 @@ class FSRS5(FSRS):
             short_term = X[:, 0] < 1
             success = X[:, 1] > 1
             is_sibling_review = X[:, 2] == 1
-            new_s = torch.where(
-                short_term,
-                self.stability_short_term(state, X[:, 1]),
-                torch.where(
-                    success,
-                    self.stability_after_success(state, r, X[:, 1]),
-                    self.stability_after_failure(state, r),
-                ),
+            short_term_s = self.stability_short_term(state, X[:, 1])
+            success_s = self.stability_after_success(state, r, X[:, 1])
+            failure_s = self.stability_after_failure(state, r)
+            new_short_term_s = torch.where(
+                is_sibling_review,
+                self.w[19] * short_term_s + (1 - self.w[19]) * state[:, 0],
+                short_term_s,
+            )
+            new_success_s = torch.where(
+                is_sibling_review,
+                self.w[20] * success_s + (1 - self.w[20]) * state[:, 0],
+                success_s,
+            )
+            new_failure_s = torch.where(
+                is_sibling_review,
+                self.w[21] * failure_s + (1 - self.w[21]) * state[:, 0],
+                failure_s,
             )
             new_s = torch.where(
-                is_sibling_review,
-                self.w[19] * new_s + (1 - self.w[19]) * state[:, 0],
-                new_s,
+                short_term,
+                new_short_term_s,
+                torch.where(
+                    success,
+                    new_success_s,
+                    new_failure_s,
+                ),
             )
             new_d = self.next_d(state, X[:, 1])
             new_d = torch.where(
                 is_sibling_review,
-                self.w[20] * new_d
-                + (1 - self.w[20]) * state[:, 1],
+                self.w[22] * new_d + (1 - self.w[22]) * state[:, 1],
                 new_d,
             )
             new_d = new_d.clamp(1, 10)
@@ -2163,10 +2178,6 @@ def create_siblings_features(dataset):
     dataset = pd.concat([dataset, tmp])
 
     df = dataset.sort_values(by=["note_id", "review_th"])
-    df["delta_t"] = df["day_offset"].diff().fillna(0).astype(int)
-    df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
-    df["j"] = df.groupby("note_id").cumcount() + 1
-    df.loc[df["j"] == 1, "delta_t"] = 0
     t_history = df.groupby("note_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[int(i)] for i in x])
     )
@@ -2200,7 +2211,7 @@ def create_siblings_features(dataset):
     df["last_is_sibling"] = df.apply(
         lambda x: x["is_sibling_history"].split(",")[-1], axis=1
     )
-    df.drop(df[(df["elapsed_days"] <= 0)].index, inplace=True)
+    df.drop(df[(df["delta_t"] <= 0)].index, inplace=True)
     df["tensor"] = df.apply(
         lambda x: torch.tensor(
             (
@@ -2369,8 +2380,6 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
     ici = np.mean(np.abs(p_calibrated - p))
     rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
-    if SIBLINGS:
-        df["delta_t"] = df["elapsed_days"]
     rmse_bins = rmse_matrix(df)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)

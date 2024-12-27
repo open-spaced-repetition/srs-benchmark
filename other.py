@@ -38,6 +38,7 @@ RAW = args.raw
 PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 RECENCY = args.recency
+SIBLINGS = args.siblings
 
 torch.set_num_threads(3)
 # torch.set_num_interop_threads(3)
@@ -92,6 +93,7 @@ FILE_NAME = (
     MODEL_NAME
     + ("-short" if SHORT_TERM else "")
     + ("-secs" if SECS_IVL else "")
+    + ("-siblings" if SIBLINGS else "")
     + ("-recency" if RECENCY else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
@@ -722,6 +724,10 @@ class FSRS5ParameterClipper:
             w[16] = w[16].clamp(1, 6)
             w[17] = w[17].clamp(0, 2)
             w[18] = w[18].clamp(0, 2)
+            w[19] = w[19].clamp(0, 1)
+            w[20] = w[20].clamp(0, 1)
+            w[21] = w[21].clamp(0, 1)
+            w[22] = w[22].clamp(0, 1)
             module.w.data = w
 
 
@@ -746,6 +752,10 @@ class FSRS5(FSRS):
         2.9898,
         0.51655,
         0.6621,
+        0,
+        0,
+        0,
+        0,
     ]
     clipper = FSRS5ParameterClipper()
     lr: float = 4e-2
@@ -822,16 +832,40 @@ class FSRS5(FSRS):
             r = self.forgetting_curve(X[:, 0], state[:, 0])
             short_term = X[:, 0] < 1
             success = X[:, 1] > 1
+            is_sibling_review = X[:, 2] == 1
+            short_term_s = self.stability_short_term(state, X[:, 1])
+            success_s = self.stability_after_success(state, r, X[:, 1])
+            failure_s = self.stability_after_failure(state, r)
+            new_short_term_s = torch.where(
+                is_sibling_review,
+                self.w[19] * short_term_s + (1 - self.w[19]) * state[:, 0],
+                short_term_s,
+            )
+            new_success_s = torch.where(
+                is_sibling_review,
+                self.w[20] * success_s + (1 - self.w[20]) * state[:, 0],
+                success_s,
+            )
+            new_failure_s = torch.where(
+                is_sibling_review,
+                self.w[21] * failure_s + (1 - self.w[21]) * state[:, 0],
+                failure_s,
+            )
             new_s = torch.where(
                 short_term,
-                self.stability_short_term(state, X[:, 1]),
+                new_short_term_s,
                 torch.where(
                     success,
-                    self.stability_after_success(state, r, X[:, 1]),
-                    self.stability_after_failure(state, r),
+                    new_success_s,
+                    new_failure_s,
                 ),
             )
             new_d = self.next_d(state, X[:, 1])
+            new_d = torch.where(
+                is_sibling_review,
+                self.w[22] * new_d + (1 - self.w[22]) * state[:, 1],
+                new_d,
+            )
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(S_MIN, 36500)
         return torch.stack([new_s, new_d], dim=1)
@@ -949,7 +983,7 @@ class GRU_P(nn.Module):
 
     def __init__(self, state_dict=None):
         super().__init__()
-        self.n_input = 2
+        self.n_input = 2 if not SIBLINGS else 3
         self.n_hidden = 8
         self.n_out = 1
         self.n_layers = 1
@@ -2102,6 +2136,104 @@ def create_features(df, model_name="FSRSv3"):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
+def create_siblings_features(dataset):
+    dataset["review_th"] = range(1, dataset.shape[0] + 1)
+    dataset["note_id"] = dataset.apply(
+        lambda x: x["note_id"] if x["note_id"] != -1 else -x["card_id"], axis=1
+    )
+    dataset["sibling_cnt"] = dataset.groupby("note_id")["card_id"].transform("nunique")
+    dataset.sort_values(by=["card_id", "review_th"], inplace=True)
+    dataset.drop(dataset[~dataset["rating"].isin([1, 2, 3, 4])].index, inplace=True)
+    dataset["i"] = dataset.groupby("card_id").cumcount() + 1
+    dataset.drop(dataset[dataset["i"] > max_seq_len * 2].index, inplace=True)
+    dataset["delta_t"] = dataset["elapsed_days"].map(lambda x: max(0, x))
+    t_history = dataset.groupby("card_id", group_keys=False)["delta_t"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    r_history = dataset.groupby("card_id", group_keys=False)["rating"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
+    dataset["r_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+    ]
+    dataset["t_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+    ]
+    dataset["first_rating"] = dataset["r_history"].map(
+        lambda x: x[0] if len(x) > 0 else ""
+    )
+    dataset["y"] = dataset["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    if SHORT_TERM:
+        dataset = dataset[(dataset["delta_t"] != 0) | (dataset["i"] == 1)].copy()
+        dataset["i"] = dataset.groupby("card_id").cumcount() + 1
+    tmp = dataset[(dataset["delta_t"] == 0) & (dataset["i"] != 1)].copy()
+    dataset = dataset.drop(tmp.index)
+    dataset["i"] = dataset.groupby("card_id").cumcount() + 1
+    filtered_dataset = (
+        dataset[dataset["i"] == 2]
+        .groupby(by=["first_rating"], as_index=False, group_keys=False)[dataset.columns]
+        .apply(remove_outliers)
+    )
+    dataset[dataset["i"] == 2] = filtered_dataset
+    dataset.dropna(inplace=True)
+    dataset = dataset.groupby("card_id", as_index=False, group_keys=False)[
+        dataset.columns
+    ].apply(remove_non_continuous_rows)
+
+    df = dataset.sort_values(by=["note_id", "review_th"])
+    t_history = df.groupby("note_id", group_keys=False)["delta_t"].apply(
+        lambda x: cum_concat([[int(i)] for i in x])
+    )
+    r_history = df.groupby("note_id", group_keys=False)["rating"].apply(
+        lambda x: cum_concat([[int(i)] for i in x])
+    )
+    cid_history = df.groupby("note_id", group_keys=False)["card_id"].apply(
+        lambda x: cum_concat([[int(i)] for i in x])
+    )
+    df["n_r_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+    ]
+    if MODEL_NAME.startswith("FSRS"):
+        df["n_t_history"] = [
+            ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+        ]
+    elif MODEL_NAME.startswith("GRU-P"):
+        df["n_t_history"] = [
+            ",".join(map(str, item[1:])) for sublist in t_history for item in sublist
+        ]
+    df["cid_history"] = [
+        ",".join(map(str, item[:-1])) for sublist in cid_history for item in sublist
+    ]
+    df["is_sibling_history"] = df.apply(
+        lambda x: ",".join(
+            [
+                str(int(x["card_id"] != int(cid)))
+                for cid in x["cid_history"].split(",")
+                if cid != ""
+            ]
+        ),
+        axis=1,
+    )
+    del df["cid_history"]
+    df.drop(df[df["is_sibling_history"] == ""].index, inplace=True)
+    df["last_is_sibling"] = df.apply(
+        lambda x: x["is_sibling_history"].split(",")[-1], axis=1
+    )
+    df.drop(df[(df["delta_t"] <= 0)].index, inplace=True)
+    df["tensor"] = df.apply(
+        lambda x: torch.tensor(
+            (
+                tuple(map(int, x["n_t_history"].split(","))),
+                tuple(map(int, x["n_r_history"].split(","))),
+                tuple(map(int, x["is_sibling_history"].split(","))),
+            ),
+            dtype=torch.float32,
+        ).transpose(0, 1),
+        axis=1,
+    )
+    return df.sort_values(by=["review_th"])
+
+
 @catch_exceptions
 def process(user_id):
     plt.close("all")
@@ -2142,10 +2274,30 @@ def process(user_id):
     elif MODEL_NAME == "SM2-trainable":
         model = SM2
 
-    dataset = create_features(df_revlogs, MODEL_NAME)
-    if dataset.shape[0] < 6:
-        raise Exception(f"{user_id} does not have enough data.")
-    if PARTITIONS != "none":
+    if not SIBLINGS:
+        dataset = create_features(df_revlogs, MODEL_NAME)
+        if dataset.shape[0] < 6:
+            raise Exception(f"{user_id} does not have enough data.")
+        if PARTITIONS != "none":
+            df_cards = pd.read_parquet(
+                DATA_PATH / "cards", filters=[("user_id", "=", user_id)]
+            )
+            df_cards.drop(columns=["user_id"], inplace=True)
+            df_decks = pd.read_parquet(
+                DATA_PATH / "decks", filters=[("user_id", "=", user_id)]
+            )
+            df_decks.drop(columns=["user_id"], inplace=True)
+            dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
+                df_decks, on="deck_id", how="left"
+            )
+            dataset.fillna(-1, inplace=True)
+            if PARTITIONS == "preset":
+                dataset["partition"] = dataset["preset_id"].astype(int)
+            elif PARTITIONS == "deck":
+                dataset["partition"] = dataset["deck_id"].astype(int)
+        else:
+            dataset["partition"] = 0
+    else:
         df_cards = pd.read_parquet(
             DATA_PATH / "cards", filters=[("user_id", "=", user_id)]
         )
@@ -2154,16 +2306,15 @@ def process(user_id):
             DATA_PATH / "decks", filters=[("user_id", "=", user_id)]
         )
         df_decks.drop(columns=["user_id"], inplace=True)
-        dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
+        dataset = df_revlogs.merge(df_cards, on="card_id", how="left").merge(
             df_decks, on="deck_id", how="left"
         )
         dataset.fillna(-1, inplace=True)
-        if PARTITIONS == "preset":
-            dataset["partition"] = dataset["preset_id"].astype(int)
-        elif PARTITIONS == "deck":
-            dataset["partition"] = dataset["deck_id"].astype(int)
-    else:
+        dataset = create_siblings_features(dataset)
+        if dataset.shape[0] < 6:
+            raise Exception(f"{user_id} does not have enough data.")
         dataset["partition"] = 0
+
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)

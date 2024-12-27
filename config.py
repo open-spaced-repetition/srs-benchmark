@@ -54,6 +54,9 @@ def create_parser():
     parser.add_argument(
         "--weights", action="store_true", help="save neural network weights"
     )
+    parser.add_argument(
+        "--siblings", action="store_true", help="use siblings features"
+    )
 
     # script.py only
     parser.add_argument("--dry", action="store_true", help="FSRS-5 without training")

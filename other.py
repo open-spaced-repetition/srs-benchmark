@@ -93,6 +93,7 @@ FILE_NAME = (
     MODEL_NAME
     + ("-short" if SHORT_TERM else "")
     + ("-secs" if SECS_IVL else "")
+    + ("-siblings" if SIBLINGS else "")
     + ("-recency" if RECENCY else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
@@ -982,7 +983,7 @@ class GRU_P(nn.Module):
 
     def __init__(self, state_dict=None):
         super().__init__()
-        self.n_input = 2
+        self.n_input = 2 if not SIBLINGS else 3
         self.n_hidden = 8
         self.n_out = 1
         self.n_layers = 1
@@ -2162,6 +2163,9 @@ def create_siblings_features(dataset):
         lambda x: x[0] if len(x) > 0 else ""
     )
     dataset["y"] = dataset["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+    if SHORT_TERM:
+        dataset = dataset[(dataset["delta_t"] != 0) | (dataset["i"] == 1)].copy()
+        dataset["i"] = dataset.groupby("card_id").cumcount() + 1
     tmp = dataset[(dataset["delta_t"] == 0) & (dataset["i"] != 1)].copy()
     dataset = dataset.drop(tmp.index)
     dataset["i"] = dataset.groupby("card_id").cumcount() + 1
@@ -2175,7 +2179,6 @@ def create_siblings_features(dataset):
     dataset = dataset.groupby("card_id", as_index=False, group_keys=False)[
         dataset.columns
     ].apply(remove_non_continuous_rows)
-    dataset = pd.concat([dataset, tmp])
 
     df = dataset.sort_values(by=["note_id", "review_th"])
     t_history = df.groupby("note_id", group_keys=False)["delta_t"].apply(
@@ -2190,9 +2193,14 @@ def create_siblings_features(dataset):
     df["n_r_history"] = [
         ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
     ]
-    df["n_t_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
-    ]
+    if MODEL_NAME.startswith("FSRS"):
+        df["n_t_history"] = [
+            ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+        ]
+    elif MODEL_NAME.startswith("GRU-P"):
+        df["n_t_history"] = [
+            ",".join(map(str, item[1:])) for sublist in t_history for item in sublist
+        ]
     df["cid_history"] = [
         ",".join(map(str, item[:-1])) for sublist in cid_history for item in sublist
     ]

@@ -5,6 +5,7 @@ import torch.nn as nn
 from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P
 from config import create_parser
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 parser = create_parser()
 args = parser.parse_args()
@@ -15,11 +16,13 @@ SECS_IVL = args.secs
 FILE_NAME = (
     MODEL_NAME + ("-short" if SHORT_TERM else "") + ("-secs" if SECS_IVL else "")
 )
-DATA_PATH = args.data
+DATA_PATH = Path(args.data)
 
 
 def process_user(user_id):
-    dataset = pd.read_parquet(DATA_PATH, filters=[("user_id", "=", user_id)])
+    dataset = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+    )
     dataset = create_features(dataset, model_name=MODEL_NAME)
     return user_id, dataset
 

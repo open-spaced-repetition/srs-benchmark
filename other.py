@@ -722,6 +722,10 @@ class FSRS5ParameterClipper:
             w[16] = w[16].clamp(1, 6)
             w[17] = w[17].clamp(0, 2)
             w[18] = w[18].clamp(0, 2)
+            w[19] = w[19].clamp(1, 10)
+            w[20] = w[20].clamp(1, 10)
+            w[21] = w[21].clamp(1, 10)
+            w[22] = w[22].clamp(1, 10)
             module.w.data = w
 
 
@@ -746,6 +750,10 @@ class FSRS5(FSRS):
         2.9898,
         0.51655,
         0.6621,
+        1,
+        2,
+        3,
+        4,
     ]
     clipper = FSRS5ParameterClipper()
     lr: float = 4e-2
@@ -809,10 +817,12 @@ class FSRS5(FSRS):
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
         :return state:
         """
+        keys = torch.tensor([1, 2, 3, 4], device=DEVICE)
+        keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+        index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
+        X_rating = torch.zeros_like(X[:, 1], device=DEVICE)
+        X_rating[index[0]] = self.w[19 + index[1]]
         if torch.equal(state, torch.zeros_like(state)):
-            keys = torch.tensor([1, 2, 3, 4], device=DEVICE)
-            keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
-            index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
             new_s = torch.ones_like(state[:, 0], device=DEVICE)
             new_s[index[0]] = self.w[index[1]]
@@ -824,14 +834,14 @@ class FSRS5(FSRS):
             success = X[:, 1] > 1
             new_s = torch.where(
                 short_term,
-                self.stability_short_term(state, X[:, 1]),
+                self.stability_short_term(state, X_rating),
                 torch.where(
                     success,
                     self.stability_after_success(state, r, X[:, 1]),
                     self.stability_after_failure(state, r),
                 ),
             )
-            new_d = self.next_d(state, X[:, 1])
+            new_d = self.next_d(state, X_rating)
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(S_MIN, 36500)
         return torch.stack([new_s, new_d], dim=1)

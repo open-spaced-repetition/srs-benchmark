@@ -43,6 +43,7 @@ torch.set_num_threads(3)
 # torch.set_num_interop_threads(3)
 
 model_list = (
+    "FSRSv1",
     "FSRSv2",
     "FSRSv3",
     "FSRSv4",
@@ -2326,6 +2327,8 @@ def process(user_id):
         model = RNN
     elif MODEL_NAME == "GRU-P":
         model = GRU_P
+    elif MODEL_NAME == "FSRSv1":
+        model = FSRS1
     elif MODEL_NAME == "FSRSv2":
         model = FSRS2
     elif MODEL_NAME == "FSRSv3":

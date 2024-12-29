@@ -273,9 +273,34 @@ class FSRS(nn.Module):
         )
 
 
+class FSRS2ParameterClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data
+            w[0] = w[0].clamp(0.1, 10)
+            w[1] = w[1].clamp(0.01, 10)
+            w[2] = w[2].clamp(1, 10)
+            w[3] = w[3].clamp(-10, -0.01)
+            w[4] = w[4].clamp(-10, -0.01)
+            w[5] = w[5].clamp(0, 1)
+            w[6] = w[6].clamp(0, 5)
+            w[7] = w[7].clamp(-2, -0.01)
+            w[8] = w[8].clamp(-2, -0.01)
+            w[9] = w[9].clamp(0.01, 2)
+            w[10] = w[10].clamp(0, 5)
+            w[11] = w[11].clamp(-2, -0.01)
+            w[12] = w[12].clamp(0.01, 1)
+            w[13] = w[13].clamp(0.01, 2)
+            module.w.data = w
+
+
 class FSRS2(FSRS):
     # 14 params
     init_w = [1, 1, 1, -1, -1, 0.2, 3, -0.8, -0.2, 1.3, 2.6, -0.2, 0.6, 1.5]
+    clipper = FSRS2ParameterClipper()
     lr: float = 4e-2
     wd: float = 1e-5
     n_epoch: int = 5

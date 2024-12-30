@@ -30,7 +30,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 
 ### Algorithms
 
-- FSRS v1 and v2: alpha versions of FSRS that weren't publicly available.
+- FSRS v1 and v2: the initial experimental versions of FSRS.
 - FSRS v3: the first version of the FSRS algorithm that people actually used.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.

@@ -1842,12 +1842,14 @@ class AnkiParameterClipper:
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
-            w[0] = w[0].clamp(S_MIN, S_MAX)
-            w[1] = w[1].clamp(S_MIN, S_MAX)
-            w[2] = w[2].clamp(1.3, 10.0)
-            w[3] = w[3].clamp(1, None)
-            w[4] = w[4].clamp(0, None)
+            # based on limits in Anki 24.11
+            w[0] = w[0].clamp(1, 9999)
+            w[1] = w[1].clamp(1, 9999)
+            w[2] = w[2].clamp(1.31, 5.0)
+            w[3] = w[3].clamp(1, 5)
+            w[4] = w[4].clamp(0.5, 1.3)
             w[5] = w[5].clamp(0, 1)
+            w[6] = w[6].clamp(0.5, 2)
             module.w.data = w
 
 
@@ -1859,6 +1861,7 @@ class Anki(nn.Module):
         1.3,  # easy bonus
         1.2,  # hard interval
         0,  # new interval
+        1,  # interval multiplier
     ]
     clipper = AnkiParameterClipper()
     lr: float = 4e-2
@@ -1920,7 +1923,7 @@ class Anki(nn.Module):
                     self.passing_nonearly_review_intervals(
                         rating, ease, ivl, days_late
                     ),
-                ),
+                ) * self.w[6]
             )
             new_ease = torch.where(
                 rating == 1,
@@ -1931,7 +1934,7 @@ class Anki(nn.Module):
                     torch.where(rating == 4, ease + 0.15, ease),
                 ),
             )
-        new_ease = new_ease.clamp(1.3, 10)
+        new_ease = new_ease.clamp(1.3, 5.5)
         new_ivl = torch.max(nn.functional.leaky_relu(new_ivl - 1) + 1, new_ivl)
         return torch.stack([new_ivl, new_ease], dim=1)
 

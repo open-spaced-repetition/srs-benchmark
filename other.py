@@ -1115,7 +1115,7 @@ class RNN(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{FILE_NAME}_pretrain.pth",
+                        f"./pretrain/{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=DEVICE,
                     )
@@ -1181,7 +1181,7 @@ class GRU_P(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{FILE_NAME}_pretrain.pth",
+                        f"./pretrain/{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=DEVICE,
                     )
@@ -1236,7 +1236,7 @@ class Transformer(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{FILE_NAME}_pretrain.pth",
+                        f"./pretrain/{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=DEVICE,
                     )
@@ -1617,7 +1617,7 @@ class NN_17(nn.Module):
             try:
                 self.load_state_dict(
                     torch.load(
-                        f"./{FILE_NAME}_pretrain.pth",
+                        f"./pretrain/{FILE_NAME}_pretrain.pth",
                         weights_only=True,
                         map_location=DEVICE,
                     )

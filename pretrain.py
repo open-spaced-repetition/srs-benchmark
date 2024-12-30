@@ -72,4 +72,4 @@ if __name__ == "__main__":
     )
     trainer.train()
 
-    torch.save(trainer.model.state_dict(), f"./{FILE_NAME}_pretrain.pth")
+    torch.save(trainer.model.state_dict(), f"./pretrain/{FILE_NAME}_pretrain.pth")

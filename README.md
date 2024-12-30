@@ -31,7 +31,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 ### Algorithms
 
 - FSRS v1 and v2: the initial experimental versions of FSRS.
-- FSRS v3: the first version of the FSRS algorithm that people actually used.
+- FSRS v3: the first official release of the FSRS algorithm, made available as a custom scheduling script.
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
 - FSRS-5: the latest version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.

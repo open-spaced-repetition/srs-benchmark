@@ -1859,7 +1859,7 @@ class Anki(nn.Module):
         2.5,  # starting ease
         1.3,  # easy bonus
         1.2,  # hard interval
-        0.001,  # new interval
+        0,  # new interval
     ]
     clipper = AnkiParameterClipper()
     lr: float = 4e-2
@@ -1933,7 +1933,7 @@ class Anki(nn.Module):
                 ),
             )
         new_ease = new_ease.clamp(1.3, 10)
-        new_ivl = new_ivl.clamp(1, S_MAX)
+        new_ivl = torch.max(nn.functional.leaky_relu(new_ivl - 1) + 1, new_ivl)
         return torch.stack([new_ivl, new_ease], dim=1)
 
     def forward(

@@ -1842,11 +1842,12 @@ class AnkiParameterClipper:
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
-            w[0] = w[0].clamp(1, S_MAX)
-            w[1] = w[1].clamp(1, S_MAX)
-            w[2] = w[2].clamp(1.3, 10.0)
-            w[3] = w[3].clamp(1, None)
-            w[4] = w[4].clamp(0, None)
+            # based on limits in Anki 24.11
+            w[0] = w[0].clamp(1, 9999)
+            w[1] = w[1].clamp(1, 9999)
+            w[2] = w[2].clamp(1.31, 5.0)
+            w[3] = w[3].clamp(1, 5)
+            w[4] = w[4].clamp(0.5, 1.3)
             w[5] = w[5].clamp(0, 1)
             module.w.data = w
 

@@ -145,7 +145,7 @@ if __name__ == "__main__":
     models[index_v3] = "FSRS v3"
     models[index_v2] = "FSRS v2"
     models[index_v1] = "FSRS v1"
-    models[index_sm2] = "SM-2"
+    models[index_sm2] = "SM-2 \n def. param."
     models[index_sm2_train] = "SM-2 trainable"
     models[index_sm2_short] = "SM-2-short"
 

@@ -90,6 +90,7 @@ if __name__ == "__main__":
         "ACT-R",
         "FSRSv1",
         "HLR",
+        "Anki",
         "HLR-short",
         "SM2-trainable",
         "SM2-short",

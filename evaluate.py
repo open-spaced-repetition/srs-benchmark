@@ -114,6 +114,7 @@ if __name__ == "__main__":
             ("ACT-R", 5),
             ("FSRSv1", 7),
             ("AVG", 0),
+            ("Anki", 7),
             ("HLR", 3),
             ("HLR-short", 3),
             ("SM2-trainable", 6),

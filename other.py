@@ -1755,6 +1755,7 @@ class SM2ParameterClipper:
 
 
 class SM2(nn.Module):
+    # 6 params
     init_w = [1, 6, 2.5, 0.02, 7, 0.18]
     clipper = SM2ParameterClipper()
     lr: float = 4e-2
@@ -1854,6 +1855,7 @@ class AnkiParameterClipper:
 
 
 class Anki(nn.Module):
+    # 7 params
     init_w = [
         1,  # graduating interval
         4,  # easy interval
@@ -1923,7 +1925,8 @@ class Anki(nn.Module):
                     self.passing_nonearly_review_intervals(
                         rating, ease, ivl, days_late
                     ),
-                ) * self.w[6]
+                )
+                * self.w[6],
             )
             new_ease = torch.where(
                 rating == 1,

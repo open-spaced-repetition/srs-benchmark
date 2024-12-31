@@ -94,9 +94,11 @@ The following tables present the means and the 99% confidence intervals. The bes
 | ACT-R | 5 | 0.362±0.0089 | 0.086±0.0024 | 0.534±0.0054 |
 | FSRS v1 | 7 | 0.40±0.011 | 0.086±0.0024 | 0.633±0.0046 |
 | AVG | 0 | 0.363±0.0090 | 0.088±0.0025 | 0.508±0.0046 |
+| Anki | 7 | 0.41±0.011 | 0.094±0.0030 | 0.616±0.0057 |
 | HLR | 3 | 0.41±0.012 | 0.105±0.0030 | 0.633±0.0050 |
 | HLR-short | 3 | 0.44±0.013 | 0.116±0.0036 | 0.615±0.0062 |
 | SM2-trainable | 6 | 0.44±0.012 | 0.119±0.0033 | 0.599±0.0050 |
+| Anki default param. | 0 | 0.49±0.015 | 0.128±0.0037 | 0.597±0.0055 |
 | SM-2-short | 0 | 0.51±0.015 | 0.128±0.0038 | 0.593±0.0064 |
 | SM-2 | 0 | 0.55±0.017 | 0.148±0.0041 | 0.600±0.0051 |
 | Ebisu-v2 | 0 | 0.46±0.012 | 0.158±0.0038 | 0.594±0.0050 |
@@ -131,10 +133,12 @@ The following tables present the means and the 99% confidence intervals. The bes
 | HLR | 3 | 0.469±0.0073 | 0.128±0.0019 | 0.637±0.0026 |
 | FSRS v1 | 7 | 0.491±0.0080 | 0.132±0.0022 | 0.630±0.0025 |
 | HLR-short | 3 | 0.493±0.0079 | 0.140±0.0021 | 0.611±0.0029 |
+| Anki | 7 | 0.513±0.0089 | 0.140±0.0024 | 0.618±0.0023 |
 | Ebisu-v2 | 0 | 0.499±0.0078 | 0.163±0.0021 | 0.605±0.0026 |
 | Transformer | 127 | 0.468±0.0059 | 0.167±0.0022 | 0.531±0.0030 |
 | SM2-trainable | 6 | 0.58±0.012 | 0.170±0.0028 | 0.597±0.0025 |
 | SM-2-short | 0 | 0.65±0.015 | 0.170±0.0028 | 0.590±0.0027 |
+| Anki default param. | 0 | 0.62±0.011 | 0.172±0.0026 | 0.613±0.0022 |
 | SM-2 | 0 | 0.72±0.017 | 0.203±0.0030 | 0.603±0.0025 |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.

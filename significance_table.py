@@ -92,6 +92,7 @@ if __name__ == "__main__":
         "HLR",
         "Anki",
         "HLR-short",
+        "Anki-dry-run",
         "SM2-trainable",
         "SM2-short",
         "Ebisu-v2",
@@ -191,6 +192,7 @@ if __name__ == "__main__":
 
     # small changes to labels
     index_5_dry_run = models.index("FSRS-5-dry-run")
+    index_anki_dry_run = models.index("Anki-dry-run")
     index_5_pretrain = models.index("FSRS-5-pretrain")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
@@ -199,6 +201,7 @@ if __name__ == "__main__":
     index_sm2 = models.index("SM2")
     index_sm2_short = models.index("SM2-short")
     models[index_5_dry_run] = "FSRS-5 \n def. param."
+    models[index_anki_dry_run] = "Anki \n def. param."
     models[index_5_pretrain] = "FSRS-5 \n pretrain"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"

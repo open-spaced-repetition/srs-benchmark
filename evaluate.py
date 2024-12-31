@@ -118,6 +118,7 @@ if __name__ == "__main__":
             ("HLR", 3),
             ("HLR-short", 3),
             ("SM2-trainable", 6),
+            ("Anki-dry-run", 0),
             ("SM2-short", 0),
             ("SM2", 0),
             ("Ebisu-v2", 0),

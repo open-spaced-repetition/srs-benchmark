@@ -18,6 +18,9 @@ def create_parser():
     parser.add_argument(
         "--recency", action="store_true", help="enable recency weighting"
     )
+    parser.add_argument(
+        "--dry", action="store_true", help="evaluate default parameters"
+    )
 
     # download revlogs from huggingface
     parser.add_argument(
@@ -56,7 +59,6 @@ def create_parser():
     )
 
     # script.py only
-    parser.add_argument("--dry", action="store_true", help="FSRS-5 without training")
     parser.add_argument(
         "--pretrain", action="store_true", help="FSRS-5 with only pretraining"
     )

@@ -26,6 +26,7 @@ parser = create_parser()
 args = parser.parse_args()
 
 DEV_MODE = args.dev
+DRY_RUN = args.dry
 MODEL_NAME = args.model
 SHORT_TERM = args.short
 SECS_IVL = args.secs
@@ -93,6 +94,7 @@ verbose_inadequate_data: bool = False
 
 FILE_NAME = (
     MODEL_NAME
+    + ("-dry-run" if DRY_RUN else "")
     + ("-short" if SHORT_TERM else "")
     + ("-secs" if SECS_IVL else "")
     + ("-recency" if RECENCY else "")
@@ -1938,7 +1940,9 @@ class Anki(nn.Module):
                 ),
             )
         new_ease = new_ease.clamp(1.3, 5.5)
-        new_ivl = torch.max(nn.functional.leaky_relu(new_ivl - 1) + 1, new_ivl)
+        new_ivl = torch.max(nn.functional.leaky_relu(new_ivl - 1) + 1, new_ivl).clamp(
+            S_MIN, S_MAX
+        )
         return torch.stack([new_ivl, new_ease], dim=1)
 
     def forward(
@@ -2543,6 +2547,9 @@ def process(user_id):
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
+                if DRY_RUN:
+                    partition_weights[partition] = model().state_dict()
+                    continue
                 trainer = Trainer(
                     model(),
                     train_partition,

@@ -128,21 +128,25 @@ if __name__ == "__main__":
     # small changes to labels
     index_5_dry_run = models.index("FSRS-5-dry-run")
     index_anki_dry_run = models.index("Anki-dry-run")
+    index_anki_train = models.index("Anki")
     index_5_pretrain = models.index("FSRS-5-pretrain")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_v2 = models.index("FSRSv2")
     index_v1 = models.index("FSRSv1")
     index_sm2 = models.index("SM2")
+    index_sm2_train = models.index("SM2-trainable")
     index_sm2_short = models.index("SM2-short")
     models[index_5_dry_run] = "FSRS-5 \n def. param."
     models[index_anki_dry_run] = "Anki \n def. param."
+    models[index_anki_train] = "Anki \n trainable"
     models[index_5_pretrain] = "FSRS-5 \n pretrain"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
     models[index_v2] = "FSRS v2"
     models[index_v1] = "FSRS v1"
-    models[index_sm2] = "SM-2"
+    models[index_sm2] = "SM-2 \n def. param."
+    models[index_sm2_train] = "SM-2 trainable"
     models[index_sm2_short] = "SM-2-short"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)

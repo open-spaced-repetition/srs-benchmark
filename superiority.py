@@ -138,8 +138,8 @@ if __name__ == "__main__":
     index_sm2_train = models.index("SM2-trainable")
     index_sm2_short = models.index("SM2-short")
     models[index_5_dry_run] = "FSRS-5 \n def. param."
-    models[index_anki_dry_run] = "Anki \n def. param."
-    models[index_anki_train] = "Anki \n trainable"
+    models[index_anki_dry_run] = "Anki-SM-2 \n def. param."
+    models[index_anki_train] = "Anki-SM-2 \n trainable"
     models[index_5_pretrain] = "FSRS-5 \n pretrain"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"

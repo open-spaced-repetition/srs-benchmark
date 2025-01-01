@@ -153,7 +153,7 @@ The metrics presented above can be difficult to interpret. In order to make it e
 
 ![Superiority, 9999](./plots/Superiority-9999.png)
 
-You may have noticed that FSRS-5 has a 99.0% superiority over SM-2, meaning that for 99.0% of users, RMSE will be lower with FSRS-5 than with SM-2. But please remember that SM-2 wasn’t designed to predict probabilities, and the only reason it does that in this benchmark is because extra formulas were added to it.
+You may have noticed that FSRS-5 has a 98.1% superiority over Anki's variant of SM-2, meaning that for 98.1% of users, the RMSE with FSRS-5 will be lower than with Anki's variant of SM-2. But please remember that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
 
 ### Statistical significance
 

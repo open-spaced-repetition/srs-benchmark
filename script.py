@@ -264,7 +264,6 @@ def process(user_id):
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
     for train_index, test_index in tscv.split(dataset):
-        optimizer.define_model()
         train_set = dataset.iloc[train_index].copy()
         test_set = dataset.iloc[test_index].copy()
         if NO_TEST_SAME_DAY:
@@ -286,12 +285,7 @@ def process(user_id):
                     )
                     partition_weights[partition] = backend.benchmark(train_set_items)
                 else:
-                    optimizer.S0_dataset_group = (
-                        train_partition[train_partition["i"] == 2]
-                        .groupby(by=["first_rating", "delta_t"], group_keys=False)
-                        .agg({"y": ["mean", "count"]})
-                        .reset_index()
-                    )
+                    optimizer.define_model()
                     _ = optimizer.pretrain(dataset=train_partition, verbose=verbose)
                     if ONLY_PRETRAIN:
                         partition_weights[partition] = optimizer.init_w

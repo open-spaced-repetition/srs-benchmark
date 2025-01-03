@@ -178,7 +178,7 @@ if __name__ == "__main__":
                 print()
 
             if len(parameters) > 0:
-                print(f"parameters: {np.median(parameters, axis=0).round(6).tolist()}")
+                print(f"parameters: {np.median(parameters, axis=0).round(6).tolist()}\n")
 
     else:
         for scale in ("reviews", "users"):

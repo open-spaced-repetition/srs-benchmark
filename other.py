@@ -193,8 +193,8 @@ class FSRS(nn.Module):
                     else:
                         rating_stability[small_rating] = rating_stability[big_rating]
 
-        w1 = 1.35
-        w2 = 0.68
+        w1 = 0.41
+        w2 = 0.54
 
         if len(rating_stability) == 0:
             raise Exception("Not enough data for pretraining!")

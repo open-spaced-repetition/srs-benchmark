@@ -35,7 +35,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - FSRS v4: the upgraded version of FSRS, made better with help from the community.
 - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
 - FSRS-5: the latest version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
-    - FSRS-5 default param.: FSRS-5 with default parameters (which have been obtained by running FSRS-5 on all 10 thousand collections).
+    - FSRS-5 default param.: FSRS-5 with default parameters. The default parameters have been obtained by running FSRS-5 on all 20 thousand collections from the *previous* dataset and calculating the median of each parameter.
     - FSRS-5 pretrain: FSRS-5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
     - FSRS-5 binary: FSRS which treats `hard` and `easy` ratings as `good`.
     - FSRS-5 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.

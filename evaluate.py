@@ -152,6 +152,8 @@ if __name__ == "__main__":
             for result in data:
                 if common_set and result["user"] not in common_set:
                     continue
+                # if result["size"] > 1000:
+                #     continue
                 m.append(result["metrics"])
                 sizes.append(result["size"])
                 if "parameters" in result:
@@ -177,8 +179,11 @@ if __name__ == "__main__":
                     print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
                 print()
 
+            # print(f"LogLoss 99%: {round(np.percentile(np.array([item['LogLoss'] for item in m]), 99), 4)}")
+            # print(f"RMSE(bins) 99%: {round(np.percentile(np.array([item['RMSE(bins)'] for item in m]), 99), 4)}")
             if len(parameters) > 0:
                 print(f"parameters: {np.median(parameters, axis=0).round(6).tolist()}\n")
+                # print(f"parameters: {np.std(parameters, axis=0).round(2).tolist()}\n")
 
     else:
         for scale in ("reviews", "users"):

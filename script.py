@@ -58,6 +58,7 @@ from fsrs_optimizer import (  # type: ignore
 model = FSRS
 optimizer = Optimizer()
 lr: float = 4e-2
+gamma: float = 2
 n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
@@ -296,6 +297,7 @@ def process(user_id):
                             optimizer.init_w,
                             n_epoch=n_epoch,
                             lr=lr,
+                            gamma=gamma,
                             batch_size=batch_size,
                             max_seq_len=max_seq_len,
                             enable_short_term=not DISABLE_SHORT_TERM,

@@ -56,7 +56,7 @@ from fsrs_optimizer import (  # type: ignore
 
 
 model = FSRS
-optimizer = Optimizer()
+optimizer = Optimizer(float_delta_t=SECS_IVL)
 lr: float = 4e-2
 gamma: float = 1
 n_epoch: int = 5
@@ -212,7 +212,7 @@ def create_time_series(df):
                 last_rating.append(r_history[0])
     df["last_rating"] = last_rating
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    df.drop(df[df["delta_t"] == 0].index, inplace=True)
+    df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
     df["i"] = df.groupby("card_id").cumcount() + 1
     df["first_rating"] = df["card_id"].map(card_id_to_first_rating).astype(str)
     if not SECS_IVL:
@@ -230,7 +230,7 @@ def create_time_series(df):
         )
     if BINARY:
         df["first_rating"] = df["first_rating"].map(lambda x: "1" if x == 1 else "3")
-    return df[df["delta_t"] > 0].sort_values(by=["review_th"])
+    return df[df["elapsed_days"] > 0].sort_values(by=["review_th"])
 
 
 @catch_exceptions

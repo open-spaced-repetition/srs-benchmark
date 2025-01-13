@@ -58,7 +58,7 @@ from fsrs_optimizer import (  # type: ignore
 model = FSRS
 optimizer = Optimizer()
 lr: float = 4e-2
-gamma: float = 2
+gamma: float = 1
 n_epoch: int = 5
 n_splits: int = 5
 batch_size: int = 512
@@ -281,10 +281,10 @@ def process(user_id):
                     partition_weights[partition] = optimizer.init_w
                     continue
                 if RUST:
-                    train_set_items = convert_to_items(
-                        train_partition[train_partition["i"] >= 2]
+                    train_set_items = convert_to_items(train_partition)
+                    partition_weights[partition] = list(
+                        map(lambda x: round(x, 4), backend.benchmark(train_set_items))
                     )
-                    partition_weights[partition] = backend.benchmark(train_set_items)
                 else:
                     optimizer.define_model()
                     _ = optimizer.pretrain(dataset=train_partition, verbose=verbose)

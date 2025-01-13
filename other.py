@@ -963,7 +963,7 @@ class FSRS5(FSRS):
     ]
     clipper = FSRS5ParameterClipper()
     lr: float = 4e-2
-    gamma: float = 2
+    gamma: float = 1
     wd: float = 1e-5
     n_epoch: int = 5
     default_params_stddev_tensor = torch.tensor(

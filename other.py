@@ -275,7 +275,7 @@ class FSRS(nn.Module):
         self.w.data[0:4] = Tensor(
             list(map(lambda x: max(min(INIT_S_MAX, x), S_MIN), init_s0))
         )
-        self.init_w_tensor = self.w.data.clone()
+        self.init_w_tensor = self.w.data.clone().to(DEVICE)
 
 
 class FSRS1ParameterClipper:
@@ -993,7 +993,7 @@ class FSRS5(FSRS):
     def __init__(self, w: List[float] = init_w):
         super(FSRS5, self).__init__()
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
-        self.init_w_tensor = self.w.data.clone()
+        self.init_w_tensor = self.w.data.clone().to(DEVICE)
 
     def iter(
         self,

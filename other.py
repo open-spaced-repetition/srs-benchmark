@@ -31,6 +31,7 @@ MODEL_NAME = args.model
 SHORT_TERM = args.short
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
+EQUALIZE_TEST_WITH_NON_SECS = args.equalize_test_with_non_secs
 FILE = args.file
 PLOT = args.plot
 WEIGHTS = args.weights
@@ -99,6 +100,7 @@ FILE_NAME = (
     + ("-secs" if SECS_IVL else "")
     + ("-recency" if RECENCY else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
+    + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
     + ("-dev" if DEV_MODE else "")
 )
@@ -2340,8 +2342,7 @@ def baseline(user_id):
     stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
     return stats, raw
 
-
-def create_features(df, model_name="FSRSv3"):
+def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
@@ -2352,7 +2353,7 @@ def create_features(df, model_name="FSRSv3"):
         and "elapsed_days" in df.columns
         and "elapsed_seconds" in df.columns
     ):
-        if SECS_IVL:
+        if secs_ivl:
             df["delta_t"] = df["elapsed_seconds"] / 86400
         else:
             df["delta_t"] = df["elapsed_days"]
@@ -2498,7 +2499,7 @@ def create_features(df, model_name="FSRSv3"):
     if SHORT_TERM:
         df = df[(df["elapsed_days"] != 0) | (df["i"] == 1)].copy()
         df["i"] = df.groupby("card_id").cumcount() + 1
-    if not SECS_IVL:
+    if not secs_ivl:
         filtered_dataset = (
             df[df["i"] == 2]
             .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
@@ -2513,6 +2514,24 @@ def create_features(df, model_name="FSRSv3"):
         )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
+def create_features(df, model_name="FSRSv3"):
+    if SECS_IVL and EQUALIZE_TEST_WITH_NON_SECS:
+        df_non_secs = create_features_helper(df.copy(), model_name, False)
+        df = create_features_helper(df, model_name, True)
+
+        tscv = TimeSeriesSplit(n_splits=n_splits)
+        for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
+            non_secs_test_set = df_non_secs.iloc[non_secs_test_index]
+            # For the resulting train set, only allow reviews that are less than the smallest review_th in non_secs_test_set
+            allowed_train = df[df['review_th'] < non_secs_test_set['review_th'].min()]
+            df[f"{split_i}_train"] = df['review_th'].isin(allowed_train['review_th'])
+
+            # For the resulting test set, only allow reviews that exist in non_secs_test_set
+            df[f"{split_i}_test"] = df['review_th'].isin(non_secs_test_set['review_th'])
+
+        return df
+    else:
+        return create_features_helper(df, model_name, SECS_IVL)
 
 @catch_exceptions
 def process(user_id):
@@ -2585,11 +2604,17 @@ def process(user_id):
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
-    for train_index, test_index in tscv.split(dataset):
+    for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         train_set = dataset.iloc[train_index]
         test_set = dataset.iloc[test_index]
         if NO_TEST_SAME_DAY:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
+        if EQUALIZE_TEST_WITH_NON_SECS:
+            # Ignores the train_index and test_index
+            train_set = dataset[dataset[f"{split_i}_train"]]
+            test_set = dataset[dataset[f"{split_i}_test"]]
+            train_index, test_index = None, None  # train_index and test_index no longer have the same meaning as before
+
         testsets.append(test_set)
         partition_weights = {}
         for partition in train_set["partition"].unique():

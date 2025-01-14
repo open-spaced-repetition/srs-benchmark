@@ -40,6 +40,12 @@ def create_parser():
         help="exclude reviews with elapsed_days=0 from testset",
     )
 
+    parser.add_argument(
+        "--equalize_test_with_non_secs",
+        action="store_true",
+        help="Only test with reviews that would be included in non-secs tests",
+    )
+
     # save detailed results
     parser.add_argument("--raw", action="store_true", help="save raw predictions")
     parser.add_argument(

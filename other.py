@@ -84,7 +84,12 @@ warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(42)
 tqdm.pandas()
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device(
+    "cuda"
+    if torch.cuda.is_available()
+    and MODEL_NAME in ["GRU", "GRU-P", "LSTM", "RNN", "NN-17", "Transformer"]
+    else "cpu"
+)
 # DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 n_splits: int = 5
@@ -2342,6 +2347,7 @@ def baseline(user_id):
     stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
     return stats, raw
 
+
 def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
@@ -2514,6 +2520,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         )
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
+
 def create_features(df, model_name="FSRSv3"):
     if SECS_IVL and EQUALIZE_TEST_WITH_NON_SECS:
         df_non_secs = create_features_helper(df.copy(), model_name, False)
@@ -2523,15 +2530,16 @@ def create_features(df, model_name="FSRSv3"):
         for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
             non_secs_test_set = df_non_secs.iloc[non_secs_test_index]
             # For the resulting train set, only allow reviews that are less than the smallest review_th in non_secs_test_set
-            allowed_train = df[df['review_th'] < non_secs_test_set['review_th'].min()]
-            df[f"{split_i}_train"] = df['review_th'].isin(allowed_train['review_th'])
+            allowed_train = df[df["review_th"] < non_secs_test_set["review_th"].min()]
+            df[f"{split_i}_train"] = df["review_th"].isin(allowed_train["review_th"])
 
             # For the resulting test set, only allow reviews that exist in non_secs_test_set
-            df[f"{split_i}_test"] = df['review_th'].isin(non_secs_test_set['review_th'])
+            df[f"{split_i}_test"] = df["review_th"].isin(non_secs_test_set["review_th"])
 
         return df
     else:
         return create_features_helper(df, model_name, SECS_IVL)
+
 
 @catch_exceptions
 def process(user_id):
@@ -2613,7 +2621,10 @@ def process(user_id):
             # Ignores the train_index and test_index
             train_set = dataset[dataset[f"{split_i}_train"]]
             test_set = dataset[dataset[f"{split_i}_test"]]
-            train_index, test_index = None, None  # train_index and test_index no longer have the same meaning as before
+            train_index, test_index = (
+                None,
+                None,
+            )  # train_index and test_index no longer have the same meaning as before
 
         testsets.append(test_set)
         partition_weights = {}

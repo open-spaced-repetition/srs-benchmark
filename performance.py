@@ -9,8 +9,10 @@ USERS = 10000
 
 sizes = []
 for id in range(1, USERS):
-    metadata = pq.ParquetFile(script.DATA_PATH / "revlogs" / f"user_id={id}" / "data.parquet").metadata
-    
+    metadata = pq.ParquetFile(
+        script.DATA_PATH / "revlogs" / f"user_id={id}" / "data.parquet"
+    ).metadata
+
     sizes.append([id, metadata.num_rows])
 
 sizes = sorted(sizes, key=lambda e: e[1])
@@ -18,11 +20,13 @@ sizes = sorted(sizes, key=lambda e: e[1])
 USER_ID = 2
 N = 100
 
+
 def process_wrapper_a():
-#    script.batch_size = 256 # Batch size example
+    #    script.batch_size = 256 # Batch size example
     script.process(USER_ID)
 
-#def process_wrapper_b():
+
+# def process_wrapper_b():
 ##    script.batch_size = 100_000_000
 #    script.process(USER_ID)
 
@@ -42,7 +46,7 @@ for i in (progress := tqdm(range(1, USERS, USERS // N))):
     # print(f"{a_time=}")
     # b_time = timeit(process_wrapper_b, number=1)
     # print(f"{b_time=}")
-    
+
     row_counts.append(rows)
     a_times.append(a_time)
     # b_times.append(b_time)

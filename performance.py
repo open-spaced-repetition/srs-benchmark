@@ -1,9 +1,5 @@
-from cProfile import label
-import os
-import sys
-sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/")) # Dev mode
+# You can pass arguments to this script as if it were script.py
 import script
-import fsrs_optimizer
 from timeit import timeit
 import pyarrow.parquet as pq
 from matplotlib import pyplot as plt
@@ -22,21 +18,19 @@ sizes = sorted(sizes, key=lambda e: e[1])
 USER_ID = 2
 N = 100
 
-def cpu():
-    script.batch_size = 256
-    fsrs_optimizer.device = "cpu"
+def process_wrapper_a():
+#    script.batch_size = 256 # Batch size example
     script.process(USER_ID)
 
-def gpu():
-    script.batch_size = 100_000_000
-    fsrs_optimizer.device = "cuda"
-    script.process(USER_ID)
+#def process_wrapper_b():
+##    script.batch_size = 100_000_000
+#    script.process(USER_ID)
 
 count = 0
 
 row_counts = []
-cpu_times = []
-gpu_times = []
+a_times = []
+# b_times = []
 
 for i in (progress := tqdm(range(1, USERS, USERS // N))):
     USER_ID = sizes[i][0]
@@ -44,17 +38,17 @@ for i in (progress := tqdm(range(1, USERS, USERS // N))):
 
     progress.set_description(f"{USER_ID=}, {rows=}")
 
-    cpu_time = timeit(cpu, number=1)
-    # print(f"{cpu_time=}")
-    gpu_time = timeit(gpu, number=1)
-    # print(f"{gpu_time=}")
+    a_time = timeit(process_wrapper_a, number=1)
+    # print(f"{a_time=}")
+    # b_time = timeit(process_wrapper_b, number=1)
+    # print(f"{b_time=}")
     
     row_counts.append(rows)
-    cpu_times.append(cpu_time)
-    gpu_times.append(gpu_time)
+    a_times.append(a_time)
+    # b_times.append(b_time)
 
 plt.xlabel("Revlogs")
 plt.ylabel("Seconds")
-plt.plot(row_counts, cpu_times, label="CPU times")
-plt.plot(row_counts, gpu_times, label="GPU times")
+plt.plot(row_counts, a_times, label="A times")
+# plt.plot(row_counts, b_times, label="B times")
 plt.show()

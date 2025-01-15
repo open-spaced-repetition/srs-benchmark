@@ -22,7 +22,7 @@ N = 100
 
 
 def process_wrapper_a():
-    #    script.batch_size = 256 # Batch size example
+    #    script.batch_size = 512 # Batch size example
     script.process(USER_ID)
 
 

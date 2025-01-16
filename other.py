@@ -59,6 +59,7 @@ model_list = (
     "LSTM",
     "RNN",
     "AVG",
+    "90%",
     "DASH",
     "DASH[MCM]",
     "DASH[ACT-R]",
@@ -2079,6 +2080,24 @@ def iter(model, batch):
     result.update(outputs)
     return result
 
+class ConstantModel(nn.Module):
+    n_epoch = 0
+    lr = 0
+    wd = 0
+
+    def __init__(self, value=0.9):
+        super().__init__()
+        self.value=value
+        self.placeholder = torch.nn.Linear(1, 1)  # So that the optimizer gets a nonempty list
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        return {"retentions": torch.full((real_batch_size,), self.value)}
 
 class Trainer:
     optimizer: torch.optim.Optimizer
@@ -2309,6 +2328,7 @@ def process_untrainable(user_id):
                 lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
                 axis=1,
             )
+
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
@@ -2347,7 +2367,6 @@ def baseline(user_id):
     stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
     return stats, raw
 
-
 def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
@@ -2359,17 +2378,22 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         and "elapsed_days" in df.columns
         and "elapsed_seconds" in df.columns
     ):
+        df["delta_t"] = df["elapsed_days"]
         if secs_ivl:
-            df["delta_t"] = df["elapsed_seconds"] / 86400
-        else:
-            df["delta_t"] = df["elapsed_days"]
+            df["delta_t_secs"] = df["elapsed_seconds"] / 86400
+            df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
+
     if not SHORT_TERM:
         df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
         df["i"] = df.groupby("card_id").cumcount() + 1
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
-    t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
+    t_history_non_secs = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
+    if secs_ivl:
+        t_history_secs = df.groupby("card_id", group_keys=False)["delta_t_secs"].apply(
+            lambda x: cum_concat([[i] for i in x])
+        )
     r_history = df.groupby("card_id", group_keys=False)["rating"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
@@ -2377,8 +2401,27 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
     ]
     df["t_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+        ",".join(map(str, item[:-1])) for sublist in t_history_non_secs for item in sublist
     ]
+    if secs_ivl:
+        if EQUALIZE_TEST_WITH_NON_SECS:
+            df["t_history"] = [
+                ",".join(map(str, item[:-1])) for sublist in t_history_non_secs for item in sublist
+            ]
+            df["t_history_secs"] = [
+                ",".join(map(str, item[:-1])) for sublist in t_history_secs for item in sublist
+            ]
+        else:
+            # If we do not care about test equality, we are allowed to overwrite delta_t and t_history
+            df["delta_t"] = df["delta_t_secs"]
+            df["t_history"] = [
+                ",".join(map(str, item[:-1])) for sublist in t_history_secs for item in sublist
+            ]
+
+        t_history_used = t_history_secs
+    else:
+        t_history_used = t_history_non_secs
+
     if model_name.startswith("FSRS") or model_name in (
         "RNN",
         "LSTM",
@@ -2386,18 +2429,19 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         "Transformer",
         "SM2-trainable",
         "Anki",
+        "90%",
     ):
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
                 0, 1
             )
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "GRU-P":
         df["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "HLR":
@@ -2419,7 +2463,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     elif model_name == "ACT-R":
         df["tensor"] = [
             (torch.cumsum(torch.tensor([t_item]), dim=1)).transpose(0, 1)
-            for t_sublist in t_history
+            for t_sublist in t_history_used
             for t_item in t_sublist
         ]
     elif model_name in ("DASH", "DASH[MCM]"):
@@ -2456,7 +2500,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
                 dash_tw_features(r_item[:-1], t_item[1:], "MCM" in model_name),
                 dtype=torch.float32,
             )
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "DASH[ACT-R]":
@@ -2473,7 +2517,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
                 dash_actr_features(r_item[:-1], t_item[1:]),
                 dtype=torch.float32,
             )
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "NN-17":
@@ -2488,7 +2532,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
             torch.tensor(
                 (t_item[:-1], r_item[:-1], r_history_to_l_history(r_item[:-1]))
             ).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "SM2":
@@ -2496,7 +2540,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     elif model_name.startswith("Ebisu"):
         df["sequence"] = [
             tuple(zip(t_item[:-1], r_item[:-1]))
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
 
@@ -2525,6 +2569,13 @@ def create_features(df, model_name="FSRSv3"):
     if SECS_IVL and EQUALIZE_TEST_WITH_NON_SECS:
         df_non_secs = create_features_helper(df.copy(), model_name, False)
         df = create_features_helper(df, model_name, True)
+        df_intersect = df[df["review_th"].isin(df_non_secs["review_th"])]
+        # rmse_bins requires that delta_t, i, r_history, t_history remains the same as with non secs
+        assert len(df_intersect) == len(df_non_secs)
+        assert np.equal(df_intersect["delta_t"], df_non_secs["delta_t"]).all()
+        assert np.equal(df_intersect["i"], df_non_secs["i"]).all()
+        assert np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all()
+        assert np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all()
 
         tscv = TimeSeriesSplit(n_splits=n_splits)
         for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
@@ -2586,6 +2637,10 @@ def process(user_id):
         Model = SM2
     elif MODEL_NAME == "Anki":
         Model = Anki
+    elif MODEL_NAME == "90%":
+        def get_constant_model(state_dict=None):
+            return ConstantModel(0.9)
+        Model = get_constant_model
 
     dataset = create_features(df_revlogs, MODEL_NAME)
     if dataset.shape[0] < 6:

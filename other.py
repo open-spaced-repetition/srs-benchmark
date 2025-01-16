@@ -125,13 +125,16 @@ class FSRS(nn.Module):
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
-        stabilities = outputs[
+        stabilities, difficulties = outputs[
             seq_lens - 1,
             torch.arange(real_batch_size, device=DEVICE),
-            0,
-        ]
+        ].transpose(0, 1)
         retentions = self.forgetting_curve(delta_ts, stabilities)
-        return {"retentions": retentions, "stabilities": stabilities}
+        return {
+            "retentions": retentions,
+            "stabilities": stabilities,
+            "difficulties": difficulties,
+        }
 
     def pretrain(self, train_set):
         S0_dataset_group = (
@@ -2283,14 +2286,17 @@ class Collection:
         batch_loader = BatchLoader(batch_dataset, shuffle=False)
         retentions = []
         stabilities = []
+        difficulties = []
         with torch.no_grad():
             for batch in batch_loader:
                 result = iter(self.model, batch)
                 retentions.extend(result["retentions"].cpu().tolist())
                 if "stabilities" in result:
                     stabilities.extend(result["stabilities"].cpu().tolist())
+                if "difficulties" in result:
+                    difficulties.extend(result["difficulties"].cpu().tolist())
 
-        return retentions, stabilities
+        return retentions, stabilities, difficulties
 
 
 def process_untrainable(user_id):
@@ -2722,10 +2728,12 @@ def process(user_id):
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(Model(weights) if weights else Model())
-            retentions, stabilities = my_collection.batch_predict(partition_testset)
+            retentions, stabilities, difficulties = my_collection.batch_predict(partition_testset)
             partition_testset["p"] = retentions
             if stabilities:
                 partition_testset["s"] = stabilities
+            if difficulties:
+                partition_testset["d"] = difficulties
             p.extend(retentions)
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)

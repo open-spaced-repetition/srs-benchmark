@@ -55,6 +55,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
 - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.
+- RMSE-BINS-EXPLOIT: An algorithm that exploits the calculation of rmse(bins) by simulating the bins and keeping the error term close to 0.
 
 If an algorithm has "-short" at the end of its name, it means that it uses data from same-day reviews as well.
 
@@ -73,7 +74,8 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 | Model | Parameters | LogLoss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
-| **GRU-P-short** | 297 | **0.320±0.0080** | **0.042±0.0013** | **0.710±0.0047** |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.5±0.13 | **0.0062±0.00022** | 0.638±0.0040 |
+| **GRU-P-short** | 297 | **0.320±0.0080** | 0.042±0.0013 | **0.710±0.0047** |
 | GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 |
 | FSRS-5 recency | 19 | 0.326±0.0080 | 0.049±0.0014 | 0.704±0.0042 |
 | FSRS-5 preset | 19 | 0.328±0.0083 | 0.051±0.0015 | 0.702±0.0043 |
@@ -110,7 +112,8 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 | Model | Parameters | Log Loss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
-| **GRU-P-short** | 297 | **0.346±0.0042** | **0.062±0.0011** | 0.699±0.0026 |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.61±0.067 | **0.0135±0.00028** | 0.655±0.0021 |
+| **GRU-P-short** | 297 | **0.346±0.0042** | 0.062±0.0011 | 0.699±0.0026 |
 | GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 |
 | **FSRS-5 recency** | 19 | 0.355±0.0043 | 0.072±0.0012 | **0.701±0.0023** |
 | FSRS-rs | 19 | 0.356±0.0045 | 0.074±0.0012 | 0.698±0.0023 |

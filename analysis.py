@@ -200,7 +200,7 @@ def best_mode(a, weights):
 
 
 if __name__ == "__main__":
-    model = "FSRS-rs"
+    model = "FSRS-rs-recency"
     with open(f"./result/{model}.jsonl", "r") as f:
         data = [json.loads(x) for x in f.readlines()]
     weights_list = []
@@ -216,9 +216,9 @@ if __name__ == "__main__":
                     ):
                         # remove users who have parameters that are close to the default
                         break
-                    else:
-                        weights_list.append(result["parameters"][partition])
-                        sizes.append(result["size"])
+                else:
+                    weights_list.append(result["parameters"][partition])
+                    sizes.append(result["size"])
         else:
             for i in range(n_params):
                 if abs(result["parameters"][i] - DEFAULT_PARAMETER[i]) <= 1e-4:

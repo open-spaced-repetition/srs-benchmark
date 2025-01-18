@@ -123,6 +123,7 @@ if __name__ == "__main__":
             ("SM2", 0),
             ("Ebisu-v2", 0),
             ("Transformer", 127),
+            ("RMSE-BINS-EXPLOIT", 0),
         ]
         if not args.secs
         else [

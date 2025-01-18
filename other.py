@@ -59,6 +59,7 @@ model_list = (
     "LSTM",
     "RNN",
     "AVG",
+    "RMSE-BINS-EXPLOIT",
     "90%",
     "DASH",
     "DASH[MCM]",
@@ -2083,6 +2084,49 @@ def iter(model, batch):
     result.update(outputs)
     return result
 
+def count_lapse(r_history, t_history):
+    lapse = 0
+    for r, t in zip(r_history.split(","), t_history.split(",")):
+        if t != "0" and r == "1":
+            lapse += 1
+    return lapse
+
+def get_bin(row):
+    raw_lapse = count_lapse(row["r_history"], row["t_history"])
+    lapse = round(1.65 * np.power(1.73, np.floor(np.log(raw_lapse) / np.log(1.73))), 0) if raw_lapse != 0 else 0
+    delta_t = round(2.48 * np.power(3.62, np.floor(np.log(row["delta_t"]) / np.log(3.62))), 2)
+    i = round(1.99 * np.power(1.89, np.floor(np.log(row["i"]) / np.log(1.89))), 0)
+    return (lapse, delta_t, i)
+
+class RMSEBinsExploit:
+    def __init__(self):
+        super().__init__()
+        self.state = {}
+        self.global_succ = 0
+        self.global_n = 0
+
+    def adapt(self, bin_key, y):
+        if bin_key not in self.state:
+            self.state[bin_key] = (0, 0, 0)
+
+        pred_sum, truth_sum, bin_n = self.state[bin_key]
+        self.state[bin_key] = (pred_sum, truth_sum + y, bin_n + 1)
+        self.global_succ += y
+        self.global_n += 1
+
+    def predict(self, bin_key):
+        if self.global_n == 0:
+            return 0.5
+
+        if bin_key not in self.state:
+            self.state[bin_key] = (0, 0, 0)
+        
+        pred_sum, truth_sum, bin_n = self.state[bin_key]
+        estimated_p = self.global_succ / self.global_n
+        pred = np.clip(truth_sum + estimated_p - pred_sum, a_min=0, a_max=1)
+        self.state[bin_key] = (pred_sum + pred, truth_sum, bin_n)
+        return pred
+
 class ConstantModel(nn.Module):
     n_epoch = 0
     lr = 0
@@ -2373,6 +2417,42 @@ def baseline(user_id):
     stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
     return stats, raw
 
+def rmse_bins_exploit(user_id):
+    """ This model attempts to exploit rmse(bins) by keeping track of per-bin statistics
+    """
+    model_name = "RMSE-BINS-EXPLOIT"
+    dataset = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+    )
+    dataset = create_features(dataset, model_name)
+    if dataset.shape[0] < 6:
+        return Exception("Not enough data")
+
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    save_tmp = []
+    first_test_index = int(1e9)
+    for _, test_index in tscv.split(dataset):
+        first_test_index = min(first_test_index, test_index.min())
+        test_set = dataset.iloc[test_index].copy()
+        save_tmp.append(test_set)
+
+    p = []
+    y = []
+    model = RMSEBinsExploit()
+    for i in range(len(dataset)):
+        row = dataset.iloc[i].copy()
+        bin = get_bin(row)
+        if i >= first_test_index:
+            pred = model.predict(bin)
+            p.append(pred)
+            y.append(row["y"])
+            model.adapt(bin, row["y"])
+
+    save_tmp = pd.concat(save_tmp)
+    save_tmp["p"] = p
+    stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
+    return stats, raw
+
 def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
@@ -2605,6 +2685,8 @@ def process(user_id):
         return process_untrainable(user_id)
     if MODEL_NAME == "AVG":
         return baseline(user_id)
+    if MODEL_NAME == "RMSE-BINS-EXPLOIT":
+        return rmse_bins_exploit(user_id)
     df_revlogs = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )

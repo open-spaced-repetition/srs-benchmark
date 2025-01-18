@@ -152,11 +152,11 @@ Unweighted averages are more representative of "average case" performance. In re
 
 ### Superiority
 
-The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, GRU-P-short has a 95.9% superiority over the Transformer, meaning that for 95.9% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer. This is based on 9,999 collections.
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, GRU-P-short has a 96.0% superiority over the Transformer, meaning that for 96.0% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer. This is based on 9,999 collections.
 
 ![Superiority, 9999](./plots/Superiority-9999.png)
 
-You may have noticed that FSRS-5 has a 98.1% superiority over Anki's variant of SM-2, meaning that for 98.1% of users, the Log Loss with FSRS-5 will be lower than with Anki's variant of SM-2. But please remember that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
+You may have noticed that FSRS-5 has a 99.3% superiority over Anki's variant of SM-2, meaning that for 99.3% of users, the Log Loss with FSRS-5 will be lower than with Anki's variant of SM-2. But please remember that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
 
 ### Statistical significance
 

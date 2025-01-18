@@ -55,7 +55,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
 - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.
-- RMSE-BINS-EXPLOIT: An algorithm that exploits the calculation of rmse(bins) by simulating the bins and keeping the error term close to 0.
+- RMSE-BINS-EXPLOIT: An algorithm that exploits the calculation of RMSE(bins) by simulating the bins and keeping the error term close to 0.
 
 If an algorithm has "-short" at the end of its name, it means that it uses data from same-day reviews as well.
 

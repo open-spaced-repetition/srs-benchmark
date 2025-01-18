@@ -22,9 +22,9 @@ Note: TimeSeriesSplit will remove the first split from evaluation. This is becau
 
 ### Metrics
 
-We use three metrics in the SRS benchmark to evaluate how well these algorithms work: log loss, AUC, and a custom RMSE that we call RMSE (bins).
+We use three metrics in the SRS benchmark to evaluate how well these algorithms work: Log Loss, AUC, and a custom RMSE that we call RMSE (bins).
 
-- Log Loss (also known as Binary Cross Entropy): Utilized primarily for its applicability in binary classification problems, log loss serves as a measure of the discrepancies between predicted probabilities of recall and review outcomes (1 or 0). It quantifies how well the algorithm approximates the true recall probabilities, making it an important metric for algorithm evaluation in spaced repetition systems. Log Loss ranges from 0 to infinity, lower is better.
+- Log Loss (also known as Binary Cross Entropy): Utilized primarily for its applicability in binary classification problems, Log Loss serves as a measure of the discrepancies between predicted probabilities of recall and review outcomes (1 or 0). It quantifies how well the algorithm approximates the true recall probabilities, making it an important metric for algorithm evaluation in spaced repetition systems. Log Loss ranges from 0 to infinity, lower is better.
 - AUC (Area under the ROC Curve): AUC represents the degree or measure of separability. It tells how much the algorithm is capable of distinguishing between classes. AUC ranges from 0 to 1, however, in practice it's almost always greater than 0.5; higher is better.
 - Root Mean Square Error in Bins (RMSE (bins)): This is a metric designed for use in the SRS benchmark. In this approach, predictions and review outcomes are grouped into bins based on three features: the interval length, the number of reviews, and the number of lapses. Within each bin, the squared difference between the average predicted probability of recall and the average recall rate is calculated. These values are then weighted according to the sample size in each bin, and then the final weighted root mean square error is calculated. This metric provides a nuanced understanding of algorithm performance across different probability ranges. For more details, you can read [The Metric](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Metric). RMSE (bins) ranges from 0 to 1, lower is better.
 
@@ -55,7 +55,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
 - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.
-- RMSE-BINS-EXPLOIT: An algorithm that exploits the calculation of RMSE(bins) by simulating the bins and keeping the error term close to 0.
+- RMSE-BINS-EXPLOIT: An algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.
 
 If an algorithm has "-short" at the end of its name, it means that it uses data from same-day reviews as well.
 
@@ -72,7 +72,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 ### Weighted by the number of reviews
 
-| Model | Parameters | LogLoss | RMSE (bins) | AUC |
+| Model | Parameters | Log Loss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
 | **GRU-P-short** | 297 | **0.320±0.0080** | 0.042±0.0013 | **0.710±0.0047** |
 | GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 |
@@ -152,15 +152,15 @@ Unweighted averages are more representative of "average case" performance. In re
 
 ### Superiority
 
-The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower RMSE than algorithm B (column). For example, GRU-P-short has a 95.9% superiority over the Transformer, meaning that for 95.9% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer. This is based on 9,999 collections.
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, GRU-P-short has a 95.9% superiority over the Transformer, meaning that for 95.9% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer. This is based on 9,999 collections.
 
 ![Superiority, 9999](./plots/Superiority-9999.png)
 
-You may have noticed that FSRS-5 has a 98.1% superiority over Anki's variant of SM-2, meaning that for 98.1% of users, the RMSE with FSRS-5 will be lower than with Anki's variant of SM-2. But please remember that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
+You may have noticed that FSRS-5 has a 98.1% superiority over Anki's variant of SM-2, meaning that for 98.1% of users, the Log Loss with FSRS-5 will be lower than with Anki's variant of SM-2. But please remember that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
 
 ### Statistical significance
 
-The figures below show two different measures of effect size comparing the RMSE between all pairs of algorithms:
+The figures below show two different measures of effect size comparing the Log Loss between all pairs of algorithms:
 
 1. Wilcoxon signed-rank test r-values (effect sizes)
 2. Paired t-test Cohen's d values (effect sizes)

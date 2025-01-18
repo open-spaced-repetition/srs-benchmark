@@ -69,35 +69,36 @@ if __name__ == "__main__":
         "GRU-P-short",
         "GRU-P",
         "FSRS-5-recency",
-        "FSRS-rs",
         "FSRS-5-preset",
         "FSRS-5",
+        "FSRS-rs",
         "FSRS-4.5",
-        "FSRS-5-deck",
         "FSRS-5-binary",
+        "FSRS-5-deck",
         "FSRSv4",
-        "GRU",
+        "DASH-short",
         "DASH",
         "DASH[MCM]",
-        "FSRS-5-pretrain",
-        "DASH-short",
+        "GRU",
         "DASH[ACT-R]",
+        "FSRS-5-pretrain",
         "FSRS-5-dry-run",
-        "FSRSv2",
-        "FSRSv3",
-        "NN-17",
-        "AVG",
         "ACT-R",
+        "AVG",
+        "FSRSv3",
+        "FSRSv2",
+        "NN-17",
         "FSRSv1",
-        "HLR",
         "Anki",
+        "HLR",
         "HLR-short",
-        "Anki-dry-run",
         "SM2-trainable",
-        "SM2-short",
-        "Ebisu-v2",
         "Transformer",
+        "Ebisu-v2",
+        "Anki-dry-run",
+        "SM2-short",
         "SM2",
+        "RMSE-BINS-EXPLOIT",
     ]
     csv_name = f"{len(models)} models.csv"
     print(f"Number of tests={(len(models)-1) ** 2}")
@@ -144,8 +145,8 @@ if __name__ == "__main__":
                 ttest[i, j] = np.nan
                 color_ttest[i, j] = np.nan
             else:
-                df1 = df[f"{models[i]}, RMSE (bins)"]
-                df2 = df[f"{models[j]}, RMSE (bins)"]
+                df1 = df[f"{models[i]}, LogLoss"]
+                df2 = df[f"{models[j]}, LogLoss"]
                 result = wilcoxon_effect_size(df1[:n_collections], df2[:n_collections])
                 p_value = result["p_value"]
                 wilcox[i, j] = result["r"]

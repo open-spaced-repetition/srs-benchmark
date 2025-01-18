@@ -17,35 +17,36 @@ if __name__ == "__main__":
         "GRU-P-short",
         "GRU-P",
         "FSRS-5-recency",
-        "FSRS-rs",
         "FSRS-5-preset",
         "FSRS-5",
+        "FSRS-rs",
         "FSRS-4.5",
-        "FSRS-5-deck",
         "FSRS-5-binary",
+        "FSRS-5-deck",
         "FSRSv4",
-        "GRU",
+        "DASH-short",
         "DASH",
         "DASH[MCM]",
-        "FSRS-5-pretrain",
-        "DASH-short",
+        "GRU",
         "DASH[ACT-R]",
+        "FSRS-5-pretrain",
         "FSRS-5-dry-run",
-        "FSRSv2",
-        "FSRSv3",
-        "NN-17",
-        "AVG",
         "ACT-R",
+        "AVG",
+        "FSRSv3",
+        "FSRSv2",
+        "NN-17",
         "FSRSv1",
-        "HLR",
         "Anki",
+        "HLR",
         "HLR-short",
-        "Anki-dry-run",
         "SM2-trainable",
-        "SM2-short",
-        "Ebisu-v2",
         "Transformer",
+        "Ebisu-v2",
+        "Anki-dry-run",
+        "SM2-short",
         "SM2",
+        "RMSE-BINS-EXPLOIT",
     ]
     csv_name = f"{len(models)} models.csv"
 
@@ -53,7 +54,7 @@ if __name__ == "__main__":
     sizes = []
     for model in models:
         print(f"Model: {model}")
-        dictionary_RMSE = {}
+        dictionary_logloss = {}
         result_file = pathlib.Path(f"./result/{model}.jsonl")
         if not result_file.exists():
             continue
@@ -61,18 +62,16 @@ if __name__ == "__main__":
             data = [json.loads(x) for x in f.readlines()]
 
         for result in data:
-            RMSE = result["metrics"]["RMSE(bins)"]
+            logloss = result["metrics"]["LogLoss"]
             user = result["user"]
-            dictionary_RMSE.update({user: RMSE})
+            dictionary_logloss.update({user: logloss})
             if model == models[0]:
                 sizes.append(result["size"])
 
-        sorted_dictionary_RMSE = dict(sorted(dictionary_RMSE.items()))
-        RMSE_list = list(sorted_dictionary_RMSE.values())
-        # user_list = list(sorted_dictionary_RMSE.keys())
-        # assert user_list == sorted(user_list)
+        sorted_dictionary_LogLoss = dict(sorted(dictionary_logloss.items()))
+        LogLoss_list = list(sorted_dictionary_LogLoss.values())
 
-        series = pd.Series(RMSE_list, name=f"{model}, RMSE (bins)")
+        series = pd.Series(LogLoss_list, name=f"{model}, LogLoss")
         df = pd.concat([df, series], axis=1)
 
     df = pd.concat([df, pd.Series(sizes, name=f"Sizes")], axis=1)
@@ -91,8 +90,8 @@ if __name__ == "__main__":
             elif percentages[i, j] > 0:  # we already calculated this one
                 pass
             else:
-                df1 = df[f"{models[i]}, RMSE (bins)"]
-                df2 = df[f"{models[j]}, RMSE (bins)"]
+                df1 = df[f"{models[i]}, LogLoss"]
+                df2 = df[f"{models[j]}, LogLoss"]
                 greater = 0
                 lower = 0
                 # there is probably a better way to do this using Pandas

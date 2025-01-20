@@ -183,7 +183,9 @@ if __name__ == "__main__":
             # print(f"LogLoss 99%: {round(np.percentile(np.array([item['LogLoss'] for item in m]), 99), 4)}")
             # print(f"RMSE(bins) 99%: {round(np.percentile(np.array([item['RMSE(bins)'] for item in m]), 99), 4)}")
             if len(parameters) > 0:
-                print(f"parameters: {np.median(parameters, axis=0).round(6).tolist()}\n")
+                print(
+                    f"parameters: {np.median(parameters, axis=0).round(6).tolist()}\n"
+                )
                 # print(f"parameters: {np.std(parameters, axis=0).round(2).tolist()}\n")
 
     else:

@@ -2084,6 +2084,7 @@ def iter(model, batch):
     result.update(outputs)
     return result
 
+
 def count_lapse(r_history, t_history):
     lapse = 0
     for r, t in zip(r_history.split(","), t_history.split(",")):
@@ -2091,12 +2092,20 @@ def count_lapse(r_history, t_history):
             lapse += 1
     return lapse
 
+
 def get_bin(row):
     raw_lapse = count_lapse(row["r_history"], row["t_history"])
-    lapse = round(1.65 * np.power(1.73, np.floor(np.log(raw_lapse) / np.log(1.73))), 0) if raw_lapse != 0 else 0
-    delta_t = round(2.48 * np.power(3.62, np.floor(np.log(row["delta_t"]) / np.log(3.62))), 2)
+    lapse = (
+        round(1.65 * np.power(1.73, np.floor(np.log(raw_lapse) / np.log(1.73))), 0)
+        if raw_lapse != 0
+        else 0
+    )
+    delta_t = round(
+        2.48 * np.power(3.62, np.floor(np.log(row["delta_t"]) / np.log(3.62))), 2
+    )
     i = round(1.99 * np.power(1.89, np.floor(np.log(row["i"]) / np.log(1.89))), 0)
     return (lapse, delta_t, i)
+
 
 class RMSEBinsExploit:
     def __init__(self):
@@ -2120,12 +2129,13 @@ class RMSEBinsExploit:
 
         if bin_key not in self.state:
             self.state[bin_key] = (0, 0, 0)
-        
+
         pred_sum, truth_sum, bin_n = self.state[bin_key]
         estimated_p = self.global_succ / self.global_n
         pred = np.clip(truth_sum + estimated_p - pred_sum, a_min=0, a_max=1)
         self.state[bin_key] = (pred_sum + pred, truth_sum, bin_n)
         return pred
+
 
 class ConstantModel(nn.Module):
     n_epoch = 0
@@ -2134,8 +2144,10 @@ class ConstantModel(nn.Module):
 
     def __init__(self, value=0.9):
         super().__init__()
-        self.value=value
-        self.placeholder = torch.nn.Linear(1, 1)  # So that the optimizer gets a nonempty list
+        self.value = value
+        self.placeholder = torch.nn.Linear(
+            1, 1
+        )  # So that the optimizer gets a nonempty list
 
     def iter(
         self,
@@ -2145,6 +2157,7 @@ class ConstantModel(nn.Module):
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         return {"retentions": torch.full((real_batch_size,), self.value)}
+
 
 class Trainer:
     optimizer: torch.optim.Optimizer
@@ -2417,9 +2430,9 @@ def baseline(user_id):
     stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
     return stats, raw
 
+
 def rmse_bins_exploit(user_id):
-    """ This model attempts to exploit rmse(bins) by keeping track of per-bin statistics
-    """
+    """This model attempts to exploit rmse(bins) by keeping track of per-bin statistics"""
     model_name = "RMSE-BINS-EXPLOIT"
     dataset = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
@@ -2453,6 +2466,7 @@ def rmse_bins_exploit(user_id):
     stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
     return stats, raw
 
+
 def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
@@ -2470,6 +2484,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
             df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
 
     if not SHORT_TERM:
+        # exclude reviews that are on the same day from features and labels
         df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
         df["i"] = df.groupby("card_id").cumcount() + 1
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
@@ -2487,21 +2502,29 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
     ]
     df["t_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in t_history_non_secs for item in sublist
+        ",".join(map(str, item[:-1]))
+        for sublist in t_history_non_secs
+        for item in sublist
     ]
     if secs_ivl:
         if EQUALIZE_TEST_WITH_NON_SECS:
             df["t_history"] = [
-                ",".join(map(str, item[:-1])) for sublist in t_history_non_secs for item in sublist
+                ",".join(map(str, item[:-1]))
+                for sublist in t_history_non_secs
+                for item in sublist
             ]
             df["t_history_secs"] = [
-                ",".join(map(str, item[:-1])) for sublist in t_history_secs for item in sublist
+                ",".join(map(str, item[:-1]))
+                for sublist in t_history_secs
+                for item in sublist
             ]
         else:
             # If we do not care about test equality, we are allowed to overwrite delta_t and t_history
             df["delta_t"] = df["delta_t_secs"]
             df["t_history"] = [
-                ",".join(map(str, item[:-1])) for sublist in t_history_secs for item in sublist
+                ",".join(map(str, item[:-1]))
+                for sublist in t_history_secs
+                for item in sublist
             ]
 
         t_history_used = t_history_secs
@@ -2633,6 +2656,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     if SHORT_TERM:
+        # exclude reviews that are on the same day from labels
         df = df[(df["elapsed_days"] != 0) | (df["i"] == 1)].copy()
         df["i"] = df.groupby("card_id").cumcount() + 1
     if not secs_ivl:
@@ -2654,8 +2678,8 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
 def create_features(df, model_name="FSRSv3"):
     if SECS_IVL and EQUALIZE_TEST_WITH_NON_SECS:
         df_non_secs = create_features_helper(df.copy(), model_name, False)
-        df = create_features_helper(df, model_name, True)
-        df_intersect = df[df["review_th"].isin(df_non_secs["review_th"])]
+        df_secs = create_features_helper(df.copy(), model_name, True)
+        df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
         # rmse_bins requires that delta_t, i, r_history, t_history remains the same as with non secs
         assert len(df_intersect) == len(df_non_secs)
         assert np.equal(df_intersect["delta_t"], df_non_secs["delta_t"]).all()
@@ -2667,11 +2691,17 @@ def create_features(df, model_name="FSRSv3"):
         for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
             non_secs_test_set = df_non_secs.iloc[non_secs_test_index]
             # For the resulting train set, only allow reviews that are less than the smallest review_th in non_secs_test_set
-            allowed_train = df[df["review_th"] < non_secs_test_set["review_th"].min()]
-            df[f"{split_i}_train"] = df["review_th"].isin(allowed_train["review_th"])
+            allowed_train = df_secs[
+                df_secs["review_th"] < non_secs_test_set["review_th"].min()
+            ]
+            df_secs[f"{split_i}_train"] = df_secs["review_th"].isin(
+                allowed_train["review_th"]
+            )
 
             # For the resulting test set, only allow reviews that exist in non_secs_test_set
-            df[f"{split_i}_test"] = df["review_th"].isin(non_secs_test_set["review_th"])
+            df_secs[f"{split_i}_test"] = df_secs["review_th"].isin(
+                non_secs_test_set["review_th"]
+            )
 
         return df
     else:
@@ -2726,8 +2756,10 @@ def process(user_id):
     elif MODEL_NAME == "Anki":
         Model = Anki
     elif MODEL_NAME == "90%":
+
         def get_constant_model(state_dict=None):
             return ConstantModel(0.9)
+
         Model = get_constant_model
 
     dataset = create_features(df_revlogs, MODEL_NAME)
@@ -2810,7 +2842,9 @@ def process(user_id):
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(Model(weights) if weights else Model())
-            retentions, stabilities, difficulties = my_collection.batch_predict(partition_testset)
+            retentions, stabilities, difficulties = my_collection.batch_predict(
+                partition_testset
+            )
             partition_testset["p"] = retentions
             if stabilities:
                 partition_testset["s"] = stabilities

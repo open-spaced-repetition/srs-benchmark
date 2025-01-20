@@ -2703,7 +2703,7 @@ def create_features(df, model_name="FSRSv3"):
                 non_secs_test_set["review_th"]
             )
 
-        return df
+        return df_secs
     else:
         return create_features_helper(df, model_name, SECS_IVL)
 

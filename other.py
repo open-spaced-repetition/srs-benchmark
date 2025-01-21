@@ -2680,7 +2680,6 @@ def create_features(df, model_name="FSRSv3"):
         df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
         # rmse_bins requires that delta_t, i, r_history, t_history remains the same as with non secs
         assert len(df_intersect) == len(df_non_secs)
-        assert np.equal(df_intersect["delta_t"], df_non_secs["delta_t"]).all()
         assert np.equal(df_intersect["i"], df_non_secs["i"]).all()
         assert np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all()
         assert np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all()

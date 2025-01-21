@@ -20,7 +20,7 @@ from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser
-from utils import catch_exceptions
+from utils import catch_exceptions, rmse_matrix
 
 parser = create_parser()
 args = parser.parse_args()
@@ -77,7 +77,7 @@ if MODEL_NAME not in model_list:
 if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
-from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
+from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier  # type: ignore
 
 if MODEL_NAME.startswith("Ebisu"):
     import ebisu  # type: ignore
@@ -2520,13 +2520,12 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
             ]
         else:
             # If we do not care about test equality, we are allowed to overwrite delta_t and t_history
-            df["delta_t"] = df["delta_t_secs"]
             df["t_history"] = [
                 ",".join(map(str, item[:-1]))
                 for sublist in t_history_secs
                 for item in sublist
             ]
-
+        df["delta_t"] = df["delta_t_secs"]
         t_history_used = t_history_secs
     else:
         t_history_used = t_history_non_secs

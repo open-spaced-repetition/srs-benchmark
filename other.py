@@ -2519,7 +2519,6 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
                 for item in sublist
             ]
         else:
-            # If we do not care about test equality, we are allowed to overwrite delta_t and t_history
             df["t_history"] = [
                 ",".join(map(str, item[:-1]))
                 for sublist in t_history_secs

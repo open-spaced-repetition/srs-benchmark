@@ -14,6 +14,7 @@ warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     models = [
+        "LSTM-short-secs-equalize_test_with_non_secs",
         "GRU-P-short",
         "FSRS-5-recency",
         "FSRS-rs",
@@ -125,6 +126,7 @@ if __name__ == "__main__":
                     percentages[j, i] = j_i_up
 
     # small changes to labels
+    index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
     index_5_dry_run = models.index("FSRS-5-dry-run")
     index_anki_dry_run = models.index("Anki-dry-run")
     index_anki_train = models.index("Anki")
@@ -136,6 +138,7 @@ if __name__ == "__main__":
     index_sm2 = models.index("SM2")
     index_sm2_train = models.index("SM2-trainable")
     index_sm2_short = models.index("SM2-short")
+    models[index_lstm] = "LSTM"
     models[index_5_dry_run] = "FSRS-5\ndef. param."
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_anki_train] = "Anki-SM-2\ntrainable"
@@ -181,7 +184,14 @@ if __name__ == "__main__":
     cmap = LinearSegmentedColormap.from_list(
         "custom_linear", list(zip(positions, colors))
     )
-    plt.imshow(percentages, vmin=0, cmap=cmap)
+
+    def clamp_percentages(percentages):
+        percentages = np.clip(percentages, a_min=0.005, a_max=1.0)
+        for i in range(n):
+            percentages[i, i] = -1.0
+        return percentages
+
+    plt.imshow(clamp_percentages(percentages), vmin=0, cmap=cmap)
 
     for i in range(n):
         for j in range(n):

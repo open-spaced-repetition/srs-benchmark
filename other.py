@@ -31,6 +31,7 @@ MODEL_NAME = args.model
 SHORT_TERM = args.short
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
+NO_TRAIN_SAME_DAY = args.no_train_same_day
 EQUALIZE_TEST_WITH_NON_SECS = args.equalize_test_with_non_secs
 FILE = args.file
 PLOT = args.plot
@@ -107,6 +108,7 @@ FILE_NAME = (
     + ("-secs" if SECS_IVL else "")
     + ("-recency" if RECENCY else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
+    + ("-no_train_same_day" if NO_TRAIN_SAME_DAY else "")
     + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
     + ("-dev" if DEV_MODE else "")
@@ -2654,9 +2656,13 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     if SHORT_TERM:
-        # exclude reviews that are on the same day from labels
-        df = df[(df["elapsed_days"] != 0) | (df["i"] == 1)].copy()
-        df["i"] = df.groupby("card_id").cumcount() + 1
+        df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
+    df["i"] = (
+        df.groupby("card_id")
+        .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
+        .reset_index(level=0, drop=True)
+        + 1
+    )
     if not secs_ivl:
         filtered_dataset = (
             df[df["i"] == 2]
@@ -2787,8 +2793,6 @@ def process(user_id):
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         train_set = dataset.iloc[train_index]
         test_set = dataset.iloc[test_index]
-        if NO_TEST_SAME_DAY:
-            test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if EQUALIZE_TEST_WITH_NON_SECS:
             # Ignores the train_index and test_index
             train_set = dataset[dataset[f"{split_i}_train"]]
@@ -2797,6 +2801,10 @@ def process(user_id):
                 None,
                 None,
             )  # train_index and test_index no longer have the same meaning as before
+        if NO_TEST_SAME_DAY:
+            test_set = test_set[test_set["elapsed_days"] > 0].copy()
+        if NO_TRAIN_SAME_DAY:
+            train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
         testsets.append(test_set)
         partition_weights = {}

@@ -39,6 +39,11 @@ def create_parser():
         action="store_true",
         help="exclude reviews with elapsed_days=0 from testset",
     )
+    parser.add_argument(
+        "--no_train_same_day",
+        action="store_true",
+        help="exclude reviews with elapsed_days=0 from trainset",
+    )
 
     parser.add_argument(
         "--equalize_test_with_non_secs",

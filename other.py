@@ -1241,6 +1241,9 @@ class LSTM(nn.Module):
     This model with the default batch size (16384) uses a lot of memory.
     If memory becomes a concern, use '--processes 1'. 
     Alternatively, reduce the batch size but the results would no longer be reproducible.
+
+    Just like with the GRU models, this model was trained on 100 users of the same dataset that it is tested on.
+    The effect on the resulting metrics is minor, but future work should be done to remove this influence.
     """
     def __init__(self, state_dict=None, input_mean=None, input_std=None):
         super().__init__()

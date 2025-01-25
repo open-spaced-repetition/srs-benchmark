@@ -1160,12 +1160,6 @@ class RNN(nn.Module):
             nn.init.orthogonal_(self.rnn.weight_hh_l0)
             self.rnn.bias_ih_l0.data.fill_(0)
             self.rnn.bias_hh_l0.data.fill_(0)
-        elif MODEL_NAME == "LSTM":
-            self.rnn = nn.LSTM(
-                input_size=self.n_input,
-                hidden_size=self.n_hidden,
-                num_layers=self.n_layers,
-            )
         else:
             self.rnn = nn.RNN(
                 input_size=self.n_input,

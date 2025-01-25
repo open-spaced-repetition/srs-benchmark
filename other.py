@@ -2657,7 +2657,12 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     if SHORT_TERM:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
-        df["i"] = df.groupby("card_id").cumcount() + 1
+    df["i"] = (
+        df.groupby("card_id")
+        .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
+        .reset_index(level=0, drop=True)
+        + 1
+    )
     if not secs_ivl:
         filtered_dataset = (
             df[df["i"] == 2]
@@ -2681,7 +2686,7 @@ def create_features(df, model_name="FSRSv3"):
         df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
         # rmse_bins requires that delta_t, i, r_history, t_history remains the same as with non secs
         assert len(df_intersect) == len(df_non_secs)
-        # assert np.equal(df_intersect["i"], df_non_secs["i"]).all()py
+        assert np.equal(df_intersect["i"], df_non_secs["i"]).all()
         assert np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all()
         assert np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all()
 

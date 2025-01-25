@@ -2697,6 +2697,12 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         df["diff_reviews"] = np.maximum(0, -1 + df.groupby("card_id")["review_th"].diff().fillna(0))
         df["cum_new_cards_today"] = df.groupby("day_offset")["is_new_card"].cumsum()
         df["cum_reviews_today"] = df.groupby("day_offset").cumcount()
+        df["delta_t_days"] = df["elapsed_days"].map(lambda x: max(0, x))
+
+        if secs_ivl:
+            # Use days for the forgetting curve
+            # This also indirectly causes --no_train_on_same_day and --no_test_on_same_day.
+            df["delta_t"] = df["delta_t_days"]
 
         features = ['delta_t_secs' if secs_ivl else 'delta_t', 'duration', 'rating']
         def get_history(group):

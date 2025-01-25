@@ -1228,6 +1228,16 @@ class RNNWrapper(torch.nn.Module):
         return outputs
 
 class LSTM(nn.Module):
+    """
+    This model is trained with reptile_trainer.py, and is called with the flags
+    ['--short', '--secs', '--equalize_test_with_non_secs']
+    It uses:
+    - same-day reviews as features
+    - fractional intervals
+    - the duration of each review as an input feature
+    - its own version of --recency
+    For prediction, it uses 'elapsed_days' for input to the forgetting curve.
+    """
     def __init__(self, state_dict=None, input_mean=None, input_std=None):
         super().__init__()
         self.register_buffer('input_mean', torch.tensor(0.0) if input_mean is None else input_mean)
@@ -1235,7 +1245,6 @@ class LSTM(nn.Module):
         self.n_input = 6
         self.n_hidden = 20
         self.n_curves = 3
-        self.n_layers = 2
 
         self.process = nn.Sequential(
             nn.Linear(self.n_input, self.n_hidden),

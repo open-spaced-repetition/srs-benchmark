@@ -54,6 +54,7 @@ def objective(trial, df_list, model, inner_opt_state):
 
     recency_weight = trial.suggest_float("recency_weight", 0.0, 30.0)
     recency_degree = trial.suggest_float("recency_degree", 1.0, 4.0)
+    weight_decay = trial.suggest_float("weight_decay", 1e-3, 1, log=True)
 
     finetune_params = {
         "lr_start_raw": lr_start_raw,
@@ -66,6 +67,7 @@ def objective(trial, df_list, model, inner_opt_state):
         "inner_steps": inner_steps,
         "recency_weight": recency_weight,
         "recency_degree": recency_degree,
+        "weight_decay": weight_decay,
     }
     # finetune_params = copy.copy(DEFAULT_FINETUNE_PARAMS)
     # finetune_params["batch_size_exp"] = trial.suggest_float("batch_size_exp", 1.2, 1.6)
@@ -148,8 +150,7 @@ def main():
         print("Optimizer file not found.")
 
     df_dict = {}
-    # users = list(range(7626, 7662))
-    users = [8]
+    users = list(range(7626, 7662))
 
     def worker(user_id):
         return process_user(user_id)

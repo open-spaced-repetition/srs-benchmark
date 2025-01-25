@@ -1229,14 +1229,18 @@ class RNNWrapper(torch.nn.Module):
 
 class LSTM(nn.Module):
     """
-    This model is trained with reptile_trainer.py, and is called with the flags
-    ['--short', '--secs', '--equalize_test_with_non_secs']
+    This model is trained with reptile_trainer.py, and was run with the flags
+    ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
     It uses:
     - same-day reviews as features
     - fractional intervals
     - the duration of each review as an input feature
     - its own version of --recency
     For prediction, it uses 'elapsed_days' for input to the forgetting curve.
+
+    This model with the default batch size (16384) uses a lot of memory.
+    If memory becomes a concern, use '--processes 1'. 
+    Alternatively, reduce the batch size but the results would no longer be reproducible.
     """
     def __init__(self, state_dict=None, input_mean=None, input_std=None):
         super().__init__()

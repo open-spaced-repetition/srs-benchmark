@@ -198,8 +198,15 @@ def finetune_adapt(data: BatchLoader, meta_model_params, model, inner_opt, inner
 
     return inner_loss
 
-def get_inner_opt(params):
-    return torch.optim.AdamW(params, lr=1e9, betas=(INNER_ADAM_BETA1, INNER_ADAM_BETA2), weight_decay=INNER_WEIGHT_DECAY)
+def get_inner_opt(params, path=None):
+    opt = torch.optim.AdamW(params, lr=1e9, betas=(INNER_ADAM_BETA1, INNER_ADAM_BETA2), weight_decay=INNER_WEIGHT_DECAY)
+    if path is not None:
+        try:
+            opt.load_state_dict(torch.load(path, weights_only=True))
+        except FileNotFoundError:
+            print("Warning: optimizer file not found. Performance will be worse.")
+    return opt
+
 
 def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS):
     """ A fine tuning procedure designed to generalize as well as possible given the data

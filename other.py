@@ -2981,12 +2981,12 @@ def process(user_id):
         if NO_TRAIN_SAME_DAY:
             train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
-        assert train_set["review_th"].max() < test_set["review_th"].min()
         testsets.append(test_set)
         partition_weights = {}
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
+                assert train_partition["review_th"].max() < test_set["review_th"].min()
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
@@ -2998,12 +2998,7 @@ def process(user_id):
                 
                 if MODEL_NAME == "LSTM":
                     model = model.to(DEVICE)
-                    inner_opt = get_inner_opt(model.parameters())
-                    opt_path = f"./pretrain/{OPT_NAME}_pretrain.pth"
-                    try:
-                        inner_opt.load_state_dict(torch.load(opt_path, weights_only=True))
-                    except FileNotFoundError:
-                        print("Warning: optimizer file not found. Performance will be worse.")
+                    inner_opt = get_inner_opt(model.parameters(), path=f"./pretrain/{OPT_NAME}_pretrain.pth")
                     trained_model = finetune(train_partition, model, inner_opt.state_dict())
                     partition_weights[partition] = copy.deepcopy(trained_model.state_dict())
                 else:

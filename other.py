@@ -18,7 +18,7 @@ from tqdm.auto import tqdm  # type: ignore
 from scipy.optimize import minimize  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
-from reptile.reptile_trainer import get_inner_opt, finetune
+from reptile_trainer import get_inner_opt, finetune
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore

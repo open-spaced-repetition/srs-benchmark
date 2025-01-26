@@ -71,7 +71,7 @@ Same-day reviews are excluded except when optimizing FSRS-5 and algorithms that 
 
 The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The "Parameters" column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
-For the sake of brevity, the following abbreviations are used in the "Input features" column: **IL** = **i**nterval **l**engths, **IL+G** = **i**nterval **l**engths and **g**rades (ratings), **SR** = **s**ame-day **r**eviews, 
+For the sake of brevity, the following abbreviations are used in the "Input features" column: **IL** = **i**nterval **l**engths, **IL+G** = **i**nterval **l**engths and **g**rades (ratings), **SR** = **s**ame-day (or short-term) **r**eviews, 
 **FIL** = **f**ractional (non-integer) **i**nterval **l**engths, **AT** = **a**nswer **t**ime (duration of the review).
 
 ### Weighted by the number of reviews

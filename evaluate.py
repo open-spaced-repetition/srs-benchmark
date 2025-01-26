@@ -90,6 +90,7 @@ if __name__ == "__main__":
     models = (
         [
             (dev_mode_name, None),
+            ("LSTM-short-secs-equalize_test_with_non_secs", 8869),
             ("GRU-P-short", 297),
             ("GRU-P", 297),
             ("FSRS-5-recency", 19),

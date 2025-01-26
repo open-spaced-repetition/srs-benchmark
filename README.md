@@ -44,6 +44,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
 - GRU: a type of neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks.
     - GRU-P: a variant of GRU that removes the forgetting curve and predicts the probability of recall directly.
+- LSTM: A model that is trained with the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews, fractional intervals, and the duration of review as part of its input. It must be finetuned on some data before it can be used.
 - DASH: the model proposed in [this paper](https://scholar.colorado.edu/concern/graduate_thesis_or_dissertations/zp38wc97m). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this model: DASH[MCM] and DASH[ACT-R]. For further information, please refer to [this paper](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
 - ACT-R: the model proposed in [this paper](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
 - HLR: the model proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
@@ -74,7 +75,8 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 | Model | Parameters | Log Loss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
-| **GRU-P-short** | 297 | **0.320±0.0080** | 0.042±0.0013 | **0.710±0.0047** |
+| **LSTM** | 8869 | **0.312±0.0078** | 0.035±0.0011 | **0.733±0.0038** |
+| GRU-P-short | 297 | 0.320±0.0080 | 0.042±0.0013 | 0.710±0.0047 |
 | GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 |
 | FSRS-5 recency | 19 | 0.326±0.0082 | 0.049±0.0015 | 0.706±0.0041 |
 | FSRS-rs | 19 | 0.326±0.0082 | 0.049±0.0015 | 0.705±0.0041 |
@@ -112,9 +114,10 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 | Model | Parameters | Log Loss | RMSE (bins) | AUC |
 | --- | --- | --- | --- | --- |
-| **GRU-P-short** | 297 | **0.346±0.0042** | 0.062±0.0011 | 0.699±0.0026 |
+| **LSTM** | 8869 | **0.333±0.0042** | 0.0538±0.00096 | **0.733±0.0021** |
+| GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 |
 | GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 |
-| **FSRS-5 recency** | 19 | 0.354±0.0044 | 0.072±0.0012 | **0.704±0.0023** |
+| FSRS-5 recency | 19 | 0.354±0.0044 | 0.072±0.0012 | 0.704±0.0023 |
 | FSRS-rs | 19 | 0.354±0.0044 | 0.072±0.0012 | 0.703±0.0023 |
 | FSRS-5 | 19 | 0.357±0.0043 | 0.074±0.0012 | 0.699±0.0023 |
 | FSRS-5 preset | 19 | 0.358±0.0045 | 0.074±0.0012 | 0.699±0.0023 |

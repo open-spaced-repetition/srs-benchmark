@@ -35,6 +35,10 @@ def create_parser():
     )
 
     parser.add_argument(
+        "--two_buttons", action="store_true", help="treat Hard and Easy as Good"
+    )
+
+    parser.add_argument(
         "--no_test_same_day",
         action="store_true",
         help="exclude reviews with elapsed_days=0 from testset",

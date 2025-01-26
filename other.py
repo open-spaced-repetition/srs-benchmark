@@ -1,3 +1,5 @@
+import copy
+from itertools import accumulate
 import sys
 import os
 import pandas as pd
@@ -16,6 +18,7 @@ from tqdm.auto import tqdm  # type: ignore
 from scipy.optimize import minimize  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
+from reptile_trainer import get_inner_opt, finetune
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
@@ -33,6 +36,7 @@ SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
 NO_TRAIN_SAME_DAY = args.no_train_same_day
 EQUALIZE_TEST_WITH_NON_SECS = args.equalize_test_with_non_secs
+TWO_BUTTONS = args.two_buttons
 FILE = args.file
 PLOT = args.plot
 WEIGHTS = args.weights
@@ -113,6 +117,7 @@ FILE_NAME = (
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
     + ("-dev" if DEV_MODE else "")
 )
+OPT_NAME = FILE_NAME + "_opt"
 
 S_MIN = 1e-6 if SECS_IVL else 0.01
 INIT_S_MAX = 100
@@ -1155,12 +1160,6 @@ class RNN(nn.Module):
             nn.init.orthogonal_(self.rnn.weight_hh_l0)
             self.rnn.bias_ih_l0.data.fill_(0)
             self.rnn.bias_hh_l0.data.fill_(0)
-        elif MODEL_NAME == "LSTM":
-            self.rnn = nn.LSTM(
-                input_size=self.n_input,
-                hidden_size=self.n_hidden,
-                num_layers=self.n_layers,
-            )
         else:
             self.rnn = nn.RNN(
                 input_size=self.n_input,
@@ -1210,6 +1209,175 @@ class RNN(nn.Module):
 
     def forgetting_curve(self, t, s):
         return (1 + FACTOR * t / s) ** DECAY
+
+
+class ResBlock(torch.nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, inputs):
+        return self.module(inputs) + inputs
+
+
+class RNNWrapper(torch.nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, inputs):
+        outputs, _ = self.module(inputs)
+        return outputs
+
+
+class LSTM(nn.Module):
+    """
+    This model is trained with reptile_trainer.py, and was run with the flags
+    ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
+    It uses:
+    - same-day reviews as features
+    - fractional intervals
+    - the duration of each review as an input feature
+    - its own version of --recency
+    For prediction, it uses 'elapsed_days' for input to the forgetting curve.
+
+    This model with the default batch size (16384) uses a lot of memory.
+    If memory becomes a concern, use '--processes 1'.
+    Alternatively, reduce the batch size but the results would no longer be reproducible.
+
+    Just like with the GRU models, this model was trained on 100 users of the same dataset that it is tested on.
+    The effect on the resulting metrics is minor, but future work should be done to remove this influence.
+    """
+
+    def __init__(self, state_dict=None, input_mean=None, input_std=None):
+        super().__init__()
+        self.register_buffer(
+            "input_mean", torch.tensor(0.0) if input_mean is None else input_mean
+        )
+        self.register_buffer(
+            "input_std", torch.tensor(1.0) if input_std is None else input_std
+        )
+        self.n_input = 6
+        self.n_hidden = 20
+        self.n_curves = 3
+
+        self.process = nn.Sequential(
+            nn.Linear(self.n_input, self.n_hidden),
+            nn.SiLU(),
+            nn.LayerNorm((self.n_hidden,), bias=False),
+            nn.Linear(self.n_hidden, self.n_hidden),
+            nn.SiLU(),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    RNNWrapper(
+                        nn.LSTM(
+                            input_size=self.n_hidden,
+                            hidden_size=self.n_hidden,
+                            num_layers=1,
+                        )
+                    ),
+                )
+            ),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,)),
+                    RNNWrapper(
+                        nn.LSTM(
+                            input_size=self.n_hidden,
+                            hidden_size=self.n_hidden,
+                            num_layers=1,
+                        )
+                    ),
+                )
+            ),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.Linear(self.n_hidden, self.n_hidden),
+                    nn.SiLU(),
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.Linear(self.n_hidden, self.n_hidden),
+                    nn.SiLU(),
+                )
+            ),
+            nn.LayerNorm((self.n_hidden,), bias=False),
+            nn.Linear(self.n_hidden, self.n_hidden),
+            nn.SiLU(),
+        )
+
+        for name, param in self.named_parameters():
+            if "weight_ih" in name:  # Input-to-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif "weight_hh" in name:  # Hidden-to-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif "bias_ih" in name:  # Biases
+                start_index = len(param.data) // 4
+                end_index = len(param.data) // 2
+                param.data[start_index:end_index].fill_(1.0)
+
+        self.w_fc = nn.Linear(self.n_hidden, self.n_curves)
+        self.s_fc = nn.Linear(self.n_hidden, self.n_curves)
+        self.d_fc = nn.Linear(self.n_hidden, self.n_curves)
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(
+                        f"./pretrain/{FILE_NAME}_pretrain.pth",
+                        weights_only=True,
+                        map_location=DEVICE,
+                    )
+                )
+            except FileNotFoundError:
+                pass
+
+    def set_normalization_params(self, mean_i, std_i):
+        self.register_buffer("input_mean", mean_i)
+        self.register_buffer("input_std", std_i)
+
+    def forward(self, x_lni, hx=None):
+        x_delay, x_duration, x_rating = x_lni.split(1, dim=-1)
+        x_delay = torch.log(1e-5 + x_delay)
+        x_duration = torch.log(torch.clamp(x_duration, min=100, max=60000))
+        x_main = torch.cat([x_delay, x_duration], dim=-1)
+
+        x_main = (x_main - self.input_mean) / self.input_std
+
+        x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))
+        x_rating = torch.nn.functional.one_hot(
+            x_rating.squeeze(-1).long() - 1, num_classes=4
+        ).float()
+        x = torch.cat([x_main, x_rating], dim=-1)
+        x_lnh = self.process(x)
+
+        w_lnh = torch.nn.functional.softmax(self.w_fc(x_lnh), dim=-1)
+        s_lnh = torch.exp(torch.clamp(self.s_fc(x_lnh), min=-25, max=25))
+        d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
+        return w_lnh, s_lnh, d_lnh
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_n: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        w_lnh, s_lnh, d_lnh = self.forward(sequences)
+        (_, n, h) = w_lnh.shape
+        delta_nh = delta_n.unsqueeze(-1).expand(n, h)
+        w_nh = w_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        s_nh = s_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        d_nh = d_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        retentions = self.forgetting_curve(delta_nh, w_nh, s_nh, d_nh)
+        return {"retentions": retentions, "stabilities": s_nh}
+
+    def forgetting_curve(self, t_nh, w_nh, s_nh, d_nh):
+        return (1 - 1e-7) * (
+            torch.sum(w_nh * (1 + t_nh / (1e-7 + s_nh)) ** -d_nh, dim=-1)
+        )
 
 
 class GRU_P(nn.Module):
@@ -2473,6 +2641,9 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
+
+    if TWO_BUTTONS:
+        df["rating"] = df["rating"].replace({2: 3, 4: 3})
     df["i"] = df.groupby("card_id").cumcount() + 1
     df.drop(df[df["i"] > max_seq_len * 2].index, inplace=True)
     if (
@@ -2533,7 +2704,6 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
 
     if model_name.startswith("FSRS") or model_name in (
         "RNN",
-        "LSTM",
         "GRU",
         "Transformer",
         "SM2-trainable",
@@ -2547,7 +2717,54 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
             for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
-    elif model_name == "GRU-P":
+    elif model_name in "LSTM":
+        # Create features (currently unused):
+        # # - number of unique cards in the revlog
+        # # - the number of new cards that were introduced today so far
+        # # - the number of reviews that were done today so far
+        # # - the number of new cards that were introduced since the last review of this card
+        # # - the number of reviews that were done since the last review of this card
+        df["is_new_card"] = (~df["card_id"].duplicated()).astype(int)
+        df["cum_new_cards"] = df["is_new_card"].cumsum()
+        df["diff_new_cards"] = df.groupby("card_id")["cum_new_cards"].diff().fillna(0)
+        df["diff_reviews"] = np.maximum(
+            0, -1 + df.groupby("card_id")["review_th"].diff().fillna(0)
+        )
+        df["cum_new_cards_today"] = df.groupby("day_offset")["is_new_card"].cumsum()
+        df["cum_reviews_today"] = df.groupby("day_offset").cumcount()
+        df["delta_t_days"] = df["elapsed_days"].map(lambda x: max(0, x))
+
+        if secs_ivl:
+            # Use days for the forgetting curve
+            # This also indirectly causes --no_train_on_same_day and --no_test_on_same_day.
+            df["delta_t"] = df["delta_t_days"]
+
+        features = ["delta_t_secs" if secs_ivl else "delta_t", "duration", "rating"]
+
+        def get_history(group):
+            rows = group.apply(
+                lambda row: torch.tensor(
+                    [row[feature] for feature in features],
+                    dtype=torch.float32,
+                    requires_grad=False,
+                ),
+                axis=1,
+            ).tolist()
+
+            cum_rows = list(
+                accumulate(
+                    rows,
+                    lambda x, y: torch.cat((x, y.unsqueeze(0))),
+                    initial=torch.empty(
+                        (0, len(features)), dtype=torch.float32, requires_grad=False
+                    ),
+                )
+            )[:-1]
+            return pd.Series(cum_rows, index=group.index)
+
+        grouped = df.groupby("card_id", group_keys=False)
+        df["tensor"] = grouped[df.columns.difference(["card_id"])].apply(get_history)
+    elif model_name in "GRU-P":
         df["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history_used, r_history)
@@ -2724,10 +2941,12 @@ def process(user_id):
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
-    if MODEL_NAME in ("RNN", "LSTM", "GRU"):
+    if MODEL_NAME in ("RNN", "GRU"):
         Model = RNN
     elif MODEL_NAME == "GRU-P":
         Model = GRU_P
+    elif MODEL_NAME == "LSTM":
+        Model = LSTM
     elif MODEL_NAME == "FSRSv1":
         Model = FSRS1
     elif MODEL_NAME == "FSRSv2":
@@ -2811,23 +3030,38 @@ def process(user_id):
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
-                model = Model()
+                assert train_partition["review_th"].max() < test_set["review_th"].min()
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
+
+                model = Model()
                 if DRY_RUN:
                     partition_weights[partition] = model.state_dict()
                     continue
-                trainer = Trainer(
-                    model,
-                    train_partition,
-                    None,
-                    n_epoch=model.n_epoch,
-                    lr=model.lr,
-                    wd=model.wd,
-                    batch_size=batch_size,
-                )
-                partition_weights[partition] = trainer.train()
+
+                if MODEL_NAME == "LSTM":
+                    model = model.to(DEVICE)
+                    inner_opt = get_inner_opt(
+                        model.parameters(), path=f"./pretrain/{OPT_NAME}_pretrain.pth"
+                    )
+                    trained_model = finetune(
+                        train_partition, model, inner_opt.state_dict()
+                    )
+                    partition_weights[partition] = copy.deepcopy(
+                        trained_model.state_dict()
+                    )
+                else:
+                    trainer = Trainer(
+                        model,
+                        train_partition,
+                        None,
+                        n_epoch=model.n_epoch,
+                        lr=model.lr,
+                        wd=model.wd,
+                        batch_size=batch_size,
+                    )
+                    partition_weights[partition] = trainer.train()
             except Exception as e:
                 if str(e).endswith("inadequate."):
                     if verbose_inadequate_data:

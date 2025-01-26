@@ -82,13 +82,14 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MAX_SEQ_LEN: int = 64
 n_splits = 5
 
-class PiecewiseLinearScheduler():
+
+class PiecewiseLinearScheduler:
     def __init__(self, optimizer, lr_start, lr_middle, lr_end, n_warmup, n_total):
         self._optimizer = optimizer
         self.lr_start = lr_start
         self.lr_middle = lr_middle
         self.lr_end = lr_end
-        self.n_warmup = n_warmup 
+        self.n_warmup = n_warmup
         self.n_total = n_total
         self.n_steps = 0
         self.set_lr()
@@ -98,12 +99,17 @@ class PiecewiseLinearScheduler():
 
     def set_lr(self):
         if self.n_steps < self.n_warmup:
-            lr = self.lr_start + (self.lr_middle - self.lr_start) * self.n_steps / self.n_warmup
+            lr = (
+                self.lr_start
+                + (self.lr_middle - self.lr_start) * self.n_steps / self.n_warmup
+            )
         else:
-            lr = self.lr_middle + (self.lr_end - self.lr_middle) * (self.n_steps - self.n_warmup) / (self.n_total - self.n_warmup)
+            lr = self.lr_middle + (self.lr_end - self.lr_middle) * (
+                self.n_steps - self.n_warmup
+            ) / (self.n_total - self.n_warmup)
 
         for param_group in self._optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group["lr"] = lr
 
     def step(self):
         assert self.n_steps < self.n_total
@@ -111,8 +117,10 @@ class PiecewiseLinearScheduler():
         if self.n_steps < self.n_total:
             self.set_lr()
 
+
 def get_params_flattened(model):
     return torch.cat([param.view(-1) for param in model.parameters()])
+
 
 def print_grad_norm(model):
     grads = [
@@ -122,6 +130,7 @@ def print_grad_norm(model):
     ]
     print(torch.cat(grads).norm())
 
+
 def compute_data_loss(model, data, batch_size_exp=1.0):
     sequences, delta_ts, labels, seq_lens, weights = data
     real_batch_size = seq_lens.shape[0]
@@ -130,10 +139,21 @@ def compute_data_loss(model, data, batch_size_exp=1.0):
     result.update(outputs)
     loss_fn = nn.BCELoss(reduction="none")
     loss_vec = loss_fn(result["retentions"], result["labels"]) * result["weights"]
-    return loss_vec.mean(), loss_vec.mean() * (loss_vec.shape[0] ** batch_size_exp), loss_vec
+    return (
+        loss_vec.mean(),
+        loss_vec.mean() * (loss_vec.shape[0] ** batch_size_exp),
+        loss_vec,
+    )
+
 
 def compute_df_loss(model, df):
-    df_batchdataset = BatchDataset(df.copy(), BATCH_SIZE, sort_by_length=False, max_seq_len=MAX_SEQ_LEN, device=DEVICE)
+    df_batchdataset = BatchDataset(
+        df.copy(),
+        BATCH_SIZE,
+        sort_by_length=False,
+        max_seq_len=MAX_SEQ_LEN,
+        device=DEVICE,
+    )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
     total = 0.0
     for batch in df_loader:
@@ -142,11 +162,15 @@ def compute_df_loss(model, df):
 
     return total
 
-def adapt_on_data(data: BatchLoader, meta_model_params, model, inner_opt, train_adapt_params):
-    """ Not all of the data is necessarily used. This function is for training where we want a quick adaption
-    """
+
+def adapt_on_data(
+    data: BatchLoader, meta_model_params, model, inner_opt, train_adapt_params
+):
+    """Not all of the data is necessarily used. This function is for training where we want a quick adaption"""
     model.train()
-    assert not meta_model_params.requires_grad  # Do not update the meta model's parameters by accident
+    assert (
+        not meta_model_params.requires_grad
+    )  # Do not update the meta model's parameters by accident
 
     lr_start_raw = train_adapt_params["lr_start_raw"]
     lr_middle_raw = train_adapt_params["lr_middle_raw"]
@@ -157,17 +181,28 @@ def adapt_on_data(data: BatchLoader, meta_model_params, model, inner_opt, train_
     reg_scale = train_adapt_params["reg_scale"]
     inner_steps = train_adapt_params["inner_steps"]
     lr_start = lr_start_raw * (16000 ** (1.0 - batch_size_exp))
-    lr_middle = lr_middle_raw * (16000 ** (1.0 - batch_size_exp))  # convert since we know that ~3e-3 for 16k batch size works well
+    lr_middle = lr_middle_raw * (
+        16000 ** (1.0 - batch_size_exp)
+    )  # convert since we know that ~3e-3 for 16k batch size works well
     lr_end = lr_end_raw * (16000 ** (1.0 - batch_size_exp))
 
-    inner_scheduler = PiecewiseLinearScheduler(inner_opt, lr_start=lr_start, lr_middle=lr_middle, lr_end=lr_end, n_warmup=warmup_steps, n_total=inner_steps)
+    inner_scheduler = PiecewiseLinearScheduler(
+        inner_opt,
+        lr_start=lr_start,
+        lr_middle=lr_middle,
+        lr_end=lr_end,
+        n_warmup=warmup_steps,
+        n_total=inner_steps,
+    )
 
     for i, batch in enumerate(data):
         if i >= inner_steps:
             break
 
         inner_opt.zero_grad()
-        inner_loss, inner_loss_scaled, inner_loss_vec = compute_data_loss(model, batch, batch_size_exp)
+        inner_loss, inner_loss_scaled, inner_loss_vec = compute_data_loss(
+            model, batch, batch_size_exp
+        )
         reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
         loss = inner_loss_scaled + reg_scale * reg_loss
         loss.backward()
@@ -177,16 +212,30 @@ def adapt_on_data(data: BatchLoader, meta_model_params, model, inner_opt, train_
 
     return inner_loss, inner_loss_vec.shape[0]
 
-def finetune_adapt(data: BatchLoader, meta_model_params, model, inner_opt, inner_scheduler, batch_size_exp, inner_steps, reg_scale, clip_norm):
-    """ Adapts over all batches
-    """
+
+def finetune_adapt(
+    data: BatchLoader,
+    meta_model_params,
+    model,
+    inner_opt,
+    inner_scheduler,
+    batch_size_exp,
+    inner_steps,
+    reg_scale,
+    clip_norm,
+):
+    """Adapts over all batches"""
     model.train()
-    assert not meta_model_params.requires_grad  # Do not update the meta model's parameters by accident
+    assert (
+        not meta_model_params.requires_grad
+    )  # Do not update the meta model's parameters by accident
 
     for _ in range(inner_steps):
         for batch in data:
             inner_opt.zero_grad()
-            inner_loss, inner_loss_scaled, _ = compute_data_loss(model, batch, batch_size_exp)
+            inner_loss, inner_loss_scaled, _ = compute_data_loss(
+                model, batch, batch_size_exp
+            )
             reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
             assert reg_loss.requires_grad
             loss = inner_loss_scaled + reg_scale * reg_loss
@@ -198,8 +247,14 @@ def finetune_adapt(data: BatchLoader, meta_model_params, model, inner_opt, inner
 
     return inner_loss
 
+
 def get_inner_opt(params, path=None):
-    opt = torch.optim.AdamW(params, lr=1e9, betas=(INNER_ADAM_BETA1, INNER_ADAM_BETA2), weight_decay=INNER_WEIGHT_DECAY)
+    opt = torch.optim.AdamW(
+        params,
+        lr=1e9,
+        betas=(INNER_ADAM_BETA1, INNER_ADAM_BETA2),
+        weight_decay=INNER_WEIGHT_DECAY,
+    )
     if path is not None:
         try:
             opt.load_state_dict(torch.load(path, weights_only=True))
@@ -209,8 +264,7 @@ def get_inner_opt(params, path=None):
 
 
 def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS):
-    """ A fine tuning procedure designed to generalize as well as possible given the data
-    """
+    """A fine tuning procedure designed to generalize as well as possible given the data"""
     lr_start_raw = finetune_params["lr_start_raw"]
     lr_middle_raw = finetune_params["lr_middle_raw"]
     lr_end_raw = finetune_params["lr_end_raw"]
@@ -223,7 +277,9 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
     recency_degree = finetune_params["recency_degree"]
     weight_decay = finetune_params["weight_decay"]
     lr_start = lr_start_raw * (16000 ** (1.0 - batch_size_exp))
-    lr_middle = lr_middle_raw * (16000 ** (1.0 - batch_size_exp))  # convert since we know that ~3e-3 for 16k batch size works well
+    lr_middle = lr_middle_raw * (
+        16000 ** (1.0 - batch_size_exp)
+    )  # convert since we know that ~3e-3 for 16k batch size works well
     lr_end = lr_end_raw * (16000 ** (1.0 - batch_size_exp))
 
     # Set recency weights
@@ -236,18 +292,42 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
 
     # optimizer's state_dict mutates so we must make a copy to avoid data leakage
     inner_opt_state_copy = copy.deepcopy(inner_opt_state)
-    inner_opt.load_state_dict(inner_opt_state_copy) 
+    inner_opt.load_state_dict(inner_opt_state_copy)
 
     # overwrite the weight decay
     for param in inner_opt.param_groups:
-        param['weight_decay'] = weight_decay
+        param["weight_decay"] = weight_decay
 
-    inner_scheduler = PiecewiseLinearScheduler(inner_opt, lr_start=lr_start, lr_middle=lr_middle, lr_end=lr_end, n_warmup=warmup_steps, n_total=inner_steps)
+    inner_scheduler = PiecewiseLinearScheduler(
+        inner_opt,
+        lr_start=lr_start,
+        lr_middle=lr_middle,
+        lr_end=lr_end,
+        n_warmup=warmup_steps,
+        n_total=inner_steps,
+    )
 
-    df_batchdataset = BatchDataset(df.sample(frac=1, random_state=2025), BATCH_SIZE, sort_by_length=False, max_seq_len=MAX_SEQ_LEN, device=DEVICE)
+    df_batchdataset = BatchDataset(
+        df.sample(frac=1, random_state=2025),
+        BATCH_SIZE,
+        sort_by_length=False,
+        max_seq_len=MAX_SEQ_LEN,
+        device=DEVICE,
+    )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
-    _ = finetune_adapt(df_loader, get_params_flattened(model).detach(), learner, inner_opt, inner_scheduler, batch_size_exp, inner_steps, reg_scale=reg_scale, clip_norm=clip_norm)
+    _ = finetune_adapt(
+        df_loader,
+        get_params_flattened(model).detach(),
+        learner,
+        inner_opt,
+        inner_scheduler,
+        batch_size_exp,
+        inner_steps,
+        reg_scale=reg_scale,
+        clip_norm=clip_norm,
+    )
     return learner
+
 
 def evaluate(df_list, model, inner_opt_state, name, log):
     all_test_loss = 0
@@ -267,9 +347,17 @@ def evaluate(df_list, model, inner_opt_state, name, log):
                 # Ignores the train_index and test_index
                 train_set = df[df[f"{split_i}_train"]]
                 test_set = df[df[f"{split_i}_test"]]
-                train_index, test_index = None, None  # train_index and test_index no longer have the same meaning as before
+                train_index, test_index = (
+                    None,
+                    None,
+                )  # train_index and test_index no longer have the same meaning as before
 
-            finetuned_model = finetune(train_set.copy(), model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS)
+            finetuned_model = finetune(
+                train_set.copy(),
+                model,
+                inner_opt_state,
+                finetune_params=DEFAULT_FINETUNE_PARAMS,
+            )
             with torch.no_grad():
                 finetuned_model.eval()
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
@@ -289,16 +377,35 @@ def evaluate(df_list, model, inner_opt_state, name, log):
     print(f"Average {name} loss: {avg_all_test_loss:.3f}")
     print("------------------------------------------------------------")
 
+
 def train(model, inner_opt_state, train_df_list, test_df_list):
     task_batchloaders = []
     for df in train_df_list:
-        task_dataset = BatchDataset(df.copy().sample(frac=1, random_state=2030), BATCH_SIZE, max_seq_len=MAX_SEQ_LEN, device=DEVICE)
+        task_dataset = BatchDataset(
+            df.copy().sample(frac=1, random_state=2030),
+            BATCH_SIZE,
+            max_seq_len=MAX_SEQ_LEN,
+            device=DEVICE,
+        )
         task_batchloaders.append(BatchLoader(task_dataset, shuffle=True))
 
-    outer_opt = torch.optim.AdamW(model.parameters(), lr=OUTER_LR_START, betas=(OUTER_ADAM_BETA1, OUTER_ADAM_BETA2), weight_decay=OUTER_WEIGHT_DECAY)
-    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(outer_opt, start_factor=1e-4, end_factor=1.0, total_iters=WARMUP_STEPS)
-    main_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(outer_opt, T_max=OUTER_STEPS - WARMUP_STEPS)
-    scheduler = torch.optim.lr_scheduler.SequentialLR(outer_opt, schedulers=[warmup_scheduler, main_scheduler], milestones=[WARMUP_STEPS])
+    outer_opt = torch.optim.AdamW(
+        model.parameters(),
+        lr=OUTER_LR_START,
+        betas=(OUTER_ADAM_BETA1, OUTER_ADAM_BETA2),
+        weight_decay=OUTER_WEIGHT_DECAY,
+    )
+    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+        outer_opt, start_factor=1e-4, end_factor=1.0, total_iters=WARMUP_STEPS
+    )
+    main_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        outer_opt, T_max=OUTER_STEPS - WARMUP_STEPS
+    )
+    scheduler = torch.optim.lr_scheduler.SequentialLR(
+        outer_opt,
+        schedulers=[warmup_scheduler, main_scheduler],
+        milestones=[WARMUP_STEPS],
+    )
 
     gamma = 0.995
     eta = 0.95
@@ -306,6 +413,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
     exp_loss_dict = {}
     recent_losses_total = 0.0
     recent_losses_n = 0
+
     def update_stats(task_id, outer_loss, outer_loss_n):
         nonlocal outer_loss_running, exp_loss_dict, recent_losses_total, recent_losses_n
         recent_losses_total += outer_loss * outer_loss_n
@@ -314,12 +422,13 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             outer_loss_running = outer_loss
         else:
             outer_loss_running = gamma * outer_loss_running + (1 - gamma) * outer_loss
-        
+
         if task_id not in exp_loss_dict:
             exp_loss_dict[task_id] = outer_loss
         else:
-            exp_loss_dict[task_id] = eta * exp_loss_dict[task_id] + (1 - eta) * outer_loss
-        
+            exp_loss_dict[task_id] = (
+                eta * exp_loss_dict[task_id] + (1 - eta) * outer_loss
+            )
 
     for outer_it in range(1, OUTER_STEPS + 1):
         outer_opt.zero_grad()
@@ -342,7 +451,13 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         train_adapt_params["lr_middle_raw"] *= min(1.0, outer_it / WARMUP_STEPS)
         train_adapt_params["lr_end_raw"] *= min(1.0, outer_it / WARMUP_STEPS)
 
-        penultimate_inner_loss, inner_loss_n = adapt_on_data(task_batchloaders[task_id], get_params_flattened(model).detach(), learner, inner_opt, train_adapt_params=train_adapt_params)
+        penultimate_inner_loss, inner_loss_n = adapt_on_data(
+            task_batchloaders[task_id],
+            get_params_flattened(model).detach(),
+            learner,
+            inner_opt,
+            train_adapt_params=train_adapt_params,
+        )
         inner_opt_state = copy.deepcopy(inner_opt.state_dict())
         update_stats(user_id, penultimate_inner_loss.item(), inner_loss_n)
 
@@ -355,11 +470,15 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         wandb_log = {}
         if outer_it > 0 and outer_it % len(train_df_list) == 0:
             outer_lr = scheduler.get_last_lr()[0]
-            print(f"{outer_it}, outer lr: {outer_lr:.3f}, inner lr: {train_adapt_params['lr_middle_raw']:.3f}, exp average: {outer_loss_running:.3f}, inner loss avg: {(recent_losses_total / recent_losses_n):.3f}")
-            sorted_exp_loss_dict = {k: round(v, 4) for k, v in sorted(exp_loss_dict.items())}
+            print(
+                f"{outer_it}, outer lr: {outer_lr:.3f}, inner lr: {train_adapt_params['lr_middle_raw']:.3f}, exp average: {outer_loss_running:.3f}, inner loss avg: {(recent_losses_total / recent_losses_n):.3f}"
+            )
+            sorted_exp_loss_dict = {
+                k: round(v, 4) for k, v in sorted(exp_loss_dict.items())
+            }
             print(sorted_exp_loss_dict)
             wandb_log["outer_lr"] = outer_lr
-            wandb_log["inner_lr"] = train_adapt_params['lr_middle_raw']
+            wandb_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
             wandb_log["recent_outer_loss"] = recent_losses_total / recent_losses_n
             wandb_log["train_exponential_average"] = outer_loss_running
             recent_losses_total = 0.0
@@ -367,9 +486,15 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
 
         if outer_it > 0 and outer_it % LOG_STEPS == 0:
             wandb_log["outer_lr"] = outer_lr
-            wandb_log["inner_lr"] = train_adapt_params['lr_middle_raw']
+            wandb_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
             wandb_log["train_exponential_average"] = outer_loss_running
-            evaluate(train_df_list[:min(len(train_df_list), 5)], model, inner_opt_state, name="train", log=wandb_log)
+            evaluate(
+                train_df_list[: min(len(train_df_list), 5)],
+                model,
+                inner_opt_state,
+                name="train",
+                log=wandb_log,
+            )
             evaluate(test_df_list, model, inner_opt_state, name="test", log=wandb_log)
 
         if outer_it > 0 and outer_it % CHECKPOINT_STEPS == 0:
@@ -383,11 +508,15 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
     # Set the correct state before exiting to ensure that the right version is saved
     inner_opt.load_state_dict(inner_opt_state)
 
+
 def main():
     from other import create_features, Transformer, LSTM
+
     def process_user(user_id):
         print("Process user:", user_id)
-        dataset = pd.read_parquet(DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)])
+        dataset = pd.read_parquet(
+            DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        )
         dataset = create_features(dataset, model_name=MODEL_NAME)
         print("Done:", user_id)
         return user_id, dataset
@@ -417,8 +546,8 @@ def main():
     df_dict = {}
     num_train_users = 100
     num_test_users = 30
-    train_users = list(range(9000, 9000+num_train_users))
-    test_users = list(range(5000-num_test_users, 5000))
+    train_users = list(range(9000, 9000 + num_train_users))
+    test_users = list(range(5000 - num_test_users, 5000))
     all_users = train_users + test_users
 
     def worker(user_id):
@@ -438,27 +567,33 @@ def main():
     print(f"Loaded data in {(time.time() - time_start):.3f} seconds.")
 
     # Initialize the mean/std norm for the model
-    features = ['delta_t_secs' if SECS_IVL else 'delta_t', 'duration', 'rating']
+    features = ["delta_t_secs" if SECS_IVL else "delta_t", "duration", "rating"]
     means = []
     stds = []
     for feature_i, feature in enumerate(features):
-        if feature in ('rating'):
+        if feature in ("rating"):
             continue
 
         all_series = []
         for df in train_df_list:
-            last_values = df.groupby('card_id').last().reset_index()
+            last_values = df.groupby("card_id").last().reset_index()
             tensors = last_values["tensor"]
-            series = np.array(list(chain.from_iterable(map(lambda row: row[:, feature_i].tolist(), tensors))))
-            if feature == 'delta_t':
+            series = np.array(
+                list(
+                    chain.from_iterable(
+                        map(lambda row: row[:, feature_i].tolist(), tensors)
+                    )
+                )
+            )
+            if feature == "delta_t":
                 series = np.log(1e-5 + series)
-            elif feature == 'duration':
+            elif feature == "duration":
                 series = np.log(np.clip(series, 100, 60000))
             else:
                 series = np.log(1 + series)
-            
+
             all_series.extend(series)
-            
+
         all_series = np.array(all_series)
         mean = all_series.mean()
         std = np.sqrt(((all_series - mean) ** 2).mean())
@@ -466,13 +601,17 @@ def main():
         means.append(mean)
         stds.append(std)
 
-    input_mean = torch.tensor(means, dtype=torch.float32, requires_grad=False, device=DEVICE)
-    input_std = torch.tensor(stds, dtype=torch.float32, requires_grad=False, device=DEVICE)
+    input_mean = torch.tensor(
+        means, dtype=torch.float32, requires_grad=False, device=DEVICE
+    )
+    input_std = torch.tensor(
+        stds, dtype=torch.float32, requires_grad=False, device=DEVICE
+    )
     model.set_normalization_params(input_mean, input_std)
 
     wandb.init(
-        project="srs-benchmark", 
-        config = {
+        project="srs-benchmark",
+        config={
             "model": MODEL_NAME,
             "outer_steps": OUTER_STEPS,
             "outer_lr_start": OUTER_LR_START,
@@ -488,13 +627,14 @@ def main():
             "outer_adam_beta2": OUTER_ADAM_BETA2,
             "outer_weight_decay": OUTER_WEIGHT_DECAY,
             "total_parameters": total_params,
-        }
+        },
     )
-        
+
     train(model, inner_opt.state_dict(), train_df_list, test_df_list)
     torch.save(model.state_dict(), MODEL_PATH)
     torch.save(inner_opt.state_dict(), INNER_OPT_PATH)
     wandb.finish()
+
 
 if __name__ == "__main__":
     main()

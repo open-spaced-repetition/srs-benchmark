@@ -3,7 +3,14 @@ from sklearn.model_selection import TimeSeriesSplit
 import torch
 import torch.nn as nn
 from config import create_parser
-from reptile_trainer import DEFAULT_FINETUNE_PARAMS, finetune, get_inner_opt, evaluate, compute_data_loss, compute_df_loss
+from reptile_trainer import (
+    DEFAULT_FINETUNE_PARAMS,
+    finetune,
+    get_inner_opt,
+    evaluate,
+    compute_data_loss,
+    compute_df_loss,
+)
 import pandas as pd
 from pathlib import Path
 import optuna
@@ -39,6 +46,7 @@ DATA_PATH = Path(args.data)
 MAX_SEQ_LEN = 64
 n_splits = 5
 
+
 def objective(trial, df_list, model, inner_opt_state):
     # Define all optuna parameters
     lr_start_raw = trial.suggest_float("lr_start_raw", 5e-4, 5e-3, log=True)
@@ -49,7 +57,7 @@ def objective(trial, df_list, model, inner_opt_state):
 
     clip_norm = trial.suggest_float("clip_norm", 100, 10000, log=True)
     reg_scale = trial.suggest_float("reg_scale", 1e-6, 1e-2, log=True)
-    
+
     inner_steps = trial.suggest_int("inner_steps", 15, 15)
 
     recency_weight = trial.suggest_float("recency_weight", 0.0, 30.0)
@@ -93,32 +101,43 @@ def objective(trial, df_list, model, inner_opt_state):
                 # Ignores the train_index and test_index
                 train_set = df[df[f"{split_i}_train"]]
                 test_set = df[df[f"{split_i}_test"]]
-                train_index, test_index = None, None  # train_index and test_index no longer have the same meaning as before
+                train_index, test_index = (
+                    None,
+                    None,
+                )  # train_index and test_index no longer have the same meaning as before
 
-            finetuned_model = finetune(df=train_set.copy(), 
-                                       model=model, 
-                                       inner_opt_state=inner_opt_state, 
-                                       finetune_params=finetune_params)
+            finetuned_model = finetune(
+                df=train_set.copy(),
+                model=model,
+                inner_opt_state=inner_opt_state,
+                finetune_params=finetune_params,
+            )
             with torch.no_grad():
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
                 all_test_loss += test_split_loss.item()
                 all_test_n += len(test_set)
-        
+
         avg_so_far = all_test_loss / all_test_n
         trial.report(avg_so_far, step)
 
         if trial.should_prune():
-            print(f"Trial pruned: params={trial.params}, step={step}, value={avg_so_far:.3f}")
+            print(
+                f"Trial pruned: params={trial.params}, step={step}, value={avg_so_far:.3f}"
+            )
             raise optuna.TrialPruned()
-            
+
     avg_all_test_loss = all_test_loss / all_test_n
     return avg_all_test_loss
 
+
 def main():
     from other import create_features, Transformer, LSTM
+
     def process_user(user_id):
         print("Process:", user_id)
-        dataset = pd.read_parquet(DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)])
+        dataset = pd.read_parquet(
+            DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        )
         dataset = create_features(dataset, model_name=MODEL_NAME)
         print("Done:", user_id)
         return user_id, dataset
@@ -163,12 +182,15 @@ def main():
     df_list = [df_dict[user_id] for user_id in users]
 
     print("Ready.")
-    objective_wrapped = partial(objective, df_list=df_list, model=model, inner_opt_state=inner_opt.state_dict())
+    objective_wrapped = partial(
+        objective, df_list=df_list, model=model, inner_opt_state=inner_opt.state_dict()
+    )
 
     study.enqueue_trial(DEFAULT_FINETUNE_PARAMS)
     study.optimize(objective_wrapped, n_trials=100)
     print(study.best_params)
     print(study.best_value)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

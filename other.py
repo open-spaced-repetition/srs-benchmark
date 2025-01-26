@@ -1210,6 +1210,7 @@ class RNN(nn.Module):
     def forgetting_curve(self, t, s):
         return (1 + FACTOR * t / s) ** DECAY
 
+
 class ResBlock(torch.nn.Module):
     def __init__(self, module):
         super().__init__()
@@ -1217,6 +1218,7 @@ class ResBlock(torch.nn.Module):
 
     def forward(self, inputs):
         return self.module(inputs) + inputs
+
 
 class RNNWrapper(torch.nn.Module):
     def __init__(self, module):
@@ -1226,6 +1228,7 @@ class RNNWrapper(torch.nn.Module):
     def forward(self, inputs):
         outputs, _ = self.module(inputs)
         return outputs
+
 
 class LSTM(nn.Module):
     """
@@ -1239,16 +1242,21 @@ class LSTM(nn.Module):
     For prediction, it uses 'elapsed_days' for input to the forgetting curve.
 
     This model with the default batch size (16384) uses a lot of memory.
-    If memory becomes a concern, use '--processes 1'. 
+    If memory becomes a concern, use '--processes 1'.
     Alternatively, reduce the batch size but the results would no longer be reproducible.
 
     Just like with the GRU models, this model was trained on 100 users of the same dataset that it is tested on.
     The effect on the resulting metrics is minor, but future work should be done to remove this influence.
     """
+
     def __init__(self, state_dict=None, input_mean=None, input_std=None):
         super().__init__()
-        self.register_buffer('input_mean', torch.tensor(0.0) if input_mean is None else input_mean)
-        self.register_buffer('input_std', torch.tensor(1.0) if input_std is None else input_std)
+        self.register_buffer(
+            "input_mean", torch.tensor(0.0) if input_mean is None else input_mean
+        )
+        self.register_buffer(
+            "input_std", torch.tensor(1.0) if input_std is None else input_std
+        )
         self.n_input = 6
         self.n_hidden = 20
         self.n_curves = 3
@@ -1259,41 +1267,51 @@ class LSTM(nn.Module):
             nn.LayerNorm((self.n_hidden,), bias=False),
             nn.Linear(self.n_hidden, self.n_hidden),
             nn.SiLU(),
-            ResBlock(nn.Sequential(
-                nn.LayerNorm((self.n_hidden,), bias=False),
-                RNNWrapper(nn.LSTM(
-                    input_size=self.n_hidden,
-                    hidden_size=self.n_hidden,
-                    num_layers=1,
-                )),
-            )),
-            ResBlock(nn.Sequential(
-                nn.LayerNorm((self.n_hidden,)),
-                RNNWrapper(nn.LSTM(
-                    input_size=self.n_hidden,
-                    hidden_size=self.n_hidden,
-                    num_layers=1,
-                )),
-            )),
-            ResBlock(nn.Sequential(
-                nn.LayerNorm((self.n_hidden,), bias=False),
-                nn.Linear(self.n_hidden, self.n_hidden),
-                nn.SiLU(),
-                nn.LayerNorm((self.n_hidden,), bias=False),
-                nn.Linear(self.n_hidden, self.n_hidden),
-                nn.SiLU(),
-            )),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    RNNWrapper(
+                        nn.LSTM(
+                            input_size=self.n_hidden,
+                            hidden_size=self.n_hidden,
+                            num_layers=1,
+                        )
+                    ),
+                )
+            ),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,)),
+                    RNNWrapper(
+                        nn.LSTM(
+                            input_size=self.n_hidden,
+                            hidden_size=self.n_hidden,
+                            num_layers=1,
+                        )
+                    ),
+                )
+            ),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.Linear(self.n_hidden, self.n_hidden),
+                    nn.SiLU(),
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.Linear(self.n_hidden, self.n_hidden),
+                    nn.SiLU(),
+                )
+            ),
             nn.LayerNorm((self.n_hidden,), bias=False),
             nn.Linear(self.n_hidden, self.n_hidden),
             nn.SiLU(),
         )
 
         for name, param in self.named_parameters():
-            if 'weight_ih' in name:  # Input-to-hidden weights
+            if "weight_ih" in name:  # Input-to-hidden weights
                 nn.init.orthogonal_(param.data)
-            elif 'weight_hh' in name:  # Hidden-to-hidden weights
+            elif "weight_hh" in name:  # Hidden-to-hidden weights
                 nn.init.orthogonal_(param.data)
-            elif 'bias_ih' in name:  # Biases
+            elif "bias_ih" in name:  # Biases
                 start_index = len(param.data) // 4
                 end_index = len(param.data) // 2
                 param.data[start_index:end_index].fill_(1.0)
@@ -1317,8 +1335,8 @@ class LSTM(nn.Module):
                 pass
 
     def set_normalization_params(self, mean_i, std_i):
-        self.register_buffer('input_mean', mean_i)
-        self.register_buffer('input_std', std_i)
+        self.register_buffer("input_mean", mean_i)
+        self.register_buffer("input_std", std_i)
 
     def forward(self, x_lni, hx=None):
         x_delay, x_duration, x_rating = x_lni.split(1, dim=-1)
@@ -1329,7 +1347,9 @@ class LSTM(nn.Module):
         x_main = (x_main - self.input_mean) / self.input_std
 
         x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))
-        x_rating = torch.nn.functional.one_hot(x_rating.squeeze(-1).long() - 1, num_classes=4).float()
+        x_rating = torch.nn.functional.one_hot(
+            x_rating.squeeze(-1).long() - 1, num_classes=4
+        ).float()
         x = torch.cat([x_main, x_rating], dim=-1)
         x_lnh = self.process(x)
 
@@ -1345,17 +1365,20 @@ class LSTM(nn.Module):
         seq_lens: Tensor,
         real_batch_size: int,
     ) -> dict[str, Tensor]:
-        w_lnh, s_lnh, d_lnh  = self.forward(sequences)
+        w_lnh, s_lnh, d_lnh = self.forward(sequences)
         (_, n, h) = w_lnh.shape
         delta_nh = delta_n.unsqueeze(-1).expand(n, h)
-        w_nh = w_lnh[seq_lens-1, torch.arange(n, device=DEVICE)]
-        s_nh = s_lnh[seq_lens-1, torch.arange(n, device=DEVICE)]
-        d_nh = d_lnh[seq_lens-1, torch.arange(n, device=DEVICE)]
+        w_nh = w_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        s_nh = s_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        d_nh = d_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
         retentions = self.forgetting_curve(delta_nh, w_nh, s_nh, d_nh)
         return {"retentions": retentions, "stabilities": s_nh}
 
     def forgetting_curve(self, t_nh, w_nh, s_nh, d_nh):
-        return (1-1e-7)*(torch.sum(w_nh*(1 + t_nh/(1e-7 + s_nh)) ** -d_nh, dim=-1))
+        return (1 - 1e-7) * (
+            torch.sum(w_nh * (1 + t_nh / (1e-7 + s_nh)) ** -d_nh, dim=-1)
+        )
+
 
 class GRU_P(nn.Module):
     # 297 params with default settings
@@ -2701,10 +2724,12 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         # # - the number of reviews that were done today so far
         # # - the number of new cards that were introduced since the last review of this card
         # # - the number of reviews that were done since the last review of this card
-        df["is_new_card"] = (~df['card_id'].duplicated()).astype(int)
+        df["is_new_card"] = (~df["card_id"].duplicated()).astype(int)
         df["cum_new_cards"] = df["is_new_card"].cumsum()
         df["diff_new_cards"] = df.groupby("card_id")["cum_new_cards"].diff().fillna(0)
-        df["diff_reviews"] = np.maximum(0, -1 + df.groupby("card_id")["review_th"].diff().fillna(0))
+        df["diff_reviews"] = np.maximum(
+            0, -1 + df.groupby("card_id")["review_th"].diff().fillna(0)
+        )
         df["cum_new_cards_today"] = df.groupby("day_offset")["is_new_card"].cumsum()
         df["cum_reviews_today"] = df.groupby("day_offset").cumcount()
         df["delta_t_days"] = df["elapsed_days"].map(lambda x: max(0, x))
@@ -2714,23 +2739,31 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
             # This also indirectly causes --no_train_on_same_day and --no_test_on_same_day.
             df["delta_t"] = df["delta_t_days"]
 
-        features = ['delta_t_secs' if secs_ivl else 'delta_t', 'duration', 'rating']
+        features = ["delta_t_secs" if secs_ivl else "delta_t", "duration", "rating"]
+
         def get_history(group):
             rows = group.apply(
-                lambda row: torch.tensor([row[feature] for feature in features],
-                                        dtype=torch.float32, requires_grad=False),
-                axis=1
+                lambda row: torch.tensor(
+                    [row[feature] for feature in features],
+                    dtype=torch.float32,
+                    requires_grad=False,
+                ),
+                axis=1,
             ).tolist()
 
-            cum_rows = list(accumulate(
-                rows,
-                lambda x, y: torch.cat((x, y.unsqueeze(0))),
-                initial=torch.empty((0, len(features)), dtype=torch.float32, requires_grad=False)
-            ))[:-1]
+            cum_rows = list(
+                accumulate(
+                    rows,
+                    lambda x, y: torch.cat((x, y.unsqueeze(0))),
+                    initial=torch.empty(
+                        (0, len(features)), dtype=torch.float32, requires_grad=False
+                    ),
+                )
+            )[:-1]
             return pd.Series(cum_rows, index=group.index)
 
-        grouped = df.groupby('card_id', group_keys=False)
-        df["tensor"] = grouped[df.columns.difference(['card_id'])].apply(get_history)
+        grouped = df.groupby("card_id", group_keys=False)
+        df["tensor"] = grouped[df.columns.difference(["card_id"])].apply(get_history)
     elif model_name in "GRU-P":
         df["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
@@ -2945,6 +2978,7 @@ def process(user_id):
     elif MODEL_NAME == "Anki":
         Model = Anki
     elif MODEL_NAME == "90%":
+
         def get_constant_model(state_dict=None):
             return ConstantModel(0.9)
 
@@ -3005,12 +3039,18 @@ def process(user_id):
                 if DRY_RUN:
                     partition_weights[partition] = model.state_dict()
                     continue
-                
+
                 if MODEL_NAME == "LSTM":
                     model = model.to(DEVICE)
-                    inner_opt = get_inner_opt(model.parameters(), path=f"./pretrain/{OPT_NAME}_pretrain.pth")
-                    trained_model = finetune(train_partition, model, inner_opt.state_dict())
-                    partition_weights[partition] = copy.deepcopy(trained_model.state_dict())
+                    inner_opt = get_inner_opt(
+                        model.parameters(), path=f"./pretrain/{OPT_NAME}_pretrain.pth"
+                    )
+                    trained_model = finetune(
+                        train_partition, model, inner_opt.state_dict()
+                    )
+                    partition_weights[partition] = copy.deepcopy(
+                        trained_model.state_dict()
+                    )
                 else:
                     trainer = Trainer(
                         model,

@@ -111,7 +111,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | Anki-SM-2 | 0 | 0.49±0.015 | 0.128±0.0037 | 0.597±0.0055 | IL+G |
 | SM-2-short | 0 | 0.51±0.015 | 0.128±0.0038 | 0.593±0.0064 | IL+G, SR |
 | SM-2 | 0 | 0.55±0.017 | 0.148±0.0041 | 0.600±0.0051 | IL+G |
-| **RMSE-BINS-EXPLOIT** | 0 | 4.5±0.13 | **0.0062±0.00022** | 0.638±0.0040 | --- |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.5±0.13 | **0.0062±0.00022** | 0.638±0.0040 | IL+G |
 
 ### Unweighted
 
@@ -150,7 +150,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | Anki-SM-2 | 0 | 0.62±0.011 | 0.172±0.0026 | 0.613±0.0022 | IL+G |
 | SM-2-short | 0 | 0.65±0.015 | 0.170±0.0028 | 0.590±0.0027 | IL+G, SR|
 | SM-2 | 0 | 0.72±0.017 | 0.203±0.0030 | 0.603±0.0025 | IL+G |
-| **RMSE-BINS-EXPLOIT** | 0 | 4.61±0.067 | **0.0135±0.00028** | 0.655±0.0021 | --- |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.61±0.067 | **0.0135±0.00028** | 0.655±0.0021 | IL+G |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 

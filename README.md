@@ -70,7 +70,7 @@ Same-day reviews are not used for evaluation, but some algorithms use them to re
 The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The "Parameters" column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
 
 For the sake of brevity, the following abbreviations are used in the "Input features" column: **IL** = **i**nterval **l**engths, **(F)IL** = (**f**ractional aka non-integer) **i**nterval **l**engths, 
-**IL+G** or **(F)IL+G** = (**f**ractional) **i**nterval **l**engths and **g**rades (s), **SR** = **s**ame-day (or **s**hort-term) **r**eviews, **AT** = **a**nswer **t**ime (duration of the review).
+**IL+G** or **(F)IL+G** = (**f**ractional) **i**nterval **l**engths and **g**rades (Again/Hard/Good/Easy), **SR** = **s**ame-day (or **s**hort-term) **r**eviews, **AT** = **a**nswer **t**ime (duration of the review).
 
 ### Weighted by the number of reviews
 

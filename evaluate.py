@@ -198,8 +198,8 @@ if __name__ == "__main__":
     else:
         for scale in ("reviews", "users"):
             print(f"Weighted by number of {scale}\n")
-            print("| Model | #Params | LogLoss | RMSE(bins) | AUC |")
-            print("| --- | --- | --- | --- | --- |")
+            print("| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |")
+            print("| --- | --- | --- | --- | --- | --- |")
             for model, n_param, input_features in models:
                 m = []
                 parameters = []

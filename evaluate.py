@@ -147,7 +147,7 @@ if __name__ == "__main__":
         ]
     )
     if args.fast:
-        for model, _ in models:
+        for model, _, _ in models:
             print(f"Model: {model}")
             m = []
             parameters = []
@@ -198,9 +198,9 @@ if __name__ == "__main__":
     else:
         for scale in ("reviews", "users"):
             print(f"Weighted by number of {scale}\n")
-            print("| Model | #Params | LogLoss | RMSE(bins) | AUC |")
-            print("| --- | --- | --- | --- | --- |")
-            for model, n_param in models:
+            print("| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |")
+            print("| --- | --- | --- | --- | --- | --- |")
+            for model, n_param, input_features in models:
                 m = []
                 parameters = []
                 sizes = []
@@ -229,4 +229,4 @@ if __name__ == "__main__":
                     CI = confidence_interval(metrics, size)
                     rounded_mean, rounded_CI = sigdig(wmean, CI)
                     result += f" {rounded_mean}±{rounded_CI} |"
-                print(result)
+                print(result + f" {input_features} |")

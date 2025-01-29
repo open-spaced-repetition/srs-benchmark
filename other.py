@@ -46,8 +46,8 @@ PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 RECENCY = args.recency
 
-torch.set_num_threads(3)
-# torch.set_num_interop_threads(3)
+torch.set_num_threads(2)
+# torch.set_num_interop_threads(2)
 
 model_list = (
     "FSRSv1",

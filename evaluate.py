@@ -147,7 +147,7 @@ if __name__ == "__main__":
         ]
     )
     if args.fast:
-        for model, _ in models:
+        for model, _, _2 in models:
             print(f"Model: {model}")
             m = []
             parameters = []
@@ -200,7 +200,7 @@ if __name__ == "__main__":
             print(f"Weighted by number of {scale}\n")
             print("| Model | #Params | LogLoss | RMSE(bins) | AUC |")
             print("| --- | --- | --- | --- | --- |")
-            for model, n_param in models:
+            for model, n_param, input_features in models:
                 m = []
                 parameters = []
                 sizes = []

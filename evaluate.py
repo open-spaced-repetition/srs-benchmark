@@ -229,4 +229,4 @@ if __name__ == "__main__":
                     CI = confidence_interval(metrics, size)
                     rounded_mean, rounded_CI = sigdig(wmean, CI)
                     result += f" {rounded_mean}±{rounded_CI} |"
-                print(result)
+                print(result + f" {input_features} |")

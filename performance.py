@@ -9,7 +9,7 @@ import torch
 
 # Config
 B_TIME = False  # Runs process_wrapper_a and process_wrapper_b to compare
-N = 100  # Number of users to sample
+N = 10  # Number of users to sample
 
 # Graph Display Info
 A_NAME = "A"
@@ -76,43 +76,49 @@ for i in (progress := tqdm(range(1, USER_COUNT, USER_COUNT // N))):
 total_a_time = sum(a_times)
 total_b_time = sum(b_times)
 
+def estimate_time(secs: int):
+    return (secs * USER_COUNT) // (N * script.PROCESSES)
+
 print(f"total a_time for {N} users={total_a_time:.2f}s")
 if B_TIME:
     print(f"total b_time for {N} users={total_b_time:.2f}s")
 print("")
 
-print(f"Estimated total a_time (one process)={(total_a_time * USER_COUNT) // N:.2f}s")
+print(f"Estimated total a_time (one process)={estimate_time(total_a_time):.2f}s")
 print(
-    f"Estimated total a_time (one process)={(total_a_time * USER_COUNT) // (N * 60 * 60):.2f}h"
+    f"Estimated total a_time (one process)={estimate_time(total_a_time) // 60 * 60:.2f}h"
 )
 if B_TIME:
     print(
-        f"Estimated total b_time for {USER_COUNT} users (one process)={(total_b_time * USER_COUNT) // N:.2f}s"
+        f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) * USER_COUNT // N:.2f}s"
     )
     print(
-        f"Estimated total b_time for {USER_COUNT} users (one process)={(total_b_time * USER_COUNT) // (N * 60 * 60):.2f}h"
+        f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) / (60 * 60):.2f}h"
     )
 
 print("")
 print(f"{mean(a_losses)=:.5f}")
-print(f"{mean(b_losses)=:.5f}")
+if B_TIME:
+    print(f"{mean(b_losses)=:.5f}")
 
 plt.suptitle(TITLE)
 
 plt.subplot(1, 2, 1)
 plt.xlabel(f"Revlogs (total={sum(row_counts)})")
-plt.ylabel(f"Seconds (total={sum(a_times):.2f})")
-plt.plot(row_counts, a_times, label=A_NAME)
-plt.plot(row_counts, b_times, label=B_NAME)
+plt.ylabel(f"Seconds")
+plt.plot(row_counts, a_times, label=f"{A_NAME} {N} in {sum(a_times):.2f}s, estimated={estimate_time(total_a_time) / (60 * 60):.2f}h")
+if B_TIME:
+    plt.plot(row_counts, b_times, label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / (60 * 60):.2f}h")
 plt.title(f"Time Spent")
 plt.legend()
 
 plt.subplot(1, 2, 2)
 plt.xlabel(f"Revlogs")
-b_losses_description = "" if len(b_losses) == 0 else f", {mean(b_losses)=:.5f}"
-plt.ylabel(f"Log Loss avg_a={mean(a_losses)}{b_losses_description}")
-plt.plot(row_counts, a_losses, label=A_NAME)
-plt.plot(row_counts, b_losses, label=B_NAME)
+
+plt.ylabel(f"Log Loss")
+plt.plot(row_counts, a_losses, label=f"{A_NAME} avg={mean(a_losses):.5f}")
+if B_TIME:
+    plt.plot(row_counts, b_losses, label=f"{B_NAME} avg={mean(b_losses)=:.5f}")
 plt.title(f"Loss")
 plt.legend()
 

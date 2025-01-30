@@ -30,8 +30,8 @@ value = 0.084111111
 CI = 0.0010011111
 assert sigdig(value, CI) == ("0.084", "0.0010")
 
-value = 0.084111111
-CI = 0.000999999999
+value = 0.083999999
+CI = 0.0009999999
 assert sigdig(value, CI) == ("0.084", "0.0010")
 
 
@@ -87,59 +87,67 @@ if __name__ == "__main__":
     parser.add_argument("--secs", action="store_true")
     args = parser.parse_args()
 
+    # IL = interval lengths
+    # (F)IL = (fractional aka non-integer) interval lengths
+    # IL+G or (F)IL+G = (fractional) interval lengths and grades (Again/Hard/Good/Easy)
+    # SR = same-day (or short-term) reviews
+    # AT = answer time (duration of the review)
+    
     models = (
         [
-            (dev_mode_name, None),
-            ("GRU-P-short", 297),
-            ("GRU-P", 297),
-            ("FSRS-5-recency", 19),
-            ("FSRS-5-preset", 19),
-            ("FSRS-rs", 19),
-            ("FSRS-5", 19),
-            ("FSRS-5-disable_short_term", 17),
-            ("FSRS-4.5", 17),
-            ("FSRS-5-deck", 19),
-            ("FSRS-5-binary", 15),
-            ("FSRSv4", 17),
-            ("DASH", 9),
-            ("GRU", 39),
-            ("DASH[MCM]", 9),
-            ("DASH-short", 9),
-            ("DASH[ACT-R]", 5),
-            ("FSRSv2", 14),
-            ("FSRS-5-pretrain", 4),
-            ("FSRSv3", 13),
-            ("NN-17", 39),
-            ("FSRS-5-dry-run", 0),
-            ("ACT-R", 5),
-            ("FSRSv1", 7),
-            ("AVG", 0),
-            ("Anki", 7),
-            ("HLR", 3),
-            ("HLR-short", 3),
-            ("SM2-trainable", 6),
-            ("Anki-dry-run", 0),
-            ("SM2-short", 0),
-            ("SM2", 0),
-            ("Ebisu-v2", 0),
-            ("Transformer", 127),
+            (dev_mode_name, None, None),
+            ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "(F)IL+G, SR, AT"),
+            ("GRU-P-short", 297, "IL+G, SR"),
+            ("GRU-P", 297, "IL+G"),
+            ("FSRS-5-recency", 19, "IL+G, SR"),
+            ("FSRS-5-preset", 19, "IL+G, SR"),
+            ("FSRS-rs", 19, "IL+G, SR"),
+            ("FSRS-5", 19, "IL+G, SR"),
+            ("FSRS-5-disable_short_term", 17, "IL+G"),
+            ("FSRS-4.5", 17, "IL+G"),
+            ("FSRS-5-deck", 19, "IL+G, SR"),
+            ("FSRS-5-binary", 15, "IL+G, SR"),
+            ("FSRSv4", 17, "IL+G"),
+            ("DASH", 9, "IL+G"),
+            ("GRU", 39, "IL+G"),
+            ("DASH[MCM]", 9, "IL+G"),
+            ("DASH-short", 9, "IL+G, SR"),
+            ("DASH[ACT-R]", 5, "IL+G"),
+            ("FSRSv2", 14, "IL+G"),
+            ("FSRS-5-pretrain", 4, "IL+G, SR"),
+            ("FSRSv3", 13, "IL+G"),
+            ("NN-17", 39, "IL+G"),
+            ("FSRS-5-dry-run", 0, "IL+G, SR"),
+            ("ACT-R", 5, "IL"),
+            ("FSRSv1", 7, "IL+G"),
+            ("AVG", 0, "---"),
+            ("Anki", 7, "IL+G"),
+            ("HLR", 3, "IL+G"),
+            ("HLR-short", 3, "IL+G, SR"),
+            ("SM2-trainable", 6, "IL+G"),
+            ("Anki-dry-run", 0, "IL+G"),
+            ("SM2-short", 0, "IL+G, SR"),
+            ("SM2", 0, "IL+G"),
+            ("Ebisu-v2", 0, "IL+G"),
+            ("Transformer", 127, "IL+G"),
+            ("RMSE-BINS-EXPLOIT", 0, "IL+G"),
         ]
         if not args.secs
         else [
-            (dev_mode_name, None),
-            ("GRU-P-secs", 297),
-            ("DASH[MCM]-secs", 9),
-            ("DASH-secs", 9),
-            ("NN-17-secs", 39),
-            ("FSRS-4.5-secs", 17),
-            ("GRU-secs", 39),
-            ("DASH[ACT-R]-secs", 5),
-            ("ACT-R-secs", 5),
-            ("AVG-secs", 0),
+            (dev_mode_name, None, None),
+            ("GRU-P-secs", 297, "(F)IL+G, SR"),
+            ("DASH[MCM]-secs", 9, "(F)IL+G, SR"),
+            ("DASH-secs", 9, "(F)IL+G, SR"),
+            ("NN-17-secs", 39, "(F)IL+G, SR"),
+            ("FSRS-4.5-secs", 17, "(F)IL+G, SR"),
+            ("GRU-secs", 39, "(F)IL+G, SR"),
+            ("DASH[ACT-R]-secs", 5, "(F)IL+G, SR"),
+            ("ACT-R-secs", 5, "(F)IL+G, SR"),
+            ("AVG-secs", 0, "---"),
         ]
     )
     if args.fast:
-        for model, _ in models:
+        for model, _, _ in models:
             print(f"Model: {model}")
             m = []
             parameters = []
@@ -182,15 +190,17 @@ if __name__ == "__main__":
             # print(f"LogLoss 99%: {round(np.percentile(np.array([item['LogLoss'] for item in m]), 99), 4)}")
             # print(f"RMSE(bins) 99%: {round(np.percentile(np.array([item['RMSE(bins)'] for item in m]), 99), 4)}")
             if len(parameters) > 0:
-                print(f"parameters: {np.median(parameters, axis=0).round(6).tolist()}\n")
+                print(
+                    f"parameters: {np.median(parameters, axis=0).round(6).tolist()}\n"
+                )
                 # print(f"parameters: {np.std(parameters, axis=0).round(2).tolist()}\n")
 
     else:
         for scale in ("reviews", "users"):
             print(f"Weighted by number of {scale}\n")
-            print("| Model | #Params | LogLoss | RMSE(bins) | AUC |")
-            print("| --- | --- | --- | --- | --- |")
-            for model, n_param in models:
+            print("| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |")
+            print("| --- | --- | --- | --- | --- | --- |")
+            for model, n_param, input_features in models:
                 m = []
                 parameters = []
                 sizes = []
@@ -219,4 +229,4 @@ if __name__ == "__main__":
                     CI = confidence_interval(metrics, size)
                     rounded_mean, rounded_CI = sigdig(wmean, CI)
                     result += f" {rounded_mean}±{rounded_CI} |"
-                print(result)
+                print(result + f" {input_features} |")

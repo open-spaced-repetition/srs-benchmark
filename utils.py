@@ -16,6 +16,42 @@ def catch_exceptions(func):
     return wrapper
 
 
+def rmse_matrix(df):
+    tmp = df.copy()
+
+    def count_lapse(r_history, t_history):
+        lapse = 0
+        for r, t in zip(r_history.split(","), t_history.split(",")):
+            if t != "0" and r == "1":
+                lapse += 1
+        return lapse
+
+    tmp["lapse"] = tmp.apply(
+        lambda x: count_lapse(x["r_history"], x["t_history"]), axis=1
+    )
+    tmp["delta_t"] = tmp["elapsed_days"].map(
+        lambda x: round(2.48 * np.power(3.62, np.floor(np.log(x) / np.log(3.62))), 2)
+    )
+    tmp["i"] = tmp["i"].map(
+        lambda x: round(1.99 * np.power(1.89, np.floor(np.log(x) / np.log(1.89))), 0)
+    )
+    tmp["lapse"] = tmp["lapse"].map(
+        lambda x: (
+            round(1.65 * np.power(1.73, np.floor(np.log(x) / np.log(1.73))), 0)
+            if x != 0
+            else 0
+        )
+    )
+    if "weights" not in tmp.columns:
+        tmp["weights"] = 1
+    tmp = (
+        tmp.groupby(["delta_t", "i", "lapse"])
+        .agg({"y": "mean", "p": "mean", "weights": "sum"})
+        .reset_index()
+    )
+    return root_mean_squared_error(tmp["y"], tmp["p"], sample_weight=tmp["weights"])
+
+
 def cross_comparison(revlogs, algoA, algoB, graph=False):
     if algoA != algoB:
         cross_comparison_record = revlogs[[f"R ({algoA})", f"R ({algoB})", "y"]].copy()

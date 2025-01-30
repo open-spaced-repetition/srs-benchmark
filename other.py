@@ -1,3 +1,5 @@
+import copy
+from itertools import accumulate
 import sys
 import os
 import pandas as pd
@@ -16,11 +18,12 @@ from tqdm.auto import tqdm  # type: ignore
 from scipy.optimize import minimize  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
+from reptile_trainer import get_inner_opt, finetune
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser
-from utils import catch_exceptions
+from utils import catch_exceptions, rmse_matrix
 
 parser = create_parser()
 args = parser.parse_args()
@@ -31,7 +34,9 @@ MODEL_NAME = args.model
 SHORT_TERM = args.short
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
+NO_TRAIN_SAME_DAY = args.no_train_same_day
 EQUALIZE_TEST_WITH_NON_SECS = args.equalize_test_with_non_secs
+TWO_BUTTONS = args.two_buttons
 FILE = args.file
 PLOT = args.plot
 WEIGHTS = args.weights
@@ -41,8 +46,8 @@ PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 RECENCY = args.recency
 
-torch.set_num_threads(3)
-# torch.set_num_interop_threads(3)
+torch.set_num_threads(2)
+# torch.set_num_interop_threads(2)
 
 model_list = (
     "FSRSv1",
@@ -59,6 +64,8 @@ model_list = (
     "LSTM",
     "RNN",
     "AVG",
+    "RMSE-BINS-EXPLOIT",
+    "90%",
     "DASH",
     "DASH[MCM]",
     "DASH[ACT-R]",
@@ -75,7 +82,7 @@ if MODEL_NAME not in model_list:
 if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 
-from fsrs_optimizer import BatchDataset, BatchLoader, rmse_matrix, plot_brier  # type: ignore
+from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier  # type: ignore
 
 if MODEL_NAME.startswith("Ebisu"):
     import ebisu  # type: ignore
@@ -105,10 +112,12 @@ FILE_NAME = (
     + ("-secs" if SECS_IVL else "")
     + ("-recency" if RECENCY else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
+    + ("-no_train_same_day" if NO_TRAIN_SAME_DAY else "")
     + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
     + ("-dev" if DEV_MODE else "")
 )
+OPT_NAME = FILE_NAME + "_opt"
 
 S_MIN = 1e-6 if SECS_IVL else 0.01
 INIT_S_MAX = 100
@@ -124,13 +133,16 @@ class FSRS(nn.Module):
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
-        stabilities = outputs[
+        stabilities, difficulties = outputs[
             seq_lens - 1,
             torch.arange(real_batch_size, device=DEVICE),
-            0,
-        ]
+        ].transpose(0, 1)
         retentions = self.forgetting_curve(delta_ts, stabilities)
-        return {"retentions": retentions, "stabilities": stabilities}
+        return {
+            "retentions": retentions,
+            "stabilities": stabilities,
+            "difficulties": difficulties,
+        }
 
     def pretrain(self, train_set):
         S0_dataset_group = (
@@ -1148,12 +1160,6 @@ class RNN(nn.Module):
             nn.init.orthogonal_(self.rnn.weight_hh_l0)
             self.rnn.bias_ih_l0.data.fill_(0)
             self.rnn.bias_hh_l0.data.fill_(0)
-        elif MODEL_NAME == "LSTM":
-            self.rnn = nn.LSTM(
-                input_size=self.n_input,
-                hidden_size=self.n_hidden,
-                num_layers=self.n_layers,
-            )
         else:
             self.rnn = nn.RNN(
                 input_size=self.n_input,
@@ -1203,6 +1209,175 @@ class RNN(nn.Module):
 
     def forgetting_curve(self, t, s):
         return (1 + FACTOR * t / s) ** DECAY
+
+
+class ResBlock(torch.nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, inputs):
+        return self.module(inputs) + inputs
+
+
+class RNNWrapper(torch.nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, inputs):
+        outputs, _ = self.module(inputs)
+        return outputs
+
+
+class LSTM(nn.Module):
+    """
+    This model is trained with reptile_trainer.py, and was run with the flags
+    ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
+    It uses:
+    - same-day reviews as features
+    - fractional intervals
+    - the duration of each review as an input feature
+    - its own version of --recency
+    For prediction, it uses 'elapsed_days' for input to the forgetting curve.
+
+    This model with the default batch size (16384) uses a lot of memory.
+    If memory becomes a concern, use '--processes 1'.
+    Alternatively, reduce the batch size but the results would no longer be reproducible.
+
+    Just like with the GRU models, this model was trained on 100 users of the same dataset that it is tested on.
+    The effect on the resulting metrics is minor, but future work should be done to remove this influence.
+    """
+
+    def __init__(self, state_dict=None, input_mean=None, input_std=None):
+        super().__init__()
+        self.register_buffer(
+            "input_mean", torch.tensor(0.0) if input_mean is None else input_mean
+        )
+        self.register_buffer(
+            "input_std", torch.tensor(1.0) if input_std is None else input_std
+        )
+        self.n_input = 6
+        self.n_hidden = 20
+        self.n_curves = 3
+
+        self.process = nn.Sequential(
+            nn.Linear(self.n_input, self.n_hidden),
+            nn.SiLU(),
+            nn.LayerNorm((self.n_hidden,), bias=False),
+            nn.Linear(self.n_hidden, self.n_hidden),
+            nn.SiLU(),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    RNNWrapper(
+                        nn.LSTM(
+                            input_size=self.n_hidden,
+                            hidden_size=self.n_hidden,
+                            num_layers=1,
+                        )
+                    ),
+                )
+            ),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,)),
+                    RNNWrapper(
+                        nn.LSTM(
+                            input_size=self.n_hidden,
+                            hidden_size=self.n_hidden,
+                            num_layers=1,
+                        )
+                    ),
+                )
+            ),
+            ResBlock(
+                nn.Sequential(
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.Linear(self.n_hidden, self.n_hidden),
+                    nn.SiLU(),
+                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.Linear(self.n_hidden, self.n_hidden),
+                    nn.SiLU(),
+                )
+            ),
+            nn.LayerNorm((self.n_hidden,), bias=False),
+            nn.Linear(self.n_hidden, self.n_hidden),
+            nn.SiLU(),
+        )
+
+        for name, param in self.named_parameters():
+            if "weight_ih" in name:  # Input-to-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif "weight_hh" in name:  # Hidden-to-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif "bias_ih" in name:  # Biases
+                start_index = len(param.data) // 4
+                end_index = len(param.data) // 2
+                param.data[start_index:end_index].fill_(1.0)
+
+        self.w_fc = nn.Linear(self.n_hidden, self.n_curves)
+        self.s_fc = nn.Linear(self.n_hidden, self.n_curves)
+        self.d_fc = nn.Linear(self.n_hidden, self.n_curves)
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(
+                        f"./pretrain/{FILE_NAME}_pretrain.pth",
+                        weights_only=True,
+                        map_location=DEVICE,
+                    )
+                )
+            except FileNotFoundError:
+                pass
+
+    def set_normalization_params(self, mean_i, std_i):
+        self.register_buffer("input_mean", mean_i)
+        self.register_buffer("input_std", std_i)
+
+    def forward(self, x_lni, hx=None):
+        x_delay, x_duration, x_rating = x_lni.split(1, dim=-1)
+        x_delay = torch.log(1e-5 + x_delay)
+        x_duration = torch.log(torch.clamp(x_duration, min=100, max=60000))
+        x_main = torch.cat([x_delay, x_duration], dim=-1)
+
+        x_main = (x_main - self.input_mean) / self.input_std
+
+        x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))
+        x_rating = torch.nn.functional.one_hot(
+            x_rating.squeeze(-1).long() - 1, num_classes=4
+        ).float()
+        x = torch.cat([x_main, x_rating], dim=-1)
+        x_lnh = self.process(x)
+
+        w_lnh = torch.nn.functional.softmax(self.w_fc(x_lnh), dim=-1)
+        s_lnh = torch.exp(torch.clamp(self.s_fc(x_lnh), min=-25, max=25))
+        d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
+        return w_lnh, s_lnh, d_lnh
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_n: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        w_lnh, s_lnh, d_lnh = self.forward(sequences)
+        (_, n, h) = w_lnh.shape
+        delta_nh = delta_n.unsqueeze(-1).expand(n, h)
+        w_nh = w_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        s_nh = s_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        d_nh = d_lnh[seq_lens - 1, torch.arange(n, device=DEVICE)]
+        retentions = self.forgetting_curve(delta_nh, w_nh, s_nh, d_nh)
+        return {"retentions": retentions, "stabilities": s_nh}
+
+    def forgetting_curve(self, t_nh, w_nh, s_nh, d_nh):
+        return (1 - 1e-7) * (
+            torch.sum(w_nh * (1 + t_nh / (1e-7 + s_nh)) ** -d_nh, dim=-1)
+        )
 
 
 class GRU_P(nn.Module):
@@ -2080,6 +2255,80 @@ def iter(model, batch):
     return result
 
 
+def count_lapse(r_history, t_history):
+    lapse = 0
+    for r, t in zip(r_history.split(","), t_history.split(",")):
+        if t != "0" and r == "1":
+            lapse += 1
+    return lapse
+
+
+def get_bin(row):
+    raw_lapse = count_lapse(row["r_history"], row["t_history"])
+    lapse = (
+        round(1.65 * np.power(1.73, np.floor(np.log(raw_lapse) / np.log(1.73))), 0)
+        if raw_lapse != 0
+        else 0
+    )
+    delta_t = round(
+        2.48 * np.power(3.62, np.floor(np.log(row["delta_t"]) / np.log(3.62))), 2
+    )
+    i = round(1.99 * np.power(1.89, np.floor(np.log(row["i"]) / np.log(1.89))), 0)
+    return (lapse, delta_t, i)
+
+
+class RMSEBinsExploit:
+    def __init__(self):
+        super().__init__()
+        self.state = {}
+        self.global_succ = 0
+        self.global_n = 0
+
+    def adapt(self, bin_key, y):
+        if bin_key not in self.state:
+            self.state[bin_key] = (0, 0, 0)
+
+        pred_sum, truth_sum, bin_n = self.state[bin_key]
+        self.state[bin_key] = (pred_sum, truth_sum + y, bin_n + 1)
+        self.global_succ += y
+        self.global_n += 1
+
+    def predict(self, bin_key):
+        if self.global_n == 0:
+            return 0.5
+
+        if bin_key not in self.state:
+            self.state[bin_key] = (0, 0, 0)
+
+        pred_sum, truth_sum, bin_n = self.state[bin_key]
+        estimated_p = self.global_succ / self.global_n
+        pred = np.clip(truth_sum + estimated_p - pred_sum, a_min=0, a_max=1)
+        self.state[bin_key] = (pred_sum + pred, truth_sum, bin_n)
+        return pred
+
+
+class ConstantModel(nn.Module):
+    n_epoch = 0
+    lr = 0
+    wd = 0
+
+    def __init__(self, value=0.9):
+        super().__init__()
+        self.value = value
+        self.placeholder = torch.nn.Linear(
+            1, 1
+        )  # So that the optimizer gets a nonempty list
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        return {"retentions": torch.full((real_batch_size,), self.value)}
+
+
 class Trainer:
     optimizer: torch.optim.Optimizer
 
@@ -2264,14 +2513,17 @@ class Collection:
         batch_loader = BatchLoader(batch_dataset, shuffle=False)
         retentions = []
         stabilities = []
+        difficulties = []
         with torch.no_grad():
             for batch in batch_loader:
                 result = iter(self.model, batch)
                 retentions.extend(result["retentions"].cpu().tolist())
                 if "stabilities" in result:
                     stabilities.extend(result["stabilities"].cpu().tolist())
+                if "difficulties" in result:
+                    difficulties.extend(result["difficulties"].cpu().tolist())
 
-        return retentions, stabilities
+        return retentions, stabilities, difficulties
 
 
 def process_untrainable(user_id):
@@ -2309,6 +2561,7 @@ def process_untrainable(user_id):
                 lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
                 axis=1,
             )
+
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
@@ -2348,10 +2601,49 @@ def baseline(user_id):
     return stats, raw
 
 
+def rmse_bins_exploit(user_id):
+    """This model attempts to exploit rmse(bins) by keeping track of per-bin statistics"""
+    model_name = "RMSE-BINS-EXPLOIT"
+    dataset = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+    )
+    dataset = create_features(dataset, model_name)
+    if dataset.shape[0] < 6:
+        return Exception("Not enough data")
+
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    save_tmp = []
+    first_test_index = int(1e9)
+    for _, test_index in tscv.split(dataset):
+        first_test_index = min(first_test_index, test_index.min())
+        test_set = dataset.iloc[test_index].copy()
+        save_tmp.append(test_set)
+
+    p = []
+    y = []
+    model = RMSEBinsExploit()
+    for i in range(len(dataset)):
+        row = dataset.iloc[i].copy()
+        bin = get_bin(row)
+        if i >= first_test_index:
+            pred = model.predict(bin)
+            p.append(pred)
+            y.append(row["y"])
+            model.adapt(bin, row["y"])
+
+    save_tmp = pd.concat(save_tmp)
+    save_tmp["p"] = p
+    stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
+    return stats, raw
+
+
 def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
+
+    if TWO_BUTTONS:
+        df["rating"] = df["rating"].replace({2: 3, 4: 3})
     df["i"] = df.groupby("card_id").cumcount() + 1
     df.drop(df[df["i"] > max_seq_len * 2].index, inplace=True)
     if (
@@ -2359,17 +2651,23 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         and "elapsed_days" in df.columns
         and "elapsed_seconds" in df.columns
     ):
+        df["delta_t"] = df["elapsed_days"]
         if secs_ivl:
-            df["delta_t"] = df["elapsed_seconds"] / 86400
-        else:
-            df["delta_t"] = df["elapsed_days"]
+            df["delta_t_secs"] = df["elapsed_seconds"] / 86400
+            df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
+
     if not SHORT_TERM:
+        # exclude reviews that are on the same day from features and labels
         df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
         df["i"] = df.groupby("card_id").cumcount() + 1
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
-    t_history = df.groupby("card_id", group_keys=False)["delta_t"].apply(
+    t_history_non_secs = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
+    if secs_ivl:
+        t_history_secs = df.groupby("card_id", group_keys=False)["delta_t_secs"].apply(
+            lambda x: cum_concat([[i] for i in x])
+        )
     r_history = df.groupby("card_id", group_keys=False)["rating"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
@@ -2377,27 +2675,99 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
     ]
     df["t_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in t_history for item in sublist
+        ",".join(map(str, item[:-1]))
+        for sublist in t_history_non_secs
+        for item in sublist
     ]
+    if secs_ivl:
+        if EQUALIZE_TEST_WITH_NON_SECS:
+            df["t_history"] = [
+                ",".join(map(str, item[:-1]))
+                for sublist in t_history_non_secs
+                for item in sublist
+            ]
+            df["t_history_secs"] = [
+                ",".join(map(str, item[:-1]))
+                for sublist in t_history_secs
+                for item in sublist
+            ]
+        else:
+            df["t_history"] = [
+                ",".join(map(str, item[:-1]))
+                for sublist in t_history_secs
+                for item in sublist
+            ]
+        df["delta_t"] = df["delta_t_secs"]
+        t_history_used = t_history_secs
+    else:
+        t_history_used = t_history_non_secs
+
     if model_name.startswith("FSRS") or model_name in (
         "RNN",
-        "LSTM",
         "GRU",
         "Transformer",
         "SM2-trainable",
         "Anki",
+        "90%",
     ):
         df["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
                 0, 1
             )
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
-    elif model_name == "GRU-P":
+    elif model_name in "LSTM":
+        # Create features (currently unused):
+        # # - number of unique cards in the revlog
+        # # - the number of new cards that were introduced today so far
+        # # - the number of reviews that were done today so far
+        # # - the number of new cards that were introduced since the last review of this card
+        # # - the number of reviews that were done since the last review of this card
+        df["is_new_card"] = (~df["card_id"].duplicated()).astype(int)
+        df["cum_new_cards"] = df["is_new_card"].cumsum()
+        df["diff_new_cards"] = df.groupby("card_id")["cum_new_cards"].diff().fillna(0)
+        df["diff_reviews"] = np.maximum(
+            0, -1 + df.groupby("card_id")["review_th"].diff().fillna(0)
+        )
+        df["cum_new_cards_today"] = df.groupby("day_offset")["is_new_card"].cumsum()
+        df["cum_reviews_today"] = df.groupby("day_offset").cumcount()
+        df["delta_t_days"] = df["elapsed_days"].map(lambda x: max(0, x))
+
+        if secs_ivl:
+            # Use days for the forgetting curve
+            # This also indirectly causes --no_train_on_same_day and --no_test_on_same_day.
+            df["delta_t"] = df["delta_t_days"]
+
+        features = ["delta_t_secs" if secs_ivl else "delta_t", "duration", "rating"]
+
+        def get_history(group):
+            rows = group.apply(
+                lambda row: torch.tensor(
+                    [row[feature] for feature in features],
+                    dtype=torch.float32,
+                    requires_grad=False,
+                ),
+                axis=1,
+            ).tolist()
+
+            cum_rows = list(
+                accumulate(
+                    rows,
+                    lambda x, y: torch.cat((x, y.unsqueeze(0))),
+                    initial=torch.empty(
+                        (0, len(features)), dtype=torch.float32, requires_grad=False
+                    ),
+                )
+            )[:-1]
+            return pd.Series(cum_rows, index=group.index)
+
+        grouped = df.groupby("card_id", group_keys=False)
+        df["tensor"] = grouped[df.columns.difference(["card_id"])].apply(get_history)
+    elif model_name in "GRU-P":
         df["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "HLR":
@@ -2419,7 +2789,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     elif model_name == "ACT-R":
         df["tensor"] = [
             (torch.cumsum(torch.tensor([t_item]), dim=1)).transpose(0, 1)
-            for t_sublist in t_history
+            for t_sublist in t_history_used
             for t_item in t_sublist
         ]
     elif model_name in ("DASH", "DASH[MCM]"):
@@ -2456,7 +2826,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
                 dash_tw_features(r_item[:-1], t_item[1:], "MCM" in model_name),
                 dtype=torch.float32,
             )
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "DASH[ACT-R]":
@@ -2473,7 +2843,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
                 dash_actr_features(r_item[:-1], t_item[1:]),
                 dtype=torch.float32,
             )
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "NN-17":
@@ -2488,7 +2858,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
             torch.tensor(
                 (t_item[:-1], r_item[:-1], r_history_to_l_history(r_item[:-1]))
             ).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "SM2":
@@ -2496,15 +2866,20 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     elif model_name.startswith("Ebisu"):
         df["sequence"] = [
             tuple(zip(t_item[:-1], r_item[:-1]))
-            for t_sublist, r_sublist in zip(t_history, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
     if SHORT_TERM:
-        df = df[(df["elapsed_days"] != 0) | (df["i"] == 1)].copy()
-        df["i"] = df.groupby("card_id").cumcount() + 1
+        df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
+    df["i"] = (
+        df.groupby("card_id")
+        .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
+        .reset_index(level=0, drop=True)
+        + 1
+    )
     if not secs_ivl:
         filtered_dataset = (
             df[df["i"] == 2]
@@ -2524,19 +2899,31 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
 def create_features(df, model_name="FSRSv3"):
     if SECS_IVL and EQUALIZE_TEST_WITH_NON_SECS:
         df_non_secs = create_features_helper(df.copy(), model_name, False)
-        df = create_features_helper(df, model_name, True)
+        df_secs = create_features_helper(df.copy(), model_name, True)
+        df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
+        # rmse_bins requires that delta_t, i, r_history, t_history remains the same as with non secs
+        assert len(df_intersect) == len(df_non_secs)
+        assert np.equal(df_intersect["i"], df_non_secs["i"]).all()
+        assert np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all()
+        assert np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all()
 
         tscv = TimeSeriesSplit(n_splits=n_splits)
         for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
             non_secs_test_set = df_non_secs.iloc[non_secs_test_index]
             # For the resulting train set, only allow reviews that are less than the smallest review_th in non_secs_test_set
-            allowed_train = df[df["review_th"] < non_secs_test_set["review_th"].min()]
-            df[f"{split_i}_train"] = df["review_th"].isin(allowed_train["review_th"])
+            allowed_train = df_secs[
+                df_secs["review_th"] < non_secs_test_set["review_th"].min()
+            ]
+            df_secs[f"{split_i}_train"] = df_secs["review_th"].isin(
+                allowed_train["review_th"]
+            )
 
             # For the resulting test set, only allow reviews that exist in non_secs_test_set
-            df[f"{split_i}_test"] = df["review_th"].isin(non_secs_test_set["review_th"])
+            df_secs[f"{split_i}_test"] = df_secs["review_th"].isin(
+                non_secs_test_set["review_th"]
+            )
 
-        return df
+        return df_secs
     else:
         return create_features_helper(df, model_name, SECS_IVL)
 
@@ -2548,14 +2935,18 @@ def process(user_id):
         return process_untrainable(user_id)
     if MODEL_NAME == "AVG":
         return baseline(user_id)
+    if MODEL_NAME == "RMSE-BINS-EXPLOIT":
+        return rmse_bins_exploit(user_id)
     df_revlogs = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
-    if MODEL_NAME in ("RNN", "LSTM", "GRU"):
+    if MODEL_NAME in ("RNN", "GRU"):
         Model = RNN
     elif MODEL_NAME == "GRU-P":
         Model = GRU_P
+    elif MODEL_NAME == "LSTM":
+        Model = LSTM
     elif MODEL_NAME == "FSRSv1":
         Model = FSRS1
     elif MODEL_NAME == "FSRSv2":
@@ -2586,6 +2977,12 @@ def process(user_id):
         Model = SM2
     elif MODEL_NAME == "Anki":
         Model = Anki
+    elif MODEL_NAME == "90%":
+
+        def get_constant_model(state_dict=None):
+            return ConstantModel(0.9)
+
+        Model = get_constant_model
 
     dataset = create_features(df_revlogs, MODEL_NAME)
     if dataset.shape[0] < 6:
@@ -2615,8 +3012,6 @@ def process(user_id):
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         train_set = dataset.iloc[train_index]
         test_set = dataset.iloc[test_index]
-        if NO_TEST_SAME_DAY:
-            test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if EQUALIZE_TEST_WITH_NON_SECS:
             # Ignores the train_index and test_index
             train_set = dataset[dataset[f"{split_i}_train"]]
@@ -2625,29 +3020,48 @@ def process(user_id):
                 None,
                 None,
             )  # train_index and test_index no longer have the same meaning as before
+        if NO_TEST_SAME_DAY:
+            test_set = test_set[test_set["elapsed_days"] > 0].copy()
+        if NO_TRAIN_SAME_DAY:
+            train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
         testsets.append(test_set)
         partition_weights = {}
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
-                model = Model()
+                assert train_partition["review_th"].max() < test_set["review_th"].min()
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
+
+                model = Model()
                 if DRY_RUN:
                     partition_weights[partition] = model.state_dict()
                     continue
-                trainer = Trainer(
-                    model,
-                    train_partition,
-                    None,
-                    n_epoch=model.n_epoch,
-                    lr=model.lr,
-                    wd=model.wd,
-                    batch_size=batch_size,
-                )
-                partition_weights[partition] = trainer.train()
+
+                if MODEL_NAME == "LSTM":
+                    model = model.to(DEVICE)
+                    inner_opt = get_inner_opt(
+                        model.parameters(), path=f"./pretrain/{OPT_NAME}_pretrain.pth"
+                    )
+                    trained_model = finetune(
+                        train_partition, model, inner_opt.state_dict()
+                    )
+                    partition_weights[partition] = copy.deepcopy(
+                        trained_model.state_dict()
+                    )
+                else:
+                    trainer = Trainer(
+                        model,
+                        train_partition,
+                        None,
+                        n_epoch=model.n_epoch,
+                        lr=model.lr,
+                        wd=model.wd,
+                        batch_size=batch_size,
+                    )
+                    partition_weights[partition] = trainer.train()
             except Exception as e:
                 if str(e).endswith("inadequate."):
                     if verbose_inadequate_data:
@@ -2667,10 +3081,14 @@ def process(user_id):
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(Model(weights) if weights else Model())
-            retentions, stabilities = my_collection.batch_predict(partition_testset)
+            retentions, stabilities, difficulties = my_collection.batch_predict(
+                partition_testset
+            )
             partition_testset["p"] = retentions
             if stabilities:
                 partition_testset["s"] = stabilities
+            if difficulties:
+                partition_testset["d"] = difficulties
             p.extend(retentions)
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)

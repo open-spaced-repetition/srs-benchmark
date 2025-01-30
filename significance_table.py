@@ -66,38 +66,40 @@ def format(exponent, n):
 
 if __name__ == "__main__":
     models = [
+        "LSTM-short-secs-equalize_test_with_non_secs",
         "GRU-P-short",
-        "GRU-P",
         "FSRS-5-recency",
         "FSRS-rs",
-        "FSRS-5-preset",
+        "GRU-P",
         "FSRS-5",
-        "FSRS-4.5",
+        "FSRS-5-preset",
         "FSRS-5-deck",
+        "FSRS-4.5",
+        "FSRS-5-pretrain",
         "FSRS-5-binary",
         "FSRSv4",
-        "GRU",
+        "DASH-short",
         "DASH",
         "DASH[MCM]",
-        "FSRS-5-pretrain",
-        "DASH-short",
         "DASH[ACT-R]",
         "FSRS-5-dry-run",
-        "FSRSv2",
-        "FSRSv3",
+        "GRU",
         "NN-17",
         "AVG",
+        "FSRSv3",
         "ACT-R",
+        "FSRSv2",
         "FSRSv1",
         "HLR",
         "Anki",
         "HLR-short",
-        "Anki-dry-run",
-        "SM2-trainable",
-        "SM2-short",
-        "Ebisu-v2",
         "Transformer",
+        "Ebisu-v2",
+        "SM2-trainable",
+        "Anki-dry-run",
+        "SM2-short",
         "SM2",
+        "RMSE-BINS-EXPLOIT",
     ]
     csv_name = f"{len(models)} models.csv"
     print(f"Number of tests={(len(models)-1) ** 2}")
@@ -144,8 +146,8 @@ if __name__ == "__main__":
                 ttest[i, j] = np.nan
                 color_ttest[i, j] = np.nan
             else:
-                df1 = df[f"{models[i]}, RMSE (bins)"]
-                df2 = df[f"{models[j]}, RMSE (bins)"]
+                df1 = df[f"{models[i]}, LogLoss"]
+                df2 = df[f"{models[j]}, LogLoss"]
                 result = wilcoxon_effect_size(df1[:n_collections], df2[:n_collections])
                 p_value = result["p_value"]
                 wilcox[i, j] = result["r"]
@@ -191,6 +193,7 @@ if __name__ == "__main__":
                             color_ttest[i, j] = 4
 
     # small changes to labels
+    index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
     index_5_dry_run = models.index("FSRS-5-dry-run")
     index_anki_dry_run = models.index("Anki-dry-run")
     index_anki_train = models.index("Anki")
@@ -202,6 +205,7 @@ if __name__ == "__main__":
     index_sm2 = models.index("SM2")
     index_sm2_train = models.index("SM2-trainable")
     index_sm2_short = models.index("SM2-short")
+    models[index_lstm] = "LSTM"
     models[index_5_dry_run] = "FSRS-5\ndef. param."
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_anki_train] = "Anki-SM-2\ntrainable"

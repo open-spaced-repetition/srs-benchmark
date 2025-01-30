@@ -39,18 +39,15 @@ a_times = []
 b_times = []
 
 for i in (progress := tqdm(range(1, USER_COUNT, USER_COUNT // N))):
-    USER_ID = sizes[i][0]
-    rows = sizes[i][1]
+    USER_ID, rows = sizes[i]
 
     a_time = timeit(process_wrapper_a, number=1)
     a_times.append(a_time)
-    # print(f"{a_time=}")
     if B_TIME:
         b_time = timeit(process_wrapper_b, number=1)
         b_times.append(b_time)
     else:
         b_time = None
-    # print(f"{b_time=}")
 
     row_counts.append(rows)
     b_description = "" if b_time is None else f", {b_time=:.2f}s"

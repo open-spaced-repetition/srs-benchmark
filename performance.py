@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 USER_COUNT = 10000
-B_TIME = False 
+B_TIME = False
 
 sizes = []
 for id in range(1, USER_COUNT):
@@ -23,13 +23,14 @@ N = 100
 
 
 def process_wrapper_a():
-    script.batch_size = 512 
+    script.batch_size = 512
     script.process(USER_ID)
 
 
 def process_wrapper_b():
-   script.batch_size = 1_000_000_000 # Batch size example
-   script.process(USER_ID)
+    script.batch_size = 1_000_000_000  # Batch size example
+    script.process(USER_ID)
+
 
 count = 0
 

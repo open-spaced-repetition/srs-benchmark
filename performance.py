@@ -69,7 +69,9 @@ for i in (progress := tqdm(range(1, USER_COUNT, USER_COUNT // N))):
 
     row_counts.append(rows)
     b_description = "" if b_time is None else f", {B_NAME}={b_time:.2f}s"
-    progress.set_description(f"{USER_ID=}, {rows=}, {A_NAME}={a_time:.2f}s{b_description}")
+    progress.set_description(
+        f"{USER_ID=}, {rows=}, {A_NAME}={a_time:.2f}s{b_description}"
+    )
 
 total_a_time = sum(a_times)
 total_b_time = sum(b_times)
@@ -95,12 +97,14 @@ print("")
 print(f"{mean(a_losses)=:.5f}")
 print(f"{mean(b_losses)=:.5f}")
 
+plt.suptitle(TITLE)
+
 plt.subplot(1, 2, 1)
 plt.xlabel(f"Revlogs (total={sum(row_counts)})")
 plt.ylabel(f"Seconds (total={sum(a_times):.2f})")
 plt.plot(row_counts, a_times, label=A_NAME)
 plt.plot(row_counts, b_times, label=B_NAME)
-plt.title(f"Time Spent ({TITLE})")
+plt.title(f"Time Spent")
 plt.legend()
 
 plt.subplot(1, 2, 2)
@@ -109,7 +113,7 @@ b_losses_description = "" if len(b_losses) == 0 else f", {mean(b_losses)=:.5f}"
 plt.ylabel(f"Log Loss avg_a={mean(a_losses)}{b_losses_description}")
 plt.plot(row_counts, a_losses, label=A_NAME)
 plt.plot(row_counts, b_losses, label=B_NAME)
-plt.title(f"Loss ({TITLE})")
+plt.title(f"Loss")
 plt.legend()
 
 plt.show()

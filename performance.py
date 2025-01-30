@@ -68,8 +68,8 @@ for i in (progress := tqdm(range(1, USER_COUNT, USER_COUNT // N))):
         b_time = None
 
     row_counts.append(rows)
-    b_description = "" if b_time is None else f", {b_time=:.2f}s"
-    progress.set_description(f"{USER_ID=}, {rows=}, {a_time=:.2f}s{b_description}")
+    b_description = "" if b_time is None else f", {B_NAME}={b_time:.2f}s"
+    progress.set_description(f"{USER_ID=}, {rows=}, {A_NAME}={a_time:.2f}s{b_description}")
 
 total_a_time = sum(a_times)
 total_b_time = sum(b_times)

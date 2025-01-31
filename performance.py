@@ -6,10 +6,11 @@ import pyarrow.parquet as pq
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 import torch
+import os
 
 # Config
-B_TIME = False  # Runs process_wrapper_a and process_wrapper_b to compare
-N = 10  # Number of users to sample
+B_TIME = bool(os.environ.get("B", False))  # Runs process_wrapper_a and process_wrapper_b to compare
+N = int(os.environ.get("N", 50))  # Number of users to sample
 
 # Graph Display Info
 A_NAME = "A"

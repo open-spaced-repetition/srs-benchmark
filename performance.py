@@ -85,9 +85,9 @@ if B_TIME:
     print(f"total b_time for {N} users={total_b_time:.2f}s")
 print("")
 
-print(f"Estimated total a_time (one process)={estimate_time(total_a_time):.2f}s")
+print(f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s")
 print(
-    f"Estimated total a_time (one process)={estimate_time(total_a_time) // 60 * 60:.2f}h"
+    f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) // 60 * 60:.2f}h"
 )
 if B_TIME:
     print(

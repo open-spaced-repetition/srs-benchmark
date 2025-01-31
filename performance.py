@@ -81,7 +81,7 @@ total_b_time = sum(b_times)
 
 
 def estimate_time(secs: int):
-    return (secs * USER_COUNT) // (N * script.PROCESSES)
+    return (secs * USER_COUNT) / (N * script.PROCESSES)
 
 
 print(f"total a_time for {N} users={total_a_time:.2f}s")
@@ -93,11 +93,11 @@ print(
     f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s"
 )
 print(
-    f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) // 60 * 60:.2f}h"
+    f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) / 60 * 60:.2f}h"
 )
 if B_TIME:
     print(
-        f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) * USER_COUNT // N:.2f}s"
+        f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) * USER_COUNT / N:.2f}s"
     )
     print(
         f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) / (60 * 60):.2f}h"

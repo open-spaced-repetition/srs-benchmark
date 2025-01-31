@@ -133,7 +133,7 @@ plt.xlabel(f"Revlogs")
 plt.ylabel(f"Log Loss")
 plt.plot(row_counts, a_losses, label=f"{A_NAME} avg={mean(a_losses):.5f}")
 if B_TIME:
-    plt.plot(row_counts, b_losses, label=f"{B_NAME} avg={mean(b_losses)=:.5f}")
+    plt.plot(row_counts, b_losses, label=f"{B_NAME} avg={mean(b_losses):.5f}")
 plt.title(f"Loss")
 plt.legend()
 

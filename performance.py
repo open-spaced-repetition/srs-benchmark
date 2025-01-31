@@ -9,7 +9,9 @@ import torch
 import os
 
 # Config
-B_TIME = bool(os.environ.get("B", False))  # Runs process_wrapper_a and process_wrapper_b to compare
+B_TIME = bool(
+    os.environ.get("B", False)
+)  # Runs process_wrapper_a and process_wrapper_b to compare
 N = int(os.environ.get("N", 50))  # Number of users to sample
 
 # Graph Display Info
@@ -77,15 +79,19 @@ for i in (progress := tqdm(range(1, USER_COUNT, USER_COUNT // N))):
 total_a_time = sum(a_times)
 total_b_time = sum(b_times)
 
+
 def estimate_time(secs: int):
     return (secs * USER_COUNT) // (N * script.PROCESSES)
+
 
 print(f"total a_time for {N} users={total_a_time:.2f}s")
 if B_TIME:
     print(f"total b_time for {N} users={total_b_time:.2f}s")
 print("")
 
-print(f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s")
+print(
+    f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s"
+)
 print(
     f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) // 60 * 60:.2f}h"
 )
@@ -107,9 +113,17 @@ plt.suptitle(TITLE)
 plt.subplot(1, 2, 1)
 plt.xlabel(f"Revlogs (total={sum(row_counts)})")
 plt.ylabel(f"Seconds")
-plt.plot(row_counts, a_times, label=f"{A_NAME} {N} in {sum(a_times):.2f}s, estimated={estimate_time(total_a_time) / (60 * 60):.2f}h")
+plt.plot(
+    row_counts,
+    a_times,
+    label=f"{A_NAME} {N} in {sum(a_times):.2f}s, estimated={estimate_time(total_a_time) / (60 * 60):.2f}h",
+)
 if B_TIME:
-    plt.plot(row_counts, b_times, label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / (60 * 60):.2f}h")
+    plt.plot(
+        row_counts,
+        b_times,
+        label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / (60 * 60):.2f}h",
+    )
 plt.title(f"Time Spent")
 plt.legend()
 

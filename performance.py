@@ -35,7 +35,6 @@ for id in range(1, USER_COUNT):
 sizes = sorted(sizes, key=lambda e: e[1])
 
 indexes = range(1, USER_COUNT, USER_COUNT // N)
-row_counts = [sizes[i][1] for i in indexes]
 a_times = np.zeros(N)
 b_times = np.zeros(N)
 
@@ -44,11 +43,13 @@ b_losses = np.zeros(N)
 
 
 def process_wrapper(uid: int):
+    start = timeit.default_timer()
     (result, _), err = script.process(uid)
+    time = timeit.default_timer() - start
     if err:
         print(err)
         exit(-1)
-    return result
+    return result, time
 
 
 def process_wrapper_a(uid: int):
@@ -62,9 +63,7 @@ def process_wrapper_b(uid: int):
 
 
 def performance_process(uid: int, i: int, wrapper, name):
-    start = timeit.default_timer()
-    result = wrapper(uid)
-    time = timeit.default_timer() - start
+    result, time = wrapper(uid)
     loss = result["metrics"]["LogLoss"]
     return uid, i, time, loss, name
 
@@ -74,15 +73,15 @@ with ProcessPoolExecutor(script.PROCESSES) as executor:
     future_args = [
         (
             [
-                (performance_process, uid, i, process_wrapper_a, A_NAME),
-                (performance_process, uid, i, process_wrapper_b, B_NAME),
+                (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
+                (performance_process, sizes[user_index][0], i, process_wrapper_b, B_NAME),
             ]
             if B_TIME
             else [
-                (performance_process, uid, i, process_wrapper_a, A_NAME),
+                (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
             ]
         )
-        for i, uid in enumerate(indexes)
+        for i, user_index in enumerate(indexes)
     ]
 
     futures = [executor.submit(*args) for argss in future_args for args in argss]
@@ -91,7 +90,7 @@ with ProcessPoolExecutor(script.PROCESSES) as executor:
         progress := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
     ):
         uid, i, time, loss, name = future.result()
-        progress.set_description(f"{uid=}, rows={row_counts[i]}, {name}={time:.2f}s")
+        progress.set_description(f"{uid=}, rows={sizes[uid][1]}, {name}={time:.2f}s")
         if name == A_NAME:
             a_times[i] = time
             a_losses[i] = loss

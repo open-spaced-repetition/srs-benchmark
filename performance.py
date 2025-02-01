@@ -1,12 +1,14 @@
 # You can pass arguments to this script as if it were script.py
 from statistics import mean
 import script
-from timeit import timeit
+import timeit
 import pyarrow.parquet as pq
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 import torch
 import os
+import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Config
 B_TIME = bool(
@@ -32,49 +34,71 @@ for id in range(1, USER_COUNT):
 
 sizes = sorted(sizes, key=lambda e: e[1])
 
+indexes = range(1, USER_COUNT, USER_COUNT // N)
+row_counts = [sizes[i][1] for i in indexes]
+a_times = np.zeros(N)
+b_times = np.zeros(N)
 
-row_counts = []
-a_times = []
-b_times = []
-
-a_losses = []
-b_losses = []
+a_losses = np.zeros(N)
+b_losses = np.zeros(N)
 
 
-def process_wrapper(loss_to: list[int], uid: int):
+def process_wrapper(uid: int):
     (result, _), err = script.process(uid)
     if err:
         print(err)
         exit(-1)
-    loss_to.append(result["metrics"]["LogLoss"])
+    return result
 
 
 def process_wrapper_a(uid: int):
     torch.set_num_threads(2)
-    process_wrapper(a_losses, uid)
+    return process_wrapper(uid)
 
 
-def process_wrapper_b(uid):
+def process_wrapper_b(uid: int):
     torch.set_num_threads(3)  # Num threads example
-    process_wrapper(b_losses, uid)
+    return process_wrapper(uid)
 
 
-for i in (progress := tqdm(range(1, USER_COUNT, USER_COUNT // N))):
-    USER_ID, rows = sizes[i]
+def performance_process(uid: int, i: int, wrapper, name):
+    start = timeit.default_timer()
+    result = wrapper(uid)
+    time = timeit.default_timer() - start
+    loss = result["metrics"]["LogLoss"]
+    return uid, i, time, loss, name
 
-    a_time = timeit(lambda: process_wrapper_a(USER_ID), number=1)
-    a_times.append(a_time)
-    if B_TIME:
-        b_time = timeit(lambda: process_wrapper_b(USER_ID), number=1)
-        b_times.append(b_time)
-    else:
-        b_time = None
 
-    row_counts.append(rows)
-    b_description = "" if b_time is None else f", {B_NAME}={b_time:.2f}s"
-    progress.set_description(
-        f"{USER_ID=}, {rows=}, {A_NAME}={a_time:.2f}s{b_description}"
-    )
+with ProcessPoolExecutor(script.PROCESSES) as executor:
+
+    future_args = [
+        (
+            [
+                (performance_process, uid, i, process_wrapper_a, A_NAME),
+                (performance_process, uid, i, process_wrapper_b, B_NAME),
+            ]
+            if B_TIME
+            else [
+                (performance_process, uid, i, process_wrapper_a, A_NAME),
+            ]
+        )
+        for i, uid in enumerate(indexes)
+    ]
+
+    futures = [executor.submit(*args) for argss in future_args for args in argss]
+
+    for future in (
+        progress := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
+    ):
+        uid, i, time, loss, name = future.result()
+        progress.set_description(f"{uid=}, rows={row_counts[i]}, {name}={time:.2f}s")
+        if name == A_NAME:
+            a_times[i] = time
+            a_losses[i] = loss
+        else:
+            b_times[i] = time
+            b_losses[i] = loss
+
 
 total_a_time = sum(a_times)
 total_b_time = sum(b_times)

@@ -16,6 +16,7 @@ B_TIME = bool(
     os.environ.get("B", False)
 )  # Runs process_wrapper_a and process_wrapper_b to compare
 N = int(os.environ.get("N", 50))  # Number of users to sample
+MEMORY = bool(os.environ.get("MEM", False)) # Significantly impacts run speed
 
 # Graph Display Info
 A_NAME = "A"
@@ -24,6 +25,12 @@ TITLE = "Generic"
 
 # Don't change
 USER_COUNT = 10000
+
+if not MEMORY:
+    noop = lambda: (0, 0)
+    tracemalloc.start = noop
+    tracemalloc.stop = noop
+    tracemalloc.get_tracemalloc_memory = noop
 
 sizes = []
 for id in range(1, USER_COUNT):
@@ -48,12 +55,12 @@ a_memory = np.zeros(N)
 b_memory = np.zeros(N)
 
 def process_wrapper(uid: int):
-    start = timeit.default_timer()
     tracemalloc.start()
+    start = timeit.default_timer()
     (result, _), err = script.process(uid)
     _, memory = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
     time = timeit.default_timer() - start
+    tracemalloc.stop()
     if err:
         print(err)
         exit(-1)
@@ -141,9 +148,11 @@ print(f"{mean(a_losses)=:.5f}")
 if B_TIME:
     print(f"{mean(b_losses)=:.5f}")
 
+GRAPHS = 2 if not MEMORY else 3
+
 plt.suptitle(TITLE)
 
-plt.subplot(1, 3, 1)
+plt.subplot(1, GRAPHS, 1)
 plt.xlabel(f"Revlogs (total={sum(row_counts)})")
 plt.ylabel(f"Seconds")
 plt.plot(
@@ -160,17 +169,18 @@ if B_TIME:
 plt.title(f"Time Spent")
 plt.legend()
 
-plt.subplot(1, 3, 2)
-plt.xlabel(f"Revlogs")
+if MEMORY:
+    plt.subplot(1, GRAPHS, 2)
+    plt.xlabel(f"Revlogs")
 
-plt.ylabel(f"Bytes")
-plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.5f}")
-if B_TIME:
-    plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.5f}")
-plt.title(f"Memory")
-plt.legend()
+    plt.ylabel(f"Bytes")
+    plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.5f}")
+    if B_TIME:
+        plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.5f}")
+    plt.title(f"Memory")
+    plt.legend()
 
-plt.subplot(1, 3, 3)
+plt.subplot(1, GRAPHS, GRAPHS)
 plt.xlabel(f"Revlogs")
 
 plt.ylabel(f"Log Loss")

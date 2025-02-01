@@ -9,6 +9,7 @@ import torch
 import os
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import tracemalloc
 
 # Config
 B_TIME = bool(
@@ -35,21 +36,28 @@ for id in range(1, USER_COUNT):
 sizes = sorted(sizes, key=lambda e: e[1])
 
 indexes = range(1, USER_COUNT, USER_COUNT // N)
+row_counts = [sizes[i][1] for i in indexes]
+
 a_times = np.zeros(N)
 b_times = np.zeros(N)
 
 a_losses = np.zeros(N)
 b_losses = np.zeros(N)
 
+a_memory = np.zeros(N)
+b_memory = np.zeros(N)
 
 def process_wrapper(uid: int):
     start = timeit.default_timer()
+    tracemalloc.start()
     (result, _), err = script.process(uid)
+    _, memory = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
     time = timeit.default_timer() - start
     if err:
         print(err)
         exit(-1)
-    return result, time
+    return result, time, memory
 
 
 def process_wrapper_a(uid: int):
@@ -63,9 +71,9 @@ def process_wrapper_b(uid: int):
 
 
 def performance_process(uid: int, i: int, wrapper, name):
-    result, time = wrapper(uid)
+    result, time, memory = wrapper(uid)
     loss = result["metrics"]["LogLoss"]
-    return uid, i, time, loss, name
+    return uid, i, time, memory, loss, name
 
 
 with ProcessPoolExecutor(script.PROCESSES) as executor:
@@ -89,14 +97,16 @@ with ProcessPoolExecutor(script.PROCESSES) as executor:
     for future in (
         progress := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
     ):
-        uid, i, time, loss, name = future.result()
+        uid, i, time, memory, loss, name = future.result()
         progress.set_description(f"{uid=}, rows={sizes[uid][1]}, {name}={time:.2f}s")
         if name == A_NAME:
             a_times[i] = time
             a_losses[i] = loss
+            a_memory[i] = memory
         else:
             b_times[i] = time
             b_losses[i] = loss
+            b_memory[i] = memory
 
 
 total_a_time = sum(a_times)
@@ -133,7 +143,7 @@ if B_TIME:
 
 plt.suptitle(TITLE)
 
-plt.subplot(1, 2, 1)
+plt.subplot(1, 3, 1)
 plt.xlabel(f"Revlogs (total={sum(row_counts)})")
 plt.ylabel(f"Seconds")
 plt.plot(
@@ -150,7 +160,17 @@ if B_TIME:
 plt.title(f"Time Spent")
 plt.legend()
 
-plt.subplot(1, 2, 2)
+plt.subplot(1, 3, 2)
+plt.xlabel(f"Revlogs")
+
+plt.ylabel(f"Bytes")
+plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.5f}")
+if B_TIME:
+    plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.5f}")
+plt.title(f"Memory")
+plt.legend()
+
+plt.subplot(1, 3, 3)
 plt.xlabel(f"Revlogs")
 
 plt.ylabel(f"Log Loss")

@@ -174,9 +174,9 @@ if MEMORY:
     plt.xlabel(f"Revlogs")
 
     plt.ylabel(f"Bytes")
-    plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.5f}")
+    plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.0f}")
     if B_TIME:
-        plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.5f}")
+        plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.0f}")
     plt.title(f"Memory")
     plt.legend()
 

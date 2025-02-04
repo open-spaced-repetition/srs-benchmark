@@ -82,112 +82,111 @@ def performance_process(uid: int, i: int, wrapper, name):
     loss = result["metrics"]["LogLoss"]
     return uid, i, time, memory, loss, name
 
+if __name__ == "__main__":
+    with ProcessPoolExecutor(script.PROCESSES) as executor:
+        future_args = [
+            (
+                [
+                    (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
+                    (performance_process, sizes[user_index][0], i, process_wrapper_b, B_NAME),
+                ]
+                if B_TIME
+                else [
+                    (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
+                ]
+            )
+            for i, user_index in enumerate(indexes)
+        ]
 
-with ProcessPoolExecutor(script.PROCESSES) as executor:
+        futures = [executor.submit(*args) for argss in future_args for args in argss]
 
-    future_args = [
-        (
-            [
-                (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
-                (performance_process, sizes[user_index][0], i, process_wrapper_b, B_NAME),
-            ]
-            if B_TIME
-            else [
-                (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
-            ]
+        for future in (
+            progress := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
+        ):
+            uid, i, time, memory, loss, name = future.result()
+            progress.set_description(f"{uid=}, rows={sizes[uid][1]}, {name}={time:.2f}s")
+            if name == A_NAME:
+                a_times[i] = time
+                a_losses[i] = loss
+                a_memory[i] = memory
+            else:
+                b_times[i] = time
+                b_losses[i] = loss
+                b_memory[i] = memory
+
+
+    total_a_time = sum(a_times)
+    total_b_time = sum(b_times)
+
+
+    def estimate_time(secs: int):
+        return (secs * USER_COUNT) / (N * script.PROCESSES)
+
+
+    print(f"total a_time for {N} users={total_a_time:.2f}s")
+    if B_TIME:
+        print(f"total b_time for {N} users={total_b_time:.2f}s")
+    print("")
+
+    print(
+        f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s"
+    )
+    print(
+        f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) / 60 * 60:.2f}h"
+    )
+    if B_TIME:
+        print(
+            f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) * USER_COUNT / N:.2f}s"
         )
-        for i, user_index in enumerate(indexes)
-    ]
+        print(
+            f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) / (60 * 60):.2f}h"
+        )
 
-    futures = [executor.submit(*args) for argss in future_args for args in argss]
+    print("")
+    print(f"{mean(a_losses)=:.5f}")
+    if B_TIME:
+        print(f"{mean(b_losses)=:.5f}")
 
-    for future in (
-        progress := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
-    ):
-        uid, i, time, memory, loss, name = future.result()
-        progress.set_description(f"{uid=}, rows={sizes[uid][1]}, {name}={time:.2f}s")
-        if name == A_NAME:
-            a_times[i] = time
-            a_losses[i] = loss
-            a_memory[i] = memory
-        else:
-            b_times[i] = time
-            b_losses[i] = loss
-            b_memory[i] = memory
+    GRAPHS = 2 if not MEMORY else 3
 
+    plt.suptitle(TITLE)
 
-total_a_time = sum(a_times)
-total_b_time = sum(b_times)
-
-
-def estimate_time(secs: int):
-    return (secs * USER_COUNT) / (N * script.PROCESSES)
-
-
-print(f"total a_time for {N} users={total_a_time:.2f}s")
-if B_TIME:
-    print(f"total b_time for {N} users={total_b_time:.2f}s")
-print("")
-
-print(
-    f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s"
-)
-print(
-    f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) / 60 * 60:.2f}h"
-)
-if B_TIME:
-    print(
-        f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) * USER_COUNT / N:.2f}s"
-    )
-    print(
-        f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) / (60 * 60):.2f}h"
-    )
-
-print("")
-print(f"{mean(a_losses)=:.5f}")
-if B_TIME:
-    print(f"{mean(b_losses)=:.5f}")
-
-GRAPHS = 2 if not MEMORY else 3
-
-plt.suptitle(TITLE)
-
-plt.subplot(1, GRAPHS, 1)
-plt.xlabel(f"Revlogs (total={sum(row_counts)})")
-plt.ylabel(f"Seconds")
-plt.plot(
-    row_counts,
-    a_times,
-    label=f"{A_NAME} {N} in {sum(a_times):.2f}s, estimated={estimate_time(total_a_time) / (60 * 60):.2f}h",
-)
-if B_TIME:
+    plt.subplot(1, GRAPHS, 1)
+    plt.xlabel(f"Revlogs (total={sum(row_counts)})")
+    plt.ylabel(f"Seconds")
     plt.plot(
         row_counts,
-        b_times,
-        label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / (60 * 60):.2f}h",
+        a_times,
+        label=f"{A_NAME} {N} in {sum(a_times):.2f}s, estimated={estimate_time(total_a_time) / (60 * 60):.2f}h",
     )
-plt.title(f"Time Spent")
-plt.legend()
-
-if MEMORY:
-    plt.subplot(1, GRAPHS, 2)
-    plt.xlabel(f"Revlogs")
-
-    plt.ylabel(f"Bytes")
-    plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.0f}")
     if B_TIME:
-        plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.0f}")
-    plt.title(f"Memory")
+        plt.plot(
+            row_counts,
+            b_times,
+            label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / (60 * 60):.2f}h",
+        )
+    plt.title(f"Time Spent")
     plt.legend()
 
-plt.subplot(1, GRAPHS, GRAPHS)
-plt.xlabel(f"Revlogs")
+    if MEMORY:
+        plt.subplot(1, GRAPHS, 2)
+        plt.xlabel(f"Revlogs")
 
-plt.ylabel(f"Log Loss")
-plt.plot(row_counts, a_losses, label=f"{A_NAME} avg={mean(a_losses):.5f}")
-if B_TIME:
-    plt.plot(row_counts, b_losses, label=f"{B_NAME} avg={mean(b_losses):.5f}")
-plt.title(f"Loss")
-plt.legend()
+        plt.ylabel(f"Bytes")
+        plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.0f}")
+        if B_TIME:
+            plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.0f}")
+        plt.title(f"Memory")
+        plt.legend()
 
-plt.show()
+    plt.subplot(1, GRAPHS, GRAPHS)
+    plt.xlabel(f"Revlogs")
+
+    plt.ylabel(f"Log Loss")
+    plt.plot(row_counts, a_losses, label=f"{A_NAME} avg={mean(a_losses):.5f}")
+    if B_TIME:
+        plt.plot(row_counts, b_losses, label=f"{B_NAME} avg={mean(b_losses):.5f}")
+    plt.title(f"Loss")
+    plt.legend()
+
+    plt.show()

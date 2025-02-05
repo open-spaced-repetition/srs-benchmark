@@ -16,7 +16,7 @@ B_TIME = bool(
     os.environ.get("B", False)
 )  # Runs process_wrapper_a and process_wrapper_b to compare
 N = int(os.environ.get("N", 50))  # Number of users to sample
-MEMORY = bool(os.environ.get("MEM", False)) # Significantly impacts run speed
+MEMORY = bool(os.environ.get("MEM", False))  # Significantly impacts run speed
 
 # Graph Display Info
 A_NAME = "A"
@@ -54,6 +54,7 @@ b_losses = np.zeros(N)
 a_memory = np.zeros(N)
 b_memory = np.zeros(N)
 
+
 def process_wrapper(uid: int):
     tracemalloc.start()
     start = timeit.default_timer()
@@ -82,17 +83,36 @@ def performance_process(uid: int, i: int, wrapper, name):
     loss = result["metrics"]["LogLoss"]
     return uid, i, time, memory, loss, name
 
+
 if __name__ == "__main__":
     with ProcessPoolExecutor(script.PROCESSES) as executor:
         future_args = [
             (
                 [
-                    (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
-                    (performance_process, sizes[user_index][0], i, process_wrapper_b, B_NAME),
+                    (
+                        performance_process,
+                        sizes[user_index][0],
+                        i,
+                        process_wrapper_a,
+                        A_NAME,
+                    ),
+                    (
+                        performance_process,
+                        sizes[user_index][0],
+                        i,
+                        process_wrapper_b,
+                        B_NAME,
+                    ),
                 ]
                 if B_TIME
                 else [
-                    (performance_process, sizes[user_index][0], i, process_wrapper_a, A_NAME),
+                    (
+                        performance_process,
+                        sizes[user_index][0],
+                        i,
+                        process_wrapper_a,
+                        A_NAME,
+                    ),
                 ]
             )
             for i, user_index in enumerate(indexes)
@@ -104,7 +124,9 @@ if __name__ == "__main__":
             progress := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
         ):
             uid, i, time, memory, loss, name = future.result()
-            progress.set_description(f"{uid=}, rows={sizes[uid][1]}, {name}={time:.2f}s")
+            progress.set_description(
+                f"{uid=}, rows={sizes[uid][1]}, {name}={time:.2f}s"
+            )
             if name == A_NAME:
                 a_times[i] = time
                 a_losses[i] = loss
@@ -114,14 +136,11 @@ if __name__ == "__main__":
                 b_losses[i] = loss
                 b_memory[i] = memory
 
-
     total_a_time = sum(a_times)
     total_b_time = sum(b_times)
 
-
     def estimate_time(secs: int):
         return (secs * USER_COUNT) / (N * script.PROCESSES)
-
 
     print(f"total a_time for {N} users={total_a_time:.2f}s")
     if B_TIME:
@@ -132,14 +151,14 @@ if __name__ == "__main__":
         f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s"
     )
     print(
-        f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) / 60 * 60:.2f}h"
+        f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time) / 60 / 60:.2f}h"
     )
     if B_TIME:
         print(
             f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) * USER_COUNT / N:.2f}s"
         )
         print(
-            f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) / (60 * 60):.2f}h"
+            f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) / 60 / 60:.2f}h"
         )
 
     print("")
@@ -157,13 +176,13 @@ if __name__ == "__main__":
     plt.plot(
         row_counts,
         a_times,
-        label=f"{A_NAME} {N} in {sum(a_times):.2f}s, estimated={estimate_time(total_a_time) / (60 * 60):.2f}h",
+        label=f"{A_NAME} {N} in {sum(a_times):.2f}s, estimated={estimate_time(total_a_time) / 60 / 60:.2f}h",
     )
     if B_TIME:
         plt.plot(
             row_counts,
             b_times,
-            label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / (60 * 60):.2f}h",
+            label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / 60 / 60:.2f}h",
         )
     plt.title(f"Time Spent")
     plt.legend()
@@ -172,10 +191,18 @@ if __name__ == "__main__":
         plt.subplot(1, GRAPHS, 2)
         plt.xlabel(f"Revlogs")
 
-        plt.ylabel(f"Bytes")
-        plt.plot(row_counts, a_memory, label=f"{A_NAME} avg={mean(a_memory):.0f}")
+        plt.ylabel(f"Memory (MB)")
+        plt.plot(
+            row_counts,
+            [x / 1024 / 1024 for x in a_memory],
+            label=f"{A_NAME} avg={mean(a_memory)/1024/1024:.1f}MB",
+        )
         if B_TIME:
-            plt.plot(row_counts, b_memory, label=f"{B_NAME} avg={mean(b_memory):.0f}")
+            plt.plot(
+                row_counts,
+                [x / 1024 / 1024 for x in b_memory],
+                label=f"{B_NAME} avg={mean(b_memory)/1024/1024:.1f}MB",
+            )
         plt.title(f"Memory")
         plt.legend()
 

@@ -73,7 +73,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 **IL** = **i**nterval **l**engths
 
-**FIL** = **f**ractional aka non-integer **i**nterval **l**engths
+**FIL** = **f**ractional (aka non-integer) **i**nterval **l**engths
 
 **IL+G** = **i**nterval **l**engths and **g**rades (Again/Hard/Good/Easy)
 

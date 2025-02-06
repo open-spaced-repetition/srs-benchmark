@@ -88,15 +88,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # IL = interval lengths
-    # (F)IL = (fractional aka non-integer) interval lengths
-    # IL+G or (F)IL+G = (fractional) interval lengths and grades (Again/Hard/Good/Easy)
+
+    # FIL = fractional (aka non-integer) interval lengths
+
+    # IL+G = interval lengths and grades (Again/Hard/Good/Easy)
+
+    # FIL+G = fractional interval lengths and grades
+
     # SR = same-day (or short-term) reviews
+
     # AT = answer time (duration of the review)
     
     models = (
         [
             (dev_mode_name, None, None),
-            ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "(F)IL+G, SR, AT"),
+            ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL+G, SR, AT"),
             ("GRU-P-short", 297, "IL+G, SR"),
             ("GRU-P", 297, "IL+G"),
             ("FSRS-5-recency", 19, "IL+G, SR"),
@@ -135,14 +141,14 @@ if __name__ == "__main__":
         if not args.secs
         else [
             (dev_mode_name, None, None),
-            ("GRU-P-secs", 297, "(F)IL+G, SR"),
-            ("DASH[MCM]-secs", 9, "(F)IL+G, SR"),
-            ("DASH-secs", 9, "(F)IL+G, SR"),
-            ("NN-17-secs", 39, "(F)IL+G, SR"),
-            ("FSRS-4.5-secs", 17, "(F)IL+G, SR"),
-            ("GRU-secs", 39, "(F)IL+G, SR"),
-            ("DASH[ACT-R]-secs", 5, "(F)IL+G, SR"),
-            ("ACT-R-secs", 5, "(F)IL+G, SR"),
+            ("GRU-P-secs", 297, "FIL+G, SR"),
+            ("DASH[MCM]-secs", 9, "FIL+G, SR"),
+            ("DASH-secs", 9, "FIL+G, SR"),
+            ("NN-17-secs", 39, "FIL+G, SR"),
+            ("FSRS-4.5-secs", 17, "FIL+G, SR"),
+            ("GRU-secs", 39, "FIL+G, SR"),
+            ("DASH[ACT-R]-secs", 5, "FIL+G, SR"),
+            ("ACT-R-secs", 5, "FIL+G, SR"),
             ("AVG-secs", 0, "---"),
         ]
     )

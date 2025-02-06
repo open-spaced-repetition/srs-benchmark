@@ -69,9 +69,10 @@ def weighted_avg_and_std(values, weights):
     values, weights -- NumPy ndarrays with the same shape.
     """
     average = np.average(values, weights=weights)
-    # Fast and numerically precise:
-    variance = np.average((values - average) ** 2, weights=weights)
-    return (average, math.sqrt(variance))
+    # Bevington, P. R., Data Reduction and Error Analysis for the Physical Sciences, 336 pp., McGraw-Hill, 1969
+    n_eff = np.square(np.sum(weights)) / np.sum(np.square(weights))
+    variance = np.average((values - average) ** 2, weights=weights) * (n_eff / (n_eff - 1))
+    return (average, np.sqrt(variance))
 
 
 if __name__ == "__main__":

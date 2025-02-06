@@ -73,9 +73,11 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 **IL** = **i**nterval **l**engths
 
-**(F)IL** = (**f**ractional aka non-integer) **i**nterval **l**engths
+**FIL** = **f**ractional aka non-integer **i**nterval **l**engths
 
-**IL+G** or **(F)IL+G** = (**f**ractional) **i**nterval **l**engths and **g**rades (Again/Hard/Good/Easy)
+**IL+G** = **i**nterval **l**engths and **g**rades (Again/Hard/Good/Easy)
+
+**FIL+G** = **f**ractional **i**nterval **l**engths and **g**rades
 
 **SR** = **s**ame-day (or **s**hort-term) **r**eviews
 
@@ -86,7 +88,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 | Model | Parameters | Log Loss | RMSE (bins) | AUC | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **LSTM** | 8869 | **0.312±0.0078** | 0.035±0.0011 | **0.733±0.0038** | (F)IL+G, SR, AT |
+| **LSTM** | 8869 | **0.312±0.0078** | 0.035±0.0011 | **0.733±0.0038** | FIL+G, SR, AT |
 | GRU-P-short | 297 | 0.320±0.0080 | 0.042±0.0013 | 0.710±0.0047 | IL+G, SR|
 | GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 | IL+G |
 | FSRS-5 recency | 19 | 0.326±0.0082 | 0.049±0.0015 | 0.706±0.0041 | IL+G, SR |
@@ -125,7 +127,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 | Model | Parameters | Log Loss | RMSE (bins) | AUC | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **LSTM** | 8869 | **0.333±0.0042** | 0.0538±0.00096 | **0.733±0.0021** | (F)IL+G, SR, AT |
+| **LSTM** | 8869 | **0.333±0.0042** | 0.0538±0.00096 | **0.733±0.0021** | FIL+G, SR, AT |
 | GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 | IL+G, SR|
 | GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 | IL+G |
 | FSRS-5 recency | 19 | 0.354±0.0044 | 0.072±0.0012 | 0.704±0.0023 | IL+G, SR|

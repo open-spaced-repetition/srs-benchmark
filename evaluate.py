@@ -88,61 +88,65 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # IL = interval lengths
-    # (F)IL = (fractional aka non-integer) interval lengths
-    # IL+G or (F)IL+G = (fractional) interval lengths and grades (Again/Hard/Good/Easy)
+
+    # FIL = fractional (aka non-integer) interval lengths
+
+    # G = grades (Again/Hard/Good/Easy)
+
     # SR = same-day (or short-term) reviews
+
     # AT = answer time (duration of the review)
     
     models = (
         [
             (dev_mode_name, None, None),
-            ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "(F)IL+G, SR, AT"),
-            ("GRU-P-short", 297, "IL+G, SR"),
-            ("GRU-P", 297, "IL+G"),
-            ("FSRS-5-recency", 19, "IL+G, SR"),
-            ("FSRS-5-preset", 19, "IL+G, SR"),
-            ("FSRS-rs", 19, "IL+G, SR"),
-            ("FSRS-5", 19, "IL+G, SR"),
-            ("FSRS-5-disable_short_term", 17, "IL+G"),
-            ("FSRS-4.5", 17, "IL+G"),
-            ("FSRS-5-deck", 19, "IL+G, SR"),
-            ("FSRS-5-binary", 15, "IL+G, SR"),
-            ("FSRSv4", 17, "IL+G"),
-            ("DASH", 9, "IL+G"),
-            ("GRU", 39, "IL+G"),
-            ("DASH[MCM]", 9, "IL+G"),
-            ("DASH-short", 9, "IL+G, SR"),
-            ("DASH[ACT-R]", 5, "IL+G"),
-            ("FSRSv2", 14, "IL+G"),
-            ("FSRS-5-pretrain", 4, "IL+G, SR"),
-            ("FSRSv3", 13, "IL+G"),
-            ("NN-17", 39, "IL+G"),
-            ("FSRS-5-dry-run", 0, "IL+G, SR"),
+            ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL, G, SR, AT"),
+            ("GRU-P-short", 297, "IL, G, SR"),
+            ("GRU-P", 297, "IL, G"),
+            ("FSRS-5-recency", 19, "IL, G, SR"),
+            ("FSRS-5-preset", 19, "IL, G, SR"),
+            ("FSRS-rs", 19, "IL, G, SR"),
+            ("FSRS-5", 19, "IL, G, SR"),
+            ("FSRS-5-disable_short_term", 17, "IL, G"),
+            ("FSRS-4.5", 17, "IL, G"),
+            ("FSRS-5-deck", 19, "IL, G, SR"),
+            ("FSRS-5-binary", 15, "IL, G, SR"),
+            ("FSRSv4", 17, "IL, G"),
+            ("DASH", 9, "IL, G"),
+            ("GRU", 39, "IL, G"),
+            ("DASH[MCM]", 9, "IL, G"),
+            ("DASH-short", 9, "IL, G, SR"),
+            ("DASH[ACT-R]", 5, "IL, G"),
+            ("FSRSv2", 14, "IL, G"),
+            ("FSRS-5-pretrain", 4, "IL, G, SR"),
+            ("FSRSv3", 13, "IL, G"),
+            ("NN-17", 39, "IL, G"),
+            ("FSRS-5-dry-run", 0, "IL, G, SR"),
             ("ACT-R", 5, "IL"),
-            ("FSRSv1", 7, "IL+G"),
+            ("FSRSv1", 7, "IL, G"),
             ("AVG", 0, "---"),
-            ("Anki", 7, "IL+G"),
-            ("HLR", 3, "IL+G"),
-            ("HLR-short", 3, "IL+G, SR"),
-            ("SM2-trainable", 6, "IL+G"),
-            ("Anki-dry-run", 0, "IL+G"),
-            ("SM2-short", 0, "IL+G, SR"),
-            ("SM2", 0, "IL+G"),
-            ("Ebisu-v2", 0, "IL+G"),
-            ("Transformer", 127, "IL+G"),
-            ("RMSE-BINS-EXPLOIT", 0, "IL+G"),
+            ("Anki", 7, "IL, G"),
+            ("HLR", 3, "IL, G"),
+            ("HLR-short", 3, "IL, G, SR"),
+            ("SM2-trainable", 6, "IL, G"),
+            ("Anki-dry-run", 0, "IL, G"),
+            ("SM2-short", 0, "IL, G, SR"),
+            ("SM2", 0, "IL, G"),
+            ("Ebisu-v2", 0, "IL, G"),
+            ("Transformer", 127, "IL, G"),
+            ("RMSE-BINS-EXPLOIT", 0, "IL, G"),
         ]
         if not args.secs
         else [
             (dev_mode_name, None, None),
-            ("GRU-P-secs", 297, "(F)IL+G, SR"),
-            ("DASH[MCM]-secs", 9, "(F)IL+G, SR"),
-            ("DASH-secs", 9, "(F)IL+G, SR"),
-            ("NN-17-secs", 39, "(F)IL+G, SR"),
-            ("FSRS-4.5-secs", 17, "(F)IL+G, SR"),
-            ("GRU-secs", 39, "(F)IL+G, SR"),
-            ("DASH[ACT-R]-secs", 5, "(F)IL+G, SR"),
-            ("ACT-R-secs", 5, "(F)IL+G, SR"),
+            ("GRU-P-secs", 297, "FIL, G, SR"),
+            ("DASH[MCM]-secs", 9, "FIL, G, SR"),
+            ("DASH-secs", 9, "FIL, G, SR"),
+            ("NN-17-secs", 39, "FIL, G, SR"),
+            ("FSRS-4.5-secs", 17, "FIL, G, SR"),
+            ("GRU-secs", 39, "FIL, G, SR"),
+            ("DASH[ACT-R]-secs", 5, "FIL, G, SR"),
+            ("ACT-R-secs", 5, "FIL, G, SR"),
             ("AVG-secs", 0, "---"),
         ]
     )

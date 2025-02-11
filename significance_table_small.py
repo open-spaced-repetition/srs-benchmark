@@ -186,7 +186,7 @@ if __name__ == "__main__":
     ax.set_title(
         f"Wilcoxon signed-rank test, r-values ({n_collections} collections)",
         fontsize=24,
-        pad=10,
+        10,
     )
     cmap = matplotlib.colors.ListedColormap(
         ["darkred", "red", "coral", "silver", "limegreen", "#199819", "darkgreen"]
@@ -208,8 +208,8 @@ if __name__ == "__main__":
                     fontsize=17,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models, fontsize=10, rotation=45)
-    ax.set_yticks(np.arange(n), labels=models, fontsize=10)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=14, rotation=45)
+    ax.set_yticks(np.arange(n), labels=models, fontsize=14)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     ax.set_title(
         f"T-test, Cohen's d ({n_collections} collections)",
         fontsize=24,
-        pad=30,
+        pad=10,
     )
     plt.imshow(color_ttest, interpolation="none", vmin=0, cmap=cmap)
     for i in range(n):

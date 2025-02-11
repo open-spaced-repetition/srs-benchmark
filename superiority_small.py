@@ -119,7 +119,7 @@ if __name__ == "__main__":
     ax.set_title(
         f"Percent of collections where algorithm A (row) outperforms algorithm B (column)",
         fontsize=22,
-        pad=30,
+        pad=10,
     )
 
     def rgb2hex(list):

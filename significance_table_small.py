@@ -186,7 +186,7 @@ if __name__ == "__main__":
     ax.set_title(
         f"Wilcoxon signed-rank test, r-values ({n_collections} collections)",
         fontsize=24,
-        10,
+        pad=10,
     )
     cmap = matplotlib.colors.ListedColormap(
         ["darkred", "red", "coral", "silver", "limegreen", "#199819", "darkgreen"]

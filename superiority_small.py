@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 if __name__ == "__main__":
     models = [
         "LSTM-short-secs-equalize_test_with_non_secs",
-        "GRU-P",
+        "GRU-P-short",
         "FSRS-5-recency",
         "FSRS-4.5",
         "FSRSv4",

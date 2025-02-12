@@ -177,6 +177,6 @@ if __name__ == "__main__":
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")
     for location in ["left", "right", "top", "bottom"]:
         ax.spines[location].set_linewidth(2)
-    title = f"Wilcoxon-{n_collections}-collections"
-    plt.savefig(f"./plots/{title}.png", bbox_inches="tight")
+
+    plt.savefig(f"./plots/Wilcoxon (small), {n_collections} collections.png", bbox_inches="tight")
     # plt.show()

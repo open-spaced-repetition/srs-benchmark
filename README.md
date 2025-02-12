@@ -172,7 +172,7 @@ To make the table easier to read, not all the algorithms are included.
 
 ![Superiority, 9999](./plots/Superiority-small-9999-collections.png)
 
-Additionally, you can find the full table [here](Jarrett help plz).
+Additionally, you can find the full table [here](./plots/Superiority-9999.png).
 
 ### Statistical significance
 
@@ -198,7 +198,7 @@ To make the table easier to read, not all the algorithms are included.
 
 ![Wilcoxon, 9999 collections](./plots/Wilcoxon-small-9999-collections.png)
 
-Additionally, you can find the full table [here](Jarrett help plz).
+Additionally, you can find the full table [here](./plots/Wilcoxon-9999-collections.png).
 
 ## Default Parameters
 

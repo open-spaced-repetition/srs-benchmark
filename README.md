@@ -166,39 +166,39 @@ Unweighted averages are more representative of "average case" performance. In re
 
 ### Superiority
 
-The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, GRU-P-short has a 96.0% superiority over the Transformer, meaning that for 96.0% of all collections in this benchmark, GRU-P-short can estimate the probability of recall more accurately than the Transformer. This is based on 9,999 collections.
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, FSRS-5-recency has a 99.4% superiority over the Anki's variant of SM-2 with default parameters, meaning that for 99.4% of all collections in this benchmark, FSRS-5-recency can estimate the probability of recall more accurately. This is based on 9,999 collections. However, please keep in mind that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
 
-![Superiority, 9999](./plots/Superiority-9999.png)
+To make the table easier to read, not all the algorithms are included.
 
-You may have noticed that FSRS-5 has a 99.3% superiority over Anki's variant of SM-2, meaning that for 99.3% of users, the Log Loss with FSRS-5 will be lower than with Anki's variant of SM-2. But please remember that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
+![Superiority, 9999](./plots/Superiority-small-9999-collections.png)
+
+Additionally, you can find the full table [here](Jarrett help plz).
 
 ### Statistical significance
 
-The figures below show two different measures of effect size comparing the Log Loss between all pairs of algorithms:
+The figures below show effect sizes comparing the Log Loss between all pairs of algorithms using the Wilcoxon signed-rank test r-values:
 
-1. Wilcoxon signed-rank test r-values (effect sizes)
-2. Paired t-test Cohen's d values (effect sizes)
-
-For both visualizations, the colors indicate:
+The colors indicate:
 
 - Red shades indicate the row algorithm performs worse than the column algorithm:
-  - Dark red: large effect (r > 0.5 or d > 0.5)
-  - Red: medium effect (0.5 ≥ r > 0.2 or 0.5 ≥ d > 0.2) 
-  - Light red: small effect (r ≤ 0.2 or d ≤ 0.2)
+  - Dark red: large effect (r > 0.5)
+  - Red: medium effect (0.5 ≥ r > 0.2) 
+  - Light red: small effect (r ≤ 0.2)
 
 - Green shades indicate the row algorithm performs better than the column algorithm:
-  - Dark green: large effect (r > 0.5 or d > 0.5)
-  - Green: medium effect (0.5 ≥ r > 0.2 or 0.5 ≥ d > 0.2) 
-  - Light green: small effect (r ≤ 0.2 or d ≤ 0.2)
+  - Dark green: large effect (r > 0.5)
+  - Green: medium effect (0.5 ≥ r > 0.2) 
+  - Light green: small effect (r ≤ 0.2)
 
 - Grey indicates that the p-value is greater than 0.01, meaning we cannot conclude which algorithm performs better.
 
-The Wilcoxon test is non-parametric and considers both the sign and rank of differences between pairs, while the t-test assumes normality and provides Cohen's d as a standardized measure of the difference between means. Both tests are paired, comparing algorithms' performance on the same collections, but do not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
+The Wilcoxon test considers both the sign and rank of differences between pairs, but it does not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
 
-![Wilcoxon, 9999 collections](./plots/Wilcoxon-9999-collections.png)
-![T-test, 9999 collections](./plots/T-test-9999-collections.png)
+To make the table easier to read, not all the algorithms are included.
 
-You may have noticed that the two tests don't always agree on which algorithms are better or worse. This is because the Wilcoxon test only considers the sign and rank of differences, while the t-test also considers the magnitude of differences.
+![Wilcoxon, 9999 collections](./plots/Wilcoxon-small-9999-collections.png)
+
+Additionally, you can find the full table [here](Jarrett help plz).
 
 ## Default Parameters
 

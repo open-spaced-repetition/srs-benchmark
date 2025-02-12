@@ -182,6 +182,5 @@ if __name__ == "__main__":
     for location in ["left", "right", "top", "bottom"]:
         ax.spines[location].set_linewidth(2)
 
-    title = f"Superiority-{n_collections}"
-    plt.savefig(f"./plots/{title}.png", bbox_inches="tight")
+    plt.savefig(f"./plots/Superiority, {n_collections} (small).png", bbox_inches="tight")
     # plt.show()

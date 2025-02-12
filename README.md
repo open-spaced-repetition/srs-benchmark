@@ -166,9 +166,9 @@ Unweighted averages are more representative of "average case" performance. In re
 
 ### Superiority
 
-The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, FSRS-5-recency has a 99.4% superiority over the Anki's variant of SM-2 with default parameters, meaning that for 99.4% of all collections in this benchmark, FSRS-5-recency can estimate the probability of recall more accurately. This is based on 9,999 collections. However, please keep in mind that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added.
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, FSRS-5-recency has a 99.4% superiority over the Anki's variant of SM-2 with default parameters, meaning that for 99.4% of all collections in this benchmark, FSRS-5-recency can estimate the probability of recall more accurately. However, please keep in mind that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added to it.
 
-To make the table easier to read, not all the algorithms are included.
+This table is based on 9,999 collections. To make the table easier to read, not all the algorithms are included.
 
 ![Superiority, 9999](./plots/Superiority-small-9999-collections.png)
 

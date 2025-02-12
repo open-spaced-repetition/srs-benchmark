@@ -72,7 +72,9 @@ def weighted_avg_and_std(values, weights):
     # Bevington, P. R., Data Reduction and Error Analysis for the Physical Sciences, 336 pp., McGraw-Hill, 1969
     # https://seismo.berkeley.edu/~kirchner/Toolkits/Toolkit_12.pdf
     n_eff = np.square(np.sum(weights)) / np.sum(np.square(weights))
-    variance = np.average((values - average) ** 2, weights=weights) * (n_eff / (n_eff - 1))
+    variance = np.average((values - average) ** 2, weights=weights) * (
+        n_eff / (n_eff - 1)
+    )
     return (average, np.sqrt(variance))
 
 
@@ -98,7 +100,7 @@ if __name__ == "__main__":
     # SR = same-day (or short-term) reviews
 
     # AT = answer time (duration of the review)
-    
+
     models = (
         [
             (dev_mode_name, None, None),

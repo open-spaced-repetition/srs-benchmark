@@ -205,6 +205,7 @@ if __name__ == "__main__":
     index_sm2 = models.index("SM2")
     index_sm2_train = models.index("SM2-trainable")
     index_sm2_short = models.index("SM2-short")
+    index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_lstm] = "LSTM"
     models[index_5_dry_run] = "FSRS-5\ndef. param."
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
@@ -217,7 +218,9 @@ if __name__ == "__main__":
     models[index_sm2] = "SM-2\ndef. param."
     models[index_sm2_train] = "SM-2 trainable"
     models[index_sm2_short] = "SM-2-short"
+    models[index_Ebisu_v2] = "Ebisu v2"
 
+    
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
         f"Wilcoxon signed-rank test, r-values ({n_collections} collections)",

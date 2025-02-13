@@ -125,7 +125,7 @@ if __name__ == "__main__":
         ):
             uid, i, time, memory, loss, name = future.result()
             progress.set_description(
-                f"{uid=}, rows={sizes[uid][1]}, {name}={time:.2f}s"
+                f"{uid=}, rows={row_counts[i]}, {name}={time:.2f}s"
             )
             if name == A_NAME:
                 a_times[i] = time

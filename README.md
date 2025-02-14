@@ -28,7 +28,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 - Root Mean Square Error in Bins (RMSE (bins)): this is a metric designed for use in the SRS benchmark. In this approach, predictions and review outcomes are grouped into bins based on three features: the interval length, the number of reviews, and the number of lapses. Within each bin, the squared difference between the average predicted probability of recall and the average recall rate is calculated. These values are then weighted according to the sample size in each bin, and then the final weighted root mean square error is calculated. This metric provides a nuanced understanding of algorithm performance across different probability ranges. For more details, you can read [The Metric](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Metric). RMSE (bins) ranges from 0 to 1, lower is better.
 - AUC (Area under the ROC Curve): this metric tells us how much the algorithm is capable of distinguishing between classes. AUC ranges from 0 to 1, however, in practice it's almost always greater than 0.5; higher is better.
 
-Log Loss and RMSE (bins) measure calibration: how well predicted probabilities of recall match the real data. AUC measures discrimination: how well the algorithm can tell two (or more, generally speaking) classes apart. AUC can be good even if Log Loss and RMSE are poor.
+Log Loss and RMSE (bins) measure calibration: how well predicted probabilities of recall match the real data. AUC measures discrimination: how well the algorithm can tell two (or more, generally speaking) classes apart. AUC can be good (high) even if Log Loss and RMSE are poor.
 
 ### Algorithms
 
@@ -116,7 +116,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | HLR-short | 3 | 0.44±0.013 | 0.116±0.0036 | 0.615±0.0062 | IL, G, SR |
 | SM-2 trainable | 6 | 0.44±0.012 | 0.119±0.0033 | 0.599±0.0050 | IL, G |
 | Transformer | 127 | 0.45±0.012 | 0.166±0.0049 | 0.519±0.0065 | IL, G |
-| Ebisu-v2 | 0 | 0.46±0.012 | 0.158±0.0038 | 0.594±0.0050 | IL, G |
+| Ebisu v2 | 0 | 0.46±0.012 | 0.158±0.0038 | 0.594±0.0050 | IL, G |
 | Anki-SM-2 | 0 | 0.49±0.015 | 0.128±0.0037 | 0.597±0.0055 | IL, G |
 | SM-2-short | 0 | 0.51±0.015 | 0.128±0.0038 | 0.593±0.0064 | IL, G, SR |
 | SM-2 | 0 | 0.55±0.017 | 0.148±0.0041 | 0.600±0.0051 | IL, G |
@@ -153,7 +153,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | HLR | 3 | 0.469±0.0073 | 0.128±0.0019 | 0.637±0.0026 | IL, G |
 | FSRS v1 | 7 | 0.491±0.0080 | 0.132±0.0022 | 0.630±0.0025 | IL, G |
 | HLR-short | 3 | 0.493±0.0079 | 0.140±0.0021 | 0.611±0.0029 | IL, G, SR|
-| Ebisu-v2 | 0 | 0.499±0.0078 | 0.163±0.0021 | 0.605±0.0026 | IL, G |
+| Ebisu v2 | 0 | 0.499±0.0078 | 0.163±0.0021 | 0.605±0.0026 | IL, G |
 | Anki-SM-2 trainable | 7 | 0.513±0.0089 | 0.140±0.0024 | 0.618±0.0023 | IL, G |
 | SM-2 trainable | 6 | 0.58±0.012 | 0.170±0.0028 | 0.597±0.0025 | IL, G |
 | Anki-SM-2 | 0 | 0.62±0.011 | 0.172±0.0026 | 0.613±0.0022 | IL, G |

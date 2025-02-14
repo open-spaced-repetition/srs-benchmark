@@ -139,10 +139,12 @@ if __name__ == "__main__":
     index_anki_dry_run = models.index("Anki-dry-run")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
+    index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_lstm] = "LSTM"
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
+    models[index_Ebisu_v2] = "Ebisu v2"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

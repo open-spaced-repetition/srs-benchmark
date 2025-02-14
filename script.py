@@ -231,13 +231,11 @@ def create_time_series(df):
 @catch_exceptions
 def process(user_id):
     plt.close("all")
-    columns = ["card_id", "day_offset", "rating", "elapsed_days"]
+    columns = ["card_id", "rating", "elapsed_days"]
     if SECS_IVL:
         columns.append("elapsed_seconds")
     df_revlogs = pd.read_parquet(
-        DATA_PATH / "revlogs",
-        filters=[("user_id", "=", user_id), ("rating", "in", [1, 2, 3, 4])],
-        columns=columns,
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id), ("rating", "in", [1, 2, 3, 4])], columns=columns 
     )
     dataset = create_time_series(df_revlogs)
     if dataset.shape[0] < 6:

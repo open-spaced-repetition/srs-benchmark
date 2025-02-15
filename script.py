@@ -167,20 +167,15 @@ def cum_concat(x):
 def create_time_series(df):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
-    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
     df["i"] = df.groupby("card_id").cumcount() + 1
     df.drop(df[df["i"] > max_seq_len * 2].index, inplace=True)
     card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
     if BINARY:
         df.loc[:, "rating"] = df.loc[:, "rating"].map({1: 1, 2: 3, 3: 3, 4: 3})
-    if (
-        "delta_t" not in df.columns
-        and "elapsed_days" in df.columns
-        and "elapsed_seconds" in df.columns
-    ):
-        if SECS_IVL:
+    if "delta_t" not in df.columns:
+        if SECS_IVL and "elapsed_seconds" in df.columns:
             df["delta_t"] = df["elapsed_seconds"] / 86400
-        else:
+        elif "elapsed_days" in df.columns:
             df["delta_t"] = df["elapsed_days"]
     t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[max(0, i)] for i in x])
@@ -236,8 +231,13 @@ def create_time_series(df):
 @catch_exceptions
 def process(user_id):
     plt.close("all")
+    columns = ["card_id", "rating", "elapsed_days"]
+    if SECS_IVL:
+        columns.append("elapsed_seconds")
     df_revlogs = pd.read_parquet(
-        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        DATA_PATH / "revlogs",
+        filters=[("user_id", "=", user_id), ("rating", "in", [1, 2, 3, 4])],
+        columns=columns,
     )
     dataset = create_time_series(df_revlogs)
     if dataset.shape[0] < 6:

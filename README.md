@@ -276,7 +276,7 @@ Then run the following command:
 python script.py --rust
 ```
 
-Dev model in fsrs-optimizer:
+Dev algorithm in fsrs-optimizer:
 
 ```bash
 python script.py --dev
@@ -311,7 +311,7 @@ python script.py --plot
 Benchmark FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
-python other.py --model FSRSv4
+python other.py --algo FSRSv4
 ```
 
-> Please change the `--model` argument to `FSRSv3`, `HLR`, `GRU`, or `SM2` to run the corresponding algorithm.
+> Please change the `--algo` argument to `FSRSv3`, `HLR`, `LSTM`, or `SM2` to run the corresponding algorithm.

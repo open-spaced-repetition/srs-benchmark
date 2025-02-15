@@ -30,7 +30,7 @@ args = parser.parse_args()
 
 DEV_MODE = args.dev
 DRY_RUN = args.dry
-MODEL_NAME = args.model
+MODEL_NAME = args.algo
 SHORT_TERM = args.short
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
@@ -125,6 +125,12 @@ S_MAX = 36500
 
 
 class FSRS(nn.Module):
+    def __init__(self):
+        super(FSRS, self).__init__()
+
+    def forgetting_curve(self, t, s):
+        raise NotImplementedError("Forgetting curve not implemented")
+
     def iter(
         self,
         sequences: Tensor,
@@ -2345,7 +2351,7 @@ class Trainer:
     ) -> None:
         self.model = MODEL.to(device=DEVICE)
         if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
-            self.model.pretrain(train_set)
+            self.model.pretrain(train_set)  # type: ignore
         if isinstance(MODEL, (RNN, Transformer, GRU_P)):
             self.optimizer = torch.optim.AdamW(
                 self.model.parameters(), lr=lr, weight_decay=wd

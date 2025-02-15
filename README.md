@@ -32,7 +32,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
 
 ### Algorithms and algorithm families
 
-- DSR: **D**ifficulty, **S**tability, **R**etrievability model of memory. Sometimes the difficulty variable is excluded.
+- DSR **D**ifficulty, **S**tability, **R**etrievability model of memory:
     - FSRS v1 and v2: the initial experimental versions of FSRS.
     - FSRS v3: the first official release of the FSRS algorithm, made available as a custom scheduling script.
     - FSRS v4: the upgraded version of FSRS, made better with help from the community.
@@ -48,24 +48,24 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
 
-- Alternative models of memory.
+- Alternative models of memory:
     - DASH: the algorithm proposed in [this paper](https://scholar.colorado.edu/concern/graduate_thesis_or_dissertations/zp38wc97m). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this algorithm: DASH[MCM] and DASH[ACT-R]. For further information, please refer to [this paper](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
     - ACT-R: the algorithm proposed in [this paper](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
 
-- Neural networks.
+- Neural networks:
     - Transformer: a type of neural network that has gained popularity in recent years due to its superior performance in natural language processing. ChatGPT is based on this architecture.
     - GRU: a type of recurrent neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. Both GRU and Transformer use the same power forgetting curve as FSRS-4.5 and FSRS-5 to make the comparison more fair.
         - GRU-P: a variant of GRU that removes the fixed forgetting curve and predicts the probability of recall directly. This makes it more flexible than GRU, but also more prone to making strange predictions, such as the probability of recall *increasing* over time.
     - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews, fractional intervals, and the duration of review as part of its input. It must be fine-tuned on some data before it can be used.
     - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 
-- SM-2-based algorithms. Originally, they weren't designed to predict the probability of recall.
+- SM-2-based algorithms:
     - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve. The algorithm is described by Piotr Wozniak [here](https://super-memory.com/english/ol/sm2.htm).
         - SM-2 trainable: SM-2 algorithm with optimizable parameters.
     - Anki-SM-2: a variant of the SM-2 algorithm that is used in Anki.
         - Anki-SM-2 trainable: Anki algorithm with optimizable parameters.
 
-- Other.
+- Other:
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.
     - RMSE-BINS-EXPLOIT: an algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.
 

@@ -65,7 +65,7 @@ def create_parser():
     )
 
     # other.py only
-    parser.add_argument("--model", default="FSRSv3", help="model name")
+    parser.add_argument("--algo", default="FSRSv3", help="algorithm name")
     parser.add_argument(
         "--short", action="store_true", help="include short-term reviews"
     )

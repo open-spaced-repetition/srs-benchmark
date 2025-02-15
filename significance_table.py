@@ -220,7 +220,6 @@ if __name__ == "__main__":
     models[index_sm2_short] = "SM-2-short"
     models[index_Ebisu_v2] = "Ebisu v2"
 
-    
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
         f"Wilcoxon signed-rank test, r-values ({n_collections} collections)",

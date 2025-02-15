@@ -60,10 +60,10 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 
 - SM-2-based algorithms. Originally, they weren't designed to predict the probability of recall.
-- SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve. The algorithm is described by Piotr Wozniak [here](https://super-memory.com/english/ol/sm2.htm).
-  - SM-2 trainable: SM-2 algorithm with optimizable parameters.
-- Anki-SM-2: a variant of the SM-2 algorithm that is used in Anki.
-  - Anki-SM-2 trainable: Anki algorithm with optimizable parameters.
+    - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve. The algorithm is described by Piotr Wozniak [here](https://super-memory.com/english/ol/sm2.htm).
+        - SM-2 trainable: SM-2 algorithm with optimizable parameters.
+    - Anki-SM-2: a variant of the SM-2 algorithm that is used in Anki.
+        - Anki-SM-2 trainable: Anki algorithm with optimizable parameters.
 
 - Other.
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.

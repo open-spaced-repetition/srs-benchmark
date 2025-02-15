@@ -30,7 +30,7 @@ We use three metrics in the SRS benchmark to evaluate how well these algorithms 
 
 Log Loss and RMSE (bins) measure calibration: how well predicted probabilities of recall match the real data. AUC measures discrimination: how well the algorithm can tell two (or more, generally speaking) classes apart. AUC can be good (high) even if Log Loss and RMSE are poor.
 
-### Algorithms
+### Algorithms and algorithm families
 
 - DSR: **D**ifficulty, **S**tability, **R**etrievability model of memory. Sometimes the difficulty variable is excluded.
     - FSRS v1 and v2: the initial experimental versions of FSRS.

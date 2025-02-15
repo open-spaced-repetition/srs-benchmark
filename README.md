@@ -32,7 +32,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
 
 ### Algorithms and algorithm families
 
-- DSR **D**ifficulty, **S**tability, **R**etrievability model of memory:
+- DSR (**D**ifficulty, **S**tability, **R**etrievability) model of memory:
     - FSRS v1 and v2: the initial experimental versions of FSRS.
     - FSRS v3: the first official release of the FSRS algorithm, made available as a custom scheduling script.
     - FSRS v4: the upgraded version of FSRS, made better with help from the community.

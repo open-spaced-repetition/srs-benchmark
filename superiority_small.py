@@ -111,11 +111,13 @@ if __name__ == "__main__":
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_Ebisu_v2 = models.index("Ebisu-v2")
+    index_FSRS_5_recency = models.index("FSRS-5-recency")
     models[index_lstm] = "LSTM"
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
     models[index_Ebisu_v2] = "Ebisu v2"
+    models[index_FSRS_5_recency] = "FSRS-5\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
@@ -175,8 +177,8 @@ if __name__ == "__main__":
                     fontsize=17,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models, fontsize=14, rotation=45)
-    ax.set_yticks(np.arange(n), labels=models, fontsize=14)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=15, rotation=45)
+    ax.set_yticks(np.arange(n), labels=models, fontsize=15)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")

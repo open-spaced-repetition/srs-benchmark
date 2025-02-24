@@ -53,8 +53,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - ACT-R: the algorithm proposed in [this paper](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
 
 - Neural networks:
-    - Transformer: a type of neural network that has gained popularity in recent years due to its superior performance in natural language processing. ChatGPT is based on this architecture.
-    - GRU: a type of recurrent neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. Both GRU and Transformer use the same power forgetting curve as FSRS-4.5 and FSRS-5 to make the comparison more fair.
+    - GRU: a type of recurrent neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. It uses the same power forgetting curve as FSRS-4.5 and FSRS-5 to make the comparison more fair.
         - GRU-P: a variant of GRU that removes the fixed forgetting curve and predicts the probability of recall directly. This makes it more flexible than GRU, but also more prone to making strange predictions, such as the probability of recall *increasing* over time.
     - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews, fractional intervals, and the duration of review as part of its input. It must be fine-tuned on some data before it can be used.
     - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
@@ -124,7 +123,6 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | HLR | 3 | 0.41±0.012 | 0.105±0.0030 | 0.633±0.0050 | IL, G |
 | HLR-short | 3 | 0.44±0.013 | 0.116±0.0036 | 0.615±0.0062 | IL, G, SR |
 | SM-2 trainable | 6 | 0.44±0.012 | 0.119±0.0033 | 0.599±0.0050 | IL, G |
-| Transformer | 127 | 0.45±0.012 | 0.166±0.0049 | 0.519±0.0065 | IL, G |
 | Ebisu v2 | 0 | 0.46±0.012 | 0.158±0.0038 | 0.594±0.0050 | IL, G |
 | Anki-SM-2 | 0 | 0.49±0.015 | 0.128±0.0037 | 0.597±0.0055 | IL, G |
 | SM-2-short | 0 | 0.51±0.015 | 0.128±0.0038 | 0.593±0.0064 | IL, G, SR |
@@ -158,7 +156,6 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | ACT-R | 5 | 0.403±0.0055 | 0.107±0.0017 | 0.522±0.0024 | IL |
 | FSRS v3 | 13 | 0.436±0.0067 | 0.110±0.0020 | 0.661±0.0024 | IL, G |
 | FSRS v2 | 14 | 0.453±0.0072 | 0.110±0.0020 | 0.651±0.0023 | IL, G |
-| Transformer | 127 | 0.468±0.0059 | 0.167±0.0022 | 0.531±0.0030 | IL, G |
 | HLR | 3 | 0.469±0.0073 | 0.128±0.0019 | 0.637±0.0026 | IL, G |
 | FSRS v1 | 7 | 0.491±0.0080 | 0.132±0.0022 | 0.630±0.0025 | IL, G |
 | HLR-short | 3 | 0.493±0.0079 | 0.140±0.0021 | 0.611±0.0029 | IL, G, SR|

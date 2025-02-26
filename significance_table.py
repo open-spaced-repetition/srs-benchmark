@@ -93,7 +93,6 @@ if __name__ == "__main__":
         "HLR",
         "Anki",
         "HLR-short",
-        "Transformer",
         "Ebisu-v2",
         "SM2-trainable",
         "Anki-dry-run",

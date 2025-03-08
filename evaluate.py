@@ -68,6 +68,7 @@ def weighted_avg_and_std(values, weights):
 
     values, weights -- NumPy ndarrays with the same shape.
     """
+    weights = np.float64(weights)  # force 64-bit precision to avoid errors sometimes
     average = np.average(values, weights=weights)
     # Bevington, P. R., Data Reduction and Error Analysis for the Physical Sciences, 336 pp., McGraw-Hill, 1969
     # https://seismo.berkeley.edu/~kirchner/Toolkits/Toolkit_12.pdf

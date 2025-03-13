@@ -56,6 +56,7 @@ model_list = (
     "FSRSv4",
     "FSRS-4.5",
     "FSRS-5",
+    "FSRS-D",
     "Ebisu-v2",
     "SM2",
     "HLR",
@@ -1142,6 +1143,467 @@ class FSRS5(FSRS):
                 dict(self.named_parameters())["w"].data,
             )
         )
+
+
+class FSRS_D_ParameterClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data
+            w[0] = w[0].clamp(S_MIN, 100)
+            w[1] = w[1].clamp(S_MIN, 100)
+            w[2] = w[2].clamp(S_MIN, 100)
+            w[3] = w[3].clamp(S_MIN, 100)
+            w[4] = w[4].clamp(1, 10)
+            w[5] = w[5].clamp(1, 10)
+            w[6] = w[6].clamp(1, 10)
+            w[7] = w[7].clamp(1, 10)
+            w[8] = w[8].clamp(0.001, 4)
+            w[9] = w[9].clamp(0.001, 0.75)
+            w[10] = w[10].clamp(0, 4.5)
+            w[11] = w[11].clamp(0, 0.8)
+            w[12] = w[12].clamp(0.001, 3.5)
+            w[13] = w[13].clamp(0.001, 5)
+            w[14] = w[14].clamp(0.001, 0.25)
+            w[15] = w[15].clamp(0, 4)
+            w[16] = w[16].clamp(0, 1)
+            w[17] = w[17].clamp(1, 6)
+            w[18] = w[18].clamp(0, 2)
+            w[19] = w[19].clamp(0, 2)
+            module.w.data = w
+
+
+class FSRS_D(FSRS):
+    init_w = [
+        0.3042,
+        1.0842,
+        3.4822,
+        16.0782,
+        2.8414,
+        1.5765,
+        1.0003,
+        1.0056,
+        0.9262,
+        0.2276,
+        1.936,
+        0.0334,
+        1.3596,
+        1.9317,
+        0.2276,
+        2.2816,
+        0.2579,
+        3.0986,
+        0.6185,
+        0.6643,
+    ]
+    clipper = FSRS_D_ParameterClipper()
+    lr: float = 4e-2
+    gamma: float = 1
+    wd: float = 1e-5
+    n_epoch: int = 5
+    default_params_stddev_tensor = torch.tensor(
+        [
+            6.61,
+            9.52,
+            17.69,
+            27.74,
+            10.0,
+            10.0,
+            10.0,
+            10.0,
+            0.67,
+            0.12,
+            0.4,
+            0.18,
+            0.34,
+            0.27,
+            0.14,
+            0.57,
+            0.25,
+            1.03,
+            0.27,
+            0.39,
+        ]
+    )
+
+    def __init__(self, w: List[float] = init_w):
+        super(FSRS_D, self).__init__()
+        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+        self.init_w_tensor = self.w.data.clone().to(DEVICE)
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities, difficulties = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=DEVICE),
+        ].transpose(0, 1)
+        retentions = self.forgetting_curve(delta_ts, stabilities, difficulties)
+        output = {
+            "retentions": retentions,
+            "stabilities": stabilities,
+            "difficulties": difficulties,
+        }
+        output["penalty"] = (
+            torch.sum(
+                torch.square(self.w - self.init_w_tensor)
+                / torch.square(self.default_params_stddev_tensor)
+            )
+            * real_batch_size
+            * self.gamma
+        )
+        return output
+
+    def forgetting_curve(self, t, s, d):
+        DECAY = -0.1 * d
+        FACTOR = 0.9 ** (1 / DECAY) - 1
+        return (1 + FACTOR * t / s) ** DECAY
+
+    def stability_after_success(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> Tensor:
+        hard_penalty = torch.where(rating == 2, self.w[16], 1)
+        easy_bonus = torch.where(rating == 4, self.w[17], 1)
+        new_s = state[:, 0] * (
+            1
+            + torch.exp(self.w[10])
+            * torch.pow(state[:, 0], -self.w[11])
+            * (torch.exp((1 - r) * self.w[12]) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
+        return new_s
+
+    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
+        old_s = state[:, 0]
+        new_s = (
+            self.w[13]
+            * (torch.pow(old_s + 1, self.w[14]) - 1)
+            * torch.exp((1 - r) * self.w[15])
+        )
+        new_minimum_s = old_s / torch.exp(self.w[18] * self.w[19])
+        return torch.minimum(new_s, new_minimum_s)
+
+    def stability_short_term(self, state: Tensor, rating: Tensor) -> Tensor:
+        new_s = state[:, 0] * torch.exp(self.w[18] * (rating - 3 + self.w[19]))
+        return new_s
+
+    def init_d(self, rating: Tensor) -> Tensor:
+        keys = torch.tensor([1, 2, 3, 4])
+        keys = keys.view(1, -1).expand(rating.size(0), -1)
+        index = (rating.unsqueeze(1) == keys).nonzero(as_tuple=True)
+        new_d = torch.ones_like(rating, dtype=torch.float32)
+        new_d[index[0]] = self.w[index[1] + 4]
+        return new_d
+
+    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+        return delta_d * (10 - old_d) / 9
+
+    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
+        delta_d = -self.w[8] * (rating - 3)
+        new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
+        new_d = self.mean_reversion(self.init_d(torch.full_like(rating, 4)), new_d)
+        return new_d
+
+    def step(self, X: Tensor, state: Tensor) -> Tensor:
+        """
+        :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
+        :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
+        :return state:
+        """
+        if torch.equal(state, torch.zeros_like(state)):
+            keys = torch.tensor([1, 2, 3, 4], device=DEVICE)
+            keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
+            # first learn, init memory states
+            new_s = torch.ones_like(state[:, 0], device=DEVICE)
+            new_s[index[0]] = self.w[index[1]]
+            new_d = self.init_d(X[:, 1])
+            new_d = new_d.clamp(1, 10)
+        else:
+            r = self.forgetting_curve(X[:, 0], state[:, 0], state[:, 1])
+            short_term = X[:, 0] < 1
+            success = X[:, 1] > 1
+            new_s = torch.where(
+                short_term,
+                self.stability_short_term(state, X[:, 1]),
+                torch.where(
+                    success,
+                    self.stability_after_success(state, r, X[:, 1]),
+                    self.stability_after_failure(state, r),
+                ),
+            )
+            new_d = self.next_d(state, X[:, 1])
+            new_d = new_d.clamp(1, 10)
+        new_s = new_s.clamp(S_MIN, 36500)
+        return torch.stack([new_s, new_d], dim=1)
+
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+        return self.w[9] * init + (1 - self.w[9]) * current
+
+    def state_dict(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+    def pretrain(self, train_set):
+        S0_dataset_group = (
+            train_set[train_set["i"] == 2]
+            .groupby(by=["first_rating", "delta_t"], group_keys=False)
+            .agg({"y": ["mean", "count"]})
+            .reset_index()
+        )
+        rating_stability = {}
+        rating_difficulty = {}
+        rating_count = {}
+        average_recall = train_set["y"].mean()
+        r_s0_default = {str(i): self.init_w[i - 1] for i in range(1, 5)}
+        r_d0_default = {str(i): self.init_w[i + 1] for i in range(1, 5)}
+
+        for first_rating in ("1", "2", "3", "4"):
+            group = S0_dataset_group[S0_dataset_group["first_rating"] == first_rating]
+            if group.empty:
+                if verbose:
+                    tqdm.write(
+                        f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
+                    )
+                continue
+            delta_t = group["delta_t"]
+            if SECS_IVL:
+                recall = group["y"]["mean"]
+            else:
+                recall = (
+                    group["y"]["mean"] * group["y"]["count"] + average_recall * 1
+                ) / (group["y"]["count"] + 1)
+            count = group["y"]["count"]
+
+            init_s0 = r_s0_default[first_rating]
+            init_d0 = r_d0_default[first_rating]
+
+            def loss(params):
+                stability, difficulty = params[0], params[1]
+                y_pred = self.forgetting_curve(delta_t, stability, difficulty)
+                logloss = sum(
+                    -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
+                    * count
+                )
+                l1 = (
+                    (
+                        (np.abs(stability - init_s0) / 16)
+                        + (np.abs(difficulty - init_d0) / 100)
+                    )
+                    if not SECS_IVL
+                    else 0
+                )
+                return logloss + l1
+
+            res = minimize(
+                loss,
+                x0=[init_s0, init_d0],
+                bounds=((S_MIN, 100), (1, 10)),
+                options={"maxiter": int(sum(count))},
+            )
+            params = res.x
+            stability = params[0]
+            difficulty = params[1]
+            rating_stability[int(first_rating)] = stability
+            rating_difficulty[int(first_rating)] = difficulty
+            rating_count[int(first_rating)] = sum(count)
+
+        for small_rating, big_rating in (
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (1, 3),
+            (2, 4),
+            (1, 4),
+        ):
+            if small_rating in rating_stability and big_rating in rating_stability:
+                # if rating_count[small_rating] > 300 and rating_count[big_rating] > 300:
+                #     continue
+                if rating_stability[small_rating] > rating_stability[big_rating]:
+                    if rating_count[small_rating] > rating_count[big_rating]:
+                        rating_stability[big_rating] = rating_stability[small_rating]
+                    else:
+                        rating_stability[small_rating] = rating_stability[big_rating]
+
+            if small_rating in rating_difficulty and big_rating in rating_difficulty:
+                if rating_difficulty[small_rating] < rating_difficulty[big_rating]:
+                    if rating_count[small_rating] > rating_count[big_rating]:
+                        rating_difficulty[big_rating] = rating_difficulty[small_rating]
+                    else:
+                        rating_difficulty[small_rating] = rating_difficulty[big_rating]
+
+        w1 = 0.41
+        w2 = 0.54
+
+        if len(rating_stability) == 0:
+            raise Exception("Not enough data for pretraining!")
+        elif len(rating_stability) == 1:
+            rating = list(rating_stability.keys())[0]
+            factor = rating_stability[rating] / r_s0_default[str(rating)]
+            init_s0 = list(map(lambda x: x * factor, r_s0_default.values()))
+            factor = rating_difficulty[rating] / r_d0_default[str(rating)]
+            init_d0 = list(map(lambda x: x * factor, r_d0_default.values()))
+        elif len(rating_stability) == 2:
+            if 1 not in rating_stability and 2 not in rating_stability:
+                rating_stability[2] = np.power(
+                    rating_stability[3], 1 / (1 - w2)
+                ) * np.power(rating_stability[4], 1 - 1 / (1 - w2))
+                rating_difficulty[2] = np.power(
+                    rating_difficulty[3], 1 / (1 - w2)
+                ) * np.power(rating_difficulty[4], 1 - 1 / (1 - w2))
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+                rating_difficulty[1] = np.power(
+                    rating_difficulty[2], 1 / w1
+                ) * np.power(rating_difficulty[3], 1 - 1 / w1)
+            elif 1 not in rating_stability and 3 not in rating_stability:
+                rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
+                    rating_stability[4], w2
+                )
+                rating_difficulty[3] = np.power(
+                    rating_difficulty[2], 1 - w2
+                ) * np.power(rating_difficulty[4], w2)
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+                rating_difficulty[1] = np.power(
+                    rating_difficulty[2], 1 / w1
+                ) * np.power(rating_difficulty[3], 1 - 1 / w1)
+            elif 1 not in rating_stability and 4 not in rating_stability:
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+                rating_difficulty[4] = np.power(
+                    rating_difficulty[2], 1 - 1 / w2
+                ) * np.power(rating_difficulty[3], 1 / w2)
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+                rating_difficulty[1] = np.power(
+                    rating_difficulty[2], 1 / w1
+                ) * np.power(rating_difficulty[3], 1 - 1 / w1)
+            elif 2 not in rating_stability and 3 not in rating_stability:
+                rating_stability[2] = np.power(
+                    rating_stability[1], w1 / (w1 + w2 - w1 * w2)
+                ) * np.power(rating_stability[4], 1 - w1 / (w1 + w2 - w1 * w2))
+                rating_difficulty[2] = np.power(
+                    rating_difficulty[1], w1 / (w1 + w2 - w1 * w2)
+                ) * np.power(rating_difficulty[4], 1 - w1 / (w1 + w2 - w1 * w2))
+                rating_stability[3] = np.power(
+                    rating_stability[1], 1 - w2 / (w1 + w2 - w1 * w2)
+                ) * np.power(rating_stability[4], w2 / (w1 + w2 - w1 * w2))
+                rating_difficulty[3] = np.power(
+                    rating_difficulty[1], 1 - w2 / (w1 + w2 - w1 * w2)
+                ) * np.power(rating_difficulty[4], w2 / (w1 + w2 - w1 * w2))
+            elif 2 not in rating_stability and 4 not in rating_stability:
+                rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
+                    rating_stability[3], 1 - w1
+                )
+                rating_difficulty[2] = np.power(rating_difficulty[1], w1) * np.power(
+                    rating_difficulty[3], 1 - w1
+                )
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+                rating_difficulty[4] = np.power(
+                    rating_difficulty[2], 1 - 1 / w2
+                ) * np.power(rating_difficulty[3], 1 / w2)
+            elif 3 not in rating_stability and 4 not in rating_stability:
+                rating_stability[3] = np.power(
+                    rating_stability[1], 1 - 1 / (1 - w1)
+                ) * np.power(rating_stability[2], 1 / (1 - w1))
+                rating_difficulty[3] = np.power(
+                    rating_difficulty[1], 1 - 1 / (1 - w1)
+                ) * np.power(rating_difficulty[2], 1 / (1 - w1))
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+                rating_difficulty[4] = np.power(
+                    rating_difficulty[2], 1 - 1 / w2
+                ) * np.power(rating_difficulty[3], 1 / w2)
+            init_s0 = [
+                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+            ]
+            init_d0 = [
+                item[1]
+                for item in sorted(rating_difficulty.items(), key=lambda x: x[0])
+            ]
+        elif len(rating_stability) == 3:
+            if 1 not in rating_stability:
+                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                    rating_stability[3], 1 - 1 / w1
+                )
+                rating_difficulty[1] = np.power(
+                    rating_difficulty[2], 1 / w1
+                ) * np.power(rating_difficulty[3], 1 - 1 / w1)
+            elif 2 not in rating_stability:
+                rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
+                    rating_stability[3], 1 - w1
+                )
+                rating_difficulty[2] = np.power(rating_difficulty[1], w1) * np.power(
+                    rating_difficulty[3], 1 - w1
+                )
+            elif 3 not in rating_stability:
+                rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
+                    rating_stability[4], w2
+                )
+                rating_difficulty[3] = np.power(
+                    rating_difficulty[2], 1 - w2
+                ) * np.power(rating_difficulty[4], w2)
+            elif 4 not in rating_stability:
+                rating_stability[4] = np.power(
+                    rating_stability[2], 1 - 1 / w2
+                ) * np.power(rating_stability[3], 1 / w2)
+                rating_difficulty[4] = np.power(
+                    rating_difficulty[2], 1 - 1 / w2
+                ) * np.power(rating_difficulty[3], 1 / w2)
+            init_s0 = [
+                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+            ]
+            init_d0 = [
+                item[1]
+                for item in sorted(rating_difficulty.items(), key=lambda x: x[0])
+            ]
+        elif len(rating_stability) == 4:
+            init_s0 = [
+                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+            ]
+            init_d0 = [
+                item[1]
+                for item in sorted(rating_difficulty.items(), key=lambda x: x[0])
+            ]
+        self.w.data[0:4] = Tensor(
+            list(map(lambda x: max(min(INIT_S_MAX, x), S_MIN), init_s0))
+        )
+        self.w.data[4:8] = Tensor(list(map(lambda x: max(min(10, x), 1), init_d0)))
+        self.init_w_tensor = self.w.data.clone().to(DEVICE)
 
 
 class RNN(nn.Module):
@@ -2350,7 +2812,7 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.model = MODEL.to(device=DEVICE)
-        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
+        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5, FSRS_D)):
             self.model.pretrain(train_set)  # type: ignore
         if isinstance(MODEL, (RNN, Transformer, GRU_P)):
             self.optimizer = torch.optim.AdamW(
@@ -2967,6 +3429,8 @@ def process(user_id):
         global SHORT_TERM
         SHORT_TERM = True
         Model = FSRS5
+    elif MODEL_NAME == "FSRS-D":
+        Model = FSRS_D
     elif MODEL_NAME == "HLR":
         Model = HLR
     elif MODEL_NAME == "Transformer":

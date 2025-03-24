@@ -16,6 +16,7 @@ from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
 from scipy.optimize import minimize  # type: ignore
+from scipy.stats import binom  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
 from reptile_trainer import get_inner_opt, finetune
@@ -2934,6 +2935,106 @@ def create_features(df, model_name="FSRSv3"):
         return create_features_helper(df, model_name, SECS_IVL)
 
 
+class HighProbabilityBinomialApproximatorCDF:
+    def __init__(self):
+        self.sum_p = 0.0
+        self.sum_p_squared = 0.0
+        self.sum_log_q = 0.0  # For the boundary case
+        self.n = 0
+
+    def add_trial(self, p):
+        """Add a new Bernoulli trial with probability p"""
+        self.sum_p += p
+        self.sum_p_squared += p * p
+        self.sum_log_q += np.log(1 - p) if p < 1 else float("-inf")
+        self.n += 1
+
+    def get_heterogeneity(self):
+        """Calculate coefficient of variation of probabilities"""
+        if self.n <= 1:
+            return 0.0
+
+        p_avg = self.sum_p / self.n
+        p_variance = (self.sum_p_squared / self.n) - (p_avg * p_avg)
+        p_std_dev = np.sqrt(max(0, p_variance))  # Avoid numerical issues
+
+        # Coefficient of variation
+        return p_std_dev / p_avg if p_avg > 0 else 0
+
+    def cdf(self, k):
+        """Calculate probability that number of successes is <= k"""
+        # Handle boundary cases
+        if k < 0:
+            return 0.0
+        elif k == 0:
+            return np.exp(self.sum_log_q)  # Product of (1-p_i)
+        elif k == self.n:
+            return 1.0
+
+        # Get average probability and heterogeneity
+        p_avg = self.sum_p / self.n
+        heterogeneity = self.get_heterogeneity()
+
+        # Parameters that can be fine-tuned (same as in PMF)
+        coeff1 = 0.0256
+        coeff2 = 0.0200
+        coeff3 = 0.95
+        thresh = 0.98
+
+        # For highly heterogeneous distributions
+        if heterogeneity > thresh:
+            # Calculate true variance of the Poisson Binomial
+            true_variance = self.sum_p - self.sum_p_squared  # sum(p*(1-p))
+
+            # Use refined parameter estimation
+            binom_variance = self.n * p_avg * (1 - p_avg)
+
+            if true_variance < binom_variance:
+                # When true variance is lower, we need n_eff > n
+                variance_ratio = (
+                    binom_variance / true_variance if true_variance > 0 else 1.0
+                )
+                n_eff = min(10 * self.n, self.n * variance_ratio)
+            else:
+                # When true variance is higher, we need n_eff < n
+                variance_ratio = (
+                    true_variance / binom_variance if binom_variance > 0 else 1.0
+                )
+                n_eff = max(k, self.n / variance_ratio)  # Ensure n_eff >= k
+
+            # Adjust p to maintain the same mean
+            p_eff = self.sum_p / n_eff if n_eff > 0 else p_avg
+            p_eff = max(min(0.9999, p_eff), 0.0001)  # Ensure it's a valid probability
+
+            # Handle non-integer n_eff
+            n_floor = np.floor(n_eff)
+            n_ceil = np.ceil(n_eff)
+            weight_ceil = n_eff - n_floor
+
+            if n_floor == n_ceil:
+                return binom.cdf(k, n_floor, p_eff)
+            else:
+                # Linear interpolation between binomials
+                cdf_floor = binom.cdf(min(k, n_floor), n_floor, p_eff)
+                cdf_ceil = binom.cdf(k, n_ceil, p_eff)
+                return (1 - weight_ceil) * cdf_floor + weight_ceil * cdf_ceil
+        else:
+            # For nearly homogeneous probabilities, use standard binomial with
+            # small adjustment based on cutoff point
+            cutoff = self.n * p_avg  # Mean as the cutoff point
+
+            if k > cutoff:
+                # For high k values (right tail), slightly increase p
+                adjustment = coeff1 * (p_avg - coeff3)
+                p_adjusted = max(min(0.9999, p_avg + adjustment), 0.0001)
+                return binom.cdf(k, self.n, p_adjusted)
+            else:
+                # For low k values (left tail), slightly decrease p
+                adjustment = coeff2 * (p_avg - coeff3)
+                p_adjusted = max(min(0.9999, p_avg - adjustment), 0.0001)
+                return binom.cdf(k, self.n, p_adjusted)
+
+
 @catch_exceptions
 def process(user_id):
     plt.close("all")
@@ -3158,56 +3259,64 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
 
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
-    unprocessed_users = []
-    dataset = pq.ParquetDataset(DATA_PATH / "revlogs")
-    Path(f"evaluation/{FILE_NAME}").mkdir(parents=True, exist_ok=True)
-    Path("result").mkdir(parents=True, exist_ok=True)
-    Path("raw").mkdir(parents=True, exist_ok=True)
-    result_file = Path(f"result/{FILE_NAME}.jsonl")
-    raw_file = Path(f"raw/{FILE_NAME}.jsonl")
-    if result_file.exists():
-        data = sort_jsonl(result_file)
-        processed_user = set(map(lambda x: x["user"], data))
-    else:
-        processed_user = set()
+    probabilities = np.asarray([0.9, 0.95, 0.9, 0.7, 0.8])
+    n_succ = 1
+    approximator = HighProbabilityBinomialApproximatorCDF()
+    for p in probabilities:
+        approximator.add_trial(p)
+    pmf_1 = [approximator.cdf(n) for n in range(len(probabilities) + 1)]
+    p_value_norm_approx = sum(pmf_1[0 : n_succ + 1])
+    print(p_value_norm_approx)
+    # mp.set_start_method("spawn", force=True)
+    # unprocessed_users = []
+    # dataset = pq.ParquetDataset(DATA_PATH / "revlogs")
+    # Path(f"evaluation/{FILE_NAME}").mkdir(parents=True, exist_ok=True)
+    # Path("result").mkdir(parents=True, exist_ok=True)
+    # Path("raw").mkdir(parents=True, exist_ok=True)
+    # result_file = Path(f"result/{FILE_NAME}.jsonl")
+    # raw_file = Path(f"raw/{FILE_NAME}.jsonl")
+    # if result_file.exists():
+    #     data = sort_jsonl(result_file)
+    #     processed_user = set(map(lambda x: x["user"], data))
+    # else:
+    #     processed_user = set()
 
-    if RAW and raw_file.exists():
-        sort_jsonl(raw_file)
+    # if RAW and raw_file.exists():
+    #     sort_jsonl(raw_file)
 
-    for user_id in dataset.partitioning.dictionaries[0]:
-        if user_id.as_py() in processed_user:
-            continue
-        unprocessed_users.append(user_id.as_py())
+    # for user_id in dataset.partitioning.dictionaries[0]:
+    #     if user_id.as_py() in processed_user:
+    #         continue
+    #     unprocessed_users.append(user_id.as_py())
 
-    unprocessed_users.sort()
+    # unprocessed_users.sort()
 
-    with ProcessPoolExecutor(max_workers=PROCESSES) as executor:
-        futures = [
-            executor.submit(
-                process,
-                user_id,
-            )
-            for user_id in unprocessed_users
-        ]
-        for future in (
-            pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
-        ):
-            try:
-                result, error = future.result()
-                if error:
-                    tqdm.write(error)
-                else:
-                    stats, raw = result
-                    with open(result_file, "a") as f:
-                        f.write(json.dumps(stats, ensure_ascii=False) + "\n")
-                    if raw:
-                        with open(raw_file, "a") as f:
-                            f.write(json.dumps(raw, ensure_ascii=False) + "\n")
-                    pbar.set_description(f"Processed {stats['user']}")
-            except Exception as e:
-                tqdm.write(str(e))
+    # with ProcessPoolExecutor(max_workers=PROCESSES) as executor:
+    #     futures = [
+    #         executor.submit(
+    #             process,
+    #             user_id,
+    #         )
+    #         for user_id in unprocessed_users
+    #     ]
+    #     for future in (
+    #         pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
+    #     ):
+    #         try:
+    #             result, error = future.result()
+    #             if error:
+    #                 tqdm.write(error)
+    #             else:
+    #                 stats, raw = result
+    #                 with open(result_file, "a") as f:
+    #                     f.write(json.dumps(stats, ensure_ascii=False) + "\n")
+    #                 if raw:
+    #                     with open(raw_file, "a") as f:
+    #                         f.write(json.dumps(raw, ensure_ascii=False) + "\n")
+    #                 pbar.set_description(f"Processed {stats['user']}")
+    #         except Exception as e:
+    #             tqdm.write(str(e))
 
-    sort_jsonl(result_file)
-    if RAW:
-        sort_jsonl(raw_file)
+    # sort_jsonl(result_file)
+    # if RAW:
+    #     sort_jsonl(raw_file)

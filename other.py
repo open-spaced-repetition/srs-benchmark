@@ -2935,104 +2935,109 @@ def create_features(df, model_name="FSRSv3"):
         return create_features_helper(df, model_name, SECS_IVL)
 
 
-class HighProbabilityBinomialApproximatorCDF:
-    def __init__(self):
-        self.sum_p = 0.0
-        self.sum_p_squared = 0.0
-        self.sum_log_q = 0.0  # For the boundary case
-        self.n = 0
+def heterogeneous_binomial_log_cdf(sum_p, sum_p_squared, sum_log_q, n, k):
+    """
+    Calculate probability that number of successes is <= k for a heterogeneous binomial distribution
 
-    def add_trial(self, p):
-        """Add a new Bernoulli trial with probability p"""
-        self.sum_p += p
-        self.sum_p_squared += p * p
-        self.sum_log_q += np.log(1 - p) if p < 1 else float("-inf")
-        self.n += 1
+    Args:
+        sum_p: Sum of all probabilities (1-D tensor)
+        sum_p_squared: Sum of squares of all probabilities (1-D tensor)
+        sum_log_q: Sum of log(1-p) for all probabilities (1-D tensor)
+        n: Number of trials (1-D tensor)
+        k: Number of successes to calculate CDF for (1-D tensor)
 
-    def get_heterogeneity(self):
-        """Calculate coefficient of variation of probabilities"""
-        if self.n <= 1:
-            return 0.0
+    Returns:
+        Probability that number of successes is <= k (1-D tensor)
+    """
+    # Initialize result tensor
+    result = torch.zeros_like(k, dtype=torch.float32)
 
-        p_avg = self.sum_p / self.n
-        p_variance = (self.sum_p_squared / self.n) - (p_avg * p_avg)
-        p_std_dev = np.sqrt(max(0, p_variance))  # Avoid numerical issues
+    # Handle boundary cases
+    mask_neg = k < 0
+    mask_zero = k == 0
+    mask_equal_n = k == n
+    mask_process = ~(mask_neg | mask_zero | mask_equal_n)
 
-        # Coefficient of variation
-        return p_std_dev / p_avg if p_avg > 0 else 0
+    # Set values for boundary cases
+    result = torch.where(mask_zero, torch.exp(sum_log_q), result)
+    result = torch.where(mask_equal_n, torch.ones_like(result), result)
 
-    def cdf(self, k):
-        """Calculate probability that number of successes is <= k"""
-        # Handle boundary cases
-        if k < 0:
-            return 0.0
-        elif k == 0:
-            return np.exp(self.sum_log_q)  # Product of (1-p_i)
-        elif k == self.n:
-            return 1.0
+    # Skip processing if no valid cases
+    if not torch.any(mask_process):
+        return result
 
-        # Get average probability and heterogeneity
-        p_avg = self.sum_p / self.n
-        heterogeneity = self.get_heterogeneity()
+    # Get average probability
+    p_avg = sum_p / n
 
-        # Parameters that can be fine-tuned (same as in PMF)
-        coeff1 = 0.0256
-        coeff2 = 0.0200
-        coeff3 = 0.95
-        thresh = 0.98
+    # Calculate heterogeneity (coefficient of variation)
+    p_variance = torch.where(
+        n > 1, (sum_p_squared / n) - (p_avg * p_avg), torch.zeros_like(p_avg)
+    )
+    p_std_dev = torch.sqrt(torch.clamp(p_variance, min=0.0))
+    heterogeneity = torch.where(p_avg > 0, p_std_dev / p_avg, torch.zeros_like(p_avg))
 
-        # For highly heterogeneous distributions
-        if heterogeneity > thresh:
+    # Parameters that can be fine-tuned
+    coeff1 = 0.0256
+    coeff2 = 0.0200
+    coeff3 = 0.95
+    thresh = 0.98
+
+    # Process each element individually using vectorized operations where possible
+    for i in range(len(k)):
+        if not mask_process[i]:
+            continue
+
+        # Determine if distribution is heterogeneous
+        if heterogeneity[i] > thresh:
             # Calculate true variance of the Poisson Binomial
-            true_variance = self.sum_p - self.sum_p_squared  # sum(p*(1-p))
+            true_variance = sum_p[i] - sum_p_squared[i]  # sum(p*(1-p))
 
             # Use refined parameter estimation
-            binom_variance = self.n * p_avg * (1 - p_avg)
+            binom_variance = n[i] * p_avg[i] * (1 - p_avg[i])
 
+            # Determine n_eff based on variance comparison
             if true_variance < binom_variance:
                 # When true variance is lower, we need n_eff > n
-                variance_ratio = (
-                    binom_variance / true_variance if true_variance > 0 else 1.0
-                )
-                n_eff = min(10 * self.n, self.n * variance_ratio)
+                variance_ratio = binom_variance / max(true_variance, 1e-10)
+                n_eff = min(10.0 * n[i], n[i] * variance_ratio)
             else:
                 # When true variance is higher, we need n_eff < n
-                variance_ratio = (
-                    true_variance / binom_variance if binom_variance > 0 else 1.0
-                )
-                n_eff = max(k, self.n / variance_ratio)  # Ensure n_eff >= k
+                variance_ratio = true_variance / max(binom_variance, 1e-10)
+                n_eff = max(float(k[i]), n[i] / variance_ratio)
 
             # Adjust p to maintain the same mean
-            p_eff = self.sum_p / n_eff if n_eff > 0 else p_avg
-            p_eff = max(min(0.9999, p_eff), 0.0001)  # Ensure it's a valid probability
+            p_eff = sum_p[i] / max(n_eff, 1e-10)
+            p_eff = max(0.0001, min(0.9999, p_eff))  # Ensure it's a valid probability
 
             # Handle non-integer n_eff
-            n_floor = np.floor(n_eff)
-            n_ceil = np.ceil(n_eff)
+            n_floor = int(torch.floor(n_eff))
+            n_ceil = int(torch.ceil(n_eff))
             weight_ceil = n_eff - n_floor
 
+            # Calculate CDF using interpolation if necessary
             if n_floor == n_ceil:
-                return binom.cdf(k, n_floor, p_eff)
+                result[i] = binom.cdf(k[i].item(), n_floor, p_eff)
             else:
-                # Linear interpolation between binomials
-                cdf_floor = binom.cdf(min(k, n_floor), n_floor, p_eff)
-                cdf_ceil = binom.cdf(k, n_ceil, p_eff)
-                return (1 - weight_ceil) * cdf_floor + weight_ceil * cdf_ceil
+                cdf_floor = binom.cdf(min(k[i].item(), n_floor), n_floor, p_eff)
+                cdf_ceil = binom.cdf(k[i].item(), n_ceil, p_eff)
+                result[i] = (1 - weight_ceil) * cdf_floor + weight_ceil * cdf_ceil
         else:
-            # For nearly homogeneous probabilities, use standard binomial with
-            # small adjustment based on cutoff point
-            cutoff = self.n * p_avg  # Mean as the cutoff point
+            # For nearly homogeneous probabilities
+            cutoff = n[i] * p_avg[i]  # Mean as the cutoff point
 
-            if k > cutoff:
+            # Adjust p based on k value
+            if k[i] > cutoff:
                 # For high k values (right tail), slightly increase p
-                adjustment = coeff1 * (p_avg - coeff3)
-                p_adjusted = max(min(0.9999, p_avg + adjustment), 0.0001)
-                return binom.cdf(k, self.n, p_adjusted)
+                adjustment = coeff1 * (p_avg[i] - coeff3)
+                p_adjusted = max(0.0001, min(0.9999, p_avg[i] + adjustment))
             else:
                 # For low k values (left tail), slightly decrease p
-                adjustment = coeff2 * (p_avg - coeff3)
-                p_adjusted = max(min(0.9999, p_avg - adjustment), 0.0001)
-                return binom.cdf(k, self.n, p_adjusted)
+                adjustment = coeff2 * (p_avg[i] - coeff3)
+                p_adjusted = max(0.0001, min(0.9999, p_avg[i] - adjustment))
+
+            result[i] = binom.cdf(k[i].item(), n[i].item(), p_adjusted)
+
+    return result
 
 
 @catch_exceptions
@@ -3259,14 +3264,13 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
 
 
 if __name__ == "__main__":
-    probabilities = np.asarray([0.9, 0.95, 0.9, 0.7, 0.8])
-    n_succ = 1
-    approximator = HighProbabilityBinomialApproximatorCDF()
-    for p in probabilities:
-        approximator.add_trial(p)
-    pmf_1 = [approximator.cdf(n) for n in range(len(probabilities) + 1)]
-    p_value_norm_approx = sum(pmf_1[0 : n_succ + 1])
-    print(p_value_norm_approx)
+    sum_r = torch.tensor([0.0000, 1.8254, 1.8254, 1.8180, 1.7552, 0.9270])
+    sum_r_squared = torch.tensor([0.0000, 1.6665, 1.6665, 1.6532, 1.5452, 0.8594])
+    sum_log_1mr = torch.tensor([0.0000, -4.9044, -4.9044, -4.8337, -4.3788, -2.6178])
+    n = torch.tensor([0.0, 2.0, 2.0, 2.0, 2.0, 1.0])
+    k = torch.tensor([0.0, 0.0, 1.0, 2.0, 1.0, 1.0])
+
+    print(heterogeneous_binomial_log_cdf(sum_r, sum_r_squared, sum_log_1mr, n, k))
     # mp.set_start_method("spawn", force=True)
     # unprocessed_users = []
     # dataset = pq.ParquetDataset(DATA_PATH / "revlogs")

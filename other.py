@@ -3184,7 +3184,7 @@ def heterogeneous_binomial_log_cdf(sum_p, sum_p_squared, sum_log_q, n, k):
         )
         result[mask_homogeneous] = homo_cdf
 
-    return result
+    return -torch.log(result)
 
 
 @catch_exceptions

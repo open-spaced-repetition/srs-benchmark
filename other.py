@@ -2935,9 +2935,118 @@ def create_features(df, model_name="FSRSv3"):
         return create_features_helper(df, model_name, SECS_IVL)
 
 
+def torch_binom_cdf(k, n, p):
+    """
+    Fully vectorized PyTorch implementation of binomial CDF.
+
+    Parameters:
+    -----------
+    k : torch.Tensor
+        Number of successes
+    n : torch.Tensor
+        Number of trials
+    p : torch.Tensor
+        Probability of success in each trial
+
+    Returns:
+    --------
+    torch.Tensor
+        Probability of getting k or fewer successes in n trials
+    """
+    # Ensure inputs are tensors
+    k = torch.as_tensor(k, dtype=torch.float32)
+    n = torch.as_tensor(n, dtype=torch.float32)
+    p = torch.as_tensor(p, dtype=torch.float32)
+
+    # Handle boundary conditions
+    result = torch.zeros_like(k, dtype=torch.float32)
+
+    # k >= n: probability is 1.0
+    mask_k_ge_n = k >= n
+    result = torch.where(mask_k_ge_n, torch.ones_like(result), result)
+
+    # k < 0: probability is 0.0 (already initialized to 0)
+
+    # 0 <= k < n: calculate CDF using regularized incomplete beta function
+    mask_calculate = (k >= 0) & (k < n)
+
+    if not torch.any(mask_calculate):
+        return result
+
+    # For valid k values, use the relationship between binomial CDF and beta distribution
+    # CDF(k; n, p) = 1 - I_p(k+1, n-k) where I is the regularized incomplete beta function
+    # We can compute this using the beta CDF in PyTorch
+
+    # Extract valid values
+    k_valid = k[mask_calculate]
+    n_valid = n[mask_calculate]
+    p_valid = p[mask_calculate]
+
+    # Calculate parameters for beta distribution
+    a = n_valid - k_valid
+    b = k_valid + 1
+
+    # Calculate CDF using the relationship with beta distribution
+    # The binomial CDF is related to the beta CDF:
+    # P(X ≤ k) = 1 - I_p(k+1, n-k)
+    # where I_p is the regularized incomplete beta function
+
+    # We'll implement this using a direct summation of PMF values
+    # This is more numerically stable for the ranges we care about
+
+    # Create a tensor of all possible values from 0 to max(k)
+    max_k = torch.max(k_valid).int().item()
+    j_values = torch.arange(0, max_k + 1, device=k.device)
+
+    # Expand dimensions for broadcasting
+    j_values = j_values.unsqueeze(1)  # Shape: [max_k+1, 1]
+    k_valid = k_valid.unsqueeze(0)  # Shape: [1, num_valid]
+    n_valid = n_valid.unsqueeze(0)  # Shape: [1, num_valid]
+    p_valid = p_valid.unsqueeze(0)  # Shape: [1, num_valid]
+
+    # Create mask for j ≤ k
+    j_mask = j_values <= k_valid  # Shape: [max_k+1, num_valid]
+
+    # Calculate log PMF for all j values
+    log_n_choose_j = (
+        torch.lgamma(n_valid + 1)
+        - torch.lgamma(j_values + 1)
+        - torch.lgamma(n_valid - j_values + 1)
+    )
+    log_pmf = (
+        log_n_choose_j
+        + j_values * torch.log(p_valid)
+        + (n_valid - j_values) * torch.log(1 - p_valid)
+    )
+
+    # Apply mask to keep only j ≤ k
+    log_pmf = torch.where(j_mask, log_pmf, torch.tensor(-float("inf"), device=k.device))
+
+    # Sum the PMFs using log-sum-exp for numerical stability
+    max_log_pmf = torch.max(log_pmf, dim=0)[0]
+    log_cdf = max_log_pmf + torch.log(
+        torch.sum(torch.exp(log_pmf - max_log_pmf.unsqueeze(0)), dim=0)
+    )
+    cdf_values = torch.exp(log_cdf)
+
+    # Place results back into the output tensor
+    result_flat = result.flatten()
+    mask_calculate_flat = mask_calculate.flatten()
+    valid_idx = torch.nonzero(mask_calculate_flat).squeeze()
+
+    if valid_idx.dim() == 0:  # Handle case with single valid index
+        valid_idx = valid_idx.unsqueeze(0)
+
+    result_flat.index_copy_(0, valid_idx, cdf_values)
+    result = result_flat.reshape(result.shape)
+
+    return result
+
+
 def heterogeneous_binomial_log_cdf(sum_p, sum_p_squared, sum_log_q, n, k):
     """
-    Calculate probability that number of successes is <= k for a heterogeneous binomial distribution
+    Fully vectorized calculation of probability that number of successes is <= k
+    for a heterogeneous binomial distribution
 
     Args:
         sum_p: Sum of all probabilities (1-D tensor)
@@ -2962,7 +3071,7 @@ def heterogeneous_binomial_log_cdf(sum_p, sum_p_squared, sum_log_q, n, k):
     result = torch.where(mask_zero, torch.exp(sum_log_q), result)
     result = torch.where(mask_equal_n, torch.ones_like(result), result)
 
-    # Skip processing if no valid cases
+    # If no cases to process, return early
     if not torch.any(mask_process):
         return result
 
@@ -2982,60 +3091,98 @@ def heterogeneous_binomial_log_cdf(sum_p, sum_p_squared, sum_log_q, n, k):
     coeff3 = 0.95
     thresh = 0.98
 
-    # Process each element individually using vectorized operations where possible
-    for i in range(len(k)):
-        if not mask_process[i]:
-            continue
+    # Create masks for different cases
+    mask_heterogeneous = (heterogeneity > thresh) & mask_process
+    mask_homogeneous = (~mask_heterogeneous) & mask_process
 
-        # Determine if distribution is heterogeneous
-        if heterogeneity[i] > thresh:
-            # Calculate true variance of the Poisson Binomial
-            true_variance = sum_p[i] - sum_p_squared[i]  # sum(p*(1-p))
+    # Process heterogeneous cases
+    true_variance = sum_p - sum_p_squared  # sum(p*(1-p))
+    binom_variance = n * p_avg * (1 - p_avg)
 
-            # Use refined parameter estimation
-            binom_variance = n[i] * p_avg[i] * (1 - p_avg[i])
+    # Determine n_eff based on variance comparison
+    variance_ratio_high = torch.where(
+        true_variance < binom_variance,
+        binom_variance / torch.clamp(true_variance, min=1e-10),
+        torch.ones_like(binom_variance),
+    )
 
-            # Determine n_eff based on variance comparison
-            if true_variance < binom_variance:
-                # When true variance is lower, we need n_eff > n
-                variance_ratio = binom_variance / max(true_variance, 1e-10)
-                n_eff = min(10.0 * n[i], n[i] * variance_ratio)
-            else:
-                # When true variance is higher, we need n_eff < n
-                variance_ratio = true_variance / max(binom_variance, 1e-10)
-                n_eff = max(float(k[i]), n[i] / variance_ratio)
+    variance_ratio_low = torch.where(
+        true_variance >= binom_variance,
+        true_variance / torch.clamp(binom_variance, min=1e-10),
+        torch.ones_like(binom_variance),
+    )
 
-            # Adjust p to maintain the same mean
-            p_eff = sum_p[i] / max(n_eff, 1e-10)
-            p_eff = max(0.0001, min(0.9999, p_eff))  # Ensure it's a valid probability
+    n_eff_high = torch.minimum(10.0 * n, n * variance_ratio_high)
+    n_eff_low = torch.maximum(k.float(), n / variance_ratio_low)
 
-            # Handle non-integer n_eff
-            n_floor = int(torch.floor(n_eff))
-            n_ceil = int(torch.ceil(n_eff))
-            weight_ceil = n_eff - n_floor
+    n_eff = torch.where(true_variance < binom_variance, n_eff_high, n_eff_low)
 
-            # Calculate CDF using interpolation if necessary
-            if n_floor == n_ceil:
-                result[i] = binom.cdf(k[i].item(), n_floor, p_eff)
-            else:
-                cdf_floor = binom.cdf(min(k[i].item(), n_floor), n_floor, p_eff)
-                cdf_ceil = binom.cdf(k[i].item(), n_ceil, p_eff)
-                result[i] = (1 - weight_ceil) * cdf_floor + weight_ceil * cdf_ceil
-        else:
-            # For nearly homogeneous probabilities
-            cutoff = n[i] * p_avg[i]  # Mean as the cutoff point
+    # Adjust p to maintain the same mean
+    p_eff = sum_p / torch.clamp(n_eff, min=1e-10)
+    p_eff = torch.clamp(
+        p_eff, min=0.0001, max=0.9999
+    )  # Ensure it's a valid probability
 
-            # Adjust p based on k value
-            if k[i] > cutoff:
-                # For high k values (right tail), slightly increase p
-                adjustment = coeff1 * (p_avg[i] - coeff3)
-                p_adjusted = max(0.0001, min(0.9999, p_avg[i] + adjustment))
-            else:
-                # For low k values (left tail), slightly decrease p
-                adjustment = coeff2 * (p_avg[i] - coeff3)
-                p_adjusted = max(0.0001, min(0.9999, p_avg[i] - adjustment))
+    # Handle non-integer n_eff
+    n_floor = torch.floor(n_eff).int()
+    n_ceil = torch.ceil(n_eff).int()
+    weight_ceil = n_eff - n_floor.float()
 
-            result[i] = binom.cdf(k[i].item(), n[i].item(), p_adjusted)
+    # For homogeneous cases
+    cutoff = n * p_avg  # Mean as the cutoff point
+
+    # Adjust p based on k value
+    high_k_mask = k > cutoff
+
+    adjustment_high = coeff1 * (p_avg - coeff3)
+    adjustment_low = coeff2 * (p_avg - coeff3)
+
+    p_adjusted = torch.where(
+        high_k_mask,
+        torch.clamp(p_avg + adjustment_high, min=0.0001, max=0.9999),
+        torch.clamp(p_avg - adjustment_low, min=0.0001, max=0.9999),
+    )
+
+    # Calculate results for heterogeneous cases
+    # First, handle cases where n_floor == n_ceil
+    equal_floor_ceil = n_floor == n_ceil
+
+    # Calculate k_floor safely (min of k and n_floor)
+    k_floor = torch.minimum(k, n_floor.float()).int()
+
+    # Calculate CDFs for floor and ceiling n values
+    # Extract the relevant subsets to avoid unnecessary calculations
+    if torch.any(mask_heterogeneous):
+        hetero_mask = mask_heterogeneous
+
+        # Equal floor and ceiling case
+        equal_mask = hetero_mask & equal_floor_ceil
+        if torch.any(equal_mask):
+            cdf_equal = torch_binom_cdf(
+                k[equal_mask], n_floor[equal_mask], p_eff[equal_mask]
+            )
+            result[equal_mask] = cdf_equal
+
+        # Different floor and ceiling case
+        diff_mask = hetero_mask & (~equal_floor_ceil)
+        if torch.any(diff_mask):
+            cdf_floor = torch_binom_cdf(
+                k_floor[diff_mask], n_floor[diff_mask], p_eff[diff_mask]
+            )
+            cdf_ceil = torch_binom_cdf(
+                k[diff_mask], n_ceil[diff_mask], p_eff[diff_mask]
+            )
+            weighted_cdf = (1 - weight_ceil[diff_mask]) * cdf_floor + weight_ceil[
+                diff_mask
+            ] * cdf_ceil
+            result[diff_mask] = weighted_cdf
+
+    # Calculate results for homogeneous cases
+    if torch.any(mask_homogeneous):
+        homo_cdf = torch_binom_cdf(
+            k[mask_homogeneous], n[mask_homogeneous], p_adjusted[mask_homogeneous]
+        )
+        result[mask_homogeneous] = homo_cdf
 
     return result
 

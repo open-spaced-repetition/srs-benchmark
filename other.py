@@ -3062,10 +3062,9 @@ def heterogeneous_binomial_log_cdf(sum_p, sum_p_squared, sum_log_q, n, k):
     result = torch.zeros_like(k, dtype=torch.float32)
 
     # Handle boundary cases
-    mask_neg = k < 0
     mask_zero = k == 0
     mask_equal_n = k == n
-    mask_process = ~(mask_neg | mask_zero | mask_equal_n)
+    mask_process = ~(mask_zero | mask_equal_n)
 
     # Set values for boundary cases
     result = torch.where(mask_zero, torch.exp(sum_log_q), result)

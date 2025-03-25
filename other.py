@@ -1355,10 +1355,10 @@ class FSRSH(FSRS):
         self, inputs: Tensor, state: Optional[Tensor] = None
     ) -> tuple[Tensor, Tensor]:
         """
-        :param inputs: shape[seq_len, batch_size, 2]
+        :param inputs: shape[seq_len, batch_size, 7]
         """
         if state is None:
-            state = torch.zeros((inputs.shape[1], 2))
+            state = torch.zeros((inputs.shape[1], 7))
         outputs = []
         for X in inputs:
             state = self.step(X, state)

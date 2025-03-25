@@ -57,6 +57,7 @@ model_list = (
     "FSRSv4",
     "FSRS-4.5",
     "FSRS-5",
+    "FSRS-5-H",
     "Ebisu-v2",
     "SM2",
     "HLR",
@@ -1118,6 +1119,237 @@ class FSRS5(FSRS):
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(S_MIN, 36500)
         return torch.stack([new_s, new_d], dim=1)
+
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+        return self.w[7] * init + (1 - self.w[7]) * current
+
+    def state_dict(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+
+class FSRSHParameterClipper:
+    def __init__(self, frequency: int = 1):
+        self.frequency = frequency
+
+    def __call__(self, module):
+        if hasattr(module, "w"):
+            w = module.w.data
+            w[0] = w[0].clamp(S_MIN, 100)
+            w[1] = w[1].clamp(S_MIN, 100)
+            w[2] = w[2].clamp(S_MIN, 100)
+            w[3] = w[3].clamp(S_MIN, 100)
+            w[4] = w[4].clamp(1, 10)
+            w[5] = w[5].clamp(0.001, 4)
+            w[6] = w[6].clamp(0.001, 4)
+            w[7] = w[7].clamp(0.001, 0.75)
+            w[8] = w[8].clamp(0, 4.5)
+            w[9] = w[9].clamp(0, 0.8)
+            w[10] = w[10].clamp(0.001, 3.5)
+            w[11] = w[11].clamp(0.001, 5)
+            w[12] = w[12].clamp(0.001, 0.25)
+            w[13] = w[13].clamp(0.001, 0.9)
+            w[14] = w[14].clamp(0, 4)
+            w[15] = w[15].clamp(0, 1)
+            w[16] = w[16].clamp(1, 6)
+            w[17] = w[17].clamp(0, 2)
+            w[18] = w[18].clamp(0, 2)
+            module.w.data = w
+
+
+class FSRSH(FSRS):
+    init_w = [
+        0.40255,
+        1.18385,
+        3.173,
+        15.69105,
+        7.1949,
+        0.5345,
+        1.4604,
+        0.0046,
+        1.54575,
+        0.1192,
+        1.01925,
+        1.9395,
+        0.11,
+        0.29605,
+        2.2698,
+        0.2315,
+        2.9898,
+        0.51655,
+        0.6621,
+    ]
+    clipper = FSRSHParameterClipper()
+    lr: float = 4e-2
+    gamma: float = 1
+    wd: float = 1e-5
+    n_epoch: int = 5
+    default_params_stddev_tensor = torch.tensor(
+        [
+            6.61,
+            9.52,
+            17.69,
+            27.74,
+            0.55,
+            0.28,
+            0.67,
+            0.12,
+            0.4,
+            0.18,
+            0.34,
+            0.27,
+            0.08,
+            0.14,
+            0.57,
+            0.25,
+            1.03,
+            0.27,
+            0.39,
+        ]
+    )
+
+    def __init__(self, w: List[float] = init_w):
+        super(FSRSH, self).__init__()
+        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+        self.init_w_tensor = self.w.data.clone().to(DEVICE)
+
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        output = super().iter(sequences, delta_ts, seq_lens, real_batch_size)
+        output["penalty"] = (
+            torch.sum(
+                torch.square(self.w - self.init_w_tensor)
+                / torch.square(self.default_params_stddev_tensor)
+            )
+            * real_batch_size
+            * self.gamma
+        )
+        return output
+
+    def forgetting_curve(self, t, s):
+        return (1 + FACTOR * t / s) ** DECAY
+
+    def stability_after_success(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> Tensor:
+        hard_penalty = torch.where(rating == 2, self.w[15], 1)
+        easy_bonus = torch.where(rating == 4, self.w[16], 1)
+        new_s = state[:, 0] * (
+            1
+            + torch.exp(self.w[8])
+            * (11 - state[:, 1])
+            * torch.pow(state[:, 0], -self.w[9])
+            * (torch.exp((1 - r) * self.w[10]) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
+        return new_s
+
+    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
+        old_s = state[:, 0]
+        new_s = (
+            self.w[11]
+            * torch.pow(state[:, 1], -self.w[12])
+            * (torch.pow(old_s + 1, self.w[13]) - 1)
+            * torch.exp((1 - r) * self.w[14])
+        )
+        new_minimum_s = old_s / torch.exp(self.w[17] * self.w[18])
+        return torch.minimum(new_s, new_minimum_s)
+
+    def stability_short_term(self, state: Tensor, rating: Tensor) -> Tensor:
+        new_s = state[:, 0] * torch.exp(self.w[17] * (rating - 3 + self.w[18]))
+        return new_s
+
+    def init_d(self, rating: Union[int, Tensor]) -> Tensor:
+        new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
+        return new_d
+
+    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+        return delta_d * (10 - old_d) / 9
+
+    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
+        delta_d = -self.w[6] * (rating - 3)
+        new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
+        new_d = self.mean_reversion(self.init_d(4), new_d)
+        return new_d
+
+    def step(self, X: Tensor, state: Tensor) -> Tensor:
+        """
+        :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
+        :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
+        # for calculating historical likelihood
+        :param state[:,2] is sum_r, state[:,3] is sum_r_squared, state[:,4] is sum_log_1mr (log(1-R)),
+        :param state[:,5] is n reviews (not same-day), state[:,6] is k successes (not same-day)
+        :return state:
+        """
+        if torch.equal(state, torch.zeros_like(state)):
+            ...
+            # For historical likelihood
+            sum_r = torch.zeros_like(state[:, 0], device=DEVICE)
+            sum_r_squared = torch.zeros_like(state[:, 0], device=DEVICE)
+            sum_log_1mr = torch.zeros_like(state[:, 0], device=DEVICE)
+            n = torch.zeros_like(state[:, 0], device=DEVICE)
+            k = torch.zeros_like(state[:, 0], device=DEVICE)
+        else:
+            r = self.forgetting_curve(X[:, 0], state[:, 0])
+            r = r.clamp(0.0001, 0.9999)
+
+            short_term = X[:, 0] < 1
+
+            # For calculating historical likelihood
+            binary_grade = torch.where(
+                X[:, 1] > 1, torch.ones_like(state[:, 0]), torch.zeros_like(state[:, 0])
+            )
+            sum_r = torch.where(short_term, state[:, 2], state[:, 2] + r)
+            sum_r_squared = torch.where(short_term, state[:, 3], state[:, 3] + r * r)
+            sum_log_1mr = torch.where(
+                short_term, state[:, 4], state[:, 4] + torch.log(1 - r)
+            )
+            n = torch.where(short_term, state[:, 5], state[:, 5] + 1)
+            k = torch.where(short_term, state[:, 6], state[:, 6] + binary_grade)
+            binomial_log_cdf = heterogeneous_binomial_log_cdf(
+                sum_r, sum_r_squared, sum_log_1mr, n, k
+            )
+
+            success = X[:, 1] > 1
+            new_s = torch.where(
+                short_term,
+                self.stability_short_term(state, X[:, 1]),
+                torch.where(
+                    success,
+                    self.stability_after_success(state, r, X[:, 1]),
+                    self.stability_after_failure(state, r),
+                ),
+            )
+            new_d = self.next_d(state, X[:, 1])
+            new_d = new_d.clamp(1, 10)
+        new_s = new_s.clamp(S_MIN, 36500)
+        return torch.stack(
+            [new_s, new_d, sum_r, sum_r_squared, sum_log_1mr, n, k], dim=1
+        )
 
     def forward(
         self, inputs: Tensor, state: Optional[Tensor] = None
@@ -2351,7 +2583,7 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.model = MODEL.to(device=DEVICE)
-        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
+        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5, FSRSH)):
             self.model.pretrain(train_set)  # type: ignore
         if isinstance(MODEL, (RNN, Transformer, GRU_P)):
             self.optimizer = torch.optim.AdamW(
@@ -3219,6 +3451,10 @@ def process(user_id):
         global SHORT_TERM
         SHORT_TERM = True
         Model = FSRS5
+    elif MODEL_NAME == "FSRS-5-H":
+        global SHORT_TERM
+        SHORT_TERM = True
+        Model = FSRSH
     elif MODEL_NAME == "HLR":
         Model = HLR
     elif MODEL_NAME == "Transformer":
@@ -3410,63 +3646,56 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
 
 
 if __name__ == "__main__":
-    sum_r = torch.tensor([0.0000, 1.8254, 1.8254, 1.8180, 1.7552, 0.9270])
-    sum_r_squared = torch.tensor([0.0000, 1.6665, 1.6665, 1.6532, 1.5452, 0.8594])
-    sum_log_1mr = torch.tensor([0.0000, -4.9044, -4.9044, -4.8337, -4.3788, -2.6178])
-    n = torch.tensor([0.0, 2.0, 2.0, 2.0, 2.0, 1.0])
-    k = torch.tensor([0.0, 0.0, 1.0, 2.0, 1.0, 1.0])
+    mp.set_start_method("spawn", force=True)
+    unprocessed_users = []
+    dataset = pq.ParquetDataset(DATA_PATH / "revlogs")
+    Path(f"evaluation/{FILE_NAME}").mkdir(parents=True, exist_ok=True)
+    Path("result").mkdir(parents=True, exist_ok=True)
+    Path("raw").mkdir(parents=True, exist_ok=True)
+    result_file = Path(f"result/{FILE_NAME}.jsonl")
+    raw_file = Path(f"raw/{FILE_NAME}.jsonl")
+    if result_file.exists():
+        data = sort_jsonl(result_file)
+        processed_user = set(map(lambda x: x["user"], data))
+    else:
+        processed_user = set()
 
-    print(heterogeneous_binomial_log_cdf(sum_r, sum_r_squared, sum_log_1mr, n, k))
-    # mp.set_start_method("spawn", force=True)
-    # unprocessed_users = []
-    # dataset = pq.ParquetDataset(DATA_PATH / "revlogs")
-    # Path(f"evaluation/{FILE_NAME}").mkdir(parents=True, exist_ok=True)
-    # Path("result").mkdir(parents=True, exist_ok=True)
-    # Path("raw").mkdir(parents=True, exist_ok=True)
-    # result_file = Path(f"result/{FILE_NAME}.jsonl")
-    # raw_file = Path(f"raw/{FILE_NAME}.jsonl")
-    # if result_file.exists():
-    #     data = sort_jsonl(result_file)
-    #     processed_user = set(map(lambda x: x["user"], data))
-    # else:
-    #     processed_user = set()
+    if RAW and raw_file.exists():
+        sort_jsonl(raw_file)
 
-    # if RAW and raw_file.exists():
-    #     sort_jsonl(raw_file)
+    for user_id in dataset.partitioning.dictionaries[0]:
+        if user_id.as_py() in processed_user:
+            continue
+        unprocessed_users.append(user_id.as_py())
 
-    # for user_id in dataset.partitioning.dictionaries[0]:
-    #     if user_id.as_py() in processed_user:
-    #         continue
-    #     unprocessed_users.append(user_id.as_py())
+    unprocessed_users.sort()
 
-    # unprocessed_users.sort()
+    with ProcessPoolExecutor(max_workers=PROCESSES) as executor:
+        futures = [
+            executor.submit(
+                process,
+                user_id,
+            )
+            for user_id in unprocessed_users
+        ]
+        for future in (
+            pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
+        ):
+            try:
+                result, error = future.result()
+                if error:
+                    tqdm.write(error)
+                else:
+                    stats, raw = result
+                    with open(result_file, "a") as f:
+                        f.write(json.dumps(stats, ensure_ascii=False) + "\n")
+                    if raw:
+                        with open(raw_file, "a") as f:
+                            f.write(json.dumps(raw, ensure_ascii=False) + "\n")
+                    pbar.set_description(f"Processed {stats['user']}")
+            except Exception as e:
+                tqdm.write(str(e))
 
-    # with ProcessPoolExecutor(max_workers=PROCESSES) as executor:
-    #     futures = [
-    #         executor.submit(
-    #             process,
-    #             user_id,
-    #         )
-    #         for user_id in unprocessed_users
-    #     ]
-    #     for future in (
-    #         pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
-    #     ):
-    #         try:
-    #             result, error = future.result()
-    #             if error:
-    #                 tqdm.write(error)
-    #             else:
-    #                 stats, raw = result
-    #                 with open(result_file, "a") as f:
-    #                     f.write(json.dumps(stats, ensure_ascii=False) + "\n")
-    #                 if raw:
-    #                     with open(raw_file, "a") as f:
-    #                         f.write(json.dumps(raw, ensure_ascii=False) + "\n")
-    #                 pbar.set_description(f"Processed {stats['user']}")
-    #         except Exception as e:
-    #             tqdm.write(str(e))
-
-    # sort_jsonl(result_file)
-    # if RAW:
-    #     sort_jsonl(raw_file)
+    sort_jsonl(result_file)
+    if RAW:
+        sort_jsonl(raw_file)

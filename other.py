@@ -161,147 +161,150 @@ class FSRS(nn.Module):
         rating_count = {}
         average_recall = train_set["y"].mean()
         r_s0_default = {str(i): self.init_w[i - 1] for i in range(1, 5)}
-
-        for first_rating in ("1", "2", "3", "4"):
-            group = S0_dataset_group[S0_dataset_group["first_rating"] == first_rating]
-            if group.empty:
-                if verbose:
-                    tqdm.write(
-                        f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
+        
+        try:
+            for first_rating in ("1", "2", "3", "4"):
+                group = S0_dataset_group[S0_dataset_group["first_rating"] == first_rating]
+                if group.empty:
+                    if verbose:
+                        tqdm.write(
+                            f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
+                        )
+                    continue
+                delta_t = group["delta_t"]
+                if SECS_IVL:
+                    recall = group["y"]["mean"]
+                else:
+                    recall = (
+                        group["y"]["mean"] * group["y"]["count"] + average_recall * 1
+                    ) / (group["y"]["count"] + 1)
+                count = group["y"]["count"]
+    
+                init_s0 = r_s0_default[first_rating]
+    
+                def loss(stability):
+                    y_pred = self.forgetting_curve(delta_t, stability)
+                    logloss = sum(
+                        -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
+                        * count
                     )
-                continue
-            delta_t = group["delta_t"]
-            if SECS_IVL:
-                recall = group["y"]["mean"]
-            else:
-                recall = (
-                    group["y"]["mean"] * group["y"]["count"] + average_recall * 1
-                ) / (group["y"]["count"] + 1)
-            count = group["y"]["count"]
-
-            init_s0 = r_s0_default[first_rating]
-
-            def loss(stability):
-                y_pred = self.forgetting_curve(delta_t, stability)
-                logloss = sum(
-                    -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
-                    * count
+                    l1 = np.abs(stability - init_s0) / 16 if not SECS_IVL else 0
+                    return logloss + l1
+    
+                res = minimize(
+                    loss,
+                    x0=init_s0,
+                    bounds=((S_MIN, INIT_S_MAX),),
+                    options={"maxiter": int(sum(count))},
                 )
-                l1 = np.abs(stability - init_s0) / 16 if not SECS_IVL else 0
-                return logloss + l1
-
-            res = minimize(
-                loss,
-                x0=init_s0,
-                bounds=((S_MIN, INIT_S_MAX),),
-                options={"maxiter": int(sum(count))},
+                params = res.x
+                stability = params[0]
+                rating_stability[int(first_rating)] = stability
+                rating_count[int(first_rating)] = sum(count)
+            
+            for small_rating, big_rating in (
+                (1, 2),
+                (2, 3),
+                (3, 4),
+                (1, 3),
+                (2, 4),
+                (1, 4),
+            ):
+                if small_rating in rating_stability and big_rating in rating_stability:
+                    # if rating_count[small_rating] > 300 and rating_count[big_rating] > 300:
+                    #     continue
+                    if rating_stability[small_rating] > rating_stability[big_rating]:
+                        if rating_count[small_rating] > rating_count[big_rating]:
+                            rating_stability[big_rating] = rating_stability[small_rating]
+                        else:
+                            rating_stability[small_rating] = rating_stability[big_rating]
+    
+            w1 = 0.41
+            w2 = 0.54
+    
+            if len(rating_stability) == 0:
+                raise Exception("Not enough data for pretraining!")
+            elif len(rating_stability) == 1:
+                rating = list(rating_stability.keys())[0]
+                factor = rating_stability[rating] / r_s0_default[str(rating)]
+                init_s0 = list(map(lambda x: x * factor, r_s0_default.values()))
+            elif len(rating_stability) == 2:
+                if 1 not in rating_stability and 2 not in rating_stability:
+                    rating_stability[2] = np.power(
+                        rating_stability[3], 1 / (1 - w2)
+                    ) * np.power(rating_stability[4], 1 - 1 / (1 - w2))
+                    rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                        rating_stability[3], 1 - 1 / w1
+                    )
+                elif 1 not in rating_stability and 3 not in rating_stability:
+                    rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
+                        rating_stability[4], w2
+                    )
+                    rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                        rating_stability[3], 1 - 1 / w1
+                    )
+                elif 1 not in rating_stability and 4 not in rating_stability:
+                    rating_stability[4] = np.power(
+                        rating_stability[2], 1 - 1 / w2
+                    ) * np.power(rating_stability[3], 1 / w2)
+                    rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                        rating_stability[3], 1 - 1 / w1
+                    )
+                elif 2 not in rating_stability and 3 not in rating_stability:
+                    rating_stability[2] = np.power(
+                        rating_stability[1], w1 / (w1 + w2 - w1 * w2)
+                    ) * np.power(rating_stability[4], 1 - w1 / (w1 + w2 - w1 * w2))
+                    rating_stability[3] = np.power(
+                        rating_stability[1], 1 - w2 / (w1 + w2 - w1 * w2)
+                    ) * np.power(rating_stability[4], w2 / (w1 + w2 - w1 * w2))
+                elif 2 not in rating_stability and 4 not in rating_stability:
+                    rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
+                        rating_stability[3], 1 - w1
+                    )
+                    rating_stability[4] = np.power(
+                        rating_stability[2], 1 - 1 / w2
+                    ) * np.power(rating_stability[3], 1 / w2)
+                elif 3 not in rating_stability and 4 not in rating_stability:
+                    rating_stability[3] = np.power(
+                        rating_stability[1], 1 - 1 / (1 - w1)
+                    ) * np.power(rating_stability[2], 1 / (1 - w1))
+                    rating_stability[4] = np.power(
+                        rating_stability[2], 1 - 1 / w2
+                    ) * np.power(rating_stability[3], 1 / w2)
+                init_s0 = [
+                    item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+                ]
+            elif len(rating_stability) == 3:
+                if 1 not in rating_stability:
+                    rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
+                        rating_stability[3], 1 - 1 / w1
+                    )
+                elif 2 not in rating_stability:
+                    rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
+                        rating_stability[3], 1 - w1
+                    )
+                elif 3 not in rating_stability:
+                    rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
+                        rating_stability[4], w2
+                    )
+                elif 4 not in rating_stability:
+                    rating_stability[4] = np.power(
+                        rating_stability[2], 1 - 1 / w2
+                    ) * np.power(rating_stability[3], 1 / w2)
+                init_s0 = [
+                    item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+                ]
+            elif len(rating_stability) == 4:
+                init_s0 = [
+                    item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
+                ]
+            self.w.data[0:4] = Tensor(
+                list(map(lambda x: max(min(INIT_S_MAX, x), S_MIN), init_s0))
             )
-            params = res.x
-            stability = params[0]
-            rating_stability[int(first_rating)] = stability
-            rating_count[int(first_rating)] = sum(count)
-
-        for small_rating, big_rating in (
-            (1, 2),
-            (2, 3),
-            (3, 4),
-            (1, 3),
-            (2, 4),
-            (1, 4),
-        ):
-            if small_rating in rating_stability and big_rating in rating_stability:
-                # if rating_count[small_rating] > 300 and rating_count[big_rating] > 300:
-                #     continue
-                if rating_stability[small_rating] > rating_stability[big_rating]:
-                    if rating_count[small_rating] > rating_count[big_rating]:
-                        rating_stability[big_rating] = rating_stability[small_rating]
-                    else:
-                        rating_stability[small_rating] = rating_stability[big_rating]
-
-        w1 = 0.41
-        w2 = 0.54
-
-        if len(rating_stability) == 0:
-            raise Exception("Not enough data for pretraining!")
-        elif len(rating_stability) == 1:
-            rating = list(rating_stability.keys())[0]
-            factor = rating_stability[rating] / r_s0_default[str(rating)]
-            init_s0 = list(map(lambda x: x * factor, r_s0_default.values()))
-        elif len(rating_stability) == 2:
-            if 1 not in rating_stability and 2 not in rating_stability:
-                rating_stability[2] = np.power(
-                    rating_stability[3], 1 / (1 - w2)
-                ) * np.power(rating_stability[4], 1 - 1 / (1 - w2))
-                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
-                    rating_stability[3], 1 - 1 / w1
-                )
-            elif 1 not in rating_stability and 3 not in rating_stability:
-                rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
-                    rating_stability[4], w2
-                )
-                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
-                    rating_stability[3], 1 - 1 / w1
-                )
-            elif 1 not in rating_stability and 4 not in rating_stability:
-                rating_stability[4] = np.power(
-                    rating_stability[2], 1 - 1 / w2
-                ) * np.power(rating_stability[3], 1 / w2)
-                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
-                    rating_stability[3], 1 - 1 / w1
-                )
-            elif 2 not in rating_stability and 3 not in rating_stability:
-                rating_stability[2] = np.power(
-                    rating_stability[1], w1 / (w1 + w2 - w1 * w2)
-                ) * np.power(rating_stability[4], 1 - w1 / (w1 + w2 - w1 * w2))
-                rating_stability[3] = np.power(
-                    rating_stability[1], 1 - w2 / (w1 + w2 - w1 * w2)
-                ) * np.power(rating_stability[4], w2 / (w1 + w2 - w1 * w2))
-            elif 2 not in rating_stability and 4 not in rating_stability:
-                rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
-                    rating_stability[3], 1 - w1
-                )
-                rating_stability[4] = np.power(
-                    rating_stability[2], 1 - 1 / w2
-                ) * np.power(rating_stability[3], 1 / w2)
-            elif 3 not in rating_stability and 4 not in rating_stability:
-                rating_stability[3] = np.power(
-                    rating_stability[1], 1 - 1 / (1 - w1)
-                ) * np.power(rating_stability[2], 1 / (1 - w1))
-                rating_stability[4] = np.power(
-                    rating_stability[2], 1 - 1 / w2
-                ) * np.power(rating_stability[3], 1 / w2)
-            init_s0 = [
-                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
-            ]
-        elif len(rating_stability) == 3:
-            if 1 not in rating_stability:
-                rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
-                    rating_stability[3], 1 - 1 / w1
-                )
-            elif 2 not in rating_stability:
-                rating_stability[2] = np.power(rating_stability[1], w1) * np.power(
-                    rating_stability[3], 1 - w1
-                )
-            elif 3 not in rating_stability:
-                rating_stability[3] = np.power(rating_stability[2], 1 - w2) * np.power(
-                    rating_stability[4], w2
-                )
-            elif 4 not in rating_stability:
-                rating_stability[4] = np.power(
-                    rating_stability[2], 1 - 1 / w2
-                ) * np.power(rating_stability[3], 1 / w2)
-            init_s0 = [
-                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
-            ]
-        elif len(rating_stability) == 4:
-            init_s0 = [
-                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
-            ]
-        self.w.data[0:4] = Tensor(
-            list(map(lambda x: max(min(INIT_S_MAX, x), S_MIN), init_s0))
-        )
-        self.init_w_tensor = self.w.data.clone().to(DEVICE)
-
+            self.init_w_tensor = self.w.data.clone().to(DEVICE)
+        except Exception as err:
+            print('Error in pretrain')
+            print(err)
 
 class FSRS1ParameterClipper:
     def __init__(self, frequency: int = 1):
@@ -1118,9 +1121,7 @@ class FSRS5(FSRS):
         new_s = new_s.clamp(S_MIN, 36500)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
-    ) -> tuple[Tensor, Tensor]:
+    def forward(self, inputs: Tensor, state: Optional[Tensor] = None) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -1128,7 +1129,11 @@ class FSRS5(FSRS):
             state = torch.zeros((inputs.shape[1], 2))
         outputs = []
         for X in inputs:
-            state = self.step(X, state)
+            try:
+                state = self.step(X, state)
+            except Exception as err:
+                print('Error in step (FSRS-5)')
+                print(err)
             outputs.append(state)
         return torch.stack(outputs), state
 
@@ -2253,12 +2258,16 @@ def ebisu_v2(sequence):
 
 
 def iter(model, batch):
-    sequences, delta_ts, labels, seq_lens, weights = batch
-    real_batch_size = seq_lens.shape[0]
-    result = {"labels": labels, "weights": weights}
-    outputs = model.iter(sequences, delta_ts, seq_lens, real_batch_size)
-    result.update(outputs)
-    return result
+    try:
+        sequences, delta_ts, labels, seq_lens, weights = batch
+        real_batch_size = seq_lens.shape[0]
+        result = {"labels": labels, "weights": weights}
+        outputs = model.iter(sequences, delta_ts, seq_lens, real_batch_size)
+        result.update(outputs)
+        return result
+    except Exception as err:
+        print('Error in iter')
+        print(err)
 
 
 def count_lapse(r_history, t_history):
@@ -2394,106 +2403,118 @@ class Trainer:
                 device=DEVICE,
             )
             self.next_train_data_loader = BatchLoader(self.next_train_set)
-
-        self.train_set = BatchDataset(
-            train_set.copy(),
-            self.batch_size,
-            max_seq_len=self.max_seq_len,
-            device=DEVICE,
-        )
-        self.train_data_loader = BatchLoader(self.train_set)
-
-        self.test_set = (
-            []
-            if test_set is None
-            else BatchDataset(
-                test_set.copy(),
-                batch_size=self.batch_size,
+        
+        try:
+            self.train_set = BatchDataset(
+                train_set.copy(),
+                self.batch_size,
                 max_seq_len=self.max_seq_len,
                 device=DEVICE,
             )
-        )
-        self.test_data_loader = (
-            [] if test_set is None else BatchLoader(self.test_set, shuffle=False)
-        )
+            self.train_data_loader = BatchLoader(self.train_set)
 
+            self.test_set = (
+                []
+                if test_set is None
+                else BatchDataset(
+                    test_set.copy(),
+                    batch_size=self.batch_size,
+                    max_seq_len=self.max_seq_len,
+                    device=DEVICE,
+                )
+            )
+            self.test_data_loader = (
+                [] if test_set is None else BatchLoader(self.test_set, shuffle=False)
+            )
+        except Exception as err:
+            print('Error when creating the dataset')
+            print(err)
+        
     def train(self):
         best_loss = np.inf
         epoch_len = len(self.train_set.y_train)
-        for k in range(self.n_epoch):
+        try:
+            for k in range(self.n_epoch):
+                weighted_loss, w = self.eval()
+                if weighted_loss < best_loss:
+                    best_loss = weighted_loss
+                    best_w = w
+                for i, batch in enumerate(
+                    self.train_data_loader
+                    if not isinstance(self.model, (FSRS4, FSRS4dot5))
+                    else self.next_train_data_loader  # FSRS4 and FSRS-4.5 have two training stages
+                ):
+                    self.model.train()
+                    self.optimizer.zero_grad()
+                    result = iter(self.model, batch)
+                    loss = (
+                        self.loss_fn(result["retentions"], result["labels"])
+                        * result["weights"]
+                    ).sum()
+                    if "penalty" in result:
+                        loss += result["penalty"] / epoch_len
+                    loss.backward()
+                    if isinstance(
+                        self.model, (FSRS4, FSRS4dot5)
+                    ):  # the initial stability is not trainable
+                        for param in self.model.parameters():
+                            param.grad[:4] = torch.zeros(4)
+                    self.optimizer.step()
+                    self.scheduler.step()
+                    if self.clipper:
+                        self.model.apply(self.clipper)
             weighted_loss, w = self.eval()
             if weighted_loss < best_loss:
                 best_loss = weighted_loss
                 best_w = w
-            for i, batch in enumerate(
-                self.train_data_loader
-                if not isinstance(self.model, (FSRS4, FSRS4dot5))
-                else self.next_train_data_loader  # FSRS4 and FSRS-4.5 have two training stages
-            ):
-                self.model.train()
-                self.optimizer.zero_grad()
-                result = iter(self.model, batch)
-                loss = (
-                    self.loss_fn(result["retentions"], result["labels"])
-                    * result["weights"]
-                ).sum()
-                if "penalty" in result:
-                    loss += result["penalty"] / epoch_len
-                loss.backward()
-                if isinstance(
-                    self.model, (FSRS4, FSRS4dot5)
-                ):  # the initial stability is not trainable
-                    for param in self.model.parameters():
-                        param.grad[:4] = torch.zeros(4)
-                self.optimizer.step()
-                self.scheduler.step()
-                if self.clipper:
-                    self.model.apply(self.clipper)
-        weighted_loss, w = self.eval()
-        if weighted_loss < best_loss:
-            best_loss = weighted_loss
-            best_w = w
-        return best_w
+            return best_w
+        except Exception as err:
+            print('Error during optimization')
+            print(err)
 
     def eval(self):
-        self.model.eval()
-        with torch.no_grad():
-            losses = []
-            self.train_data_loader.shuffle = False
-            for data_loader in (self.train_data_loader, self.test_data_loader):
-                if len(data_loader) == 0:
-                    losses.append(0)
-                    continue
-                loss = 0
-                total = 0
-                epoch_len = len(data_loader.dataset.y_train)
-                for batch in data_loader:
-                    result = iter(self.model, batch)
-                    loss += (
-                        (
-                            self.loss_fn(result["retentions"], result["labels"])
-                            * result["weights"]
+        try:
+            self.model.eval()
+            with torch.no_grad():
+                losses = []
+                self.train_data_loader.shuffle = False
+                for data_loader in (self.train_data_loader, self.test_data_loader):
+                    if len(data_loader) == 0:
+                        losses.append(0)
+                        continue
+                    loss = 0
+                    total = 0
+                    epoch_len = len(data_loader.dataset.y_train)
+                    for batch in data_loader:
+                        result = iter(self.model, batch)
+                        loss += (
+                            (
+                                self.loss_fn(result["retentions"], result["labels"])
+                                * result["weights"]
+                            )
+                            .sum()
+                            .detach()
+                            .item()
                         )
-                        .sum()
-                        .detach()
-                        .item()
-                    )
-                    if "penalty" in result:
-                        loss += (result["penalty"] / epoch_len).detach().item()
-                    total += batch[3].shape[0]
-                losses.append(loss / total)
-            self.train_data_loader.shuffle = True
-            self.avg_train_losses.append(losses[0])
-            self.avg_eval_losses.append(losses[1])
-
-            w = self.model.state_dict()
-
-            weighted_loss = (
-                losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
-            ) / (len(self.train_set) + len(self.test_set))
-
-            return weighted_loss, w
-
+                        if "penalty" in result:
+                            loss += (result["penalty"] / epoch_len).detach().item()
+                        total += batch[3].shape[0]
+                    losses.append(loss / total)
+                self.train_data_loader.shuffle = True
+                self.avg_train_losses.append(losses[0])
+                self.avg_eval_losses.append(losses[1])
+    
+                w = self.model.state_dict()
+    
+                weighted_loss = (
+                    losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
+                ) / (len(self.train_set) + len(self.test_set))
+    
+                return weighted_loss, w
+        except Exception as err:
+            print('Error during evaluation')
+            print(err)
+        
     def plot(self):
         fig = plt.figure()
         ax = fig.gca()

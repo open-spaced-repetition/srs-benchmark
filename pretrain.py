@@ -10,7 +10,7 @@ from pathlib import Path
 parser = create_parser()
 args = parser.parse_args()
 
-MODEL_NAME = args.model
+MODEL_NAME = args.algo
 SHORT_TERM = args.short
 SECS_IVL = args.secs
 FILE_NAME = (

@@ -6,7 +6,7 @@ Spaced repetition algorithms are computer programs designed to help people sched
 
 This benchmark is designed to assess the predictive accuracy of various algorithms. A multitude of algorithms are evaluated to find out which ones provide the most accurate predictions.
 
-**We will evaluate your algorithm! Open a github issue or contact [L-M-Sherlock](https://github.com/L-M-Sherlock).**
+**We will evaluate your algorithm! [Open a GitHub issue](https://github.com/open-spaced-repetition/srs-benchmark/issues/new) or contact [L-M-Sherlock](https://github.com/L-M-Sherlock).**
 
 ## Dataset
 

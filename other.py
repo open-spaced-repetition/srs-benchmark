@@ -55,7 +55,7 @@ model_list = (
     "FSRSv3",
     "FSRSv4",
     "FSRS-4.5",
-    "FSRS-5",
+    "FSRS-5-D",
     "Ebisu-v2",
     "SM2",
     "HLR",
@@ -964,7 +964,7 @@ class FSRS5ParameterClipper:
             module.w.data = w
 
 
-class FSRS5(FSRS):
+class FSRS5D(FSRS):
     init_w = [
         0.40255,
         1.18385,
@@ -1015,10 +1015,23 @@ class FSRS5(FSRS):
         ]
     )
 
-    def __init__(self, w: List[float] = init_w):
-        super(FSRS5, self).__init__()
-        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+    def __init__(self, state_dict=None):
+        super(FSRS5D, self).__init__()
+        self.w = nn.Parameter(torch.tensor(self.init_w, dtype=torch.float32))
         self.init_w_tensor = self.w.data.clone().to(DEVICE)
+
+        self.hidden_dim = 4
+
+        # Neural network for next_d function
+        self.difficulty_nn = nn.Sequential(
+            nn.Linear(3, self.hidden_dim),  # Input: retrievability, difficulty, rating
+            nn.Mish(),
+            nn.Linear(self.hidden_dim, self.hidden_dim),
+            nn.Mish(),
+            nn.Linear(self.hidden_dim, 1),  # Output: new difficulty
+        )
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
 
     def iter(
         self,
@@ -1113,7 +1126,13 @@ class FSRS5(FSRS):
                     self.stability_after_failure(state, r),
                 ),
             )
-            new_d = self.next_d(state, X[:, 1])
+            # Reshape inputs to ensure proper dimensions for the neural network
+            inputs = torch.stack(
+                [r, state[:, 1], X[:, 1]], dim=1
+            )  # Shape: [batch_size, 3]
+            new_d = self.difficulty_nn(inputs).squeeze(
+                -1
+            )  # Apply network and ensure output shape is correct
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(S_MIN, 36500)
         return torch.stack([new_s, new_d], dim=1)
@@ -1134,14 +1153,6 @@ class FSRS5(FSRS):
 
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[7] * init + (1 - self.w[7]) * current
-
-    def state_dict(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
 
 
 class RNN(nn.Module):
@@ -2350,9 +2361,9 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.model = MODEL.to(device=DEVICE)
-        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5)):
+        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5D)):
             self.model.pretrain(train_set)  # type: ignore
-        if isinstance(MODEL, (RNN, Transformer, GRU_P)):
+        if isinstance(MODEL, (RNN, Transformer, GRU_P, FSRS5D)):
             self.optimizer = torch.optim.AdamW(
                 self.model.parameters(), lr=lr, weight_decay=wd
             )
@@ -2963,10 +2974,10 @@ def process(user_id):
         Model = FSRS4
     elif MODEL_NAME == "FSRS-4.5":
         Model = FSRS4dot5
-    elif MODEL_NAME == "FSRS-5":
+    elif MODEL_NAME == "FSRS-5-D":
         global SHORT_TERM
         SHORT_TERM = True
-        Model = FSRS5
+        Model = FSRS5D
     elif MODEL_NAME == "HLR":
         Model = HLR
     elif MODEL_NAME == "Transformer":
@@ -3073,8 +3084,7 @@ def process(user_id):
                     if verbose_inadequate_data:
                         print("Skipping - Inadequate data")
                 else:
-                    tb = sys.exc_info()[2]
-                    print("User:", user_id, "Error:", e.with_traceback(tb))
+                    raise e
                 partition_weights[partition] = Model().state_dict()
         w_list.append(partition_weights)
 
@@ -3145,7 +3155,11 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
             for partition, w in w_list[-1].items()
         }
     elif WEIGHTS:
-        torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
+        if Path(f"weights/{file_name}").exists():
+            torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
+        else:
+            Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
+            torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
     if RAW:
         raw = {
             "user": int(user_id),

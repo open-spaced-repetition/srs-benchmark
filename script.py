@@ -308,8 +308,8 @@ def process(user_id):
                     if verbose_inadequate_data:
                         print("Skipping - Inadequate data")
                 else:
-                    tb = sys.exc_info()[2]
-                    print("User:", user_id, "Error:", e.with_traceback(tb))
+                    print(f"User: {user_id}")
+                    raise e
                 partition_weights[partition] = optimizer.init_w
         w_list.append(partition_weights)
 

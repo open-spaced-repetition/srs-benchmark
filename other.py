@@ -3145,6 +3145,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
             for partition, w in w_list[-1].items()
         }
     elif WEIGHTS:
+        Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
         torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
     if RAW:
         raw = {

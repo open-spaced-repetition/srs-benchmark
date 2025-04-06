@@ -2363,9 +2363,23 @@ class Trainer:
         self.model = MODEL.to(device=DEVICE)
         if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5D)):
             self.model.pretrain(train_set)  # type: ignore
-        if isinstance(MODEL, (RNN, Transformer, GRU_P, FSRS5D)):
+        if isinstance(MODEL, (RNN, Transformer, GRU_P)):
             self.optimizer = torch.optim.AdamW(
                 self.model.parameters(), lr=lr, weight_decay=wd
+            )
+        elif isinstance(MODEL, FSRS5D):
+            self.optimizer = torch.optim.AdamW(
+                [
+                    {
+                        "params": self.model.w,
+                        "weight_decay": 0,
+                    },
+                    {
+                        "params": self.model.difficulty_nn.parameters(),
+                        "weight_decay": wd,
+                    },
+                ],
+                lr=lr,
             )
         else:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)

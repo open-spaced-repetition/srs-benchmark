@@ -34,7 +34,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
 
 ### Algorithms and algorithm families
 
-- DSR (**D**ifficulty, **S**tability, **R**etrievability) model of memory:
+- Two component or three component* model of memory:
     - FSRS v1 and v2: the initial experimental versions of FSRS.
     - FSRS v3: the first official release of the FSRS algorithm, made available as a custom scheduling script.
     - FSRS v4: the upgraded version of FSRS, made better with help from the community.
@@ -49,6 +49,8 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
+
+*In the two-component model of long-term memory, two independent variables are used to describe the status of unitary memory in a human brain: retrievability (R), or retrieval strength/probability of recall; and stability (S), or storage strength/memory half-life. The expanded three-component model adds a third variable - difficulty (D).
 
 - Alternative models of memory:
     - DASH: the algorithm proposed in [this paper](https://scholar.colorado.edu/concern/graduate_thesis_or_dissertations/zp38wc97m). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this algorithm: DASH[MCM] and DASH[ACT-R]. For further information, please refer to [this paper](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).

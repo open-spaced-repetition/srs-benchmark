@@ -75,7 +75,7 @@ if RUST:
     backend = FSRS(parameters=[])
 
 else:
-    path = "FSRS-5"
+    path = "FSRS-6"
     if DRY_RUN:
         path += "-dry-run"
     if ONLY_PRETRAIN:

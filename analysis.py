@@ -260,7 +260,7 @@ if __name__ == "__main__":
             linewidth=2,
             label=f"Mode: {mode:.2f}",
         )
-        plt.xlabel("Weight")
+        plt.xlabel("Parameter value")
         plt.ylabel("Frequency")
         plt.legend()
         plt.title(f"w[{i}]")

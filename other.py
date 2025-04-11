@@ -3073,8 +3073,8 @@ def process(user_id):
                     if verbose_inadequate_data:
                         print("Skipping - Inadequate data")
                 else:
-                    tb = sys.exc_info()[2]
-                    print("User:", user_id, "Error:", e.with_traceback(tb))
+                    print(f"User: {user_id}")
+                    raise e
                 partition_weights[partition] = Model().state_dict()
         w_list.append(partition_weights)
 
@@ -3145,6 +3145,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
             for partition, w in w_list[-1].items()
         }
     elif WEIGHTS:
+        Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
         torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
     if RAW:
         raw = {

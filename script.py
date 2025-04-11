@@ -52,6 +52,7 @@ from fsrs_optimizer import (  # type: ignore
     remove_non_continuous_rows,
     plot_brier,
     rmse_matrix,
+    DEFAULT_PARAMETER,
 )
 
 
@@ -104,7 +105,7 @@ def predict(w_list, testsets, user_id=None):
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         for partition in testset["partition"].unique():
             partition_testset = testset[testset["partition"] == partition].copy()
-            weights = w.get(partition, None)
+            weights = w.get(partition, DEFAULT_PARAMETER)
             my_collection = Collection(weights)
             partition_testset["stability"], partition_testset["difficulty"] = (
                 my_collection.batch_predict(partition_testset)
@@ -309,8 +310,8 @@ def process(user_id):
                     if verbose_inadequate_data:
                         print("Skipping - Inadequate data")
                 else:
-                    tb = sys.exc_info()[2]
-                    print("User:", user_id, "Error:", e.with_traceback(tb))
+                    print(f"User: {user_id}")
+                    raise e
                 optimizer.define_model()
                 partition_weights[partition] = optimizer.init_w
         w_list.append(partition_weights)

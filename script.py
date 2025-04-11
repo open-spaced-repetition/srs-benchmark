@@ -278,6 +278,7 @@ def process(user_id):
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
                 if DRY_RUN:
+                    optimizer.define_model()
                     partition_weights[partition] = optimizer.init_w
                     continue
                 if RUST:
@@ -310,6 +311,7 @@ def process(user_id):
                 else:
                     tb = sys.exc_info()[2]
                     print("User:", user_id, "Error:", e.with_traceback(tb))
+                optimizer.define_model()
                 partition_weights[partition] = optimizer.init_w
         w_list.append(partition_weights)
 

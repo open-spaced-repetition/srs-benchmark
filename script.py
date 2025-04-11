@@ -113,7 +113,7 @@ def predict(w_list, testsets, user_id=None):
             partition_testset["p"] = power_forgetting_curve(
                 partition_testset["delta_t"],
                 partition_testset["stability"],
-                -weights[19],
+                -weights[20],
             )
             p.extend(partition_testset["p"].tolist())
             y.extend(partition_testset["y"].tolist())

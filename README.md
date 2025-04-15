@@ -40,7 +40,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS v4: the upgraded version of FSRS, made better with help from the community.
     - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
     - FSRS-5: the upgraded version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
-    - FSRS-6: the latest version of FSRS. It fixes some issues of the same-day reviews and makes the decay of the forgetting curve trainable.
+    - FSRS-6: the latest version of FSRS. The formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
         - FSRS-6 default param.: FSRS-6 with default parameters. The default parameters have been obtained by running FSRS-6 on all 10 thousand collections from the dataset and calculating the median of each parameter.
         - FSRS-6 pretrain: FSRS-6 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
         - FSRS-6 binary: FSRS-6 which treats `hard` and `easy` grades as `good`.

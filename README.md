@@ -105,12 +105,8 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-rs | 21 | 0.320±0.0082 | 0.044±0.0012 | 0.709±0.0041 | IL, G, SR |
 | FSRS-6 | 21 | 0.321±0.0083 | 0.046±0.0013 | 0.706±0.0041 | IL, G, SR |
 | GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 | IL, G |
-| FSRS-5 recency | 19 | 0.326±0.0082 | 0.049±0.0015 | 0.706±0.0041 | IL, G, SR |
 | FSRS-5 | 19 | 0.327±0.0083 | 0.052±0.0015 | 0.702±0.0042 | IL, G, SR |
-| FSRS-5 preset | 19 | 0.328±0.0083 | 0.051±0.0015 | 0.702±0.0043 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.332±0.0083 | 0.054±0.0016 | 0.692±0.0041 | IL, G |
-| FSRS-5 binary | 15 | 0.334±0.0083 | 0.056±0.0016 | 0.679±0.0047 | IL, G, SR |
-| FSRS-5 deck | 19 | 0.336±0.0085 | 0.056±0.0018 | 0.692±0.0044 | IL, G, SR |
 | FSRS v4 | 17 | 0.338±0.0086 | 0.058±0.0017 | 0.689±0.0043 | IL, G |
 | DASH-short | 9 | 0.339±0.0084 | 0.066±0.0019 | 0.636±0.0050 | IL, G, SR |
 | FSRS-6 pretrain | 4 | 0.339±0.0084 | 0.070±0.0024 | 0.695±0.0039 | IL, G, SR |
@@ -145,13 +141,9 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-6 | 21 | 0.345±0.0042 | 0.066±0.0011 | 0.707±0.0023 | IL, G, SR |
 | GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 | IL, G, SR|
 | GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 | IL, G |
-| FSRS-5 recency | 19 | 0.354±0.0044 | 0.072±0.0012 | 0.704±0.0023 | IL, G, SR|
 | FSRS-5 | 19 | 0.356±0.0043 | 0.074±0.0012 | 0.701±0.0023 | IL, G, SR |
-| FSRS-5 preset | 19 | 0.358±0.0045 | 0.074±0.0012 | 0.699±0.0023 | IL, G, SR|
 | FSRS-6 pretrain | 4 | 0.359±0.0044 | 0.083±0.0013 | 0.702±0.0022 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.362±0.0045 | 0.076±0.0013 | 0.689±0.0023 | IL, G |
-| FSRS-5 binary | 15 | 0.367±0.0045 | 0.081±0.0014 | 0.671±0.0025 | IL, G, SR|
-| FSRS-5 deck | 19 | 0.368±0.0047 | 0.081±0.0014 | 0.694±0.0023 | IL, G, SR|
 | DASH | 9 | 0.368±0.0045 | 0.084±0.0013 | 0.631±0.0027 | IL, G |
 | DASH-short | 9 | 0.368±0.0045 | 0.086±0.0014 | 0.622±0.0029 | IL, G, SR|
 | DASH[MCM] | 9 | 0.369±0.0044 | 0.086±0.0014 | 0.634±0.0026 | IL, G |
@@ -217,15 +209,16 @@ Additionally, you can find the full table [here](./plots/Wilcoxon-9999-collectio
 
 ## Default Parameters
 
-FSRS-5:
+FSRS-6:
 
 ```
-0.40255, 1.18385, 3.173, 15.69105,
-7.1949, 0.5345, 1.4604, 0.0046,
-1.54575, 0.1192, 1.01925,
-1.9395, 0.11, 0.29605, 2.2698,
-0.2315, 2.9898,
-0.51655, 0.6621
+0.2172, 1.1771, 3.2602, 16.1507,
+7.0114, 0.57, 2.0966, 0.0069,
+1.5261, 0.112, 1.0178,
+1.849, 0.1133, 0.3127, 2.2934,
+0.2191, 3.0004,
+0.7536, 0.3332, 0.1437,
+0.2,
 ```
 
 ## Comparisons with SuperMemo 15/16/17
@@ -249,19 +242,21 @@ pip install -r requirements.txt
 
 ### Commands
 
-FSRS-5:
+FSRS-6:
 
 ```bash
 python script.py
 ```
 
-FSRS-5 with default parameters:
+> Please confirm that you have upgraded the `fsrs-optimizer` package to the latest version.
+
+FSRS-6 with default parameters:
 
 ```bash
 python script.py --dry
 ```
 
-FSRS-5 with only the first 4 parameters optimized:
+FSRS-6 with only the first 4 parameters optimized:
 
 ```bash
 python script.py --pretrain
@@ -313,7 +308,7 @@ Save the analyzing charts:
 python script.py --plot
 ```
 
-Benchmark FSRSv4/FSRSv3/HLR/LSTM/SM2:
+Benchmark FSRS-5/FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
 python other.py --algo FSRSv4

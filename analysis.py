@@ -247,10 +247,10 @@ if __name__ == "__main__":
         # Calculate 2nd and 98th percentiles to limit the histogram range
         p2 = np.percentile(weights[:, i], 2)
         p98 = np.percentile(weights[:, i], 98)
-        
+
         # Filter data for histogram display
         filtered_weights = weights[:, i][(weights[:, i] >= p2) & (weights[:, i] <= p98)]
-        
+
         plt.hist(filtered_weights, bins=128, log=False)
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])

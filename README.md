@@ -139,10 +139,10 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | Algorithm | Parameters | Log Loss | RMSE (bins) | AUC | Input features |
 | --- | --- | --- | --- | --- | --- |
 | **LSTM** | 8869 | **0.333±0.0042** | 0.0538±0.00096 | **0.733±0.0021** | FIL, G, SR, AT |
-| GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 | IL, G, SR|
 | FSRS-6 recency | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0023 | IL, G, SR |
 | FSRS-rs | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0022 | IL, G, SR |
 | FSRS-6 | 21 | 0.345±0.0042 | 0.066±0.0011 | 0.707±0.0023 | IL, G, SR |
+| GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 | IL, G, SR|
 | GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 | IL, G |
 | FSRS-5 recency | 19 | 0.354±0.0044 | 0.072±0.0012 | 0.704±0.0023 | IL, G, SR|
 | FSRS-5 | 19 | 0.356±0.0043 | 0.074±0.0012 | 0.701±0.0023 | IL, G, SR |

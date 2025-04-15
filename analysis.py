@@ -1,8 +1,19 @@
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
 import json
 import pathlib
 from KDEpy import FFTKDE  # type: ignore
+from config import create_parser
+import os
+import sys
+
+parser = create_parser()
+args = parser.parse_args()
+
+DEV_MODE = args.dev
+if DEV_MODE:
+    sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
+
 from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
 
 
@@ -233,7 +244,14 @@ if __name__ == "__main__":
     print(weights.shape)
     pathlib.Path("./plots").mkdir(parents=True, exist_ok=True)
     for i in range(n_params):
-        plt.hist(weights[:, i], bins=128, log=False)
+        # Calculate 2nd and 98th percentiles to limit the histogram range
+        p2 = np.percentile(weights[:, i], 2)
+        p98 = np.percentile(weights[:, i], 98)
+        
+        # Filter data for histogram display
+        filtered_weights = weights[:, i][(weights[:, i] >= p2) & (weights[:, i] <= p98)]
+        
+        plt.hist(filtered_weights, bins=128, log=False)
         median = np.median(weights[:, i])
         mean = np.mean(weights[:, i])
         # mode = best_mode(weights[:, i], sizes)

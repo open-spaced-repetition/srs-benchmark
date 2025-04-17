@@ -54,8 +54,9 @@ def format(exponent, n):
 if __name__ == "__main__":
     models = [
         "LSTM-short-secs-equalize_test_with_non_secs",
+        "FSRS-6-recency",
         "GRU-P-short",
-        "FSRS-5-recency",
+        "FSRS-5",
         "FSRS-4.5",
         "FSRSv4",
         "DASH",
@@ -140,11 +141,13 @@ if __name__ == "__main__":
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_Ebisu_v2 = models.index("Ebisu-v2")
+    index_FSRS_6_recency = models.index("FSRS-6-recency")
     models[index_lstm] = "LSTM"
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
     models[index_Ebisu_v2] = "Ebisu v2"
+    models[index_FSRS_6_recency] = "FSRS-6\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

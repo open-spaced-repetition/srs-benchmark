@@ -2,9 +2,7 @@ import json
 import math
 import pathlib
 import warnings
-import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd

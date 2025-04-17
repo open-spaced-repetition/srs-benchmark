@@ -156,7 +156,7 @@ if __name__ == "__main__":
         ]
     )
     if args.fast:
-        for model, _, _ in models:
+        for model, n_param, features in models:
             print(f"Model: {model}")
             m = []
             parameters = []

@@ -82,7 +82,7 @@ Total number of users: 9,999.
 Total number of reviews for evaluation: 349,923,850.
 Same-day reviews are not used for evaluation, but some algorithms use them to refine their predictions of probability of recall for the next day. Some reviews are filtered out, for example, the revlog entries created by changing the due date manually or reviewing cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 727 million mentioned earlier. 
 
-The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The "Parameters" column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included.
+The following tables present the means and the 99% confidence intervals. The best result is highlighted in **bold**. The "Parameters" column shows the number of optimizable (trainable) parameters. If a parameter is a constant, it is not included. Arrows indicate whether lower (↓) or higher (↑) values are better.
 
 For the sake of brevity, the following abbreviations are used in the "Input features" column:
 
@@ -98,7 +98,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 ### Weighted by the number of reviews
 
-| Algorithm | Parameters | Log Loss | RMSE (bins) | AUC | Input features |
+| Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
 | **LSTM** | 8869 | **0.312±0.0078** | 0.035±0.0011 | **0.733±0.0038** | FIL, G, SR, AT |
 | GRU-P-short | 297 | 0.320±0.0080 | 0.042±0.0013 | 0.710±0.0047 | IL, G, SR|
@@ -136,7 +136,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 ### Unweighted
 
-| Algorithm | Parameters | Log Loss | RMSE (bins) | AUC | Input features |
+| Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
 | **LSTM** | 8869 | **0.333±0.0042** | 0.0538±0.00096 | **0.733±0.0021** | FIL, G, SR, AT |
 | GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 | IL, G, SR|

@@ -67,33 +67,34 @@ def format(exponent, n):
 if __name__ == "__main__":
     models = [
         "LSTM-short-secs-equalize_test_with_non_secs",
-        "GRU-P-short",
-        "FSRS-5-recency",
+        "FSRS-6-recency",
         "FSRS-rs",
+        "GRU-P-short",
+        "FSRS-6",
+        "FSRS-6-preset",
+        "FSRS-6-binary",
         "GRU-P",
+        "FSRS-6-deck",
         "FSRS-5",
-        "FSRS-5-preset",
-        "FSRS-5-deck",
+        "FSRS-6-pretrain",
         "FSRS-4.5",
-        "FSRS-5-pretrain",
-        "FSRS-5-binary",
-        "FSRSv4",
         "DASH-short",
         "DASH",
         "DASH[MCM]",
+        "FSRSv4",
         "DASH[ACT-R]",
-        "FSRS-5-dry-run",
+        "FSRS-6-dry-run",
         "GRU",
-        "NN-17",
         "AVG",
-        "FSRSv3",
+        "NN-17",
         "ACT-R",
+        "FSRSv3",
         "FSRSv2",
-        "FSRSv1",
         "HLR",
-        "Anki",
+        "FSRSv1",
         "HLR-short",
         "Ebisu-v2",
+        "Anki",
         "SM2-trainable",
         "Anki-dry-run",
         "SM2-short",
@@ -193,10 +194,10 @@ if __name__ == "__main__":
 
     # small changes to labels
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
-    index_5_dry_run = models.index("FSRS-5-dry-run")
+    index_6_dry_run = models.index("FSRS-6-dry-run")
     index_anki_dry_run = models.index("Anki-dry-run")
     index_anki_train = models.index("Anki")
-    index_5_pretrain = models.index("FSRS-5-pretrain")
+    index_6_pretrain = models.index("FSRS-6-pretrain")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_v2 = models.index("FSRSv2")
@@ -206,10 +207,10 @@ if __name__ == "__main__":
     index_sm2_short = models.index("SM2-short")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_lstm] = "LSTM"
-    models[index_5_dry_run] = "FSRS-5\ndef. param."
+    models[index_6_dry_run] = "FSRS-6\ndef. param."
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_anki_train] = "Anki-SM-2\ntrainable"
-    models[index_5_pretrain] = "FSRS-5\npretrain"
+    models[index_6_pretrain] = "FSRS-6\npretrain"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
     models[index_v2] = "FSRS v2"

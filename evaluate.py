@@ -80,7 +80,7 @@ def weighted_avg_and_std(values, weights):
 
 
 if __name__ == "__main__":
-    dev_mode_name = "FSRS-5-dev"
+    dev_mode_name = "FSRS-6-dev"
     dev_file = pathlib.Path(f"./result/{dev_mode_name}.jsonl")
     if dev_file.exists():
         with open(dev_file, "r") as f:
@@ -107,26 +107,26 @@ if __name__ == "__main__":
             (dev_mode_name, None, None),
             ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL, G, SR, AT"),
             ("GRU-P-short", 297, "IL, G, SR"),
+            ("FSRS-6-recency", 21, "IL, G, SR"),
+            ("FSRS-rs", 21, "IL, G, SR"),
+            ("FSRS-6", 21, "IL, G, SR"),
+            ("FSRS-6-preset", 21, "IL, G, SR"),
             ("GRU-P", 297, "IL, G"),
-            ("FSRS-5-recency", 19, "IL, G, SR"),
-            ("FSRS-5-preset", 19, "IL, G, SR"),
-            ("FSRS-rs", 19, "IL, G, SR"),
+            ("FSRS-6-binary", 17, "IL, G, SR"),
             ("FSRS-5", 19, "IL, G, SR"),
-            ("FSRS-5-disable_short_term", 17, "IL, G"),
+            ("FSRS-6-deck", 21, "IL, G, SR"),
             ("FSRS-4.5", 17, "IL, G"),
-            ("FSRS-5-deck", 19, "IL, G, SR"),
-            ("FSRS-5-binary", 15, "IL, G, SR"),
             ("FSRSv4", 17, "IL, G"),
+            ("FSRS-6-pretrain", 4, "IL, G, SR"),
             ("DASH", 9, "IL, G"),
-            ("GRU", 39, "IL, G"),
             ("DASH[MCM]", 9, "IL, G"),
+            ("GRU", 39, "IL, G"),
             ("DASH-short", 9, "IL, G, SR"),
             ("DASH[ACT-R]", 5, "IL, G"),
             ("FSRSv2", 14, "IL, G"),
-            ("FSRS-5-pretrain", 4, "IL, G, SR"),
             ("FSRSv3", 13, "IL, G"),
             ("NN-17", 39, "IL, G"),
-            ("FSRS-5-dry-run", 0, "IL, G, SR"),
+            ("FSRS-6-dry-run", 0, "IL, G, SR"),
             ("ACT-R", 5, "IL"),
             ("FSRSv1", 7, "IL, G"),
             ("AVG", 0, "---"),

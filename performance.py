@@ -1,3 +1,4 @@
+# type: ignore
 # You can pass arguments to this script as if it were script.py
 from statistics import mean
 import script

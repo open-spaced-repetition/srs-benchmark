@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
 from config import create_parser
@@ -7,16 +7,14 @@ from reptile_trainer import (
     DEFAULT_FINETUNE_PARAMS,
     finetune,
     get_inner_opt,
-    evaluate,
-    compute_data_loss,
     compute_df_loss,
 )
 import pandas as pd
 from pathlib import Path
-import optuna
+import optuna  # type: ignore
 from functools import partial
 import random
-from multiprocess import Pool
+from multiprocess import Pool  # type: ignore
 
 optuna_nonce = random.randint(0, 100000000)
 

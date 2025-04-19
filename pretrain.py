@@ -46,6 +46,8 @@ if __name__ == "__main__":
 
     print(total)
 
+    pretrain_num = 500
+
     df_dict = {}
 
     with ThreadPoolExecutor() as executor:
@@ -54,13 +56,13 @@ if __name__ == "__main__":
                 process_user,
                 user_id,
             )
-            for user_id in range(1, 101)
+            for user_id in range(1, pretrain_num + 1)
         ]
         for future in tqdm(as_completed(futures), total=len(futures)):
             user_id, dataset = future.result()
             df_dict[user_id] = dataset
 
-    df_list = [df_dict[user_id] for user_id in range(1, 101)]
+    df_list = [df_dict[user_id] for user_id in range(1, pretrain_num + 1)]
     df = pd.concat(df_list, axis=0)
 
     trainer = Trainer(

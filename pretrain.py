@@ -2,7 +2,7 @@ import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
 import torch.nn as nn
-from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P
+from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P, FSRS6
 from config import create_parser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -37,6 +37,8 @@ if __name__ == "__main__":
         model = Transformer()
     elif MODEL_NAME == "NN-17":
         model = NN_17()
+    elif MODEL_NAME == "FSRS-6":
+        model = FSRS6()
 
     total = 0
     for param in model.parameters():
@@ -71,5 +73,7 @@ if __name__ == "__main__":
         batch_size=65536,
     )
     trainer.train()
+
+    print(trainer.model.state_dict())
 
     torch.save(trainer.model.state_dict(), f"./pretrain/{FILE_NAME}_pretrain.pth")

@@ -2873,7 +2873,7 @@ def rmse_bins_exploit(user_id):
     return stats, raw
 
 
-def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
+def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_TERM):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
@@ -2892,7 +2892,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
             df["delta_t_secs"] = df["elapsed_seconds"] / 86400
             df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
 
-    if not SHORT_TERM:
+    if not short_term:
         # exclude reviews that are on the same day from features and labels
         df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
         df["i"] = df.groupby("card_id").cumcount() + 1
@@ -3108,7 +3108,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    if SHORT_TERM:
+    if short_term:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
     df["i"] = (
         df.groupby("card_id")
@@ -3132,8 +3132,8 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
-def create_features(df, model_name="FSRSv3"):
-    if SECS_IVL and EQUALIZE_TEST_WITH_NON_SECS:
+def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL, short_term=SHORT_TERM):
+    if secs_ivl and EQUALIZE_TEST_WITH_NON_SECS:
         df_non_secs = create_features_helper(df.copy(), model_name, False)
         df_secs = create_features_helper(df.copy(), model_name, True)
         df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
@@ -3161,7 +3161,7 @@ def create_features(df, model_name="FSRSv3"):
 
         return df_secs
     else:
-        return create_features_helper(df, model_name, SECS_IVL)
+        return create_features_helper(df, model_name, secs_ivl, short_term)
 
 
 @catch_exceptions

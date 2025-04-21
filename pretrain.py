@@ -23,7 +23,9 @@ def process_user(user_id):
     dataset = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    dataset = create_features(dataset, model_name=MODEL_NAME)
+    dataset = create_features(
+        dataset, model_name=MODEL_NAME, secs_ivl=SECS_IVL, short_term=SHORT_TERM
+    )
     return user_id, dataset
 
 
@@ -38,6 +40,7 @@ if __name__ == "__main__":
     elif MODEL_NAME == "NN-17":
         model = NN_17()
     elif MODEL_NAME == "FSRS-6":
+        SHORT_TERM = True
         model = FSRS6()
 
     total = 0
@@ -69,10 +72,10 @@ if __name__ == "__main__":
         model,
         df,
         None,
-        n_epoch=32,
+        n_epoch=5,
         lr=4e-2,
-        wd=1e-4,
-        batch_size=65536,
+        wd=0,
+        batch_size=512,
     )
     trainer.train()
 

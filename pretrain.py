@@ -31,6 +31,10 @@ def process_user(user_id):
 
 if __name__ == "__main__":
     model: nn.Module
+    n_epoch = 32
+    lr = 4e-2
+    wd = 1e-4
+    batch_size = 65536
     if MODEL_NAME == "GRU":
         model = RNN()
     elif MODEL_NAME == "GRU-P":
@@ -41,6 +45,10 @@ if __name__ == "__main__":
         model = NN_17()
     elif MODEL_NAME == "FSRS-6":
         SHORT_TERM = True
+        n_epoch = 5
+        lr = 4e-2
+        wd = 1e-4
+        batch_size = 512
         model = FSRS6()
 
     total = 0
@@ -72,10 +80,10 @@ if __name__ == "__main__":
         model,
         df,
         None,
-        n_epoch=5,
-        lr=4e-2,
-        wd=0,
-        batch_size=512,
+        n_epoch=n_epoch,
+        lr=lr,
+        wd=wd,
+        batch_size=batch_size,
     )
     trainer.train()
 

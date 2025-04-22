@@ -140,7 +140,7 @@ class FSRS(nn.Module):
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
-        stabilities, difficulties = outputs[
+        stabilities, difficulties, *_ = outputs[
             seq_lens - 1,
             torch.arange(real_batch_size, device=DEVICE),
         ].transpose(0, 1)

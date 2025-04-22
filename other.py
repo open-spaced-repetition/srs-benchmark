@@ -2873,7 +2873,7 @@ def rmse_bins_exploit(user_id):
     return stats, raw
 
 
-def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_TERM):
+def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
@@ -2891,52 +2891,66 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
         if secs_ivl:
             df["delta_t_secs"] = df["elapsed_seconds"] / 86400
             df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
-
-    if not short_term:
+    global SHORT_TERM
+    if model_name.startswith("FSRS-5") or model_name.startswith("FSRS-6"):
+        SHORT_TERM = True
+    if not SHORT_TERM:
         # exclude reviews that are on the same day from features and labels
         df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
         df["i"] = df.groupby("card_id").cumcount() + 1
     df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
-    t_history_non_secs = df.groupby("card_id", group_keys=False)["delta_t"].apply(
+    t_history_non_secs_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
     if secs_ivl:
-        t_history_secs = df.groupby("card_id", group_keys=False)["delta_t_secs"].apply(
-            lambda x: cum_concat([[i] for i in x])
-        )
-    r_history = df.groupby("card_id", group_keys=False)["rating"].apply(
+        t_history_secs_list = df.groupby("card_id", group_keys=False)[
+            "delta_t_secs"
+        ].apply(lambda x: cum_concat([[i] for i in x]))
+    r_history_list = df.groupby("card_id", group_keys=False)["rating"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
+    last_rating = []
+    for t_sublist, r_sublist in zip(t_history_non_secs_list, r_history_list):
+        for t_history, r_history in zip(t_sublist, r_sublist):
+            flag = True
+            for t, r in zip(reversed(t_history[:-1]), reversed(r_history[:-1])):
+                if t > 0:
+                    last_rating.append(r)
+                    flag = False
+                    break
+            if flag:
+                last_rating.append(r_history[0])
+    df["last_rating"] = last_rating
     df["r_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in r_history for item in sublist
+        ",".join(map(str, item[:-1])) for sublist in r_history_list for item in sublist
     ]
     df["t_history"] = [
         ",".join(map(str, item[:-1]))
-        for sublist in t_history_non_secs
+        for sublist in t_history_non_secs_list
         for item in sublist
     ]
     if secs_ivl:
         if EQUALIZE_TEST_WITH_NON_SECS:
             df["t_history"] = [
                 ",".join(map(str, item[:-1]))
-                for sublist in t_history_non_secs
+                for sublist in t_history_non_secs_list
                 for item in sublist
             ]
             df["t_history_secs"] = [
                 ",".join(map(str, item[:-1]))
-                for sublist in t_history_secs
+                for sublist in t_history_secs_list
                 for item in sublist
             ]
         else:
             df["t_history"] = [
                 ",".join(map(str, item[:-1]))
-                for sublist in t_history_secs
+                for sublist in t_history_secs_list
                 for item in sublist
             ]
         df["delta_t"] = df["delta_t_secs"]
-        t_history_used = t_history_secs
+        t_history_used = t_history_secs_list
     else:
-        t_history_used = t_history_non_secs
+        t_history_used = t_history_non_secs_list
 
     if model_name.startswith("FSRS") or model_name in (
         "RNN",
@@ -2950,7 +2964,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
                 0, 1
             )
-            for t_sublist, r_sublist in zip(t_history_used, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name in "LSTM":
@@ -3003,7 +3017,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
     elif model_name in "GRU-P":
         df["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history_used, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "HLR":
@@ -3019,7 +3033,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
                 ],
                 dtype=torch.float32,
             )
-            for r_sublist in r_history
+            for r_sublist in r_history_list
             for r_item in r_sublist
         ]
     elif model_name == "ACT-R":
@@ -3062,7 +3076,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
                 dash_tw_features(r_item[:-1], t_item[1:], "MCM" in model_name),
                 dtype=torch.float32,
             )
-            for t_sublist, r_sublist in zip(t_history_used, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "DASH[ACT-R]":
@@ -3079,7 +3093,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
                 dash_actr_features(r_item[:-1], t_item[1:]),
                 dtype=torch.float32,
             )
-            for t_sublist, r_sublist in zip(t_history_used, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "NN-17":
@@ -3094,7 +3108,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
             torch.tensor(
                 (t_item[:-1], r_item[:-1], r_history_to_l_history(r_item[:-1]))
             ).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history_used, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
     elif model_name == "SM2":
@@ -3102,13 +3116,13 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
     elif model_name.startswith("Ebisu"):
         df["sequence"] = [
             tuple(zip(t_item[:-1], r_item[:-1]))
-            for t_sublist, r_sublist in zip(t_history_used, r_history)
+            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)
         ]
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    if short_term:
+    if SHORT_TERM:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
     df["i"] = (
         df.groupby("card_id")
@@ -3132,7 +3146,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL, short_term=SHORT_T
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
-def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL, short_term=SHORT_TERM):
+def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL):
     if secs_ivl and EQUALIZE_TEST_WITH_NON_SECS:
         df_non_secs = create_features_helper(df.copy(), model_name, False)
         df_secs = create_features_helper(df.copy(), model_name, True)
@@ -3161,13 +3175,12 @@ def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL, short_term=SHORT
 
         return df_secs
     else:
-        return create_features_helper(df, model_name, secs_ivl, short_term)
+        return create_features_helper(df, model_name, secs_ivl)
 
 
 @catch_exceptions
 def process(user_id):
     plt.close("all")
-    global SHORT_TERM
     global S_MIN
     if MODEL_NAME == "SM2" or MODEL_NAME.startswith("Ebisu"):
         return process_untrainable(user_id)
@@ -3196,10 +3209,8 @@ def process(user_id):
     elif MODEL_NAME == "FSRS-4.5":
         Model = FSRS4dot5
     elif MODEL_NAME == "FSRS-5":
-        SHORT_TERM = True
         Model = FSRS5
     elif MODEL_NAME == "FSRS-6":
-        SHORT_TERM = True
         S_MIN = 0.001 if not SECS_IVL else S_MIN
         Model = FSRS6
     elif MODEL_NAME == "HLR":
@@ -3225,7 +3236,7 @@ def process(user_id):
 
         Model = get_constant_model
 
-    dataset = create_features(df_revlogs, MODEL_NAME)
+    dataset = create_features(df_revlogs, MODEL_NAME, SECS_IVL)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
     if PARTITIONS != "none":

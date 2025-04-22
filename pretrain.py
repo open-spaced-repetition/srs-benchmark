@@ -47,7 +47,7 @@ if __name__ == "__main__":
         SHORT_TERM = True
         n_epoch = 5
         lr = 4e-2
-        wd = 1e-4
+        wd = 0
         batch_size = 512
         model = FSRS6()
 
@@ -58,6 +58,7 @@ if __name__ == "__main__":
     print(total)
 
     pretrain_num = 500
+    pretrain_users = [i for i in range(1, pretrain_num + 1)]
 
     df_dict = {}
 
@@ -67,13 +68,13 @@ if __name__ == "__main__":
                 process_user,
                 user_id,
             )
-            for user_id in range(1, pretrain_num + 1)
+            for user_id in pretrain_users
         ]
         for future in tqdm(as_completed(futures), total=len(futures)):
             user_id, dataset = future.result()
             df_dict[user_id] = dataset
 
-    df_list = [df_dict[user_id] for user_id in range(1, pretrain_num + 1)]
+    df_list = [df_dict[user_id] for user_id in pretrain_users]
     df = pd.concat(df_list, axis=0)
 
     trainer = Trainer(

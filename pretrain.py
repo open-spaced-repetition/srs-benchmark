@@ -1,8 +1,20 @@
+import math
+from matplotlib import pyplot as plt
 import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
 import torch.nn as nn
-from other import create_features, Trainer, RNN, Transformer, NN_17, GRU_P, FSRS6
+from other import (
+    create_features,
+    Trainer,
+    RNN,
+    Transformer,
+    NN_17,
+    GRU_P,
+    FSRS6,
+    Collection,
+)
+from fsrs_optimizer import plot_brier, Optimizer  # type: ignore
 from config import create_parser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -23,9 +35,7 @@ def process_user(user_id):
     dataset = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    dataset = create_features(
-        dataset, model_name=MODEL_NAME, secs_ivl=SECS_IVL, short_term=SHORT_TERM
-    )
+    dataset = create_features(dataset, model_name=MODEL_NAME, secs_ivl=SECS_IVL)
     return user_id, dataset
 
 
@@ -86,8 +96,31 @@ if __name__ == "__main__":
         wd=wd,
         batch_size=batch_size,
     )
-    trainer.train()
+    parameters = trainer.train()
+    print(parameters)
+    torch.save(parameters, f"./pretrain/{FILE_NAME}_pretrain.pth")
 
-    print(trainer.model.state_dict())
-
-    torch.save(trainer.model.state_dict(), f"./pretrain/{FILE_NAME}_pretrain.pth")
+    # my_collection = Collection(FSRS6(parameters))
+    # retentions, stabilities, difficulties = my_collection.batch_predict(df)
+    # df["p"] = retentions
+    # if stabilities:
+    #     df["stability"] = stabilities
+    # if difficulties:
+    #     df["difficulty"] = difficulties
+    # fig = plt.figure()
+    # plot_brier(
+    #     df["p"],
+    #     df["y"],
+    #     ax=fig.add_subplot(111),
+    # )
+    # fig.savefig(f"./{str(pretrain_users)}_calibration.png")
+    # fig2 = plt.figure()
+    # optimizer = Optimizer()
+    # optimizer.calibration_helper(
+    #     df[["stability", "p", "y"]].copy(),
+    #     "stability",
+    #     lambda x: math.pow(1.2, math.floor(math.log(x, 1.2))),
+    #     True,
+    #     fig2.add_subplot(111),
+    # )
+    # fig2.savefig(f"./{str(pretrain_users)}_stability.png")

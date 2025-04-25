@@ -39,14 +39,15 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS v3: the first official release of the FSRS algorithm, made available as a custom scheduling script.
     - FSRS v4: the upgraded version of FSRS, made better with help from the community.
     - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
-    - FSRS-5: the latest version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
-        - FSRS-5 default param.: FSRS-5 with default parameters. The default parameters have been obtained by running FSRS-5 on all 20 thousand collections from the *previous* dataset and calculating the median of each parameter.
-        - FSRS-5 pretrain: FSRS-5 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
-        - FSRS-5 binary: FSRS which treats `hard` and `easy` grades as `good`.
-        - FSRS-5 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.
-        - FSRS-5 deck: different parameters are used for each deck.
-        - FSRS-5 recency: FSRS-5 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
-    - FSRS-rs: the Rust port of FSRS-5. See also: https://github.com/open-spaced-repetition/fsrs-rs
+    - FSRS-5: the upgraded version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
+    - FSRS-6: the latest version of FSRS. The formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
+        - FSRS-6 default param.: FSRS-6 with default parameters. The default parameters have been obtained by running FSRS-6 on all 10 thousand collections from the dataset and calculating the median of each parameter.
+        - FSRS-6 pretrain: FSRS-6 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
+        - FSRS-6 binary: FSRS-6 which treats `hard` and `easy` grades as `good`.
+        - FSRS-6 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.
+        - FSRS-6 deck: different parameters are used for each deck.
+        - FSRS-6 recency: FSRS-6 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
+    - FSRS-rs: the Rust port of FSRS-6. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
 
@@ -102,22 +103,23 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | --- | --- | --- | --- | --- | --- |
 | **LSTM** | 8869 | **0.312±0.0078** | 0.035±0.0011 | **0.733±0.0038** | FIL, G, SR, AT |
 | GRU-P-short | 297 | 0.320±0.0080 | 0.042±0.0013 | 0.710±0.0047 | IL, G, SR|
+| FSRS-6 recency | 21 | 0.320±0.0081 | 0.044±0.0013 | 0.710±0.0040 | IL, G, SR |
+| FSRS-rs | 21 | 0.320±0.0082 | 0.044±0.0012 | 0.709±0.0041 | IL, G, SR |
+| FSRS-6 | 21 | 0.321±0.0083 | 0.046±0.0013 | 0.706±0.0041 | IL, G, SR |
+| FSRS-6 preset | 21 | 0.322±0.0081 | 0.046±0.0013 | 0.707±0.0041 | IL, G, SR |
 | GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 | IL, G |
-| FSRS-5 recency | 19 | 0.326±0.0082 | 0.049±0.0015 | 0.706±0.0041 | IL, G, SR |
-| FSRS-rs | 19 | 0.326±0.0082 | 0.049±0.0015 | 0.705±0.0041 | IL, G, SR |
+| FSRS-6 binary | 17 | 0.326±0.0081 | 0.049±0.0013 | 0.686±0.0047 | IL, G, SR |
 | FSRS-5 | 19 | 0.327±0.0083 | 0.052±0.0015 | 0.702±0.0042 | IL, G, SR |
-| FSRS-5 preset | 19 | 0.328±0.0083 | 0.051±0.0015 | 0.702±0.0043 | IL, G, SR |
+| FSRS-6 deck | 21 | 0.329±0.0082 | 0.052±0.0016 | 0.699±0.0041 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.332±0.0083 | 0.054±0.0016 | 0.692±0.0041 | IL, G |
-| FSRS-5 binary | 15 | 0.334±0.0083 | 0.056±0.0016 | 0.679±0.0047 | IL, G, SR |
-| FSRS-5 deck | 19 | 0.336±0.0085 | 0.056±0.0018 | 0.692±0.0044 | IL, G, SR |
 | FSRS v4 | 17 | 0.338±0.0086 | 0.058±0.0017 | 0.689±0.0043 | IL, G |
 | DASH-short | 9 | 0.339±0.0084 | 0.066±0.0019 | 0.636±0.0050 | IL, G, SR |
+| FSRS-6 pretrain | 4 | 0.339±0.0084 | 0.070±0.0024 | 0.695±0.0039 | IL, G, SR |
 | DASH | 9 | 0.340±0.0086 | 0.063±0.0017 | 0.639±0.0046 | IL, G |
 | DASH[MCM] | 9 | 0.340±0.0085 | 0.064±0.0018 | 0.640±0.0051 | IL, G |
 | GRU | 39 | 0.343±0.0088 | 0.063±0.0017 | 0.673±0.0039 | IL, G |
 | DASH[ACT-R] | 5 | 0.343±0.0087 | 0.067±0.0019 | 0.629±0.0049 | IL, G |
-| FSRS-5 pretrain | 4 | 0.344±0.0086 | 0.071±0.0020 | 0.690±0.0040 | IL, G, SR |
-| FSRS-5 default param. | 0 | 0.353±0.0087 | 0.081±0.0023 | 0.687±0.0039 | IL, G, SR |
+| FSRS-6 default param. | 0 | 0.347±0.0087 | 0.079±0.0027 | 0.692±0.0041 | IL, G, SR |
 | ACT-R | 5 | 0.362±0.0089 | 0.086±0.0024 | 0.534±0.0054 | IL |
 | AVG | 0 | 0.363±0.0090 | 0.088±0.0025 | 0.508±0.0046 | --- |
 | FSRS v3 | 13 | 0.371±0.0099 | 0.073±0.0021 | 0.667±0.0047 | IL, G |
@@ -139,23 +141,24 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
 | **LSTM** | 8869 | **0.333±0.0042** | 0.0538±0.00096 | **0.733±0.0021** | FIL, G, SR, AT |
+| FSRS-6 recency | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0023 | IL, G, SR |
+| FSRS-rs | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0022 | IL, G, SR |
+| FSRS-6 | 21 | 0.345±0.0042 | 0.066±0.0011 | 0.707±0.0023 | IL, G, SR |
 | GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 | IL, G, SR|
+| FSRS-6 preset | 21 | 0.346±0.0042 | 0.065±0.0010 | 0.708±0.0023 | IL, G, SR |
+| FSRS-6 binary | 17 | 0.351±0.0043 | 0.068±0.0011 | 0.685±0.0025 | IL, G, SR |
 | GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 | IL, G |
-| FSRS-5 recency | 19 | 0.354±0.0044 | 0.072±0.0012 | 0.704±0.0023 | IL, G, SR|
-| FSRS-rs | 19 | 0.354±0.0044 | 0.072±0.0012 | 0.703±0.0023 | IL, G, SR|
+| FSRS-6 deck | 21 | 0.355±0.0045 | 0.074±0.0013 | 0.703±0.0023 | IL, G, SR |
 | FSRS-5 | 19 | 0.356±0.0043 | 0.074±0.0012 | 0.701±0.0023 | IL, G, SR |
-| FSRS-5 preset | 19 | 0.358±0.0045 | 0.074±0.0012 | 0.699±0.0023 | IL, G, SR|
+| FSRS-6 pretrain | 4 | 0.359±0.0044 | 0.083±0.0013 | 0.702±0.0022 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.362±0.0045 | 0.076±0.0013 | 0.689±0.0023 | IL, G |
-| FSRS-5 binary | 15 | 0.367±0.0045 | 0.081±0.0014 | 0.671±0.0025 | IL, G, SR|
-| FSRS-5 deck | 19 | 0.368±0.0047 | 0.081±0.0014 | 0.694±0.0023 | IL, G, SR|
 | DASH | 9 | 0.368±0.0045 | 0.084±0.0013 | 0.631±0.0027 | IL, G |
 | DASH-short | 9 | 0.368±0.0045 | 0.086±0.0014 | 0.622±0.0029 | IL, G, SR|
 | DASH[MCM] | 9 | 0.369±0.0044 | 0.086±0.0014 | 0.634±0.0026 | IL, G |
-| FSRS-5 pretrain | 4 | 0.369±0.0046 | 0.088±0.0013 | 0.695±0.0022 | IL, G, SR|
+| FSRS-6 default param. | 0 | 0.371±0.0046 | 0.097±0.0015 | 0.701±0.0022 | IL, G, SR |
 | FSRS v4 | 17 | 0.373±0.0048 | 0.084±0.0014 | 0.685±0.0023 | IL, G |
 | DASH[ACT-R] | 5 | 0.373±0.0047 | 0.089±0.0016 | 0.624±0.0027 | IL, G |
 | GRU | 39 | 0.375±0.0047 | 0.086±0.0014 | 0.668±0.0023 | IL, G |
-| FSRS-5 default param. | 0 | 0.382±0.0047 | 0.102±0.0015 | 0.693±0.0022 | IL, G, SR|
 | AVG | 0 | 0.394±0.0050 | 0.103±0.0016 | 0.500±0.0026 | --- |
 | NN-17 | 39 | 0.398±0.0049 | 0.101±0.0013 | 0.624±0.0023 | IL, G |
 | ACT-R | 5 | 0.403±0.0055 | 0.107±0.0017 | 0.522±0.0024 | IL |
@@ -214,15 +217,16 @@ Additionally, you can find the full table [here](./plots/Wilcoxon-9999-collectio
 
 ## Default Parameters
 
-FSRS-5:
+FSRS-6:
 
 ```
-0.40255, 1.18385, 3.173, 15.69105,
-7.1949, 0.5345, 1.4604, 0.0046,
-1.54575, 0.1192, 1.01925,
-1.9395, 0.11, 0.29605, 2.2698,
-0.2315, 2.9898,
-0.51655, 0.6621
+0.2172, 1.1771, 3.2602, 16.1507,
+7.0114, 0.57, 2.0966, 0.0069,
+1.5261, 0.112, 1.0178,
+1.849, 0.1133, 0.3127, 2.2934,
+0.2191, 3.0004,
+0.7536, 0.3332, 0.1437,
+0.2,
 ```
 
 ## Comparisons with SuperMemo 15/16/17
@@ -246,19 +250,21 @@ pip install -r requirements.txt
 
 ### Commands
 
-FSRS-5:
+FSRS-6:
 
 ```bash
 python script.py
 ```
 
-FSRS-5 with default parameters:
+> Please confirm that you have upgraded the `fsrs-optimizer` package to the latest version.
+
+FSRS-6 with default parameters:
 
 ```bash
 python script.py --dry
 ```
 
-FSRS-5 with only the first 4 parameters optimized:
+FSRS-6 with only the first 4 parameters optimized:
 
 ```bash
 python script.py --pretrain
@@ -310,7 +316,7 @@ Save the analyzing charts:
 python script.py --plot
 ```
 
-Benchmark FSRSv4/FSRSv3/HLR/LSTM/SM2:
+Benchmark FSRS-5/FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
 python other.py --algo FSRSv4

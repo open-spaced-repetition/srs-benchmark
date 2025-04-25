@@ -1,15 +1,11 @@
 import pandas as pd
-from sklearn.metrics import log_loss
-from sklearn.model_selection import TimeSeriesSplit
-from tqdm import tqdm  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
 from pathlib import Path
 from config import create_parser
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from fsrs_optimizer import BatchDataset, BatchLoader
-import multiprocess as mp
-from multiprocess import Pool
+from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
+from multiprocess import Pool  # type: ignore
 import copy
 import numpy as np
 import wandb

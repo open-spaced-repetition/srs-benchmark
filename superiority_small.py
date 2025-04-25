@@ -2,9 +2,7 @@ import json
 import math
 import pathlib
 import warnings
-import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
@@ -15,19 +13,17 @@ warnings.filterwarnings("ignore")
 if __name__ == "__main__":
     models = [
         "LSTM-short-secs-equalize_test_with_non_secs",
+        "FSRS-6-recency",
         "GRU-P-short",
-        "FSRS-5-recency",
+        "FSRS-5",
         "FSRS-4.5",
         "FSRSv4",
         "DASH",
         "NN-17",
-        "FSRSv3",
         "ACT-R",
         "HLR",
         "Ebisu-v2",
         "Anki-dry-run",
-        "SM2",
-        "RMSE-BINS-EXPLOIT",
     ]
     csv_name = f"{len(models)} models.csv"
 
@@ -109,15 +105,13 @@ if __name__ == "__main__":
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
     index_anki_dry_run = models.index("Anki-dry-run")
     index_v4 = models.index("FSRSv4")
-    index_v3 = models.index("FSRSv3")
     index_Ebisu_v2 = models.index("Ebisu-v2")
-    index_FSRS_5_recency = models.index("FSRS-5-recency")
+    index_FSRS_6_recency = models.index("FSRS-6-recency")
     models[index_lstm] = "LSTM"
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_v4] = "FSRS v4"
-    models[index_v3] = "FSRS v3"
     models[index_Ebisu_v2] = "Ebisu v2"
-    models[index_FSRS_5_recency] = "FSRS-5\nrecency"
+    models[index_FSRS_6_recency] = "FSRS-6\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

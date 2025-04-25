@@ -76,7 +76,7 @@ if RUST:
     backend = FSRS(parameters=[])
 
 else:
-    path = "FSRS-5"
+    path = "FSRS-6"
     if DRY_RUN:
         path += "-dry-run"
     if ONLY_PRETRAIN:
@@ -111,7 +111,9 @@ def predict(w_list, testsets, user_id=None):
                 my_collection.batch_predict(partition_testset)
             )
             partition_testset["p"] = power_forgetting_curve(
-                partition_testset["delta_t"], partition_testset["stability"]
+                partition_testset["delta_t"],
+                partition_testset["stability"],
+                -weights[20],
             )
             p.extend(partition_testset["p"].tolist())
             y.extend(partition_testset["y"].tolist())
@@ -279,6 +281,7 @@ def process(user_id):
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
                 if DRY_RUN:
+                    optimizer.define_model()
                     partition_weights[partition] = optimizer.init_w
                     continue
                 if RUST:
@@ -311,6 +314,7 @@ def process(user_id):
                 else:
                     print(f"User: {user_id}")
                     raise e
+                optimizer.define_model()
                 partition_weights[partition] = optimizer.init_w
         w_list.append(partition_weights)
 

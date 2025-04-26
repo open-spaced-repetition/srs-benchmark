@@ -279,8 +279,8 @@ if __name__ == "__main__":
                     fontsize=9,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models, fontsize=10, rotation=45)
-    ax.set_yticks(np.arange(n), labels=models, fontsize=10)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=8, rotation=45)
+    ax.set_yticks(np.arange(n), labels=models, fontsize=8)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")

@@ -319,7 +319,12 @@ python script.py --plot
 Benchmark FSRS-5/FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
-python other.py --algo FSRSv4
+python other.py --algo FSRS-6
 ```
 
-> Please change the `--algo` argument to `FSRSv3`, `HLR`, `LSTM`, or `SM2` to run the corresponding algorithm.
+> You can change `FSRS-6` to `FSRSv3`, `HLR`, `LSTM`, etc. to run the corresponding algorithm.
+
+Instead of using a 5-way split, train the algorithm and evaluate it on the same data. This can be useful to determine how much the algorithm is overfitting.
+```bash
+python other.py --algo FSRS-6 --train_equals_test
+```

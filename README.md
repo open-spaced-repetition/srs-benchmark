@@ -69,7 +69,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
         - SM-2 trainable: SM-2 algorithm with optimizable parameters.
     - Anki-SM-2: a variant of the SM-2 algorithm that is used in Anki.
         - Anki-SM-2 trainable: Anki algorithm with optimizable parameters.
-
+    - RWKV: Uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture.
 - Other:
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.
     - RMSE-BINS-EXPLOIT: an algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.
@@ -101,7 +101,9 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **LSTM** | 8869 | **0.312±0.0078** | 0.035±0.0011 | **0.733±0.0038** | FIL, G, SR, AT |
+| **RWKV-P** | 2762884 | **0.271±0.0075** | 0.0145±0.00037 | **0.823±0.0040** | |
+| RWKV | 2762884 | 0.299±0.0075 | 0.034±0.0012 | 0.770±0.0032 | |
+| LSTM | 8869 | 0.312±0.0078 | 0.035±0.0011 | 0.733±0.0038 | FIL, G, SR, AT |
 | GRU-P-short | 297 | 0.320±0.0080 | 0.042±0.0013 | 0.710±0.0047 | IL, G, SR|
 | FSRS-6 recency | 21 | 0.320±0.0081 | 0.044±0.0013 | 0.710±0.0040 | IL, G, SR |
 | FSRS-rs | 21 | 0.320±0.0082 | 0.044±0.0012 | 0.709±0.0041 | IL, G, SR |
@@ -140,7 +142,9 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **LSTM** | 8869 | **0.333±0.0042** | 0.0538±0.00096 | **0.733±0.0021** | FIL, G, SR, AT |
+| **RWKV-P** | 2762884 | **0.277±0.0036** | 0.0250±0.00038 | **0.833±0.0018** | |
+| RWKV | 2762884 | 0.319±0.0040 | 0.054±0.0010 | 0.768±0.0020 | |
+| LSTM | 8869 | 0.333±0.0042 | 0.0538±0.00096 | 0.733±0.0021 | FIL, G, SR, AT |
 | FSRS-6 recency | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0023 | IL, G, SR |
 | FSRS-rs | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0022 | IL, G, SR |
 | FSRS-6 | 21 | 0.345±0.0042 | 0.066±0.0011 | 0.707±0.0023 | IL, G, SR |

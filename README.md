@@ -63,13 +63,14 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews, fractional intervals, and the duration of review as part of its input.
       The three aforementioned neural networks were first pretrained on 100 users and then further optimized on each user individually.
     - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
-
+    - RWKV: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture.
+        - RWKV-P: predicts the result of a review at the time of the review.
+        - RWKV: predicts the result of a review after the previous review of the card by predicting a forgetting curve.
 - SM-2-based algorithms:
     - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve. The algorithm is described by Piotr Wozniak [here](https://super-memory.com/english/ol/sm2.htm).
         - SM-2 trainable: SM-2 algorithm with optimizable parameters.
     - Anki-SM-2: a variant of the SM-2 algorithm that is used in Anki.
         - Anki-SM-2 trainable: Anki algorithm with optimizable parameters.
-    - RWKV: Uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture.
 - Other:
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline.
     - RMSE-BINS-EXPLOIT: an algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.

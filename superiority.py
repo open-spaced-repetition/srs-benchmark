@@ -14,6 +14,8 @@ warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     models = [
+        "RWKV-P",
+        "RWKV",
         "LSTM-short-secs-equalize_test_with_non_secs",
         "FSRS-6-recency",
         "FSRS-rs",

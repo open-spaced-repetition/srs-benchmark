@@ -22,6 +22,8 @@ In the SRS benchmark, we use a tool called `TimeSeriesSplit`. This is part of th
 
 Note: TimeSeriesSplit will remove the first split from evaluation. This is because the first split is used for training, and we don't want to evaluate the algorithm on the same data it was trained on.
 
+The RWKV models do not use TimeSeriesSplit.
+
 ### Metrics
 
 We use three metrics in the SRS benchmark to evaluate how well these algorithms work: Log Loss, AUC, and a custom RMSE that we call RMSE (bins).

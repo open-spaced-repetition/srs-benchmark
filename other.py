@@ -115,6 +115,7 @@ FILE_NAME = (
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-no_train_same_day" if NO_TRAIN_SAME_DAY else "")
     + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
+    + ("-train_equals_test" if TRAIN_EQUALS_TEST else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
     + ("-dev" if DEV_MODE else "")
 )

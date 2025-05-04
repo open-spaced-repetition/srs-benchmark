@@ -87,7 +87,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 For the sake of brevity, the following abbreviations are used in the "Input features" column:
 
-**IL** = **i**nterval **l**engths
+**IL** = **i**nterval **l**engths, in days
 
 **FIL** = **f**ractional (aka non-integer) **i**nterval **l**engths
 
@@ -95,7 +95,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 **SR** = **s**ame-day (or **s**hort-term) **r**eviews
 
-**AT** = **a**nswer **t**ime (duration of the review)
+**AT** = **a**nswer **t**ime (duration of the review), in milliseconds
 
 ### Weighted by the number of reviews
 

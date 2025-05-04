@@ -85,8 +85,8 @@ def create_parser():
         "--disable_short_term", action="store_true", help="disable short-term memory"
     )
     parser.add_argument(
-    "--train_equals_test",
-    action="store_true",
-    help="Set train set equal to test set without splitting",
-)
+        "--train_equals_test",
+        action="store_true",
+        help="Set train set equal to test set without splitting",
+    )
     return parser

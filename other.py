@@ -3282,8 +3282,7 @@ def process(user_id):
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
-                if not args.train_equals_test:
-                    assert train_partition["review_th"].max() < test_set["review_th"].min()
+                assert train_partition["review_th"].max() < test_set["review_th"].min()
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)

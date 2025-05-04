@@ -340,7 +340,6 @@ def process(user_id):
 
     result = {
         "metrics": {
-            "RMSE": round(rmse_raw, 6),
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
             "ICI": round(ici, 6),

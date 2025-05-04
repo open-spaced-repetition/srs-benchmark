@@ -2775,15 +2775,11 @@ def process_untrainable(user_id):
     dataset = create_features(df_join, MODEL_NAME)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
-    
     testsets = []
-    if args.train_equals_test:  # Check the flag
-        testsets = [dataset.copy()]  # Use the entire dataset as both train and test sets
-    else:
-        tscv = TimeSeriesSplit(n_splits=n_splits)
-        for _, test_index in tscv.split(dataset):
-            test_set = dataset.iloc[test_index].copy()
-            testsets.append(test_set)
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    for _, test_index in tscv.split(dataset):
+        test_set = dataset.iloc[test_index].copy()
+        testsets.append(test_set)
 
     p = []
     y = []
@@ -2818,19 +2814,14 @@ def baseline(user_id):
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
-    
     testsets = []
     avg_ps = []
-    if args.train_equals_test:  # Check the flag
-        testsets = [dataset.copy()]
-        avg_ps = [dataset["y"].mean()]
-    else:
-        tscv = TimeSeriesSplit(n_splits=n_splits)
-        for train_index, test_index in tscv.split(dataset):
-            test_set = dataset.iloc[test_index].copy()
-            testsets.append(test_set)
-            train_set = dataset.iloc[train_index].copy()
-            avg_ps.append(train_set["y"].mean())
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    for train_index, test_index in tscv.split(dataset):
+        test_set = dataset.iloc[test_index].copy()
+        testsets.append(test_set)
+        train_set = dataset.iloc[train_index].copy()
+        avg_ps.append(train_set["y"].mean())
 
     p = []
     y = []
@@ -3191,22 +3182,16 @@ def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL):
 def process(user_id):
     plt.close("all")
     global S_MIN
-
-    # Handle untrainable models
     if MODEL_NAME == "SM2" or MODEL_NAME.startswith("Ebisu"):
         return process_untrainable(user_id)
     if MODEL_NAME == "AVG":
         return baseline(user_id)
     if MODEL_NAME == "RMSE-BINS-EXPLOIT":
         return rmse_bins_exploit(user_id)
-
-    # Load revlogs data
     df_revlogs = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
-
-    # Determine model type
     if MODEL_NAME in ("RNN", "GRU"):
         Model = RNN
     elif MODEL_NAME == "GRU-P":
@@ -3245,13 +3230,12 @@ def process(user_id):
     elif MODEL_NAME == "Anki":
         Model = Anki
     elif MODEL_NAME == "90%":
+
         def get_constant_model(state_dict=None):
             return ConstantModel(0.9)
-        Model = get_constant_model
-    else:
-        raise ValueError(f"Unknown model name: {MODEL_NAME}")
 
-    # Prepare dataset
+        Model = get_constant_model
+
     dataset = create_features(df_revlogs, MODEL_NAME, SECS_IVL)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
@@ -3274,36 +3258,26 @@ def process(user_id):
             dataset["partition"] = dataset["deck_id"].astype(int)
     else:
         dataset["partition"] = 0
-
-    # Split into train/test sets
     w_list = []
     testsets = []
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
+        train_set = dataset.iloc[train_index]
+        test_set = dataset.iloc[test_index]
+        if EQUALIZE_TEST_WITH_NON_SECS:
+            # Ignores the train_index and test_index
+            train_set = dataset[dataset[f"{split_i}_train"]]
+            test_set = dataset[dataset[f"{split_i}_test"]]
+            train_index, test_index = (
+                None,
+                None,
+            )  # train_index and test_index no longer have the same meaning as before
+        if NO_TEST_SAME_DAY:
+            test_set = test_set[test_set["elapsed_days"] > 0].copy()
+        if NO_TRAIN_SAME_DAY:
+            train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
-    if args.train_equals_test:  # If train_equals_test is enabled
-        train_set = dataset.copy()
-        test_set = dataset.copy()
         testsets.append(test_set)
-    else:
-        tscv = TimeSeriesSplit(n_splits=n_splits)
-        for train_index, test_index in tscv.split(dataset):
-            train_set = dataset.iloc[train_index]
-            test_set = dataset.iloc[test_index]
-            if EQUALIZE_TEST_WITH_NON_SECS:
-                # Ignores the train_index and test_index
-                train_set = dataset[dataset[f"{split_i}_train"]]
-                test_set = dataset[dataset[f"{split_i}_test"]]
-                train_index, test_index = (
-                    None,
-                    None,
-                )  # train_index and test_index no longer have the same meaning as before
-            if NO_TEST_SAME_DAY:
-                test_set = test_set[test_set["elapsed_days"] > 0].copy()
-            if NO_TRAIN_SAME_DAY:
-                train_set = train_set[train_set["elapsed_days"] > 0].copy()
-            testsets.append(test_set)
-
-    # Train and evaluate the model
-    for split_i, test_set in enumerate(testsets):
         partition_weights = {}
         for partition in train_set["partition"].unique():
             try:
@@ -3351,7 +3325,6 @@ def process(user_id):
                 partition_weights[partition] = Model().state_dict()
         w_list.append(partition_weights)
 
-    # Generate predictions
     p = []
     y = []
     save_tmp = []

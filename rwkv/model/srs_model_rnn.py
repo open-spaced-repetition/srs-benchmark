@@ -1,0 +1,367 @@
+import numpy as np
+import pandas as pd
+from rwkv.config import DATA_PATH, DEVICE, DTYPE
+from rwkv.data_processing import CARD_FEATURE_COLUMNS, ID_PLACEHOLDER, scale_cum_new_cards_today, scale_cum_reviews_today, scale_day_offset_diff, scale_diff_new_cards, scale_diff_reviews, scale_duration, scale_elapsed_days, scale_elapsed_seconds, scale_state
+from rwkv.model.rwkv_rnn_model import RWKV7RNN
+from rwkv.model.srs_model import is_excluded
+import torch
+
+# An RNN implementation of srs_model.
+
+# def __nop(ob):
+#     return ob
+# ModuleType = torch.nn.Module
+# FunctionType = __nop
+
+ModuleType = torch.jit.ScriptModule
+FunctionType = torch.jit.script_method
+
+class AnkiRWKVRNN(ModuleType):
+    def __init__(self, card_rwkv_config, note_rwkv_config, deck_rwkv_config, preset_rwkv_config, global_rwkv_config):
+        super().__init__()
+        self.card_features_dim = 64
+        self.global_features_dim = 1
+        self.d_model = global_rwkv_config.d_model
+        self.features_fc_dim = 4 * card_rwkv_config.d_model
+        self.head_dim = 4 * global_rwkv_config.d_model
+        self.num_curves = 4
+
+        with torch.no_grad():
+            self.features2card = torch.nn.Sequential(
+                torch.nn.Linear(self.card_features_dim, self.features_fc_dim),
+                torch.nn.SiLU(),
+                torch.nn.LayerNorm(self.features_fc_dim),
+                torch.nn.Linear(self.features_fc_dim, self.d_model),
+                torch.nn.SiLU(),
+            )
+            self.rwkv_modules = torch.nn.ModuleList([
+                RWKV7RNN(config=card_rwkv_config),
+                RWKV7RNN(config=note_rwkv_config),
+                RWKV7RNN(config=deck_rwkv_config),
+                RWKV7RNN(config=preset_rwkv_config),
+                RWKV7RNN(config=global_rwkv_config),
+            ])
+
+            self.head_curve = torch.nn.Sequential(
+                torch.nn.LayerNorm(global_rwkv_config.d_model),
+                torch.nn.Linear(global_rwkv_config.d_model, self.head_dim),
+                torch.nn.SiLU(),
+            )
+            self.head_p = torch.nn.Sequential(
+                torch.nn.LayerNorm(global_rwkv_config.d_model),
+                torch.nn.Linear(global_rwkv_config.d_model, self.head_dim),
+                torch.nn.SiLU(),
+            )
+
+            self.w_linear = torch.nn.Linear(self.head_dim, self.num_curves)
+            self.s_linear = torch.nn.Linear(self.head_dim, self.num_curves)
+            self.d_linear = torch.nn.Linear(self.head_dim, self.num_curves)
+            self.d_softplus = torch.nn.Softplus()
+            self.p_linear = torch.nn.Linear(self.head_dim, 4)
+
+    def forgetting_curve(self, w, s, d, label_elapsed_seconds):
+        return 1e-5 + (1 - 2*1e-5) * torch.sum(w * (1 + torch.max(torch.tensor(1.0), label_elapsed_seconds) / (1e-7 + s)) ** -d, dim=-1)
+    
+    def review(self, card_features, card_state, note_state, deck_state, preset_state, global_state):
+        card_features = torch.nn.functional.pad(card_features, (0, 64 - 18), mode='constant', value=0)  # TODO change
+
+        card_rwkv_input = self.features2card(card_features)
+        card_encoding, next_card_state = self.rwkv_modules[0](card_rwkv_input, card_state)
+        note_encoding, next_note_state = self.rwkv_modules[1](card_encoding, note_state)
+        deck_encoding, next_deck_state = self.rwkv_modules[2](note_encoding, deck_state)
+        preset_encoding, next_preset_state = self.rwkv_modules[3](deck_encoding, preset_state)
+        global_encoding, next_global_state = self.rwkv_modules[4](preset_encoding, global_state)
+
+        x_curve = self.head_curve(global_encoding).float()
+        out_w_logits = self.w_linear(x_curve)
+        out_s_unscaled = self.s_linear(x_curve)
+        out_d_unscaled = self.d_linear(x_curve)
+        out_w = torch.nn.functional.softmax(out_w_logits, dim=-1)
+        out_s = torch.exp(torch.clamp(out_s_unscaled, min=-28, max=28))
+        out_d = self.d_softplus(out_d_unscaled)
+        x_p = self.head_p(global_encoding).float()
+        out_p_logits = self.p_linear(x_p)
+        return out_w, out_s, out_d, out_p_logits, next_card_state, next_note_state, next_deck_state, next_preset_state, next_global_state
+
+    @torch.inference_mode()
+    def run(self, df, dtype, device):
+        print("TODO: properly do id encode and time encode, it is just padded right now")
+
+        df = df.reset_index(drop=True)
+        card_states = {}
+        note_states = {}
+        deck_states = {}
+        preset_states = {}
+        global_state = None
+        ahead_ps = {}
+        imm_ps = {}
+        card_features_df = df[CARD_FEATURE_COLUMNS]
+        card_features_all = torch.tensor(card_features_df.to_numpy(), dtype=dtype, device=device, requires_grad=False).unsqueeze(0)
+        label_elapsed_seconds_all = torch.tensor(df["label_elapsed_seconds"], dtype=dtype, device=device).to(torch.float32).unsqueeze(0)
+
+        with torch.no_grad():
+            for i, row in df.iterrows():
+                if i % 100 == 0:
+                    print(i)
+                card_id = row["card_id"]
+                note_id = row["note_id"]
+                deck_id = row["deck_id"]
+                preset_id = row["preset_id"]
+
+                if card_id not in card_states:
+                    card_states[card_id] = None
+                if note_id not in note_states:
+                    note_states[note_id] = None
+                if deck_id not in deck_states:
+                    deck_states[deck_id] = None
+                if preset_id not in preset_states:
+                    preset_states[preset_id] = None
+
+                card_features = card_features_all[:, i]
+                out_w, out_s, out_d, out_p_logits, next_card_state, next_note_state, next_deck_state, next_preset_state, next_global_state = self.review(card_features, card_states[card_id], note_states[note_id], deck_states[deck_id], preset_states[preset_id], global_state)
+
+                if not row["skip"]:
+                # if True:
+                    card_states[card_id] = next_card_state
+                    note_states[note_id] = next_note_state
+                    deck_states[deck_id] = next_deck_state
+                    preset_states[preset_id] = next_preset_state
+                    global_state = next_global_state
+
+                curve_p = self.forgetting_curve(out_w, out_s, out_d, label_elapsed_seconds_all[:, i])
+                if row["has_label"]:
+                    if row["is_query"]:
+                        out_p_probs = torch.softmax(out_p_logits, dim=-1)
+                        out_p_again, out_p_1, out_p_2, out_p_3 = out_p_probs.unbind(dim=-1)
+                        out_p_binary = torch.clamp(1.0 - out_p_again, min=1e-5, max=1.0 - 1e-5)
+                        imm_ps[row["label_review_th"]] = out_p_binary.item()
+                    else:
+                        ahead_ps[row["label_review_th"]] = curve_p.item()
+
+        return ahead_ps, imm_ps
+
+    def copy_downcast_(self, master_model, dtype):
+        master_params = dict(master_model.named_parameters())
+        with torch.no_grad():
+            for name, param in self.named_parameters():
+                # print(name, is_excluded(name))
+                target_dtype = torch.float32 if is_excluded(name) else dtype
+                assert param.dtype == target_dtype
+                param.data.copy_(master_params[name].to(target_dtype))
+                # print(param)
+                assert param.dtype == target_dtype
+
+    def selective_cast(self, dtype):
+        for name, module in self.named_modules():
+            if len(name) == 0:
+                # Skip the root module
+                continue
+            if not is_excluded(name):
+                if dtype == torch.bfloat16:
+                    module = module.to(dtype)
+                elif dtype == torch.half:
+                    raise ValueError("not tested.")
+                elif dtype == torch.float32:
+                    pass
+        return self
+
+def get_df_sequentially(user_id, max_review_th=None):
+    """ Line by line process the data. Written to avoid data leakage.
+    """
+    df = pd.read_parquet(
+        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+    )
+    df["review_th"] = range(1, df.shape[0] + 1)
+    df_cards = pd.read_parquet(
+        DATA_PATH / "cards", filters=[("user_id", "=", user_id)]
+    ) 
+    df_cards.drop(columns=["user_id"], inplace=True)
+    df_decks = pd.read_parquet(
+        DATA_PATH / "decks", filters=[("user_id", "=", user_id)]
+    ) 
+    df_decks.drop(columns=["user_id", "parent_id"], inplace=True)
+    df = df.merge(df_cards, on="card_id", how="left", validate="many_to_one")
+    df = df.merge(df_decks, on="deck_id", how="left", validate="many_to_one")
+
+    card_ids = []
+    note_ids = []
+    deck_ids = []
+    preset_ids = []
+    user_ids = []
+    note_id_is_nans = []
+    note_id_is_nans = []
+    deck_id_is_nans = []
+    preset_id_is_nans = []
+    scaled_elapsed_days_list = []
+    scaled_elapsed_seconds_list = []
+    scaled_durations_list = []
+    rating_1s = []
+    rating_2s = []
+    rating_3s = []
+    rating_4s = []
+    day_offset_diffs = []
+    day_of_weeks = []
+    diff_new_cards_list = []
+    diff_reviews_list = []
+    cum_new_cards_todays = []
+    cum_reviews_todays = []
+    scaled_states = []
+    is_querys = []
+    skips = []
+
+    # Gather the elapsed_seconds and the review_th of the next review separately.
+    # For these we explicitly send information back in time
+    label_elapsed_seconds = []
+    label_review_ths = []
+    has_label = []
+
+    all_lists = [("card_id", card_ids),
+                 ("note_id", note_ids),
+                 ("deck_id", deck_ids),
+                 ("preset_id", preset_ids),
+                 ("note_id_is_nan", note_id_is_nans),
+                 ("deck_id_is_nan", deck_id_is_nans),
+                 ("preset_id_is_nan", preset_id_is_nans),
+                 ("scaled_elapsed_days", scaled_elapsed_days_list),
+                 ("scaled_elapsed_seconds", scaled_elapsed_seconds_list),
+                 ("scaled_duration", scaled_durations_list),
+                 ("rating_1", rating_1s),
+                 ("rating_2", rating_2s),
+                 ("rating_3", rating_3s),
+                 ("rating_4", rating_4s),
+                 ("day_offset_diff", day_offset_diffs),
+                 ("day_of_week", day_of_weeks),
+                 ("diff_new_cards", diff_new_cards_list),
+                 ("diff_reviews", diff_reviews_list),
+                 ("cum_new_cards_today", cum_new_cards_todays),
+                 ("cum_reviews_today", cum_reviews_todays),
+                 ("scaled_state", scaled_states),
+                 ("is_query", is_querys),
+                 ("skip", skips),
+                 ("label_elapsed_seconds", label_elapsed_seconds),
+                 ("label_review_th", label_review_ths),
+                 ("has_label", has_label)
+                 ]
+
+    card_set = set()
+    last_new_cards = {}
+    last_i = {}
+    last_result_index = {}
+    today_new_cards = 0
+    today_reviews = 0
+    today = -1
+
+    def add_same(i, prev_row, row):
+        card_id = row["card_id"]
+        card_ids.append(row["card_id"])
+
+        def add(x, values, nan_list):
+            if pd.isna(x):
+                values.append(ID_PLACEHOLDER)
+                nan_list.append(1.0)   
+            else:
+                values.append(x)
+                nan_list.append(0.0)   
+
+        add(row["note_id"], note_ids, note_id_is_nans)
+        add(row["deck_id"], deck_ids, deck_id_is_nans)
+        add(row["preset_id"], preset_ids, preset_id_is_nans)
+        user_ids.append(row["user_id"])
+
+        day_offset_diffs.append(scale_day_offset_diff(row["day_offset"] - (0 if prev_row is None else prev_row["day_offset"])))
+        day_of_weeks.append(((row["day_offset"] % 7) - 3) / 3)
+        diff_new_cards = (len(card_set) - last_new_cards[card_id]) if card_id in last_new_cards else 0
+        diff_new_cards_list.append(scale_diff_new_cards(diff_new_cards))
+        diff_reviews = (max(0, i - last_i[card_id] - 1)) if card_id in last_i else 0
+        diff_reviews_list.append(scale_diff_reviews(diff_reviews))
+
+        cum_reviews_todays.append(scale_cum_reviews_today(today_reviews))
+        cum_new_cards_todays.append(scale_cum_new_cards_today(today_new_cards))
+
+        scaled_elapsed_days_list.append(scale_elapsed_days(row["elapsed_days"]).item())
+        scaled_elapsed_seconds_list.append(scale_elapsed_seconds(row["elapsed_seconds"]).item())
+
+    def add_query(i, prev_row, row):
+        """ 
+        We see a review `row`. We add the information to allow us to predict the outcome for this row.
+        Particularly we include attributes such as card_id, note_id, etc, but we exclude attributes such as rating, duration.
+        """
+        add_same(i, prev_row, row)
+        is_querys.append(1.0)
+        skips.append(True)
+
+        # Values to hide
+        scaled_durations_list.append(0)
+        scaled_states.append(0)
+        rating_1s.append(0)
+        rating_2s.append(0)
+        rating_3s.append(0)
+        rating_4s.append(0)
+
+    def add_predict(i, prev_row, row):
+        """
+        `row` is a review that just completed. We want to predict the outcome for this row.
+        """
+        add_same(i, prev_row, row)
+        is_querys.append(0.0)
+        skips.append(False)
+
+        scaled_durations_list.append(scale_duration(row["duration"]))
+        scaled_states.append(scale_state(row["state"]))
+        rating_1s.append(1.0 if row["rating"] == 1 else 0.0)
+        rating_2s.append(1.0 if row["rating"] == 2 else 0.0)
+        rating_3s.append(1.0 if row["rating"] == 3 else 0.0)
+        rating_4s.append(1.0 if row["rating"] == 4 else 0.0)
+
+    prev_row = None
+    for i, row in df.iterrows():
+        if max_review_th is not None and row["review_th"] > max_review_th:
+            break
+
+        card_id = row["card_id"]
+        index = len(card_ids)
+        label_elapsed_seconds.append(np.pi)
+        label_review_ths.append(np.nan)
+        has_label.append(False)
+
+        if row["day_offset"] != today:
+            today = row["day_offset"]
+            today_new_cards = 0
+            today_reviews = -1
+
+        today_reviews += 1
+        if card_id not in card_set:
+            today_new_cards += 1
+
+        if card_id in card_set:
+            # gather the labels
+            label_elapsed_seconds.append(np.pi)
+            label_review_ths.append(np.nan)
+            has_label.append(False)
+
+            label_elapsed_seconds[last_result_index[card_id]] = row["elapsed_seconds"]
+            label_elapsed_seconds[index] = 0
+            label_review_ths[last_result_index[card_id]] = row["review_th"]
+            label_review_ths[index] = row["review_th"]
+            has_label[last_result_index[card_id]] = True
+            has_label[index] = True
+
+            # Add a query row
+            add_query(i, prev_row, row)
+            last_result_index[card_id] = index + 1
+        else:
+            card_set.add(card_id)
+            last_result_index[card_id] = index
+        
+        add_predict(i, prev_row, row)
+        prev_row = row
+        last_new_cards[card_id] = len(card_set)
+        last_i[card_id] = i
+
+    for name, x in all_lists:
+        assert len(x) == len(card_ids), f"{name} does not have the right number of values"
+
+    return pd.DataFrame({name: values for name, values in all_lists})
+
+if __name__ == '__main__':
+    pass

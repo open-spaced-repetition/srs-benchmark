@@ -19,7 +19,12 @@ import wandb
 from rwkv.prepare_batch import prepare
 from rwkv.model.srs_model import AnkiRWKV
 from rwkv.rwkv_config import *
-from rwkv.utils import SlidingWindowAverage, KeyValueAverage, get_number_of_trainable_parameters
+from rwkv.utils import (
+    SlidingWindowAverage,
+    KeyValueAverage,
+    get_number_of_trainable_parameters,
+    load_tensor,
+)
 
 random.seed(120958231)
 
@@ -33,7 +38,7 @@ PEAK_LR = 1e-3 * 0.7
 # PEAK_LR = 1e-3 * 5
 FINAL_LR = 0
 SMOOTH = 1
-ADAMW_BETAS = (0.90 ** (1 / SMOOTH), 0.999 ** (1 / SMOOTH)) 
+ADAMW_BETAS = (0.90 ** (1 / SMOOTH), 0.999 ** (1 / SMOOTH))
 ADAMW_EPS = 1e-18
 WEIGHT_DECAY = 0.01
 WEIGHT_DECAY_CHANNEL_MIXER = 0.01
@@ -43,26 +48,23 @@ TRAIN_USERS = list(range(5000, 10001))
 # TRAIN_USERS = list(range(101, 5000))
 VALIDATION_USERS = list(range(1, 101))
 
-ALL_DATASET = lmdb.open(ALL_DATASET_LMDB_PATH, map_size=ALL_DATASET_LMDB_SIZE)
-LABEL_FILTER_DATASET = lmdb.open(LABEL_FILTER_LMDB_PATH, map_size=LABEL_FILTER_LMDB_SIZE)
+# ALL_DATASET = lmdb.open(ALL_DATASET_LMDB_PATH, map_size=ALL_DATASET_LMDB_SIZE)
+# LABEL_FILTER_DATASET = lmdb.open(LABEL_FILTER_LMDB_PATH, map_size=LABEL_FILTER_LMDB_SIZE)
 
 SLIDING_WINDOW_LENS = [300, 1000, 3000, 10000]
 
 NUM_FETCH_PROCESSES = 13
 FETCH_AHEAD = 50
 
+
 def extract_numbers(name):
-    match = re.findall(r'(\d+)_([\d]+)-([\d]+)_([\d]+)', name)
+    match = re.findall(r"(\d+)_([\d]+)-([\d]+)_([\d]+)", name)
     if match:
         return tuple(map(int, match[0]))
     return None
 
-def load_tensor(txn, key, device):
-    tensor_bytes = txn.get(key.encode())
-    buffer = BytesIO(tensor_bytes)
-    return torch.load(buffer, weights_only=True, map_location=device)
 
-def get_data(txn, key, device=DEVICE) -> RWKVSample:
+def get_data(txn, key, device) -> RWKVSample:
     user_id, start_th, end_th, len = key
     prefix = f"{user_id}_{start_th}-{end_th}_{len}_"
     modules = {}
@@ -73,7 +75,9 @@ def get_data(txn, key, device=DEVICE) -> RWKVSample:
         split_B = load_tensor(txn, module_key + "split_B", device=device).numpy()
         from_perm = load_tensor(txn, module_key + "from_perm", device=device)
         to_perm = load_tensor(txn, module_key + "to_perm", device=device)
-        modules[submodule] = ModuleData(split_len=split_len, split_B=split_B, from_perm=from_perm, to_perm=to_perm)
+        modules[submodule] = ModuleData(
+            split_len=split_len, split_B=split_B, from_perm=from_perm, to_perm=to_perm
+        )
         ids[submodule] = load_tensor(txn, prefix + submodule + "_id_", device=device)
 
     card_features = load_tensor(txn, prefix + "card_features", device=device)
@@ -85,19 +89,22 @@ def get_data(txn, key, device=DEVICE) -> RWKVSample:
     day_offsets_first = load_tensor(txn, prefix + "day_offsets_first", device=device)
     skips = load_tensor(txn, prefix + "skips", device=device)
 
-    return RWKVSample(user_id=user_id,
-                      start_th=start_th,
-                      end_th=end_th,
-                      length=len,
-                      card_features=card_features,
-                      modules=modules,
-                      ids=ids,
-                      global_labels=global_labels,
-                      review_ths=review_ths,
-                      label_review_ths=label_review_ths,
-                      day_offsets=day_offsets,
-                      day_offsets_first=day_offsets_first,
-                      skips=skips)
+    return RWKVSample(
+        user_id=user_id,
+        start_th=start_th,
+        end_th=end_th,
+        length=len,
+        card_features=card_features,
+        modules=modules,
+        ids=ids,
+        global_labels=global_labels,
+        review_ths=review_ths,
+        label_review_ths=label_review_ths,
+        day_offsets=day_offsets,
+        day_offsets_first=day_offsets_first,
+        skips=skips,
+    )
+
 
 def get_optimizer(model):
     encode_params = []
@@ -105,10 +112,27 @@ def get_optimizer(model):
     channel_mixer_params = []
     decay_head_params = []
     other_params = []
-    head_targets = ["head", "p_linear", "s_linear", "d_linear", "w_linear", "ahead_linear", "head_ahead_logit", "head_w", "head_s", "head_d", "head_p"]
+    head_targets = [
+        "head",
+        "p_linear",
+        "s_linear",
+        "d_linear",
+        "w_linear",
+        "ahead_linear",
+        "head_ahead_logit",
+        "head_w",
+        "head_s",
+        "head_d",
+        "head_p",
+    ]
     for name, param in model.named_parameters():
         # Param constraint is to exclude layer/group norm weights
-        if "weight" in name and "lora" not in name and "scale" not in name and len(param.squeeze().shape) >= 2:
+        if (
+            "weight" in name
+            and "lora" not in name
+            and "scale" not in name
+            and len(param.squeeze().shape) >= 2
+        ):
             is_head_param = False
             for head_target in head_targets:
                 if head_target in name:
@@ -124,13 +148,26 @@ def get_optimizer(model):
         else:
             other_params.append(param)
 
-    return torch.optim.AdamW([
-        {'params': decay_params, 'weight_decay': WEIGHT_DECAY, 'lr': PEAK_LR},
-        {'params': channel_mixer_params, 'weight_decay': WEIGHT_DECAY_CHANNEL_MIXER, 'lr': PEAK_LR},
-        {'params': decay_head_params, 'weight_decay': WEIGHT_DECAY_HEAD, 'lr': PEAK_LR},
-        {'params': encode_params, 'weight_decay': 1e-2, 'lr': PEAK_LR},
-        {'params': other_params, 'weight_decay': 0.0, 'lr': PEAK_LR},
-    ], eps=ADAMW_EPS, betas=ADAMW_BETAS)
+    return torch.optim.AdamW(
+        [
+            {"params": decay_params, "weight_decay": WEIGHT_DECAY, "lr": PEAK_LR},
+            {
+                "params": channel_mixer_params,
+                "weight_decay": WEIGHT_DECAY_CHANNEL_MIXER,
+                "lr": PEAK_LR,
+            },
+            {
+                "params": decay_head_params,
+                "weight_decay": WEIGHT_DECAY_HEAD,
+                "lr": PEAK_LR,
+            },
+            {"params": encode_params, "weight_decay": 1e-2, "lr": PEAK_LR},
+            {"params": other_params, "weight_decay": 0.0, "lr": PEAK_LR},
+        ],
+        eps=ADAMW_EPS,
+        betas=ADAMW_BETAS,
+    )
+
 
 def log_model(log, model: AnkiRWKV):
     for name, param in model.named_parameters():
@@ -149,6 +186,7 @@ def log_model(log, model: AnkiRWKV):
             log[f"{name}.grad.25th"] = torch.quantile(param.grad, 0.25).item()
             log[f"{name}.grad.50th"] = torch.quantile(param.grad, 0.50).item()
             log[f"{name}.grad.75th"] = torch.quantile(param.grad, 0.75).item()
+
 
 def get_groups():
     lmdb_env = lmdb.open(TRAIN_DATASET_LMDB_PATH, map_size=TRAIN_DATASET_LMDB_SIZE)
@@ -178,9 +216,9 @@ def get_groups():
             r = l - 1
             while r + 1 < len(keys) and r + 1 - l + 1 <= max_batch:
                 r += 1
-            
+
             if l <= r:
-                groups.append(keys[l:(r + 1)])
+                groups.append(keys[l : (r + 1)])
 
             l = r + 1
 
@@ -190,29 +228,40 @@ def get_groups():
     lmdb_env.close()
     return groups
 
+
 def get_grad_norm(model):
     total_norm = 0.0
     for p in model.parameters():
         if p.grad is not None:
             param_norm = p.grad.data.norm(2)
             total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** 0.5
+    total_norm = total_norm**0.5
     return total_norm
 
-def evaluate_on_user(user_id, batch, model: AnkiRWKV, device=DEVICE):
+
+def evaluate_on_user(user_id, batch, model: AnkiRWKV, device):
     model.eval()
     # model.train()
     with torch.no_grad():
         stats = model.get_loss(batch)
         if stats is None:
             raise Exception("Stats is none.")
-        print(f"{user_id} ahead_loss: {stats.ahead_equalize_avg.item():.3f} ({stats.ahead_raw_equalize_avg.item():.3f}), imm_loss: {stats.imm_binary_equalize_avg.item():.3f}, imm_n: {stats.imm_binary_equalize_n}")
+        print(
+            f"{user_id} ahead_loss: {stats.ahead_equalize_avg.item():.3f} ({stats.ahead_raw_equalize_avg.item():.3f}), imm_loss: {stats.imm_binary_equalize_avg.item():.3f}, imm_n: {stats.imm_binary_equalize_n}"
+        )
 
     # loss = stats.loss_tensor.squeeze(0) * mask
     # tot = loss.sum() / mask.sum()
     # print(f"{user_id} loss: {tot.item():.3f}, size: {mask.sum()}")
     # return loss.sum(), mask.sum()
-    return stats.ahead_equalize_avg * stats.ahead_equalize_n, stats.ahead_equalize_n, stats.ahead_raw_equalize_avg * stats.ahead_equalize_n, stats.imm_binary_equalize_avg * stats.imm_binary_equalize_n, stats.imm_binary_equalize_n
+    return (
+        stats.ahead_equalize_avg * stats.ahead_equalize_n,
+        stats.ahead_equalize_n,
+        stats.ahead_raw_equalize_avg * stats.ahead_equalize_n,
+        stats.imm_binary_equalize_avg * stats.imm_binary_equalize_n,
+        stats.imm_binary_equalize_n,
+    )
+
 
 def validate(model, data_fetcher, all_db_keys, users):
     torch.cuda.empty_cache()
@@ -232,36 +281,55 @@ def validate(model, data_fetcher, all_db_keys, users):
             batch = batch.to(DEVICE)
             if i + FETCH_AHEAD < len(users):
                 fetch_ahead_user_id = users[i + FETCH_AHEAD]
-                data_fetcher.enqueue((f"validate-{fetch_ahead_user_id}", [all_db_keys[fetch_ahead_user_id]]))
+                data_fetcher.enqueue(
+                    (
+                        f"validate-{fetch_ahead_user_id}",
+                        [all_db_keys[fetch_ahead_user_id]],
+                    )
+                )
 
-            user_ahead_loss, user_ahead_n, user_ahead_raw_loss, user_imm_loss, user_imm_n = evaluate_on_user(user_id, batch, model)
+            (
+                user_ahead_loss,
+                user_ahead_n,
+                user_ahead_raw_loss,
+                user_imm_loss,
+                user_imm_n,
+            ) = evaluate_on_user(user_id, batch, model)
             assert user_ahead_n == user_imm_n
             tot_ahead_loss += user_ahead_loss
             tot_ahead_raw_loss += user_ahead_raw_loss
             tot_ahead_n += user_ahead_n
             tot_imm_loss += user_imm_loss
             tot_imm_n += user_imm_n
-        
-        print(f"Mean ahead validation loss: {tot_ahead_loss / tot_ahead_n:.4f} ({tot_ahead_raw_loss / tot_ahead_n:.4f}), imm: {tot_imm_loss / tot_imm_n:.4f}, validation n: {tot_ahead_n}")
+
+        print(
+            f"Mean ahead validation loss: {tot_ahead_loss / tot_ahead_n:.4f} ({tot_ahead_raw_loss / tot_ahead_n:.4f}), imm: {tot_imm_loss / tot_imm_n:.4f}, validation n: {tot_ahead_n}"
+        )
         return tot_ahead_loss / tot_ahead_n, tot_imm_loss / tot_imm_n
     except Exception as e:
         print("Exception in validate. RWKV-7 nan?")
         print(e)
         return None
 
+
 def transfer_child_grad_to_master(master, child):
     master_params = dict(master.named_parameters())
     for name, param in child.named_parameters():
         # print(name, param.grad)
         master_param = master_params[name]
-        if param.grad is not None:  # None happens on the first few iterations for some params
+        if (
+            param.grad is not None
+        ):  # None happens on the first few iterations for some params
             # Add the child model's grad
             with torch.no_grad():
                 if master_param.grad is None:
-                    master_param.grad = torch.zeros_like(master_param, requires_grad=True)
+                    master_param.grad = torch.zeros_like(
+                        master_param, requires_grad=True
+                    )
                 master_param.grad.add_(param.grad.to(torch.float32))
             # Set the child model's grad to zero
             param.grad.zero_()
+
 
 def get_test_keys(dataset, users):
     keys = {}
@@ -278,6 +346,7 @@ def get_test_keys(dataset, users):
                 keys[user_id] = (user_id, batch[0], batch[1], batch[2])
     return keys
 
+
 def prepare_data(task_queue, batch_queue, fixed_seed=None):
     train_env = lmdb.open(TRAIN_DATASET_LMDB_PATH, map_size=TRAIN_DATASET_LMDB_SIZE)
     validate_env = lmdb.open(ALL_DATASET_LMDB_PATH, map_size=ALL_DATASET_LMDB_SIZE)
@@ -291,29 +360,44 @@ def prepare_data(task_queue, batch_queue, fixed_seed=None):
                 group_i, group = task
                 # print("Got task", group_i)
                 if "train" in group_i:
-                    result = prepare([get_data(train_txn, key, device="cpu") for key in group], target_len=MAX_TRAIN_GLOBAL_LEN, seed=fixed_seed)
+                    result = prepare(
+                        [get_data(train_txn, key, device="cpu") for key in group],
+                        target_len=MAX_TRAIN_GLOBAL_LEN,
+                        seed=fixed_seed,
+                    )
                 elif "validate" in group_i:
-                    result = prepare([get_data(validate_txn, key, device="cpu") for key in group], target_len=800000, seed=fixed_seed)
+                    result = prepare(
+                        [get_data(validate_txn, key, device="cpu") for key in group],
+                        target_len=800000,
+                        seed=fixed_seed,
+                    )
                 else:
                     raise ValueError("No key.")
                 # print("Done task", group_i)
                 batch_queue.put((group_i, result))
 
+
 def main_loop(task_queue, batch_queue):
     data_fetcher = DataFetcher(task_queue=task_queue, out_queue=batch_queue)
 
     master_model = AnkiRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(DEVICE)
-    model = AnkiRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).selective_cast(DTYPE).to(DEVICE)
+    model = (
+        AnkiRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG)
+        .selective_cast(DTYPE)
+        .to(DEVICE)
+    )
 
     folder_name = "rwkv"
     rwkv_num = 178490
     print("Loading state")
-    master_model.load_state_dict(torch.load(f"pretrain/{folder_name}/RWKV_{rwkv_num}.pth", weights_only=True))
+    master_model.load_state_dict(
+        torch.load(f"pretrain/{folder_name}/RWKV_{rwkv_num}.pth", weights_only=True)
+    )
     # exit()
     # for name, param in master_model.named_parameters():
     #     if "ahead_linear" in name:
     #         torch.nn.init.zeros_(param)
-    
+
     # state_dict = torch.load(f"pretrain/{folder_name}/RWKV_{rwkv_num}.pth", weights_only=True)
     # exclude = ["head_curve", "w_linear", "s_linear", "d_linear", "ahead_linear", "p_linear", "head_ahead_logits", "head_w", "head_s", "head_d", "head_p"]
     # exclude = ["w_linear", "s_linear", "d_linear"]
@@ -368,14 +452,18 @@ def main_loop(task_queue, batch_queue):
     #         if t in n:
     #             print(n, p)
     #             break
-            
+
     # exit()
 
     optimizer = get_optimizer(master_model)
     # exit()
     # print("Warning: not loading optimizer.")
     print("Loading optimizer")
-    optimizer.load_state_dict(torch.load(f"pretrain/{folder_name}/RWKV_optim_{rwkv_num}.pth", weights_only=True))
+    optimizer.load_state_dict(
+        torch.load(
+            f"pretrain/{folder_name}/RWKV_optim_{rwkv_num}.pth", weights_only=True
+        )
+    )
 
     num_trainable_parameters = get_number_of_trainable_parameters(model)
     print(f"Trainable parameters: {num_trainable_parameters}")
@@ -459,7 +547,9 @@ def main_loop(task_queue, batch_queue):
         return 1 - np.sqrt(1 - (step / total_steps - 1) ** 2)
 
     # scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda t: cosine_down(t, total_steps-warmup_steps))
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, lr_lambda=lambda t: cosine_down(t, total_steps - warmup_steps)
+    )
     # scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.0, total_iters=total_steps)
     # scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, main_scheduler], milestones=[warmup_steps])
 
@@ -471,14 +561,24 @@ def main_loop(task_queue, batch_queue):
     # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda t: cosine_down(t, total_steps))
     # # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 1.005)
 
-    SLIDING_WINDOW_LENS.append(len(groups))  # Add a sliding window for the entire epoch size
+    SLIDING_WINDOW_LENS.append(
+        len(groups)
+    )  # Add a sliding window for the entire epoch size
     SLIDING_WINDOW_LENS.sort()
     ahead_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
-    ahead_raw_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
-    ahead_raw_diff_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
+    ahead_raw_sliding_windows = [
+        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
+    ]
+    ahead_raw_diff_sliding_windows = [
+        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
+    ]
     imm_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
-    ahead_equalize_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
-    imm_binary_equalize_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
+    ahead_equalize_sliding_windows = [
+        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
+    ]
+    imm_binary_equalize_sliding_windows = [
+        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
+    ]
     ahead_average = KeyValueAverage()
     ahead_raw_average = KeyValueAverage()
     ahead_raw_diff_average = KeyValueAverage()
@@ -489,7 +589,6 @@ def main_loop(task_queue, batch_queue):
     train_start = time.time()
     group_start = time.time()
 
-
     assert FETCH_AHEAD <= len(groups)
     # for i in range(STEP_OFFSET - 1, STEP_OFFSET - 1 + FETCH_AHEAD):
     #     group_i = i % len(groups)
@@ -497,7 +596,7 @@ def main_loop(task_queue, batch_queue):
 
     checkpoint_step_count = 0
     checkpoint_loss_n = 0
-    
+
     # i = STEP_OFFSET
     step = STEP_OFFSET - 1
     for epoch_i in range(0, int(1e9)):
@@ -516,10 +615,12 @@ def main_loop(task_queue, batch_queue):
             if step < STEP_OFFSET + 1000:
                 torch.cuda.empty_cache()
 
-            validate_iter = step == 50 or (group_i + 1) % 500 == 0 or step == total_steps
+            validate_iter = (
+                step == 50 or (group_i + 1) % 500 == 0 or step == total_steps
+            )
             log = {}
             log["step"] = step
-            log["lr"] = optimizer.param_groups[0]['lr']
+            log["lr"] = optimizer.param_groups[0]["lr"]
 
             keys = str(groups[group_i])
             print(f"\n{keys}")
@@ -529,7 +630,9 @@ def main_loop(task_queue, batch_queue):
             prepared_batch = prepared_batch.to(DEVICE)
             fetch_ahead_group_i = group_i + FETCH_AHEAD
             if fetch_ahead_group_i < len(groups):
-                data_fetcher.enqueue((f"train-{fetch_ahead_group_i}", groups[fetch_ahead_group_i]))
+                data_fetcher.enqueue(
+                    (f"train-{fetch_ahead_group_i}", groups[fetch_ahead_group_i])
+                )
 
             model.copy_downcast_(master_model, dtype=DTYPE)
             model.train()
@@ -538,7 +641,9 @@ def main_loop(task_queue, batch_queue):
                 if stats is None:
                     raise Exception("Stats is none.")
 
-                print(f"{epoch_i} {group_i} {step}, all: {stats.average_loss.item():3f}, ahead: {stats.ahead_avg.item():.4f} ({stats.ahead_raw_avg.item():.4f}), imm: {stats.imm_avg.item():.3f}")
+                print(
+                    f"{epoch_i} {group_i} {step}, all: {stats.average_loss.item():3f}, ahead: {stats.ahead_avg.item():.4f} ({stats.ahead_raw_avg.item():.4f}), imm: {stats.imm_avg.item():.3f}"
+                )
                 log["train_nan"] = 0
                 stats.average_loss.backward()
                 transfer_child_grad_to_master(master=master_model, child=model)
@@ -548,52 +653,101 @@ def main_loop(task_queue, batch_queue):
                 log["loss"] = stats.average_loss.detach()
                 log["w_divergence"] = stats.w_loss_avg.detach()
                 log["ahead_logits_mag_loss"] = stats.ahead_logits_mag_loss_avg.detach()
-                log["ahead_logits_diff_loss"] = stats.ahead_logits_diff_loss_avg.detach()
+                log["ahead_logits_diff_loss"] = (
+                    stats.ahead_logits_diff_loss_avg.detach()
+                )
                 log["norm"] = get_grad_norm(master_model)
                 checkpoint_step_count += 1
                 checkpoint_loss_n += stats.ahead_n
                 for sliding_window in ahead_sliding_windows:
-                    sliding_window.add_value(avg=stats.ahead_avg.detach(), weight=stats.ahead_n)
+                    sliding_window.add_value(
+                        avg=stats.ahead_avg.detach(), weight=stats.ahead_n
+                    )
                     if sliding_window.at_capacity():
-                        log[f"ahead_avg_{sliding_window.len}"] = sliding_window.get_value()
-                ahead_average.add_value(key=keys, avg=stats.ahead_avg.detach(), weight=stats.ahead_n)
+                        log[f"ahead_avg_{sliding_window.len}"] = (
+                            sliding_window.get_value()
+                        )
+                ahead_average.add_value(
+                    key=keys, avg=stats.ahead_avg.detach(), weight=stats.ahead_n
+                )
                 log[f"ahead_avg"] = ahead_average.get_value()
 
                 for sliding_window in ahead_raw_sliding_windows:
-                    sliding_window.add_value(avg=stats.ahead_raw_avg.detach(), weight=stats.ahead_n)
+                    sliding_window.add_value(
+                        avg=stats.ahead_raw_avg.detach(), weight=stats.ahead_n
+                    )
                     if sliding_window.at_capacity():
-                        log[f"ahead_raw_avg_{sliding_window.len}"] = sliding_window.get_value()
-                ahead_raw_average.add_value(key=keys, avg=stats.ahead_raw_avg.detach(), weight=stats.ahead_n)
+                        log[f"ahead_raw_avg_{sliding_window.len}"] = (
+                            sliding_window.get_value()
+                        )
+                ahead_raw_average.add_value(
+                    key=keys, avg=stats.ahead_raw_avg.detach(), weight=stats.ahead_n
+                )
                 log[f"ahead_raw_avg"] = ahead_raw_average.get_value()
 
                 for sliding_window in ahead_raw_diff_sliding_windows:
-                    sliding_window.add_value(avg=stats.ahead_avg.detach() - stats.ahead_raw_avg.detach(), weight=stats.ahead_n)
+                    sliding_window.add_value(
+                        avg=stats.ahead_avg.detach() - stats.ahead_raw_avg.detach(),
+                        weight=stats.ahead_n,
+                    )
                     if sliding_window.at_capacity():
-                        log[f"ahead_raw_diff_avg_{sliding_window.len}"] = sliding_window.get_value()
-                ahead_raw_diff_average.add_value(key=keys, avg=stats.ahead_avg.detach() - stats.ahead_raw_avg.detach(), weight=stats.ahead_n)
+                        log[f"ahead_raw_diff_avg_{sliding_window.len}"] = (
+                            sliding_window.get_value()
+                        )
+                ahead_raw_diff_average.add_value(
+                    key=keys,
+                    avg=stats.ahead_avg.detach() - stats.ahead_raw_avg.detach(),
+                    weight=stats.ahead_n,
+                )
                 log[f"ahead_raw_diff_avg"] = ahead_raw_diff_average.get_value()
 
                 for sliding_window in ahead_equalize_sliding_windows:
-                    sliding_window.add_value(avg=stats.ahead_equalize_avg.detach(), weight=stats.ahead_equalize_n)
+                    sliding_window.add_value(
+                        avg=stats.ahead_equalize_avg.detach(),
+                        weight=stats.ahead_equalize_n,
+                    )
                     if sliding_window.at_capacity():
-                        log[f"ahead_equalize_avg_{sliding_window.len}"] = sliding_window.get_value()
-                ahead_equalize_average.add_value(key=keys, avg=stats.ahead_equalize_avg.detach(), weight=stats.ahead_equalize_n)
+                        log[f"ahead_equalize_avg_{sliding_window.len}"] = (
+                            sliding_window.get_value()
+                        )
+                ahead_equalize_average.add_value(
+                    key=keys,
+                    avg=stats.ahead_equalize_avg.detach(),
+                    weight=stats.ahead_equalize_n,
+                )
                 log[f"ahead_equalize_avg"] = ahead_equalize_average.get_value()
 
                 for sliding_window in imm_sliding_windows:
-                    sliding_window.add_value(avg=stats.imm_avg.detach(), weight=stats.imm_n)
+                    sliding_window.add_value(
+                        avg=stats.imm_avg.detach(), weight=stats.imm_n
+                    )
                     if sliding_window.at_capacity():
-                        log[f"imm_avg_{sliding_window.len}"] = sliding_window.get_value()
-                imm_average.add_value(key=keys, avg=stats.imm_avg.detach(), weight=stats.imm_n)
+                        log[f"imm_avg_{sliding_window.len}"] = (
+                            sliding_window.get_value()
+                        )
+                imm_average.add_value(
+                    key=keys, avg=stats.imm_avg.detach(), weight=stats.imm_n
+                )
                 log[f"imm_avg"] = imm_average.get_value()
 
                 for sliding_window in imm_binary_equalize_sliding_windows:
-                    sliding_window.add_value(avg=stats.imm_binary_equalize_avg.detach(), weight=stats.imm_binary_equalize_n)
+                    sliding_window.add_value(
+                        avg=stats.imm_binary_equalize_avg.detach(),
+                        weight=stats.imm_binary_equalize_n,
+                    )
                     if stats.imm_binary_equalize_n > 0:
                         if sliding_window.at_capacity():
-                            log[f"imm_binary_equalize_avg_{sliding_window.len}"] = sliding_window.get_value()
-                imm_binary_equalize_average.add_value(key=keys, avg=stats.imm_binary_equalize_avg.detach(), weight=stats.imm_binary_equalize_n)
-                log[f"imm_binary_equalize_avg"] = imm_binary_equalize_average.get_value()
+                            log[f"imm_binary_equalize_avg_{sliding_window.len}"] = (
+                                sliding_window.get_value()
+                            )
+                imm_binary_equalize_average.add_value(
+                    key=keys,
+                    avg=stats.imm_binary_equalize_avg.detach(),
+                    weight=stats.imm_binary_equalize_n,
+                )
+                log[f"imm_binary_equalize_avg"] = (
+                    imm_binary_equalize_average.get_value()
+                )
 
                 torch.nn.utils.clip_grad_norm_(master_model.parameters(), CLIP)
                 optimizer.step()
@@ -607,7 +761,9 @@ def main_loop(task_queue, batch_queue):
 
             if validate_iter:
                 torch.save(master_model.state_dict(), f"pretrain/rwkv/RWKV_{step}.pth")
-                torch.save(optimizer.state_dict(), f"pretrain/rwkv/RWKV_optim_{step}.pth")
+                torch.save(
+                    optimizer.state_dict(), f"pretrain/rwkv/RWKV_optim_{step}.pth"
+                )
                 print("MODEL SAVED.")
                 elapsed = time.time() - group_start
                 log["elapsed"] = elapsed
@@ -621,9 +777,13 @@ def main_loop(task_queue, batch_queue):
                 checkpoint_loss_n = 0
                 group_start = time.time()
                 model.copy_downcast_(master_model, dtype=DTYPE)
-                validation_out = validate(model, data_fetcher, all_db_keys, VALIDATION_USERS)
+                validation_out = validate(
+                    model, data_fetcher, all_db_keys, VALIDATION_USERS
+                )
                 if validation_out is not None:
-                    log["validation_ahead_loss"], log["validation_imm_loss"] = validation_out
+                    log["validation_ahead_loss"], log["validation_imm_loss"] = (
+                        validation_out
+                    )
                     log["validation_nan"] = 0
                 else:
                     log["validation_nan"] = 1
@@ -633,6 +793,7 @@ def main_loop(task_queue, batch_queue):
             if WANDB:
                 wandb.log(log, step=step)
 
+
 def main():
     with multiprocessing.Manager() as manager:
         task_queue = manager.Queue()
@@ -640,7 +801,9 @@ def main():
 
         prepare_processes = []
         for _ in range(NUM_FETCH_PROCESSES):
-            process = multiprocessing.Process(target=prepare_data, args=(task_queue, batch_queue))
+            process = multiprocessing.Process(
+                target=prepare_data, args=(task_queue, batch_queue)
+            )
             process.start()
             prepare_processes.append(process)
 
@@ -662,6 +825,7 @@ def main():
 
         # main_process.join()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # torch.cuda.memory._record_memory_history(max_entries=100000)
     main()

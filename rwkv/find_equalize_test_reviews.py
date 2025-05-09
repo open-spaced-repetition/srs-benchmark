@@ -8,6 +8,7 @@ from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import lmdb
 
 from rwkv.parse_toml import parse_toml
+from rwkv.utils import save_tensor
 
 config = parse_toml()
 lmdb_env = lmdb.open(
@@ -61,15 +62,8 @@ def process(user_id):
     rmse_bins_tensor = torch.tensor(test_label_rmse_bins, dtype=torch.int32)
 
     with lmdb_env.begin(write=True) as txn:
-
-        def save(key, tensor):
-            buffer = BytesIO()
-            torch.save(tensor, buffer)
-            txn.put(key.encode(), buffer.getvalue())
-
-        # save(key_row_mask, rwkv_row_mask)
-        save(key_review_ths, review_ths_tensor)
-        save(key_rmse_bins, rmse_bins_tensor)
+        save_tensor(txn, key_review_ths, review_ths_tensor)
+        save_tensor(txn, key_rmse_bins, rmse_bins_tensor)
 
     print("Done:", user_id)
 

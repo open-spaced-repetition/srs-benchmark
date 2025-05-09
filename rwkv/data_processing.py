@@ -17,6 +17,7 @@ import random
 import matplotlib.pyplot as plt
 from rwkv.config import RWKV_SUBMODULES
 from rwkv.parse_toml import parse_toml
+from rwkv.utils import save_tensor
 
 CARD_FEATURE_COLUMNS = [
     "scaled_elapsed_days",
@@ -637,13 +638,6 @@ def save_job(lmdb_path, lmdb_size, writer_queue):
         if rwkv_sample is None:
             break
 
-        def save_tensor(key, tensor):
-            tensor = tensor.clone().contiguous()
-            buffer = BytesIO()
-            torch.save(tensor, buffer)
-            txn.put(key.encode(), buffer.getvalue())
-            # print("Saved:", key)
-
         with env.begin(write=True) as txn:
             batches_key = f"{rwkv_sample.user_id}_batches"
             user_keys = txn.get(batches_key.encode())
@@ -664,28 +658,30 @@ def save_job(lmdb_path, lmdb_size, writer_queue):
             skips_key = prefix + "skips"
 
             for name, ids in rwkv_sample.ids.items():
-                save_tensor(prefix + name + "_id_", ids)
+                save_tensor(txn, prefix + name + "_id_", ids)
 
             for name, module in rwkv_sample.modules.items():
                 module_key = prefix + name + "_"
                 save_tensor(
+                    txn,
                     module_key + "split_len",
                     torch.tensor(module.split_len, dtype=torch.int32),
                 )
                 save_tensor(
+                    txn,
                     module_key + "split_B",
                     torch.tensor(module.split_B, dtype=torch.int32),
                 )
-                save_tensor(module_key + "from_perm", module.from_perm)
-                save_tensor(module_key + "to_perm", module.to_perm)
+                save_tensor(txn, module_key + "from_perm", module.from_perm)
+                save_tensor(txn, module_key + "to_perm", module.to_perm)
 
-            save_tensor(card_features_key, rwkv_sample.card_features)
-            save_tensor(global_labels_key, rwkv_sample.global_labels)
-            save_tensor(label_review_ths_key, rwkv_sample.label_review_ths)
-            save_tensor(review_ths_key, rwkv_sample.review_ths)
-            save_tensor(day_offsets_key, rwkv_sample.day_offsets)
-            save_tensor(day_offsets_first_key, rwkv_sample.day_offsets_first)
-            save_tensor(skips_key, rwkv_sample.skips)
+            save_tensor(txn, card_features_key, rwkv_sample.card_features)
+            save_tensor(txn, global_labels_key, rwkv_sample.global_labels)
+            save_tensor(txn, label_review_ths_key, rwkv_sample.label_review_ths)
+            save_tensor(txn, review_ths_key, rwkv_sample.review_ths)
+            save_tensor(txn, day_offsets_key, rwkv_sample.day_offsets)
+            save_tensor(txn, day_offsets_first_key, rwkv_sample.day_offsets_first)
+            save_tensor(txn, skips_key, rwkv_sample.skips)
             txn.put(f"{rwkv_sample.user_id}_done".encode(), "true".encode())
 
             user_keys.append(key)
@@ -701,20 +697,6 @@ def progress_tracker(total_items, progress_queue):
 
 
 def main(config):
-    # LMDB_PATH = TRAIN_DATASET_LMDB_PATH
-    # LMDB_SIZE = TRAIN_DATASET_LMDB_SIZE
-    # # USER_IDS = list(range(9000, 10001))
-    # USER_IDS = list(range(1, 5000))
-    # # USER_IDS = list(range(1, 5000))
-    # # MAX_SIZE = int(65536 * (1 - 1.0 / P_MOD))
-    # MAX_SIZE = 65536
-    # p_mod = P_MOD
-
-    # LMDB_PATH = TRAIN_DATASET_LMDB_PATH
-    # LMDB_SIZE = TRAIN_DATASET_LMDB_SIZE
-    # USER_IDS = list(range(2, 4))
-    # SIZES = []
-
     LMDB_PATH = config.LMDB_PATH
     LMDB_SIZE = config.LMDB_SIZE
     USER_IDS = list(range(config.USER_START, config.USER_END + 1))

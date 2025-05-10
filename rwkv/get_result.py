@@ -267,7 +267,7 @@ def run(
 
             write(ahead_stats, ahead_users_result, ahead_path_result)
             write(imm_stats, imm_users_result, imm_path_result)
-            if config.RAW == "true":
+            if config.RAW:
                 db = lmdb.open(config.RAW_DB_PATH, map_size=config.RAW_DB_SIZE)
                 w_tensor = torch.cat(w_list, dim=0)
                 w_equalized = w_tensor[equalize_review_ths]
@@ -378,7 +378,7 @@ def main(config):
             print("Killed processes.")
             sort_jsonl(path_ahead_result)
             sort_jsonl(path_imm_result)
-            if config.RAW == "true":
+            if config.RAW:
                 sort_jsonl(path_ahead_raw)
                 sort_jsonl(path_imm_raw)
             print("Sorted files.")

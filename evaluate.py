@@ -14,13 +14,13 @@ def sigdig(value, CI):
     CI_sigdigs = 2
     decimals = n_lead_zeros_CI + CI_sigdigs
     rounded_CI = round(CI, decimals)
-    rounded_value = round(value, decimals - 1)
+    rounded_value = round(value, decimals)
     if n_lead_zeros_CI > num_lead_zeros(rounded_CI):
-        return str(f"{round(value, decimals - 2):.{decimals - 2}f}"), str(
-            f"{round(CI, decimals - 1):.{decimals - 1}f}"
+        return str(f"{round(value, decimals - 1):.{decimals - 1}f}"), str(
+            f"{round(CI, decimals):.{decimals}f}"
         )
     else:
-        return str(f"{rounded_value:.{decimals - 1}f}"), str(
+        return str(f"{rounded_value:.{decimals}f}"), str(
             f"{rounded_CI:.{decimals}f}"
         )
 

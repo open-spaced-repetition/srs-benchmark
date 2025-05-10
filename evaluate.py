@@ -28,12 +28,10 @@ def sigdig(value, CI):
 # tests to ensure that sigdigs is working as intended
 value = 0.084011111
 CI = 0.0010011111
-print(sigdig(value, CI))
 assert sigdig(value, CI) == ("0.0840", "0.0010")
 
 value2 = 0.083999999
 CI2 = 0.0009999999
-print(sigdig(value2, CI2))
 assert sigdig(value2, CI2) == ("0.0840", "0.0010")
 
 

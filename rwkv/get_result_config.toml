@@ -1,0 +1,22 @@
+# Output file names
+FILE_AHEAD = "RWKV_1_4999"
+FILE_IMM = "RWKV-P_1_4999"
+
+MODEL_PATH = "pretrain/RWKV_trained_on_5000_10000.pth"
+DEVICE = "cuda"
+DTYPE = "bfloat16"
+
+DATASET_LMDB_PATH = "test_db"
+DATASET_LMDB_SIZE = 195_000_000_000
+LABEL_FILTER_LMDB_PATH = "label_filter_db"
+LABEL_FILTER_LMDB_SIZE = 7_000_000_000
+
+RAW = "false"
+RAW_DB_PATH = "raw/result_db"
+RAW_DB_SIZE = 3_000_000_000
+
+USER_START = 1
+USER_END = 4999
+
+# Number of CPU processes for preprocessing the dataset
+NUM_FETCH_PROCESSES = 10

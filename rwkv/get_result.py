@@ -341,7 +341,15 @@ def main(config):
         prepare_processes = []
         for _ in range(config.NUM_FETCH_PROCESSES):
             process = multiprocessing.Process(
-                target=prepare_data, args=(task_queue, batch_queue, 1234)
+                target=prepare_data,
+                args=(
+                    config.DATASET_LMDB_PATH,
+                    config.DATASET_LMDB_SIZE,
+                    task_queue,
+                    batch_queue,
+                    800000,
+                    1234,
+                ),
             )
             process.start()
             prepare_processes.append(process)
@@ -370,8 +378,9 @@ def main(config):
             print("Killed processes.")
             sort_jsonl(path_ahead_result)
             sort_jsonl(path_imm_result)
-            sort_jsonl(path_ahead_raw)
-            sort_jsonl(path_imm_raw)
+            if config.RAW == "true":
+                sort_jsonl(path_ahead_raw)
+                sort_jsonl(path_imm_raw)
             print("Sorted files.")
 
 

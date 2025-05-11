@@ -9,5 +9,5 @@ LABEL_FILTER_LMDB_SIZE = 7_000_000_000
 
 USER_START = 1
 USER_END = 10000
-MAX_BATCH_SIZE = 2097152
+MAX_BATCH_SIZE = 65536
 RWKV_SUBMODULES = ["card_id", "note_id", "deck_id", "preset_id", "user_id"]

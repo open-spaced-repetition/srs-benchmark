@@ -36,7 +36,7 @@ WEIGHT_DECAY_CHANNEL_MIXER = 0.01
 WEIGHT_DECAY_HEAD = 0.01
 CLIP = 0.5
 SLIDING_WINDOW_LENS = [300, 1000, 3000, 10000]
-FETCH_AHEAD = 50
+FETCH_AHEAD = 5
 
 
 def extract_numbers(name):
@@ -298,9 +298,9 @@ def main_loop(config, task_queue, batch_queue):
     optimizer = get_optimizer(config, master_model)
 
     if config.LOAD_MODEL:
-        print("Loading model:", config.LOAD_MODEL_PATH)
         model_path = f"{config.LOAD_MODEL_FOLDER}/{config.LOAD_MODEL_NAME}.pth"
         optim_path = f"{config.LOAD_MODEL_FOLDER}/{config.LOAD_MODEL_NAME}_optim.pth"
+        print("Loading model:", model_path)
         master_model.load_state_dict(torch.load(model_path, weights_only=True))
         optimizer.load_state_dict(
             torch.load(
@@ -377,7 +377,7 @@ def main_loop(config, task_queue, batch_queue):
             return 1 + np.cos(0.5 * np.pi * (1 + step / total_steps))
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer, lr_lambda=lambda t: cosine_down(t, total_steps - warmup_steps)
+            optimizer, lr_lambda=lambda t: cosine_down(t, total_steps)
         )
     else:
         raise ValueError(f"Invalid train mode: {config.TRAIN_MODE}")
@@ -411,9 +411,6 @@ def main_loop(config, task_queue, batch_queue):
     group_start = time.time()
 
     assert FETCH_AHEAD <= len(groups)
-    # for i in range(STEP_OFFSET - 1, STEP_OFFSET - 1 + FETCH_AHEAD):
-    #     group_i = i % len(groups)
-    #     data_fetcher.enqueue((f"train-{group_i}", groups[group_i]))
 
     checkpoint_step_count = 0
     checkpoint_loss_n = 0
@@ -435,7 +432,9 @@ def main_loop(config, task_queue, batch_queue):
             if step < config.STEP_OFFSET + 1000:
                 torch.cuda.empty_cache()
 
-            validate_iter = step == 5 or (group_i + 1) % 500 == 0 or step == total_steps
+            validate_iter = (
+                step == 50 or (group_i + 1) % 500 == 0 or step == total_steps
+            )
             log = {}
             log["step"] = step
             log["lr"] = optimizer.param_groups[0]["lr"]

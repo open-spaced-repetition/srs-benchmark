@@ -20,7 +20,6 @@ from rwkv.prepare_batch import prepare, prepare_data, prepare_data_train_test
 from rwkv.model.srs_model import AnkiRWKV
 from rwkv.rwkv_config import *
 from rwkv.utils import (
-    SlidingWindowAverage,
     KeyValueAverage,
     get_number_of_trainable_parameters,
 )
@@ -35,7 +34,6 @@ WEIGHT_DECAY = 0.01
 WEIGHT_DECAY_CHANNEL_MIXER = 0.01
 WEIGHT_DECAY_HEAD = 0.01
 CLIP = 0.5
-SLIDING_WINDOW_LENS = [300, 1000, 3000, 10000]
 FETCH_AHEAD = 5
 
 
@@ -286,6 +284,50 @@ def get_test_keys(dataset_path, dataset_size, users):
     return keys
 
 
+class KeyValueStatistics:
+    def __init__(self):
+        self.ahead_average = KeyValueAverage()
+        self.ahead_raw_average = KeyValueAverage()
+        self.ahead_raw_diff_average = KeyValueAverage()
+        self.imm_average = KeyValueAverage()
+        self.ahead_equalize_average = KeyValueAverage()
+        self.imm_binary_equalize_average = KeyValueAverage()
+
+    def add(self, keys, stats):
+        self.ahead_average.add_value(
+            key=keys, avg=stats.ahead_avg.detach(), weight=stats.ahead_n
+        )
+        self.ahead_raw_average.add_value(
+            key=keys, avg=stats.ahead_raw_avg.detach(), weight=stats.ahead_n
+        )
+        self.ahead_raw_diff_average.add_value(
+            key=keys,
+            avg=stats.ahead_avg.detach() - stats.ahead_raw_avg.detach(),
+            weight=stats.ahead_n,
+        )
+        self.ahead_equalize_average.add_value(
+            key=keys,
+            avg=stats.ahead_equalize_avg.detach(),
+            weight=stats.ahead_equalize_n,
+        )
+        self.imm_average.add_value(
+            key=keys, avg=stats.imm_avg.detach(), weight=stats.imm_n
+        )
+        self.imm_binary_equalize_average.add_value(
+            key=keys,
+            avg=stats.imm_binary_equalize_avg.detach(),
+            weight=stats.imm_binary_equalize_n,
+        )
+
+    def add_log(self, log):
+        log[f"ahead_avg"] = self.ahead_average.get_value()
+        log[f"ahead_raw_avg"] = self.ahead_raw_average.get_value()
+        log[f"ahead_raw_diff_avg"] = self.ahead_raw_diff_average.get_value()
+        log[f"ahead_equalize_avg"] = self.ahead_equalize_average.get_value()
+        log[f"imm_avg"] = self.imm_average.get_value()
+        log[f"imm_binary_equalize_avg"] = self.imm_binary_equalize_average.get_value()
+
+
 def main_loop(config, task_queue, batch_queue):
     data_fetcher = DataFetcher(task_queue=task_queue, out_queue=batch_queue)
 
@@ -382,31 +424,7 @@ def main_loop(config, task_queue, batch_queue):
     else:
         raise ValueError(f"Invalid train mode: {config.TRAIN_MODE}")
 
-    SLIDING_WINDOW_LENS.append(
-        len(groups)
-    )  # Add a sliding window for the entire epoch size
-    SLIDING_WINDOW_LENS.sort()
-    ahead_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
-    ahead_raw_sliding_windows = [
-        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
-    ]
-    ahead_raw_diff_sliding_windows = [
-        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
-    ]
-    imm_sliding_windows = [SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS]
-    ahead_equalize_sliding_windows = [
-        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
-    ]
-    imm_binary_equalize_sliding_windows = [
-        SlidingWindowAverage(len) for len in SLIDING_WINDOW_LENS
-    ]
-    ahead_average = KeyValueAverage()
-    ahead_raw_average = KeyValueAverage()
-    ahead_raw_diff_average = KeyValueAverage()
-    imm_average = KeyValueAverage()
-    ahead_equalize_average = KeyValueAverage()
-    imm_binary_equalize_average = KeyValueAverage()
-
+    key_value_stats = KeyValueStatistics()
     train_start = time.time()
     group_start = time.time()
 
@@ -474,97 +492,11 @@ def main_loop(config, task_queue, batch_queue):
                     stats.ahead_logits_diff_loss_avg.detach()
                 )
                 log["norm"] = get_grad_norm(master_model)
+                key_value_stats.add(keys, stats)
+                key_value_stats.add_log(log)
+
                 checkpoint_step_count += 1
                 checkpoint_loss_n += stats.ahead_n
-                for sliding_window in ahead_sliding_windows:
-                    sliding_window.add_value(
-                        avg=stats.ahead_avg.detach(), weight=stats.ahead_n
-                    )
-                    if sliding_window.at_capacity():
-                        log[f"ahead_avg_{sliding_window.len}"] = (
-                            sliding_window.get_value()
-                        )
-                ahead_average.add_value(
-                    key=keys, avg=stats.ahead_avg.detach(), weight=stats.ahead_n
-                )
-                log[f"ahead_avg"] = ahead_average.get_value()
-
-                for sliding_window in ahead_raw_sliding_windows:
-                    sliding_window.add_value(
-                        avg=stats.ahead_raw_avg.detach(), weight=stats.ahead_n
-                    )
-                    if sliding_window.at_capacity():
-                        log[f"ahead_raw_avg_{sliding_window.len}"] = (
-                            sliding_window.get_value()
-                        )
-                ahead_raw_average.add_value(
-                    key=keys, avg=stats.ahead_raw_avg.detach(), weight=stats.ahead_n
-                )
-                log[f"ahead_raw_avg"] = ahead_raw_average.get_value()
-
-                for sliding_window in ahead_raw_diff_sliding_windows:
-                    sliding_window.add_value(
-                        avg=stats.ahead_avg.detach() - stats.ahead_raw_avg.detach(),
-                        weight=stats.ahead_n,
-                    )
-                    if sliding_window.at_capacity():
-                        log[f"ahead_raw_diff_avg_{sliding_window.len}"] = (
-                            sliding_window.get_value()
-                        )
-                ahead_raw_diff_average.add_value(
-                    key=keys,
-                    avg=stats.ahead_avg.detach() - stats.ahead_raw_avg.detach(),
-                    weight=stats.ahead_n,
-                )
-                log[f"ahead_raw_diff_avg"] = ahead_raw_diff_average.get_value()
-
-                for sliding_window in ahead_equalize_sliding_windows:
-                    sliding_window.add_value(
-                        avg=stats.ahead_equalize_avg.detach(),
-                        weight=stats.ahead_equalize_n,
-                    )
-                    if sliding_window.at_capacity():
-                        log[f"ahead_equalize_avg_{sliding_window.len}"] = (
-                            sliding_window.get_value()
-                        )
-                ahead_equalize_average.add_value(
-                    key=keys,
-                    avg=stats.ahead_equalize_avg.detach(),
-                    weight=stats.ahead_equalize_n,
-                )
-                log[f"ahead_equalize_avg"] = ahead_equalize_average.get_value()
-
-                for sliding_window in imm_sliding_windows:
-                    sliding_window.add_value(
-                        avg=stats.imm_avg.detach(), weight=stats.imm_n
-                    )
-                    if sliding_window.at_capacity():
-                        log[f"imm_avg_{sliding_window.len}"] = (
-                            sliding_window.get_value()
-                        )
-                imm_average.add_value(
-                    key=keys, avg=stats.imm_avg.detach(), weight=stats.imm_n
-                )
-                log[f"imm_avg"] = imm_average.get_value()
-
-                for sliding_window in imm_binary_equalize_sliding_windows:
-                    sliding_window.add_value(
-                        avg=stats.imm_binary_equalize_avg.detach(),
-                        weight=stats.imm_binary_equalize_n,
-                    )
-                    if stats.imm_binary_equalize_n > 0:
-                        if sliding_window.at_capacity():
-                            log[f"imm_binary_equalize_avg_{sliding_window.len}"] = (
-                                sliding_window.get_value()
-                            )
-                imm_binary_equalize_average.add_value(
-                    key=keys,
-                    avg=stats.imm_binary_equalize_avg.detach(),
-                    weight=stats.imm_binary_equalize_n,
-                )
-                log[f"imm_binary_equalize_avg"] = (
-                    imm_binary_equalize_average.get_value()
-                )
 
                 torch.nn.utils.clip_grad_norm_(master_model.parameters(), CLIP)
                 optimizer.step()

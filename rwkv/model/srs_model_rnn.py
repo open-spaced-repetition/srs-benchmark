@@ -17,68 +17,90 @@ from rwkv.model.rwkv_rnn_model import RWKV7RNN
 from rwkv.model.srs_model import is_excluded
 import torch
 
+from rwkv.rwkv_config import AnkiRWKVConfig
+
 # An RNN implementation of srs_model.
 
-# def __nop(ob):
-#     return ob
-# ModuleType = torch.nn.Module
-# FunctionType = __nop
 
-ModuleType = torch.jit.ScriptModule
-FunctionType = torch.jit.script_method
+def __nop(ob):
+    return ob
+
+
+ModuleType = torch.nn.Module
+FunctionType = __nop
+
+# ModuleType = torch.jit.ScriptModule
+# FunctionType = torch.jit.script_method
 
 
 class AnkiRWKVRNN(ModuleType):
-    def __init__(
-        self,
-        card_rwkv_config,
-        note_rwkv_config,
-        deck_rwkv_config,
-        preset_rwkv_config,
-        global_rwkv_config,
-    ):
+    def __init__(self, anki_rwkv_config: AnkiRWKVConfig):
         super().__init__()
-        self.card_features_dim = 64
+        self.card_features_dim = 92
         self.global_features_dim = 1
-        self.d_model = global_rwkv_config.d_model
-        self.features_fc_dim = 4 * card_rwkv_config.d_model
-        self.head_dim = 4 * global_rwkv_config.d_model
-        self.num_curves = 4
+        self.d_model = anki_rwkv_config.d_model
+        self.features_fc_dim = 4 * anki_rwkv_config.d_model
+        self.ahead_head_dim = 4 * self.d_model
+        self.p_head_dim = 4 * self.d_model
+        self.w_head_dim = 4 * self.d_model
+        self.num_curves = 128
 
-        with torch.no_grad():
-            self.features2card = torch.nn.Sequential(
-                torch.nn.Linear(self.card_features_dim, self.features_fc_dim),
-                torch.nn.SiLU(),
-                torch.nn.LayerNorm(self.features_fc_dim),
-                torch.nn.Linear(self.features_fc_dim, self.d_model),
-                torch.nn.SiLU(),
-            )
-            self.rwkv_modules = torch.nn.ModuleList(
-                [
-                    RWKV7RNN(config=card_rwkv_config),
-                    RWKV7RNN(config=note_rwkv_config),
-                    RWKV7RNN(config=deck_rwkv_config),
-                    RWKV7RNN(config=preset_rwkv_config),
-                    RWKV7RNN(config=global_rwkv_config),
-                ]
-            )
+        self.features2card = torch.nn.Sequential(
+            torch.nn.Linear(self.card_features_dim, self.features_fc_dim),
+            torch.nn.SiLU(),
+            torch.nn.LayerNorm(self.features_fc_dim),
+            torch.nn.Linear(self.features_fc_dim, self.d_model),
+            torch.nn.SiLU(),
+        )
+        self.rwkv_modules = torch.nn.ModuleList(
+            [RWKV7RNN(config=config) for _, config in anki_rwkv_config.modules]
+        )
+        self.prehead_norm = torch.nn.LayerNorm(self.d_model)
+        self.prehead_dropout = torch.nn.Dropout(p=anki_rwkv_config.dropout)
+        self.head_ahead_logits = torch.nn.Sequential(
+            torch.nn.Linear(self.d_model, self.ahead_head_dim),
+            torch.nn.ReLU(),
+        )
+        self.head_w = torch.nn.Sequential(
+            torch.nn.Linear(self.d_model, 1 * self.d_model),
+            torch.nn.ReLU(),
+            torch.nn.LayerNorm(1 * self.d_model),
+            torch.nn.Dropout(p=0.1),
+            torch.nn.Linear(1 * self.d_model, self.w_head_dim),
+        )
+        self.head_p = torch.nn.Sequential(
+            torch.nn.Linear(self.d_model, self.p_head_dim),
+            torch.nn.ReLU(),
+        )
 
-            self.head_curve = torch.nn.Sequential(
-                torch.nn.LayerNorm(global_rwkv_config.d_model),
-                torch.nn.Linear(global_rwkv_config.d_model, self.head_dim),
-                torch.nn.SiLU(),
-            )
-            self.head_p = torch.nn.Sequential(
-                torch.nn.LayerNorm(global_rwkv_config.d_model),
-                torch.nn.Linear(global_rwkv_config.d_model, self.head_dim),
-                torch.nn.SiLU(),
-            )
+        self.max_e = 21
+        self.point_spread = 18.5
+        self.num_points = 128
+        self.ahead_linear = torch.nn.Linear(self.ahead_head_dim, self.num_points)
 
-            self.w_linear = torch.nn.Linear(self.head_dim, self.num_curves)
-            self.s_linear = torch.nn.Linear(self.head_dim, self.num_curves)
-            self.d_linear = torch.nn.Linear(self.head_dim, self.num_curves)
-            self.d_softplus = torch.nn.Softplus()
-            self.p_linear = torch.nn.Linear(self.head_dim, 4)
+        self.w_linear = torch.nn.Linear(self.w_head_dim, self.num_curves)
+
+        self.s_point_spread = 18.5
+        self.s_max = 22
+
+        self.p_linear = torch.nn.Linear(self.p_head_dim, 4)
+
+        # self.head_curve = torch.nn.Sequential(
+        #     torch.nn.LayerNorm(global_rwkv_config.d_model),
+        #     torch.nn.Linear(global_rwkv_config.d_model, self.head_dim),
+        #     torch.nn.SiLU(),
+        # )
+        # self.head_p = torch.nn.Sequential(
+        #     torch.nn.LayerNorm(global_rwkv_config.d_model),
+        #     torch.nn.Linear(global_rwkv_config.d_model, self.head_dim),
+        #     torch.nn.SiLU(),
+        # )
+
+        # self.w_linear = torch.nn.Linear(self.head_dim, self.num_curves)
+        # self.s_linear = torch.nn.Linear(self.head_dim, self.num_curves)
+        # self.d_linear = torch.nn.Linear(self.head_dim, self.num_curves)
+        # self.d_softplus = torch.nn.Softplus()
+        # self.p_linear = torch.nn.Linear(self.head_dim, 4)
 
     def forgetting_curve(self, w, s, d, label_elapsed_seconds):
         return 1e-5 + (1 - 2 * 1e-5) * torch.sum(
@@ -97,36 +119,30 @@ class AnkiRWKVRNN(ModuleType):
         preset_state,
         global_state,
     ):
+        assert len(card_features.shape) == 2
         card_features = torch.nn.functional.pad(
-            card_features, (0, 64 - 18), mode="constant", value=0
+            card_features,
+            (0, self.card_features_dim - card_features.size(1)),
+            mode="constant",
+            value=0,
         )  # TODO change
 
         card_rwkv_input = self.features2card(card_features)
         card_encoding, next_card_state = self.rwkv_modules[0](
             card_rwkv_input, card_state
         )
-        note_encoding, next_note_state = self.rwkv_modules[1](card_encoding, note_state)
-        deck_encoding, next_deck_state = self.rwkv_modules[2](note_encoding, deck_state)
+        deck_encoding, next_deck_state = self.rwkv_modules[1](card_encoding, deck_state)
+        note_encoding, next_note_state = self.rwkv_modules[2](deck_encoding, note_state)
         preset_encoding, next_preset_state = self.rwkv_modules[3](
-            deck_encoding, preset_state
+            note_encoding, preset_state
         )
         global_encoding, next_global_state = self.rwkv_modules[4](
             preset_encoding, global_state
         )
 
-        x_curve = self.head_curve(global_encoding).float()
-        out_w_logits = self.w_linear(x_curve)
-        out_s_unscaled = self.s_linear(x_curve)
-        out_d_unscaled = self.d_linear(x_curve)
-        out_w = torch.nn.functional.softmax(out_w_logits, dim=-1)
-        out_s = torch.exp(torch.clamp(out_s_unscaled, min=-28, max=28))
-        out_d = self.d_softplus(out_d_unscaled)
         x_p = self.head_p(global_encoding).float()
         out_p_logits = self.p_linear(x_p)
         return (
-            out_w,
-            out_s,
-            out_d,
             out_p_logits,
             next_card_state,
             next_note_state,
@@ -179,9 +195,6 @@ class AnkiRWKVRNN(ModuleType):
 
                 card_features = card_features_all[:, i]
                 (
-                    out_w,
-                    out_s,
-                    out_d,
                     out_p_logits,
                     next_card_state,
                     next_note_state,
@@ -205,9 +218,9 @@ class AnkiRWKVRNN(ModuleType):
                     preset_states[preset_id] = next_preset_state
                     global_state = next_global_state
 
-                curve_p = self.forgetting_curve(
-                    out_w, out_s, out_d, label_elapsed_seconds_all[:, i]
-                )
+                # curve_p = self.forgetting_curve(
+                #     out_w, out_s, out_d, label_elapsed_seconds_all[:, i]
+                # )
                 if row["has_label"]:
                     if row["is_query"]:
                         out_p_probs = torch.softmax(out_p_logits, dim=-1)
@@ -219,7 +232,8 @@ class AnkiRWKVRNN(ModuleType):
                         )
                         imm_ps[row["label_review_th"]] = out_p_binary.item()
                     else:
-                        ahead_ps[row["label_review_th"]] = curve_p.item()
+                        pass
+                        # ahead_ps[row["label_review_th"]] = curve_p.item()
 
         return ahead_ps, imm_ps
 

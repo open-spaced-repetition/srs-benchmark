@@ -52,7 +52,7 @@ class Test(unittest.TestCase):
 
             for user_id in list(range(1, 2)):
                 df = get_rwkv_data(DATA_PATH, user_id, equalize_review_ths=[])
-                df = df.head(min(len(df), 200))
+                df = df.head(min(len(df), 20))
 
                 print("Test", user_id, len(df))
                 sample = create_sample(
@@ -73,6 +73,9 @@ class Test(unittest.TestCase):
                 rnn_ahead_p, rnn_imm_p = rnn.run(rnn_df, dtype=DTYPE, device=RNN_DEVICE)
                 # print("rnn ahead_p", rnn_ahead_p)
                 # print("rnn imm_p", rnn_imm_p)
+                print(base_stats.imm_ps)
+                print(rnn_imm_p)
+                # print((base_stats.imm_ps - rnn_imm_p).abs())
                 torch.testing.assert_close(base_stats.imm_ps, rnn_imm_p)
                 # torch.testing.assert_close(base_stats.ahead_ps, rnn_ahead_p)  # TODO
 

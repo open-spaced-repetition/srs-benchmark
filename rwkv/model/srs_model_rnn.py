@@ -37,7 +37,6 @@ class AnkiRWKVRNN(ModuleType):
     def __init__(self, anki_rwkv_config: AnkiRWKVConfig):
         super().__init__()
         self.card_features_dim = 92
-        self.global_features_dim = 1
         self.d_model = anki_rwkv_config.d_model
         self.features_fc_dim = 4 * anki_rwkv_config.d_model
         self.ahead_head_dim = 4 * self.d_model
@@ -127,7 +126,11 @@ class AnkiRWKVRNN(ModuleType):
             value=0,
         )  # TODO change
 
+        print("RNN 1", card_features.sum(), card_features.shape)
+        print(card_features[:, :])
         card_rwkv_input = self.features2card(card_features)
+        print("RNN 2", card_rwkv_input.sum(), card_rwkv_input.shape)
+
         card_encoding, next_card_state = self.rwkv_modules[0](
             card_rwkv_input, card_state
         )
@@ -140,7 +143,8 @@ class AnkiRWKVRNN(ModuleType):
             preset_encoding, global_state
         )
 
-        x_p = self.head_p(global_encoding).float()
+        x = self.prehead_norm(global_encoding)
+        x_p = self.head_p(x).float()
         out_p_logits = self.p_linear(x_p)
         return (
             out_p_logits,

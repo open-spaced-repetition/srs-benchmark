@@ -101,13 +101,35 @@ class AnkiRWKVRNN(ModuleType):
         # self.d_softplus = torch.nn.Softplus()
         # self.p_linear = torch.nn.Linear(self.head_dim, 4)
 
-    def forgetting_curve(self, w, s, d, label_elapsed_seconds):
-        return 1e-5 + (1 - 2 * 1e-5) * torch.sum(
-            w
-            * (1 + torch.max(torch.tensor(1.0), label_elapsed_seconds) / (1e-7 + s))
-            ** -d,
-            dim=-1,
+    def forgetting_curve(self, w, label_elapsed_seconds):
+        s_space_raw = torch.exp(
+            torch.linspace(0, self.s_point_spread, self.num_curves, device=w.device)
         )
+        s_space = 0.1 + (s_space_raw - 1) * (np.e ** (self.s_max - self.s_point_spread))
+        label_elapsed_seconds = torch.max(torch.tensor(1.0), label_elapsed_seconds)
+        return 1e-5 + (1 - 2 * 1e-5) * torch.sum(
+            w * 0.9 ** (label_elapsed_seconds / s_space), dim=-1
+        )
+
+    def interp(self, out_ahead_logits, label_elapsed_seconds):
+        label_elapsed_seconds = torch.clamp(label_elapsed_seconds.contiguous(), min=1)
+        point_space_raw = torch.exp(
+            torch.linspace(
+                0, self.point_spread, self.num_points, device=out_ahead_logits.device
+            )
+        )
+        point_space = 0.5 + (point_space_raw - 1) * (
+            np.e ** (self.max_e - self.point_spread)
+        )
+        right_idx = torch.searchsorted(point_space, label_elapsed_seconds)
+        left_idx = torch.clamp(right_idx - 1, min=0)
+        xl, xr = point_space[left_idx], point_space[right_idx]
+        yl = torch.gather(out_ahead_logits, dim=-1, index=left_idx)
+        yr = torch.gather(out_ahead_logits, dim=-1, index=right_idx)
+        res = 1e-5 + (1 - 2 * 1e-5) * (
+            yl + (yr - yl) * (label_elapsed_seconds - xl) / (xr - xl)
+        )
+        return res.squeeze(-1)
 
     def review(
         self,
@@ -126,11 +148,7 @@ class AnkiRWKVRNN(ModuleType):
             value=0,
         )  # TODO change
 
-        print("RNN 1", card_features.sum(), card_features.shape)
-        print(card_features[:, :])
         card_rwkv_input = self.features2card(card_features)
-        print("RNN 2", card_rwkv_input.sum(), card_rwkv_input.shape)
-
         card_encoding, next_card_state = self.rwkv_modules[0](
             card_rwkv_input, card_state
         )
@@ -143,10 +161,16 @@ class AnkiRWKVRNN(ModuleType):
             preset_encoding, global_state
         )
 
-        x = self.prehead_norm(global_encoding)
+        x = self.prehead_dropout(self.prehead_norm(global_encoding))
+        out_w_logits = self.w_linear(self.head_w(x).float())
+        out_w = torch.nn.functional.softmax(out_w_logits, dim=-1)
+        out_ahead_logits = self.ahead_linear(self.head_ahead_logits(x).float())
+
         x_p = self.head_p(x).float()
         out_p_logits = self.p_linear(x_p)
         return (
+            out_ahead_logits,
+            out_w,
             out_p_logits,
             next_card_state,
             next_note_state,
@@ -199,6 +223,8 @@ class AnkiRWKVRNN(ModuleType):
 
                 card_features = card_features_all[:, i]
                 (
+                    out_ahead_logits,
+                    out_w,
                     out_p_logits,
                     next_card_state,
                     next_note_state,
@@ -215,16 +241,24 @@ class AnkiRWKVRNN(ModuleType):
                 )
 
                 if not row["skip"]:
-                    # if True:
                     card_states[card_id] = next_card_state
                     note_states[note_id] = next_note_state
                     deck_states[deck_id] = next_deck_state
                     preset_states[preset_id] = next_preset_state
                     global_state = next_global_state
 
-                # curve_p = self.forgetting_curve(
-                #     out_w, out_s, out_d, label_elapsed_seconds_all[:, i]
-                # )
+                curve_probs_raw = self.forgetting_curve(
+                    out_w, label_elapsed_seconds_all[:, i].unsqueeze(0)
+                )
+                curve_logits_raw = torch.log(
+                    curve_probs_raw / (1 - curve_probs_raw)
+                )  # inverse sigmoid
+                ahead_logit_residual = self.interp(
+                    out_ahead_logits, label_elapsed_seconds_all[:, i].unsqueeze(0)
+                )
+                curve_logits = curve_logits_raw + ahead_logit_residual
+                curve_p = torch.sigmoid(curve_logits)
+
                 if row["has_label"]:
                     if row["is_query"]:
                         out_p_probs = torch.softmax(out_p_logits, dim=-1)
@@ -236,8 +270,7 @@ class AnkiRWKVRNN(ModuleType):
                         )
                         imm_ps[row["label_review_th"]] = out_p_binary.item()
                     else:
-                        pass
-                        # ahead_ps[row["label_review_th"]] = curve_p.item()
+                        ahead_ps[row["label_review_th"]] = curve_p.item()
 
         return ahead_ps, imm_ps
 
@@ -470,6 +503,42 @@ def get_df_sequentially(data_path, user_id, max_review_th=None):
         ), f"{name} does not have the right number of values"
 
     return pd.DataFrame({name: values for name, values in all_lists})
+
+
+class RNNProcess:
+    def __init__():
+        self.rnn = AnkiRWKVRNN()
+
+    def imm_predict(self, row):
+        pass
+
+
+def run(data_path, user_id):
+    """Runs the rnn version of rwkv to explicitly show information flow. Written to guard against possible data leakage.
+    Due to difficulties in matching rng with the parallel approach, the outputs will not exactly match.
+    However, the performance should be similar.
+    """
+    df = pd.read_parquet(data_path / "revlogs", filters=[("user_id", "=", user_id)])
+    df["review_th"] = range(1, df.shape[0] + 1)
+    df_cards = pd.read_parquet(data_path / "cards", filters=[("user_id", "=", user_id)])
+    df_cards.drop(columns=["user_id"], inplace=True)
+    df_decks = pd.read_parquet(data_path / "decks", filters=[("user_id", "=", user_id)])
+    df_decks.drop(columns=["user_id", "parent_id"], inplace=True)
+    df = df.merge(df_cards, on="card_id", how="left", validate="many_to_one")
+    df = df.merge(df_decks, on="deck_id", how="left", validate="many_to_one")
+    df["review_th"] = range(1, df.shape[0] + 1)
+
+    srs_rnn = RNNProcess()
+
+    pred_imm = {}
+    pred_ahead = {}
+    for i, row in df.iterrows():
+        # For the immediate predictions we do not send the rating and duration fields
+        imm_info = row.copy()
+        imm_info.drop(columns=["rating", "duration"], inplace=True)
+        pred_imm[row["review_th"]] = srs_rnn.imm_predict(imm_info)
+
+        pred_ahead_curve[TODO] = srs_rnn.ahead_predict(row)
 
 
 if __name__ == "__main__":

@@ -48,7 +48,8 @@ class Test(unittest.TestCase):
                 .to(RNN_DEVICE)
             )
             rnn.copy_downcast_(rnn_master, dtype=DTYPE)
-            rnn.load_state_dict(base.state_dict())
+            rnn.load_state_dict(base.state_dict(), strict=False)
+            rnn.eval()
 
             for user_id in list(range(1, 2)):
                 df = get_rwkv_data(DATA_PATH, user_id, equalize_review_ths=[])
@@ -73,11 +74,13 @@ class Test(unittest.TestCase):
                 rnn_ahead_p, rnn_imm_p = rnn.run(rnn_df, dtype=DTYPE, device=RNN_DEVICE)
                 # print("rnn ahead_p", rnn_ahead_p)
                 # print("rnn imm_p", rnn_imm_p)
-                print(base_stats.imm_ps)
-                print(rnn_imm_p)
+                print(base_stats.ahead_ps)
+                print(rnn_ahead_p)
                 # print((base_stats.imm_ps - rnn_imm_p).abs())
                 torch.testing.assert_close(base_stats.imm_ps, rnn_imm_p)
-                # torch.testing.assert_close(base_stats.ahead_ps, rnn_ahead_p)  # TODO
+                torch.testing.assert_close(
+                    base_stats.ahead_ps, rnn_ahead_p, atol=1e-5, rtol=1e-5
+                )  # TODO
 
     # def test_sequential_df_process_identical(self):
     #     """
@@ -85,33 +88,68 @@ class Test(unittest.TestCase):
     #     In this test we show that we can sequentially process the revlog, reducing the chance of possible data leakage.
     #     """
     #     for user_id in range(42, 45):
-    #         df_sequential = get_df_sequentially(user_id)
-    #         df_base = get_rwkv_data(user_id, equalize_review_ths=[])
-    #         df_base = add_queries(add_segment_features(df_base), [], 0, 1)
+    #         df_sequential = get_df_sequentially(DATA_PATH, user_id)
+    #         df_base = get_rwkv_data(DATA_PATH, user_id, equalize_review_ths=[])
+    #         df_base = add_queries(add_segment_features(df_base), [])
 
     #         for column in df_sequential.columns:
     #             assert column in df_base.columns, f"mismatching columns {column}"
     #             print("Testing user:", user_id, "column:", column)
-    #             np.testing.assert_allclose(df_sequential[column].to_numpy(), df_base[column].to_numpy())
+    #             np.testing.assert_allclose(
+    #                 df_sequential[column].to_numpy(), df_base[column].to_numpy()
+    #             )
 
     # def test_sequential_df_usable_by_rnn(self):
-    #     """ Show that the sequential df contains enough information to be usable by the rnn.
-    #     """
+    #     """Show that the sequential df contains enough information to be usable by the rnn."""
     #     torch._C._jit_override_can_fuse_on_cpu(False)
     #     torch._C._jit_override_can_fuse_on_gpu(False)
     #     torch._C._jit_set_texpr_fuser_enabled(False)
 
     #     with torch.no_grad():
-    #         base_master = AnkiRWKV(card_rwkv_config=CARD_CONFIG, note_rwkv_config=NOTE_CONFIG, deck_rwkv_config=DECK_CONFIG, preset_rwkv_config=PRESET_CONFIG, global_rwkv_config=GLOBAL_CONFIG, dropout=DROPOUT).to(DEVICE)
+    #         base_master = AnkiRWKV(
+    #             card_rwkv_config=CARD_CONFIG,
+    #             note_rwkv_config=NOTE_CONFIG,
+    #             deck_rwkv_config=DECK_CONFIG,
+    #             preset_rwkv_config=PRESET_CONFIG,
+    #             global_rwkv_config=GLOBAL_CONFIG,
+    #             dropout=DROPOUT,
+    #         ).to(DEVICE)
     #         for param in base_master.parameters():
     #             torch.nn.init.uniform_(param, -0.20, 0.20)
 
-    #         base = AnkiRWKV(card_rwkv_config=CARD_CONFIG, note_rwkv_config=NOTE_CONFIG, deck_rwkv_config=DECK_CONFIG, preset_rwkv_config=PRESET_CONFIG, global_rwkv_config=GLOBAL_CONFIG, dropout=DROPOUT).selective_cast(DTYPE).to(DEVICE)
+    #         base = (
+    #             AnkiRWKV(
+    #                 card_rwkv_config=CARD_CONFIG,
+    #                 note_rwkv_config=NOTE_CONFIG,
+    #                 deck_rwkv_config=DECK_CONFIG,
+    #                 preset_rwkv_config=PRESET_CONFIG,
+    #                 global_rwkv_config=GLOBAL_CONFIG,
+    #                 dropout=DROPOUT,
+    #             )
+    #             .selective_cast(DTYPE)
+    #             .to(DEVICE)
+    #         )
     #         base.copy_downcast_(base_master, dtype=DTYPE)
     #         base.eval()
 
-    #         rnn_master = AnkiRWKVRNN(card_rwkv_config=CARD_CONFIG, note_rwkv_config=NOTE_CONFIG, deck_rwkv_config=DECK_CONFIG, preset_rwkv_config=PRESET_CONFIG, global_rwkv_config=GLOBAL_CONFIG).to(DEVICE)
-    #         rnn = AnkiRWKVRNN(card_rwkv_config=CARD_CONFIG, note_rwkv_config=NOTE_CONFIG, deck_rwkv_config=DECK_CONFIG, preset_rwkv_config=PRESET_CONFIG, global_rwkv_config=GLOBAL_CONFIG).selective_cast(DTYPE).to(DEVICE)
+    #         rnn_master = AnkiRWKVRNN(
+    #             card_rwkv_config=CARD_CONFIG,
+    #             note_rwkv_config=NOTE_CONFIG,
+    #             deck_rwkv_config=DECK_CONFIG,
+    #             preset_rwkv_config=PRESET_CONFIG,
+    #             global_rwkv_config=GLOBAL_CONFIG,
+    #         ).to(DEVICE)
+    #         rnn = (
+    #             AnkiRWKVRNN(
+    #                 card_rwkv_config=CARD_CONFIG,
+    #                 note_rwkv_config=NOTE_CONFIG,
+    #                 deck_rwkv_config=DECK_CONFIG,
+    #                 preset_rwkv_config=PRESET_CONFIG,
+    #                 global_rwkv_config=GLOBAL_CONFIG,
+    #             )
+    #             .selective_cast(DTYPE)
+    #             .to(DEVICE)
+    #         )
     #         rnn.copy_downcast_(rnn_master, dtype=DTYPE)
     #         rnn.load_state_dict(base.state_dict())
 
@@ -120,12 +158,16 @@ class Test(unittest.TestCase):
     #             df_base = get_rwkv_data(user_id, equalize_review_ths=[])
     #             print("df len", len(df_base))
 
-    #             sample = create_sample(user_id, df_base, equalize_review_ths=[], dtype=DTYPE, device="cpu")
+    #             sample = create_sample(
+    #                 user_id, df_base, equalize_review_ths=[], dtype=DTYPE, device="cpu"
+    #             )
     #             stats = base.get_loss(prepare([sample]).to(DEVICE))
     #             base_ahead_p, base_imm_p = extract_p(stats)
 
     #             df_sequential = get_df_sequentially(user_id)
-    #             rnn_ahead_p, rnn_imm_p = rnn.run(df_sequential, dtype=DTYPE, device=DEVICE)
+    #             rnn_ahead_p, rnn_imm_p = rnn.run(
+    #                 df_sequential, dtype=DTYPE, device=DEVICE
+    #             )
     #             assert len(base_ahead_p) > 0
     #             # print("base", base_ahead_p, base_imm_p)
     #             # print("rnn", rnn_ahead_p, rnn_imm_p)

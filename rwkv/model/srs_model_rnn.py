@@ -514,7 +514,7 @@ class RNNProcess:
         self.deck_states = {}
         self.preset_states = {}
         self.global_state = None
-
+        self.first_day_offset = None
         self.prev_row = None
         self.card_set = set()
         self.last_new_cards = {}
@@ -523,6 +523,7 @@ class RNNProcess:
         self.today = -1
         self.today_reviews = 0
         self.today_new_cards = 0
+        self.card2first_day_offset = {}
 
     def run(self, row, skip):
         features_row = row[CARD_FEATURE_COLUMNS]
@@ -546,6 +547,18 @@ class RNNProcess:
 
     def add_same(self, row):
         row = row.copy()
+        card_id = row["card_id"]
+        if self.first_day_offset is None:
+            row["day_offset"] = 0
+        else:
+            row["day_offset"] -= self.first_day_offset
+
+        if card_id in self.card2first_day_offset:
+            row["day_offset_first"] = self.card2first_day_offset[card_id]
+        else:
+            row["day_offset_first"] = row["day_offset"]
+
+        row["day_of_week"] = ((row["day_offset"] % 7) - 3) / 3
 
         def add_id(name):
             if np.isnan(row[name]):
@@ -562,7 +575,6 @@ class RNNProcess:
             - (0 if self.prev_row is None else self.prev_row["day_offset"])
         )
         row["day_of_week"] = ((row["day_offset"] % 7) - 3) / 3
-        card_id = row["card_id"]
         unscaled_diff_new_cards = (
             (len(self.card_set) - self.last_new_cards[card_id])
             if card_id in self.last_new_cards
@@ -618,6 +630,9 @@ class RNNProcess:
         output = self.run(row, skip=False)
 
         # Update state
+        if self.first_day_offset is None:
+            self.first_day_offset = row["day_offset"]
+
         if row["day_offset"] != self.today:
             self.today = row["day_offset"]
             self.today_new_cards = 0
@@ -625,9 +640,12 @@ class RNNProcess:
         self.today_reviews += 1
         if row["card_id"] not in self.card_set:
             self.today_new_cards += 1
+            self.card_set.add(card_id)
+            self.card2first_day_offset[card_id] = (
+                row["day_offset"] - self.first_day_offset
+            )
 
         card_id = row["card_id"]
-        self.card_set.add(card_id)
         self.prev_row = row.copy()
         self.last_i[card_id] = self.i
         self.last_new_cards[card_id] = len(self.card_set)

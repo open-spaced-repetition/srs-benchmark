@@ -347,7 +347,6 @@ def add_queries(section_df, equalize_review_ths):
     section_df["skip"] = False
     # Selectively keep certain columns, zero out the remaining columns to avoid leakage
     # The kept and rejected columns are written explicitly here so that additions and removals of columns in the future must be deliberately checked here
-    # TODO experimentally leak data such as the rating to check that data is flowing properly
     keep_columns = [
         "card_id",
         "day_offset",
@@ -388,7 +387,7 @@ def add_queries(section_df, equalize_review_ths):
         "rating",
         "duration",
         "scaled_duration",
-        "state",
+        "state",  # TODO state can be kept(?)
         "scaled_state",
         "y",
         "rating_1",

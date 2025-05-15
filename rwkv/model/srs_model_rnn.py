@@ -16,6 +16,7 @@ from rwkv.data_processing import (
 from rwkv.model.rwkv_rnn_model import RWKV7RNN
 from rwkv.model.srs_model import is_excluded
 import torch
+from rwkv.rwkv_config import DEFAULT_ANKI_RWKV_CONFIG
 
 from rwkv.rwkv_config import AnkiRWKVConfig
 
@@ -506,16 +507,140 @@ def get_df_sequentially(data_path, user_id, max_review_th=None):
 
 
 class RNNProcess:
-    def __init__():
-        self.rnn = AnkiRWKVRNN()
+    def __init__(self, config=DEFAULT_ANKI_RWKV_CONFIG):
+        self.rnn = AnkiRWKVRNN(config)
+        self.card_states = {}
+        self.note_states = {}
+        self.deck_states = {}
+        self.preset_states = {}
+        self.global_state = None
+
+        self.prev_row = None
+        self.card_set = set()
+        self.last_new_cards = {}
+        self.i = 0
+        self.last_i = {}
+        self.today = -1
+        self.today_reviews = 0
+        self.today_new_cards = 0
+
+    def run(self, row, skip):
+        features_row = row[CARD_FEATURE_COLUMNS]
+        print(features_row)
+        print("EHRERAWERFD")
+        exit()
+        with torch.no_grad():
+            card_id = row["card_id"]
+            note_id = row["note_id"]
+            deck_id = row["deck_id"]
+            preset_id = row["preset_id"]
+
+            if card_id not in self.card_states:
+                self.card_states[card_id] = None
+            if note_id not in self.note_states:
+                self.note_states[note_id] = None
+            if deck_id not in self.deck_states:
+                self.deck_states[deck_id] = None
+            if preset_id not in self.preset_states:
+                self.preset_states[preset_id] = None
+
+    def add_same(self, row):
+        row = row.copy()
+
+        def add_id(name):
+            if np.isnan(row[name]):
+                row[name] = ID_PLACEHOLDER
+                row[f"{name}_is_nan"] = 1.0
+            else:
+                row[f"{name}_is_nan"] = 0.0
+
+        for name in ["note_id", "deck_id", "preset_id"]:
+            add_id(name)
+
+        row["day_offset_diff"] = scale_day_offset_diff(
+            row["day_offset"]
+            - (0 if self.prev_row is None else self.prev_row["day_offset"])
+        )
+        row["day_of_week"] = ((row["day_offset"] % 7) - 3) / 3
+        card_id = row["card_id"]
+        unscaled_diff_new_cards = (
+            (len(self.card_set) - self.last_new_cards[card_id])
+            if card_id in self.last_new_cards
+            else 0
+        )
+        row["diff_new_cards"] = scale_diff_new_cards(unscaled_diff_new_cards)
+        unscaled_diff_reviews = (
+            (max(0, self.i - self.last_i[card_id] - 1)) if card_id in self.last_i else 0
+        )
+        row["diff_reviews"] = scale_diff_reviews(unscaled_diff_reviews)
+
+        row_today_reviews = self.today_reviews
+        row_today_new_cards = self.today_new_cards
+        if row["day_offset"] != self.today:
+            row_today_new_cards = 0
+            row_today_reviews = -1
+
+        row_today_reviews += 1
+        if row["card_id"] not in self.card_set:
+            row_today_new_cards += 1
+        row["cum_reviews_today"] = scale_cum_reviews_today(row_today_reviews)
+        row["cum_new_cards_today"] = scale_cum_new_cards_today(row_today_new_cards)
+
+        row["scaled_elapsed_days"] = scale_elapsed_days(row["elapsed_days"].item())
+        row["scaled_elapsed_seconds"] = scale_elapsed_seconds(
+            row["elapsed_seconds"].item()
+        )
+        return row
 
     def imm_predict(self, row):
-        pass
+        row = row.copy()
+        row = self.add_same(row)
+        row["is_query"] = 1.0
+        row["skip"] = True
+        row["scaled_duration"] = 0
+        row["scaled_state"] = 0
+        for i in range(1, 5):
+            row[f"rating_{i}"] = 0
+
+        return self.run(row, skip=True)
+
+    def process_row(self, row):
+        row = row.copy()
+        row = self.add_same(row)
+        row["is_query"] = 0.0
+        row["skip"] = False
+        row["scaled_duration"] = scale_duration(row["duration"])
+        row["scaled_state"] = scale_state(row["state"])
+        for i in range(1, 5):
+            row[f"rating_{i}"] = 1.0 if row["rating"] == i else 0.0
+
+        # Get prediction
+        output = self.run(row, skip=False)
+
+        # Update state
+        if row["day_offset"] != self.today:
+            self.today = row["day_offset"]
+            self.today_new_cards = 0
+            self.today_reviews = -1
+        self.today_reviews += 1
+        if row["card_id"] not in self.card_set:
+            self.today_new_cards += 1
+
+        card_id = row["card_id"]
+        self.card_set.add(card_id)
+        self.prev_row = row.copy()
+        self.last_i[card_id] = self.i
+        self.last_new_cards[card_id] = len(self.card_set)
+        self.i += 1
+        return output
 
 
 def run(data_path, user_id):
     """Runs the rnn version of rwkv to explicitly show information flow. Written to guard against possible data leakage.
-    Due to difficulties in matching rng with the parallel approach, the outputs will not exactly match.
+    The outputs will not exactly match with the parallel version. Reasons:
+    - hard to match rng
+    - not all computations have the right dtype (bfloat16, float)
+    - JIT may fuse some floating point operations
     However, the performance should be similar.
     """
     df = pd.read_parquet(data_path / "revlogs", filters=[("user_id", "=", user_id)])
@@ -531,15 +656,22 @@ def run(data_path, user_id):
     srs_rnn = RNNProcess()
 
     pred_imm = {}
-    pred_ahead = {}
+    pred_ahead_curve = {}  # Map from card_ids to their latest forgetting curve
     for i, row in df.iterrows():
         # For the immediate predictions we do not send the rating and duration fields
         imm_info = row.copy()
         imm_info.drop(columns=["rating", "duration"], inplace=True)
         pred_imm[row["review_th"]] = srs_rnn.imm_predict(imm_info)
 
-        pred_ahead_curve[TODO] = srs_rnn.ahead_predict(row)
+        # For ahead-of-time predictions, predict and store a forgetting curve function
+        # This function will be evaluated at the time of the next review of this card
+        pred_ahead_curve[row["card_id"]] = srs_rnn.process_row(row)
+        print("done")
+        exit()
 
 
 if __name__ == "__main__":
+    from pathlib import Path
+
+    run(Path("../anki-revlogs-10k"), 1)
     pass

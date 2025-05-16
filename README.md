@@ -62,7 +62,6 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
         - GRU-P: a variant of GRU that removes the fixed forgetting curve and predicts the probability of recall directly. This makes it more flexible than GRU, but also more prone to making strange predictions, such as the probability of recall *increasing* over time.
     - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews, fractional intervals, and the duration of review as part of its input.
       The three aforementioned neural networks were first pretrained on 100 users and then further optimized on each user individually.
-    - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
 
 - SM-2-based algorithms:
     - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve. The algorithm is described by Piotr Wozniak [here](https://super-memory.com/english/ol/sm2.htm).
@@ -124,7 +123,6 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | AVG | 0 | 0.3630±0.0091 | 0.0876±0.0026 | 0.5085±0.0049 | --- |
 | FSRS v3 | 13 | 0.3709±0.0099 | 0.0729±0.0022 | 0.6666±0.0045 | IL, G |
 | FSRS v2 | 14 | 0.377±0.010 | 0.0687±0.0022 | 0.6669±0.0048 | IL, G |
-| NN-17 | 39 | 0.384±0.029 | 0.0810±0.0037 | 0.6112±0.0045 | IL, G |
 | FSRS v1 | 7 | 0.397±0.011 | 0.0864±0.0025 | 0.6333±0.0046 | IL, G |
 | Anki-SM-2 trainable | 7 | 0.407±0.011 | 0.0941±0.0032 | 0.6169±0.0044 | IL, G |
 | HLR | 3 | 0.415±0.012 | 0.1052±0.0031 | 0.6333±0.0050 | IL, G |
@@ -160,7 +158,6 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | DASH[ACT-R] | 5 | 0.3728±0.0047 | 0.0886±0.0016 | 0.6239±0.0027 | IL, G |
 | GRU | 39 | 0.3753±0.0047 | 0.0864±0.0013 | 0.6683±0.0023 | IL, G |
 | AVG | 0 | 0.3945±0.0051 | 0.1034±0.0016 | 0.4997±0.0026 | --- |
-| NN-17 | 39 | 0.3980±0.0051 | 0.1011±0.0013 | 0.6239±0.0023 | IL, G |
 | ACT-R | 5 | 0.4033±0.0054 | 0.1074±0.0017 | 0.5225±0.0025 | IL |
 | FSRSv3 | 13 | 0.4364±0.0068 | 0.1097±0.0019 | 0.6605±0.0023 | IL, G |
 | FSRSv2 | 14 | 0.4532±0.0072 | 0.1095±0.0020 | 0.6512±0.0023 | IL, G |

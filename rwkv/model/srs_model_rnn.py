@@ -10,7 +10,9 @@ from rwkv.data_processing import (
     scale_diff_reviews,
     scale_duration,
     scale_elapsed_days,
+    scale_elapsed_days_cumulative,
     scale_elapsed_seconds,
+    scale_elapsed_seconds_cumulative,
     scale_state,
 )
 from rwkv.model.rwkv_rnn_model import RWKV7RNN
@@ -524,11 +526,12 @@ class RNNProcess:
         self.today_reviews = 0
         self.today_new_cards = 0
         self.card2first_day_offset = {}
+        self.card2elapsed_days_cumulative = {}
+        self.card2elapsed_seconds_cumulative = {}
 
     def run(self, row, skip):
         features_row = row[CARD_FEATURE_COLUMNS]
-        print(features_row)
-        print("EHRERAWERFD")
+        print("here")
         exit()
         with torch.no_grad():
             card_id = row["card_id"]
@@ -548,6 +551,39 @@ class RNNProcess:
     def add_same(self, row):
         row = row.copy()
         card_id = row["card_id"]
+        row["elapsed_days_cumulative"] = (
+            self.card2elapsed_days_cumulative.get(card_id, 0) + row["elapsed_days"]
+        )
+        row["scaled_elapsed_days_cumulative"] = scale_elapsed_days_cumulative(
+            row["elapsed_days_cumulative"]
+        )
+        row["elapsed_seconds_cumulative"] = (
+            self.card2elapsed_seconds_cumulative.get(card_id, 0)
+            + row["elapsed_seconds"]
+        )
+        row["scaled_elapsed_seconds_cumulative"] = scale_elapsed_seconds_cumulative(
+            row["elapsed_seconds_cumulative"]
+        )
+        SECONDS_PER_DAY = 86400
+        row["elapsed_seconds_sin"] = np.sin(
+            (row["elapsed_seconds"] % SECONDS_PER_DAY) * 2 * np.pi / SECONDS_PER_DAY
+        )
+        row["elapsed_seconds_cos"] = np.cos(
+            (row["elapsed_seconds"] % SECONDS_PER_DAY) * 2 * np.pi / SECONDS_PER_DAY
+        )
+        row["elapsed_seconds_cumulative_sin"] = np.sin(
+            (row["elapsed_seconds_cumulative"] % SECONDS_PER_DAY)
+            * 2
+            * np.pi
+            / SECONDS_PER_DAY
+        )
+        row["elapsed_seconds_cumulative_cos"] = np.cos(
+            (row["elapsed_seconds_cumulative"] % SECONDS_PER_DAY)
+            * 2
+            * np.pi
+            / SECONDS_PER_DAY
+        )
+
         if self.first_day_offset is None:
             row["day_offset"] = 0
         else:
@@ -630,6 +666,14 @@ class RNNProcess:
         output = self.run(row, skip=False)
 
         # Update state
+        self.card2elapsed_days_cumulative[card_id] = (
+            self.card2elapsed_days_cumulative.get(card_id, 0) + row["elapsed_days"]
+        )
+        self.card2elapsed_seconds_cumulative[card_id] = (
+            self.card2elapsed_seconds_cumulative.get(card_id, 0)
+            + row["elapsed_seconds"]
+        )
+
         if self.first_day_offset is None:
             self.first_day_offset = row["day_offset"]
 

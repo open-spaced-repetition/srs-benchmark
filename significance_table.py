@@ -86,7 +86,6 @@ if __name__ == "__main__":
         "FSRS-6-dry-run",
         "GRU",
         "AVG",
-        "NN-17",
         "ACT-R",
         "FSRSv3",
         "FSRSv2",

@@ -15,6 +15,7 @@ from rwkv.data_processing import (
     scale_elapsed_seconds_cumulative,
     scale_state,
 )
+from rwkv.get_result import get_benchmark_info, get_stats
 from rwkv.model.rwkv_rnn_model import RWKV7RNN
 from rwkv.model.srs_model import is_excluded
 import torch
@@ -152,15 +153,19 @@ class AnkiRWKVRNN(ModuleType):
         )  # TODO change
 
         card_rwkv_input = self.features2card(card_features)
-        card_encoding, next_card_state = self.rwkv_modules[0](
+        card_encoding, next_card_state = self.rwkv_modules[0].run(
             card_rwkv_input, card_state
         )
-        deck_encoding, next_deck_state = self.rwkv_modules[1](card_encoding, deck_state)
-        note_encoding, next_note_state = self.rwkv_modules[2](deck_encoding, note_state)
-        preset_encoding, next_preset_state = self.rwkv_modules[3](
+        deck_encoding, next_deck_state = self.rwkv_modules[1].run(
+            card_encoding, deck_state
+        )
+        note_encoding, next_note_state = self.rwkv_modules[2].run(
+            deck_encoding, note_state
+        )
+        preset_encoding, next_preset_state = self.rwkv_modules[3].run(
             note_encoding, preset_state
         )
-        global_encoding, next_global_state = self.rwkv_modules[4](
+        global_encoding, next_global_state = self.rwkv_modules[4].run(
             preset_encoding, global_state
         )
 
@@ -206,7 +211,7 @@ class AnkiRWKVRNN(ModuleType):
             .unsqueeze(0)
         )
 
-        with torch.no_grad():
+        with torch.inference_mode():
             for i, row in df.iterrows():
                 if i % 100 == 0:
                     print(i)
@@ -509,8 +514,23 @@ def get_df_sequentially(data_path, user_id, max_review_th=None):
 
 
 class RNNProcess:
-    def __init__(self, config=DEFAULT_ANKI_RWKV_CONFIG):
-        self.rnn = AnkiRWKVRNN(config)
+    def __init__(
+        self,
+        path,
+        device,
+        dtype,
+        config=DEFAULT_ANKI_RWKV_CONFIG,
+    ):
+        self.rnn = AnkiRWKVRNN(config).to(device)
+        if path is not None:
+            self.rnn.load_state_dict(torch.load(path, weights_only=True))
+            print(f"Loaded: {path}")
+        else:
+            print("Did not load weights.")
+        self.rnn = self.rnn.selective_cast(dtype)
+        self.device = device
+        self.dtype = dtype
+
         self.card_states = {}
         self.note_states = {}
         self.deck_states = {}
@@ -530,9 +550,12 @@ class RNNProcess:
         self.card2elapsed_seconds_cumulative = {}
 
     def run(self, row, skip):
-        features_row = row[CARD_FEATURE_COLUMNS]
-        print("here")
-        exit()
+        features = torch.tensor(
+            row.loc[CARD_FEATURE_COLUMNS].tolist(),
+            dtype=self.dtype,
+            device=self.device,
+            requires_grad=False,
+        ).unsqueeze(0)
         with torch.no_grad():
             card_id = row["card_id"]
             note_id = row["note_id"]
@@ -547,6 +570,45 @@ class RNNProcess:
                 self.deck_states[deck_id] = None
             if preset_id not in self.preset_states:
                 self.preset_states[preset_id] = None
+
+            (
+                out_ahead_logits,
+                out_w,
+                out_p_logits,
+                next_card_state,
+                next_note_state,
+                next_deck_state,
+                next_preset_state,
+                next_global_state,
+            ) = self.rnn.review(
+                features,
+                self.card_states[card_id],
+                self.note_states[note_id],
+                self.deck_states[deck_id],
+                self.preset_states[preset_id],
+                self.global_state,
+            )
+            if not skip:
+                self.card_states[card_id] = next_card_state
+                self.note_states[note_id] = next_note_state
+                self.deck_states[deck_id] = next_deck_state
+                self.preset_states[preset_id] = next_preset_state
+                self.global_state = next_global_state
+
+            out_p_probs = torch.softmax(out_p_logits, dim=-1)
+            out_p_again, _, _, _ = out_p_probs.unbind(dim=-1)
+            return (out_ahead_logits, out_w), 1.0 - out_p_again
+
+    def predict_func(self, curve, elapsed_seconds):
+        elapsed_seconds = torch.tensor(elapsed_seconds, device=self.device).view(1, 1)
+        out_ahead_logits, out_w = curve
+        curve_probs_raw = self.rnn.forgetting_curve(out_w, elapsed_seconds)
+        curve_logits_raw = torch.log(
+            curve_probs_raw / (1 - curve_probs_raw)
+        )  # inverse sigmoid
+        ahead_logit_residual = self.rnn.interp(out_ahead_logits, elapsed_seconds)
+        curve_logits = curve_logits_raw + ahead_logit_residual
+        return torch.sigmoid(curve_logits)
 
     def add_same(self, row):
         row = row.copy()
@@ -650,7 +712,8 @@ class RNNProcess:
         for i in range(1, 5):
             row[f"rating_{i}"] = 0
 
-        return self.run(row, skip=True)
+        _, imm_probs = self.run(row, skip=True)
+        return imm_probs
 
     def process_row(self, row):
         row = row.copy()
@@ -663,9 +726,10 @@ class RNNProcess:
             row[f"rating_{i}"] = 1.0 if row["rating"] == i else 0.0
 
         # Get prediction
-        output = self.run(row, skip=False)
+        curve, _ = self.run(row, skip=False)
 
         # Update state
+        card_id = row["card_id"]
         self.card2elapsed_days_cumulative[card_id] = (
             self.card2elapsed_days_cumulative.get(card_id, 0) + row["elapsed_days"]
         )
@@ -689,15 +753,15 @@ class RNNProcess:
                 row["day_offset"] - self.first_day_offset
             )
 
-        card_id = row["card_id"]
         self.prev_row = row.copy()
         self.last_i[card_id] = self.i
         self.last_new_cards[card_id] = len(self.card_set)
         self.i += 1
-        return output
+        return curve
 
 
-def run(data_path, user_id):
+@torch.inference_mode()
+def run(data_path, model_path, label_db_path, label_db_size, user_id):
     """Runs the rnn version of rwkv to explicitly show information flow. Written to guard against possible data leakage.
     The outputs will not exactly match with the parallel version. Reasons:
     - hard to match rng
@@ -715,25 +779,76 @@ def run(data_path, user_id):
     df = df.merge(df_decks, on="deck_id", how="left", validate="many_to_one")
     df["review_th"] = range(1, df.shape[0] + 1)
 
-    srs_rnn = RNNProcess()
+    equalize_review_ths, rmse_bins = get_benchmark_info(
+        label_db_path, label_db_size, user_id
+    )
+    rmse_bins_dict = {
+        equalize_review_ths[i]: rmse_bins[i] for i in range(len(equalize_review_ths))
+    }
+
+    srs_rnn = RNNProcess(
+        path=model_path, device=torch.device("cpu"), dtype=torch.float32
+    )
 
     pred_imm = {}
     pred_ahead_curve = {}  # Map from card_ids to their latest forgetting curve
+    pred_ahead = {}
+    label_rating = {}
+    import time
+
+    print("revlog len:", len(df))
+
+    time_start = time.time()
     for i, row in df.iterrows():
+        if (i + 1) % 100 == 0:
+            print(f"{i}/{len(df)}, rate: {(i + 1) / (time.time() - time_start):.2f}")
+
+        # If this card has been seen before, get the predicted retention from the stored function
+        card_id = row["card_id"]
+        review_th = row["review_th"]
+        if card_id in pred_ahead_curve:
+            z = srs_rnn.predict_func(pred_ahead_curve[card_id], row["elapsed_seconds"])
+            pred_ahead[review_th] = z
+
         # For the immediate predictions we do not send the rating and duration fields
         imm_info = row.copy()
         imm_info.drop(columns=["rating", "duration"], inplace=True)
-        pred_imm[row["review_th"]] = srs_rnn.imm_predict(imm_info)
+        pred_imm[review_th] = srs_rnn.imm_predict(imm_info)
 
-        # For ahead-of-time predictions, predict and store a forgetting curve function
+        # For ahead-of-time predictions, predict and store a prediction function
         # This function will be evaluated at the time of the next review of this card
-        pred_ahead_curve[row["card_id"]] = srs_rnn.process_row(row)
-        print("done")
-        exit()
+        pred_ahead_curve[card_id] = srs_rnn.process_row(row)
+        label_rating[review_th] = row["rating"] - 1
+
+    imm_stats, _ = get_stats(
+        user_id,
+        equalize_review_ths,
+        rmse_bins_dict,
+        pred_imm,
+        label_rating,
+    )
+    ahead_stats, _ = get_stats(
+        user_id,
+        equalize_review_ths,
+        rmse_bins_dict,
+        pred_ahead,
+        label_rating,
+    )
+
+    print("RWKV-P:")
+    print(imm_stats)
+    print("RWKV:")
+    print(ahead_stats)
 
 
 if __name__ == "__main__":
     from pathlib import Path
 
-    run(Path("../anki-revlogs-10k"), 1)
+    run(
+        Path("../anki-revlogs-10k"),
+        "pretrain/RWKV_trained_on_5000_10000.pth",
+        "label_filter_db",
+        int(7e9),
+        1,
+    )
     pass

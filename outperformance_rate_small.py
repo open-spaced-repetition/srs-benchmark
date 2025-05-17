@@ -180,7 +180,7 @@ if __name__ == "__main__":
         ax.spines[location].set_linewidth(2)
 
     plt.savefig(
-        f"./plots/Superiority-small-{n_collections}-collections.png",
+        f"./plots/Outperformance-rate-small-{n_collections}-collections.png",
         bbox_inches="tight",
     )
     # plt.show()

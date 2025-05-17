@@ -189,7 +189,6 @@ class RWKV7RNNTimeMixer(ModuleType):
 
         _d_B1C = -0.5 - torch.nn.functional.softplus(-self.d_lora_mlp(d_B1C))
         w_B1C = torch.exp(-torch.exp(_d_B1C.float()))
-        # k_B1C = torch.lerp(k_B1C, k_B1C * a_B1C, self.iclr_mix)
 
         k_B1HK = k_scale_B1H.unsqueeze(-1) * torch.nn.functional.normalize(
             k_B1C.view(B, 1, H, K), dim=-1, p=2.0

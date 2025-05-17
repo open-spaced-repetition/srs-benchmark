@@ -905,10 +905,10 @@ if __name__ == "__main__":
 
     run(
         Path("../anki-revlogs-10k"),
-        # "pretrain/RWKV_trained_on_5000_10000.pth",
-        "pretrain/RWKV_trained_on_101_4999.pth",
+        "pretrain/RWKV_trained_on_5000_10000.pth",
+        # "pretrain/RWKV_trained_on_101_4999.pth",
         "label_filter_db",
         int(7e9),
-        1,
+        user_id=1,
     )
     pass

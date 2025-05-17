@@ -365,8 +365,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     return std::make_tuple(r_grad_BTHK, k_grad_BTHK, v_grad_BTHK, w_grad_BTHK, a_grad_BTHK, k_deformed_grad_BTHK);
 }
 
-// Registers CUDA implementations for mymuladd, mymul, myadd_out
-
 const int CHECKPOINT_LEN = 32;
 TORCH_LIBRARY_IMPL(rwkv, CUDA, m) {
     m.impl("rwkv7_wkv_forward_float", &rwkv7_wkv_forward_cuda<CHECKPOINT_LEN, float>);

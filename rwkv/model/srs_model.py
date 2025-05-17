@@ -11,8 +11,11 @@ from typing import NamedTuple
 
 from rwkv.rwkv_config import AnkiRWKVConfig
 
+
 # def __nop(ob):
 #     return ob
+
+
 # ModuleType = torch.nn.Module
 # FunctionType = __nop
 

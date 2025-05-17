@@ -1,5 +1,11 @@
 import numpy as np
 import pandas as pd
+from rwkv.config import (
+    DAY_OFFSET_ENCODE_PERIODS,
+    ID_ENCODE_DIMS,
+    ID_SPLIT,
+    RWKV_SUBMODULES,
+)
 from rwkv.data_processing import (
     CARD_FEATURE_COLUMNS,
     ID_PLACEHOLDER,
@@ -145,12 +151,6 @@ class AnkiRWKVRNN(ModuleType):
         global_state,
     ):
         assert len(card_features.shape) == 2
-        card_features = torch.nn.functional.pad(
-            card_features,
-            (0, self.card_features_dim - card_features.size(1)),
-            mode="constant",
-            value=0,
-        )  # TODO change
 
         card_rwkv_input = self.features2card(card_features)
         card_encoding, next_card_state = self.rwkv_modules[0].run(
@@ -548,14 +548,72 @@ class RNNProcess:
         self.card2first_day_offset = {}
         self.card2elapsed_days_cumulative = {}
         self.card2elapsed_seconds_cumulative = {}
+        self.id_encodings = {submodule: {} for submodule in RWKV_SUBMODULES}
 
-    def run(self, row, skip):
+    def get_tensor(self, row):
+        def add_id_encoding(features):
+            def generate_id_encoding(submodule):
+                ENCODE_DIM = ID_ENCODE_DIMS[submodule]
+                return torch.randint(
+                    low=0,
+                    high=ID_SPLIT,
+                    size=(ENCODE_DIM,),
+                    device=self.device,
+                    requires_grad=False,
+                ).to(self.dtype) - ((ID_SPLIT - 1) / 2)
+
+            gather = [features]
+            for submodule in RWKV_SUBMODULES:
+                if submodule == "user_id":
+                    continue
+                if row[submodule] not in self.id_encodings[submodule]:
+                    self.id_encodings[submodule][row[submodule]] = generate_id_encoding(
+                        submodule
+                    )
+
+                gather.append(self.id_encodings[submodule][row[submodule]])
+
+            return torch.cat(gather, dim=-1)
+
+        def add_day_offset_encoding(features):
+            day_offset = torch.full((1,), row["day_offset"], device=self.device)
+            day_offset_first = torch.full(
+                (1,), row["day_offset_first"], device=self.device
+            )
+            gather = [features]
+            for period in DAY_OFFSET_ENCODE_PERIODS:
+                f = 2 * np.pi / period
+                encodings_sin = torch.sin(f * (day_offset % period)).to(self.dtype)
+                encodings_cos = torch.cos(f * (day_offset % period)).to(self.dtype)
+                encodings = torch.cat((encodings_sin, encodings_cos), dim=-1)
+                gather.append(encodings)
+                encodings_first_sin = torch.sin(f * (day_offset_first % period)).to(
+                    self.dtype
+                )
+                encodings_first_cos = torch.cos(f * (day_offset_first % period)).to(
+                    self.dtype
+                )
+                encodings_first = torch.cat(
+                    (encodings_first_sin, encodings_first_cos), dim=-1
+                )
+                gather.append(encodings_first)
+
+            return torch.cat(gather, dim=-1)
+
         features = torch.tensor(
             row.loc[CARD_FEATURE_COLUMNS].tolist(),
             dtype=self.dtype,
             device=self.device,
             requires_grad=False,
-        ).unsqueeze(0)
+        )
+        features = add_id_encoding(features)
+        features = add_day_offset_encoding(features)
+        features = features.unsqueeze(0)
+        return features
+
+    def run(self, row, skip):
+        features = self.get_tensor(row)
+
         with torch.no_grad():
             card_id = row["card_id"]
             note_id = row["note_id"]
@@ -803,9 +861,10 @@ def run(data_path, model_path, label_db_path, label_db_size, user_id):
         if (i + 1) % 100 == 0:
             print(f"{i}/{len(df)}, rate: {(i + 1) / (time.time() - time_start):.2f}")
 
-        # If this card has been seen before, get the predicted retention from the stored function
         card_id = row["card_id"]
         review_th = row["review_th"]
+
+        # If this card has been seen before, get the predicted retention from the stored function
         if card_id in pred_ahead_curve:
             z = srs_rnn.predict_func(pred_ahead_curve[card_id], row["elapsed_seconds"])
             pred_ahead[review_th] = z
@@ -846,7 +905,8 @@ if __name__ == "__main__":
 
     run(
         Path("../anki-revlogs-10k"),
-        "pretrain/RWKV_trained_on_5000_10000.pth",
+        # "pretrain/RWKV_trained_on_5000_10000.pth",
+        "pretrain/RWKV_trained_on_101_4999.pth",
         "label_filter_db",
         int(7e9),
         1,

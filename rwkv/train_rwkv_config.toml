@@ -33,7 +33,7 @@ SAVE_MODEL_PREFIX = "rwkv_test"
 DEVICE = "cuda"
 DTYPE = "bfloat16"
 
-USE_WANDB = false
+USE_WANDB = true
 # Only relevant if USE_WANDB is set to true
 WANDB_PROJECT_NAME = "rwkv"
 WANDB_RESUME = false

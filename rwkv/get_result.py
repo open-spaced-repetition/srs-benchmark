@@ -22,10 +22,8 @@ from rwkv.utils import load_tensor, save_tensor  # type: ignore
 FETCH_AHEAD = 20
 
 
-def get_benchmark_info(config, user_id):
-    equalize_env = lmdb.open(
-        config.LABEL_FILTER_LMDB_PATH, map_size=config.LABEL_FILTER_LMDB_SIZE
-    )
+def get_benchmark_info(db_path, db_size, user_id):
+    equalize_env = lmdb.open(db_path, db_size)
     key_review_ths = f"{user_id}_review_ths"
     key_rmse_bins = f"{user_id}_rmse_bins"
     with equalize_env.begin(write=False) as txn:
@@ -69,8 +67,8 @@ def get_stats(
     assert len(equalize_review_ths) == len(gather_pred)
     rmse_raw = root_mean_squared_error(y_true=gather_y, y_pred=gather_pred)
     logloss = log_loss(y_true=gather_y, y_pred=gather_pred, labels=[0, 1])
-    y_true = torch.tensor(gather_y, dtype=torch.float32)
-    y_pred = torch.tensor(gather_pred, dtype=torch.float32)
+    # y_true = torch.tensor(gather_y, dtype=torch.float32)
+    # y_pred = torch.tensor(gather_pred, dtype=torch.float32)
     # loss_torch = torch.nn.functional.binary_cross_entropy(y_pred, y_true, reduction='none').mean().item()
     # print(f"torch loss: {loss_torch}")
     # print(f"y sum, {np.array(gather_y, dtype=int).sum()}")
@@ -182,7 +180,9 @@ def run(
         for i, user_id in enumerate(users):
             batches = all_db_keys[user_id]
             print("User:", user_id, "key:", batches)
-            equalize_review_ths, rmse_bins = get_benchmark_info(config, user_id)
+            equalize_review_ths, rmse_bins = get_benchmark_info(
+                config.LABEL_FILTER_LMDB_PATH, config.LABEL_FILTER_LMDB_SIZE, user_id
+            )
             rmse_bins_dict = {
                 equalize_review_ths[i]: rmse_bins[i]
                 for i in range(len(equalize_review_ths))

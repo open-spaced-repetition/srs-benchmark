@@ -22,7 +22,7 @@ In the SRS benchmark, we use a tool called `TimeSeriesSplit`. This is part of th
 
 Note: TimeSeriesSplit will remove the first split from evaluation. This is because the first split is used for training, and we don't want to evaluate the algorithm on the same data it was trained on.
 
-The RWKV models do not use TimeSeriesSplit.
+RWKV and RMSE-BINS-EXPLOIT do not use TimeSeriesSplit.
 
 ### Metrics
 

@@ -44,6 +44,8 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                 for id in ids[submodule].numpy():
                     encodings.append(encode[id])
                 gather.append(torch.stack(encodings))
+                # print("WARNING: zeroing out ids and rng")
+                # gather.append(torch.zeros_like(torch.stack(encodings)))
 
             for period in DAY_OFFSET_ENCODE_PERIODS:
                 # Randomly sampled baseline to improve generalization
@@ -57,6 +59,8 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                 )
                 encodings = torch.stack((encodings_sin, encodings_cos), dim=-1)
                 gather.append(encodings)
+                # print("WARNING: zeroing out ids and rng")
+                # gather.append(torch.zeros_like(encodings))
                 encodings_first_sin = torch.sin(
                     f * ((baseline + day_offsets_first) % period)
                 ).to(card_features.dtype)
@@ -67,6 +71,8 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                     (encodings_first_sin, encodings_first_cos), dim=-1
                 )
                 gather.append(encodings_first)
+                # print("WARNING: zeroing out ids and rng")
+                # gather.append(torch.zeros_like(encodings_first))
 
             return torch.cat(gather, dim=-1)
 
@@ -370,12 +376,14 @@ def get_data(txn, key, device) -> RWKVSample:
 
 
 def prepare_data(
-    lmdb_path, lmdb_size, task_queue, batch_queue, target_len=800000, fixed_seed=None
+    lmdb_path,
+    lmdb_size,
+    task_queue,
+    batch_queue,
+    target_len=66000,
+    fixed_seed=None,
 ):
-    env = lmdb.open(
-        lmdb_path,
-        map_size=lmdb_size,
-    )
+    env = lmdb.open(lmdb_path, map_size=lmdb_size)
     with env.begin(write=False) as txn:
         while True:
             task = task_queue.get()
@@ -389,3 +397,40 @@ def prepare_data(
                 seed=fixed_seed,
             )
             batch_queue.put((group_i, result))
+
+
+def prepare_data_train_test(
+    train_lmdb_path,
+    train_lmdb_size,
+    all_lmdb_path,
+    all_lmdb_size,
+    task_queue,
+    batch_queue,
+    target_len=66000,
+    fixed_seed=None,
+):
+    train_env = lmdb.open(train_lmdb_path, map_size=train_lmdb_size)
+    all_env = lmdb.open(all_lmdb_path, map_size=all_lmdb_size)
+    with train_env.begin(write=False) as train_txn:
+        with all_env.begin(write=False) as all_txn:
+            while True:
+                task = task_queue.get()
+                if task is None:
+                    return
+
+                group_i, group = task
+                if "train" in group_i:
+                    result = prepare(
+                        [get_data(train_txn, key, device="cpu") for key in group],
+                        target_len=target_len,
+                        seed=fixed_seed,
+                    )
+                elif "validate" in group_i:
+                    result = prepare(
+                        [get_data(all_txn, key, device="cpu") for key in group],
+                        target_len=800000,
+                        seed=fixed_seed,
+                    )
+                else:
+                    raise ValueError("No key.")
+                batch_queue.put((group_i, result))

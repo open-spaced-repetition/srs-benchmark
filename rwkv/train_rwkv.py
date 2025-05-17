@@ -16,7 +16,7 @@ import torch
 import wandb
 
 from rwkv.parse_toml import parse_toml
-from rwkv.prepare_batch import prepare, prepare_data, prepare_data_train_test
+from rwkv.prepare_batch import prepare_data_train_test
 from rwkv.model.srs_model import AnkiRWKV
 from rwkv.rwkv_config import *
 from rwkv.utils import (

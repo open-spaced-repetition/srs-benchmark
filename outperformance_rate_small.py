@@ -2,9 +2,7 @@ import json
 import math
 import pathlib
 import warnings
-import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
@@ -16,37 +14,15 @@ if __name__ == "__main__":
     models = [
         "LSTM-short-secs-equalize_test_with_non_secs",
         "FSRS-6-recency",
-        "FSRS-rs",
         "GRU-P-short",
-        "FSRS-6",
-        "FSRS-6-preset",
-        "FSRS-6-binary",
-        "GRU-P",
-        "FSRS-6-deck",
         "FSRS-5",
-        "FSRS-6-pretrain",
         "FSRS-4.5",
-        "DASH-short",
-        "DASH",
-        "DASH[MCM]",
         "FSRSv4",
-        "DASH[ACT-R]",
-        "FSRS-6-dry-run",
-        "GRU",
-        "AVG",
+        "DASH",
         "ACT-R",
-        "FSRSv3",
-        "FSRSv2",
         "HLR",
-        "FSRSv1",
-        "HLR-short",
         "Ebisu-v2",
-        "Anki",
-        "SM2-trainable",
         "Anki-dry-run",
-        "SM2-short",
-        "SM2",
-        "RMSE-BINS-EXPLOIT",
     ]
     csv_name = f"{len(models)} models.csv"
 
@@ -126,37 +102,21 @@ if __name__ == "__main__":
 
     # small changes to labels
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
-    index_6_dry_run = models.index("FSRS-6-dry-run")
     index_anki_dry_run = models.index("Anki-dry-run")
-    index_anki_train = models.index("Anki")
-    index_6_pretrain = models.index("FSRS-6-pretrain")
     index_v4 = models.index("FSRSv4")
-    index_v3 = models.index("FSRSv3")
-    index_v2 = models.index("FSRSv2")
-    index_v1 = models.index("FSRSv1")
-    index_sm2 = models.index("SM2")
-    index_sm2_train = models.index("SM2-trainable")
-    index_sm2_short = models.index("SM2-short")
     index_Ebisu_v2 = models.index("Ebisu-v2")
+    index_FSRS_6_recency = models.index("FSRS-6-recency")
     models[index_lstm] = "LSTM"
-    models[index_6_dry_run] = "FSRS-6\ndef. param."
     models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
-    models[index_anki_train] = "Anki-SM-2\ntrainable"
-    models[index_6_pretrain] = "FSRS-6\npretrain"
     models[index_v4] = "FSRS v4"
-    models[index_v3] = "FSRS v3"
-    models[index_v2] = "FSRS v2"
-    models[index_v1] = "FSRS v1"
-    models[index_sm2] = "SM-2\ndef. param."
-    models[index_sm2_train] = "SM-2 trainable"
-    models[index_sm2_short] = "SM-2-short"
     models[index_Ebisu_v2] = "Ebisu v2"
+    models[index_FSRS_6_recency] = "FSRS-6\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
         f"Percent of collections where algorithm A (row) outperforms algorithm B (column)",
         fontsize=22,
-        pad=30,
+        pad=10,
     )
 
     def rgb2hex(list):
@@ -207,11 +167,11 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=6.5,
+                    fontsize=17,
                 )
 
-    ax.set_xticks(np.arange(n), labels=models, fontsize=8, rotation=45)
-    ax.set_yticks(np.arange(n), labels=models, fontsize=8)
+    ax.set_xticks(np.arange(n), labels=models, fontsize=15, rotation=45)
+    ax.set_yticks(np.arange(n), labels=models, fontsize=15)
     ax.set_xticks(np.arange(n) - 0.5, minor=True)
     ax.set_yticks(np.arange(n) - 0.5, minor=True)
     plt.grid(True, alpha=1, color="black", linewidth=2, which="minor")
@@ -219,6 +179,8 @@ if __name__ == "__main__":
     for location in ["left", "right", "top", "bottom"]:
         ax.spines[location].set_linewidth(2)
 
-    title = f"Superiority-{n_collections}"
-    plt.savefig(f"./plots/{title}.png", bbox_inches="tight")
+    plt.savefig(
+        f"./plots/Outperformance-rate-small-{n_collections}-collections.png",
+        bbox_inches="tight",
+    )
     # plt.show()

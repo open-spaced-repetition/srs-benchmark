@@ -338,7 +338,7 @@ class RNNProcess:
 
 
 @torch.inference_mode()
-def run(data_path, model_path, label_db_path, label_db_size, user_id):
+def run(data_path, model_path, label_db_path, label_db_size, user_id, verbose):
     """Runs the rnn version of rwkv to explicitly show information flow. Written to guard against possible data leakage.
     The outputs will not exactly match with the parallel version. Reasons:
     - hard to match rng
@@ -385,8 +385,9 @@ def run(data_path, model_path, label_db_path, label_db_size, user_id):
 
         # If this card has been seen before, get the predicted retention from the stored function
         if card_id in pred_ahead_curve:
-            z = srs_rnn.predict_func(pred_ahead_curve[card_id], row["elapsed_seconds"])
-            pred_ahead[review_th] = z
+            pred_ahead[review_th] = srs_rnn.predict_func(
+                pred_ahead_curve[card_id], row["elapsed_seconds"]
+            )
 
         # For the immediate predictions we do not send the rating and duration fields
         imm_info = row.copy()
@@ -397,6 +398,11 @@ def run(data_path, model_path, label_db_path, label_db_size, user_id):
         # This function will be evaluated at the time of the next review of this card
         pred_ahead_curve[card_id] = srs_rnn.process_row(row)
         label_rating[review_th] = row["rating"] - 1
+
+        if verbose and review_th in pred_ahead:
+            print(
+                f"review, {i}, ahead: {pred_ahead[review_th].item():.3f}, immediate: {pred_imm[review_th].item():.3f}, truth: {int(row['rating'] >= 2)}"
+            )
 
     imm_stats, _ = get_stats(
         user_id,
@@ -431,4 +437,5 @@ if __name__ == "__main__":
         label_db_path=config.LABEL_FILTER_LMDB_PATH,
         label_db_size=config.LABEL_FILTER_LMDB_SIZE,
         user_id=config.USER,
+        verbose=config.VERBOSE,
     )

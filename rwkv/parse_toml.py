@@ -13,8 +13,12 @@ def parse_toml():
     with open(args.config, "rb") as f:
         args = tomli.load(f)
         if "DTYPE" in args:
-            assert args["DTYPE"] == "bfloat16"
-            args["DTYPE"] = torch.bfloat16
+            if args["DTYPE"] == "bfloat16":
+                args["DTYPE"] = torch.bfloat16
+            elif args["DTYPE"] in ("float", "float32"):
+                args["DTYPE"] = torch.float32
+            else:
+                raise ValueError("Not currently supported:", args["DTYPE"])
         if "DEVICE" in args:
             args["DEVICE"] = torch.device(args["DEVICE"])
         if "DATA_PATH" in args:

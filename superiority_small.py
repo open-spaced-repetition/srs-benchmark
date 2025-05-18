@@ -21,7 +21,6 @@ if __name__ == "__main__":
         "FSRS-4.5",
         "FSRSv4",
         "DASH",
-        "NN-17",
         "ACT-R",
         "HLR",
         "Ebisu-v2",

@@ -14,25 +14,23 @@ def sigdig(value, CI):
     CI_sigdigs = 2
     decimals = n_lead_zeros_CI + CI_sigdigs
     rounded_CI = round(CI, decimals)
-    rounded_value = round(value, decimals - 1)
+    rounded_value = round(value, decimals)
     if n_lead_zeros_CI > num_lead_zeros(rounded_CI):
-        return str(f"{round(value, decimals - 2):.{decimals - 2}f}"), str(
+        return str(f"{round(value, decimals - 1):.{decimals - 1}f}"), str(
             f"{round(CI, decimals - 1):.{decimals - 1}f}"
         )
     else:
-        return str(f"{rounded_value:.{decimals - 1}f}"), str(
-            f"{rounded_CI:.{decimals}f}"
-        )
+        return str(f"{rounded_value:.{decimals}f}"), str(f"{rounded_CI:.{decimals}f}")
 
 
 # tests to ensure that sigdigs is working as intended
-value = 0.084111111
+value = 0.084011111
 CI = 0.0010011111
-assert sigdig(value, CI) == ("0.084", "0.0010")
+assert sigdig(value, CI) == ("0.0840", "0.0010")
 
-value = 0.083999999
-CI = 0.0009999999
-assert sigdig(value, CI) == ("0.084", "0.0010")
+value2 = 0.083999999
+CI2 = 0.0009999999
+assert sigdig(value2, CI2) == ("0.0840", "0.0010")
 
 
 def confidence_interval(values, sizes):

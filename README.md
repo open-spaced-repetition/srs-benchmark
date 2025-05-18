@@ -64,7 +64,6 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
         - GRU-P: a variant of GRU that removes the fixed forgetting curve and predicts the probability of recall directly. This makes it more flexible than GRU, but also more prone to making strange predictions, such as the probability of recall *increasing* over time.
     - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews, fractional intervals, and the duration of review as part of its input.
       The three aforementioned neural networks were first pretrained on 100 users and then further optimized on each user individually.
-    - NN-17: a neural network approximation of [SM-17](https://supermemo.guru/wiki/Algorithm_SM-17). It has a comparable number of parameters, and according to our estimates, it performs similarly to SM-17.
     - RWKV: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture.
         - RWKV-P: predicts the result of a review at the time of the review.
         - RWKV: predicts the result of a review after the previous review of the card by predicting a forgetting curve.
@@ -90,7 +89,7 @@ The following tables present the means and the 99% confidence intervals. The bes
 
 For the sake of brevity, the following abbreviations are used in the "Input features" column:
 
-**IL** = **i**nterval **l**engths
+**IL** = **i**nterval **l**engths, in days
 
 **FIL** = **f**ractional (aka non-integer) **i**nterval **l**engths
 
@@ -98,89 +97,87 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 **SR** = **s**ame-day (or **s**hort-term) **r**eviews
 
-**AT** = **a**nswer **t**ime (duration of the review)
+**AT** = **a**nswer **t**ime (duration of the review), in milliseconds
 
 ### Weighted by the number of reviews
 
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **RWKV-P** | 2762884 | **0.271±0.0075** | 0.0145±0.00037 | **0.823±0.0040** | |
-| RWKV | 2762884 | 0.299±0.0075 | 0.034±0.0012 | 0.770±0.0032 | |
-| LSTM | 8869 | 0.312±0.0078 | 0.035±0.0011 | 0.733±0.0038 | FIL, G, SR, AT |
-| GRU-P-short | 297 | 0.320±0.0080 | 0.042±0.0013 | 0.710±0.0047 | IL, G, SR|
-| FSRS-6 recency | 21 | 0.320±0.0081 | 0.044±0.0013 | 0.710±0.0040 | IL, G, SR |
-| FSRS-rs | 21 | 0.320±0.0082 | 0.044±0.0012 | 0.709±0.0041 | IL, G, SR |
-| FSRS-6 | 21 | 0.321±0.0083 | 0.046±0.0013 | 0.706±0.0041 | IL, G, SR |
-| FSRS-6 preset | 21 | 0.322±0.0081 | 0.046±0.0013 | 0.707±0.0041 | IL, G, SR |
-| GRU-P | 297 | 0.325±0.0081 | 0.043±0.0013 | 0.699±0.0046 | IL, G |
-| FSRS-6 binary | 17 | 0.326±0.0081 | 0.049±0.0013 | 0.686±0.0047 | IL, G, SR |
-| FSRS-5 | 19 | 0.327±0.0083 | 0.052±0.0015 | 0.702±0.0042 | IL, G, SR |
-| FSRS-6 deck | 21 | 0.329±0.0082 | 0.052±0.0016 | 0.699±0.0041 | IL, G, SR |
-| FSRS-4.5 | 17 | 0.332±0.0083 | 0.054±0.0016 | 0.692±0.0041 | IL, G |
-| FSRS v4 | 17 | 0.338±0.0086 | 0.058±0.0017 | 0.689±0.0043 | IL, G |
-| DASH-short | 9 | 0.339±0.0084 | 0.066±0.0019 | 0.636±0.0050 | IL, G, SR |
-| FSRS-6 pretrain | 4 | 0.339±0.0084 | 0.070±0.0024 | 0.695±0.0039 | IL, G, SR |
-| DASH | 9 | 0.340±0.0086 | 0.063±0.0017 | 0.639±0.0046 | IL, G |
-| DASH[MCM] | 9 | 0.340±0.0085 | 0.064±0.0018 | 0.640±0.0051 | IL, G |
-| GRU | 39 | 0.343±0.0088 | 0.063±0.0017 | 0.673±0.0039 | IL, G |
-| DASH[ACT-R] | 5 | 0.343±0.0087 | 0.067±0.0019 | 0.629±0.0049 | IL, G |
-| FSRS-6 default param. | 0 | 0.347±0.0087 | 0.079±0.0027 | 0.692±0.0041 | IL, G, SR |
-| ACT-R | 5 | 0.362±0.0089 | 0.086±0.0024 | 0.534±0.0054 | IL |
-| AVG | 0 | 0.363±0.0090 | 0.088±0.0025 | 0.508±0.0046 | --- |
-| FSRS v3 | 13 | 0.371±0.0099 | 0.073±0.0021 | 0.667±0.0047 | IL, G |
-| FSRS v2 | 14 | 0.38±0.010 | 0.069±0.0021 | 0.667±0.0048 | IL, G |
-| NN-17 | 39 | 0.38±0.027 | 0.081±0.0038 | 0.611±0.0043 | IL, G |
-| FSRS v1 | 7 | 0.40±0.011 | 0.086±0.0024 | 0.633±0.0046 | IL, G |
-| Anki-SM-2 trainable | 7 | 0.41±0.011 | 0.094±0.0030 | 0.616±0.0057 | IL, G |
-| HLR | 3 | 0.41±0.012 | 0.105±0.0030 | 0.633±0.0050 | IL, G |
-| HLR-short | 3 | 0.44±0.013 | 0.116±0.0036 | 0.615±0.0062 | IL, G, SR |
-| SM-2 trainable | 6 | 0.44±0.012 | 0.119±0.0033 | 0.599±0.0050 | IL, G |
-| Ebisu v2 | 0 | 0.46±0.012 | 0.158±0.0038 | 0.594±0.0050 | IL, G |
-| Anki-SM-2 | 0 | 0.49±0.015 | 0.128±0.0037 | 0.597±0.0055 | IL, G |
-| SM-2-short | 0 | 0.51±0.015 | 0.128±0.0038 | 0.593±0.0064 | IL, G, SR |
-| SM-2 | 0 | 0.55±0.017 | 0.148±0.0041 | 0.600±0.0051 | IL, G |
-| **RMSE-BINS-EXPLOIT** | 0 | 4.5±0.13 | **0.0062±0.00022** | 0.638±0.0040 | IL, G |
+| RWKV-P | 2762884 | 0.2709±0.0074 | 0.01450±0.00037 | 0.8233±0.0040 |  |
+| RWKV | 2762884 | 0.2991±0.0075 | 0.0341±0.0012 | 0.7699±0.0032 |  |
+| **LSTM** | 8869 | **0.3115±0.0079** | 0.0354±0.0011 | **0.7332±0.0038** | FIL, G, SR, AT |
+| GRU-P-short | 297 | 0.3195±0.0080 | 0.0421±0.0013 | 0.7096±0.0047 | IL, G, SR|
+| FSRS-6 recency | 21 | 0.3198±0.0080 | 0.0437±0.0013 | 0.7096±0.0041 | IL, G, SR |
+| FSRS-rs | 21 | 0.3198±0.0083 | 0.0437±0.0012 | 0.7095±0.0040 | IL, G, SR |
+| FSRS-6 | 21 | 0.3215±0.0082 | 0.0464±0.0013 | 0.7060±0.0041 | IL, G, SR |
+| FSRS-6 preset | 21 | 0.3217±0.0080 | 0.0457±0.0013 | 0.7073±0.0040 | IL, G, SR |
+| GRU-P | 297 | 0.3251±0.0082 | 0.0433±0.0013 | 0.6991±0.0046 | IL, G |
+| FSRS-6 binary | 17 | 0.3256±0.0082 | 0.0485±0.0014 | 0.6865±0.0046 | IL, G, SR |
+| FSRS-5 | 19 | 0.3273±0.0082 | 0.0518±0.0016 | 0.7025±0.0041 | IL, G, SR |
+| FSRS-6 deck | 21 | 0.3289±0.0082 | 0.0521±0.0017 | 0.6986±0.0042 | IL, G, SR |
+| FSRS-4.5 | 17 | 0.3324±0.0084 | 0.0536±0.0016 | 0.6918±0.0041 | IL, G |
+| FSRS v4 | 17 | 0.3378±0.0086 | 0.0582±0.0017 | 0.6891±0.0043 | IL, G |
+| FSRS-6 pretrain | 4 | 0.3385±0.0084 | 0.0698±0.0023 | 0.6951±0.0039 | IL, G, SR |
+| DASH-short | 9 | 0.3395±0.0084 | 0.0660±0.0018 | 0.6355±0.0049 | IL, G, SR |
+| DASH | 9 | 0.3398±0.0083 | 0.0627±0.0016 | 0.6386±0.0047 | IL, G |
+| DASH[MCM] | 9 | 0.3399±0.0083 | 0.0644±0.0017 | 0.6398±0.0052 | IL, G |
+| DASH[ACT-R] | 5 | 0.3428±0.0084 | 0.0670±0.0019 | 0.6294±0.0049 | IL, G |
+| GRU | 39 | 0.3430±0.0086 | 0.0631±0.0017 | 0.6726±0.0039 | IL, G |
+| FSRS-6 default param. | 0 | 0.3468±0.0086 | 0.0786±0.0026 | 0.6922±0.0040 | IL, G, SR |
+| ACT-R | 5 | 0.3623±0.0092 | 0.0864±0.0024 | 0.5345±0.0054 | IL |
+| AVG | 0 | 0.3630±0.0091 | 0.0876±0.0026 | 0.5085±0.0049 | --- |
+| FSRS v3 | 13 | 0.3709±0.0099 | 0.0729±0.0022 | 0.6666±0.0045 | IL, G |
+| FSRS v2 | 14 | 0.377±0.010 | 0.0687±0.0022 | 0.6669±0.0048 | IL, G |
+| FSRS v1 | 7 | 0.397±0.011 | 0.0864±0.0025 | 0.6333±0.0046 | IL, G |
+| Anki-SM-2 trainable | 7 | 0.407±0.011 | 0.0941±0.0032 | 0.6169±0.0044 | IL, G |
+| HLR | 3 | 0.415±0.012 | 0.1052±0.0031 | 0.6333±0.0050 | IL, G |
+| HLR-short | 3 | 0.436±0.013 | 0.1160±0.0036 | 0.6149±0.0064 | IL, G, SR |
+| SM-2 trainable | 6 | 0.444±0.012 | 0.1193±0.0034 | 0.5994±0.0049 | IL, G |
+| Ebisu v2 | 0 | 0.457±0.012 | 0.1582±0.0039 | 0.5942±0.0050 | IL, G |
+| Anki-SM-2 | 0 | 0.490±0.015 | 0.1278±0.0036 | 0.5973±0.0054 | IL, G |
+| SM-2-short | 0 | 0.511±0.016 | 0.1278±0.0038 | 0.5929±0.0065 | IL, G, SR |
+| SM-2 | 0 | 0.547±0.017 | 0.1484±0.0042 | 0.6005±0.0051 | IL, G |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.48±0.13 | **0.00623±0.00021** | 0.6380±0.0040 | IL, G |
 
 ### Unweighted
 
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **RWKV-P** | 2762884 | **0.277±0.0036** | 0.0250±0.00038 | **0.833±0.0018** | |
-| RWKV | 2762884 | 0.319±0.0040 | 0.054±0.0010 | 0.768±0.0020 | |
-| LSTM | 8869 | 0.333±0.0042 | 0.0538±0.00096 | 0.733±0.0021 | FIL, G, SR, AT |
-| FSRS-6 recency | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0023 | IL, G, SR |
-| FSRS-rs | 21 | 0.344±0.0041 | 0.063±0.0010 | 0.710±0.0022 | IL, G, SR |
-| FSRS-6 | 21 | 0.345±0.0042 | 0.066±0.0011 | 0.707±0.0023 | IL, G, SR |
-| GRU-P-short | 297 | 0.346±0.0042 | 0.062±0.0011 | 0.699±0.0026 | IL, G, SR|
-| FSRS-6 preset | 21 | 0.346±0.0042 | 0.065±0.0010 | 0.708±0.0023 | IL, G, SR |
-| FSRS-6 binary | 17 | 0.351±0.0043 | 0.068±0.0011 | 0.685±0.0025 | IL, G, SR |
-| GRU-P | 297 | 0.352±0.0042 | 0.063±0.0011 | 0.687±0.0025 | IL, G |
-| FSRS-6 deck | 21 | 0.355±0.0045 | 0.074±0.0013 | 0.703±0.0023 | IL, G, SR |
-| FSRS-5 | 19 | 0.356±0.0043 | 0.074±0.0012 | 0.701±0.0023 | IL, G, SR |
-| FSRS-6 pretrain | 4 | 0.359±0.0044 | 0.083±0.0013 | 0.702±0.0022 | IL, G, SR |
-| FSRS-4.5 | 17 | 0.362±0.0045 | 0.076±0.0013 | 0.689±0.0023 | IL, G |
-| DASH | 9 | 0.368±0.0045 | 0.084±0.0013 | 0.631±0.0027 | IL, G |
-| DASH-short | 9 | 0.368±0.0045 | 0.086±0.0014 | 0.622±0.0029 | IL, G, SR|
-| DASH[MCM] | 9 | 0.369±0.0044 | 0.086±0.0014 | 0.634±0.0026 | IL, G |
-| FSRS-6 default param. | 0 | 0.371±0.0046 | 0.097±0.0015 | 0.701±0.0022 | IL, G, SR |
-| FSRS v4 | 17 | 0.373±0.0048 | 0.084±0.0014 | 0.685±0.0023 | IL, G |
-| DASH[ACT-R] | 5 | 0.373±0.0047 | 0.089±0.0016 | 0.624±0.0027 | IL, G |
-| GRU | 39 | 0.375±0.0047 | 0.086±0.0014 | 0.668±0.0023 | IL, G |
-| AVG | 0 | 0.394±0.0050 | 0.103±0.0016 | 0.500±0.0026 | --- |
-| NN-17 | 39 | 0.398±0.0049 | 0.101±0.0013 | 0.624±0.0023 | IL, G |
-| ACT-R | 5 | 0.403±0.0055 | 0.107±0.0017 | 0.522±0.0024 | IL |
-| FSRS v3 | 13 | 0.436±0.0067 | 0.110±0.0020 | 0.661±0.0024 | IL, G |
-| FSRS v2 | 14 | 0.453±0.0072 | 0.110±0.0020 | 0.651±0.0023 | IL, G |
-| HLR | 3 | 0.469±0.0073 | 0.128±0.0019 | 0.637±0.0026 | IL, G |
-| FSRS v1 | 7 | 0.491±0.0080 | 0.132±0.0022 | 0.630±0.0025 | IL, G |
-| HLR-short | 3 | 0.493±0.0079 | 0.140±0.0021 | 0.611±0.0029 | IL, G, SR|
-| Ebisu v2 | 0 | 0.499±0.0078 | 0.163±0.0021 | 0.605±0.0026 | IL, G |
-| Anki-SM-2 trainable | 7 | 0.513±0.0089 | 0.140±0.0024 | 0.618±0.0023 | IL, G |
-| SM-2 trainable | 6 | 0.58±0.012 | 0.170±0.0028 | 0.597±0.0025 | IL, G |
-| Anki-SM-2 | 0 | 0.62±0.011 | 0.172±0.0026 | 0.613±0.0022 | IL, G |
-| SM-2-short | 0 | 0.65±0.015 | 0.170±0.0028 | 0.590±0.0027 | IL, G, SR|
-| SM-2 | 0 | 0.72±0.017 | 0.203±0.0030 | 0.603±0.0025 | IL, G |
-| **RMSE-BINS-EXPLOIT** | 0 | 4.61±0.067 | **0.0135±0.00028** | 0.655±0.0021 | IL, G |
+| RWKV-P | 2762884 | 0.2773±0.0036 | 0.02502±0.00038 | 0.8329±0.0017 |  |
+| RWKV | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0020 |  |
+| **LSTM** | 8869 | **0.3332±0.0041** | 0.05378±0.00096 | **0.7329±0.0020** | FIL, G, SR, AT |
+| FSRS-6 recency | 21 | 0.3436±0.0042 | 0.0630±0.0010 | 0.7099±0.0022 | IL, G, SR |
+| FSRS-rs | 21 | 0.3436±0.0042 | 0.0630±0.0010 | 0.7100±0.0022 | IL, G, SR |
+| FSRS-6 | 21 | 0.3455±0.0042 | 0.0655±0.0011 | 0.7069±0.0023 | IL, G, SR |
+| GRU-P-short | 297 | 0.3458±0.0043 | 0.0622±0.0011 | 0.6990±0.0025 | IL, G, SR|
+| FSRS-6 preset | 21 | 0.3461±0.0042 | 0.0653±0.0011 | 0.7076±0.0022 | IL, G, SR |
+| FSRS-6 binary | 17 | 0.3508±0.0043 | 0.0678±0.0011 | 0.6849±0.0025 | IL, G, SR |
+| GRU-P | 297 | 0.3521±0.0043 | 0.0633±0.0011 | 0.6868±0.0025 | IL, G |
+| FSRS-6 deck | 21 | 0.3555±0.0045 | 0.0736±0.0013 | 0.7026±0.0023 | IL, G, SR |
+| FSRS-5 | 19 | 0.3560±0.0045 | 0.0741±0.0013 | 0.7011±0.0023 | IL, G, SR |
+| FSRS-6 pretrain | 4 | 0.3586±0.0043 | 0.0833±0.0013 | 0.7016±0.0022 | IL, G, SR |
+| FSRS-4.5 | 17 | 0.3624±0.0046 | 0.0764±0.0013 | 0.6893±0.0023 | IL, G |
+| DASH-short | 9 | 0.3681±0.0045 | 0.0858±0.0014 | 0.6225±0.0029 | IL, G, SR|
+| DASH | 9 | 0.3682±0.0045 | 0.0836±0.0013 | 0.6312±0.0026 | IL, G |
+| DASH[MCM] | 9 | 0.3688±0.0045 | 0.0861±0.0014 | 0.6343±0.0026 | IL, G |
+| FSRS-6 default param. | 0 | 0.3714±0.0045 | 0.0971±0.0015 | 0.7006±0.0022 | IL, G, SR |
+| FSRS v4 | 17 | 0.3726±0.0048 | 0.0838±0.0014 | 0.6853±0.0023 | IL, G |
+| DASH[ACT-R] | 5 | 0.3728±0.0047 | 0.0886±0.0016 | 0.6239±0.0027 | IL, G |
+| GRU | 39 | 0.3753±0.0047 | 0.0864±0.0013 | 0.6683±0.0023 | IL, G |
+| AVG | 0 | 0.3945±0.0051 | 0.1034±0.0016 | 0.4997±0.0026 | --- |
+| ACT-R | 5 | 0.4033±0.0054 | 0.1074±0.0017 | 0.5225±0.0025 | IL |
+| FSRSv3 | 13 | 0.4364±0.0068 | 0.1097±0.0019 | 0.6605±0.0023 | IL, G |
+| FSRSv2 | 14 | 0.4532±0.0072 | 0.1095±0.0020 | 0.6512±0.0023 | IL, G |
+| HLR | 3 | 0.4694±0.0073 | 0.1275±0.0019 | 0.6369±0.0026 | IL, G |
+| FSRS v1 | 7 | 0.4913±0.0079 | 0.1316±0.0023 | 0.6295±0.0025 | IL, G |
+| HLR-short | 3 | 0.4929±0.0078 | 0.1397±0.0021 | 0.6115±0.0029 | IL, G, SR|
+| Ebisu v2 | 0 | 0.4989±0.0078 | 0.1627±0.0022 | 0.6051±0.0025 | IL, G |
+| Anki-SM-2 trainable | 7 | 0.5129±0.0089 | 0.1397±0.0024 | 0.6179±0.0023 | IL, G |
+| SM-2 trainable | 6 | 0.581±0.012 | 0.1699±0.0027 | 0.5970±0.0025 | IL, G |
+| Anki-SM-2 | 0 | 0.616±0.011 | 0.1724±0.0026 | 0.6133±0.0023 | IL, G |
+| SM-2-short | 0 | 0.653±0.015 | 0.1701±0.0027 | 0.5901±0.0027 | IL, G, SR |
+| SM-2 | 0 | 0.722±0.017 | 0.2031±0.0031 | 0.6026±0.0025 | IL, G |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.608±0.067 | **0.01350±0.00027** | 0.6548±0.0022 | IL, G |
 
 Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
 
@@ -326,7 +323,12 @@ python script.py --plot
 Benchmark FSRS-5/FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
-python other.py --algo FSRSv4
+python other.py --algo FSRS-6
 ```
 
-> Please change the `--algo` argument to `FSRSv3`, `HLR`, `LSTM`, or `SM2` to run the corresponding algorithm.
+> You can change `FSRS-6` to `FSRSv3`, `HLR`, `LSTM`, etc. to run the corresponding algorithm.
+
+Instead of using a 5-way split, train the algorithm and evaluate it on the same data. This can be useful to determine how much the algorithm is overfitting.
+```bash
+python other.py --algo FSRS-6 --train_equals_test
+```

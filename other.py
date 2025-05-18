@@ -46,7 +46,7 @@ RAW = args.raw
 PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 RECENCY = args.recency
-
+TRAIN_EQUALS_TEST = args.train_equals_test
 torch.set_num_threads(2)
 # torch.set_num_interop_threads(2)
 
@@ -116,6 +116,7 @@ FILE_NAME = (
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-no_train_same_day" if NO_TRAIN_SAME_DAY else "")
     + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
+    + ("-train_equals_test" if TRAIN_EQUALS_TEST else "")
     + ("-" + PARTITIONS if PARTITIONS != "none" else "")
     + ("-dev" if DEV_MODE else "")
 )
@@ -3263,16 +3264,20 @@ def process(user_id):
     testsets = []
     tscv = TimeSeriesSplit(n_splits=n_splits)
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
-        train_set = dataset.iloc[train_index]
-        test_set = dataset.iloc[test_index]
-        if EQUALIZE_TEST_WITH_NON_SECS:
-            # Ignores the train_index and test_index
-            train_set = dataset[dataset[f"{split_i}_train"]]
-            test_set = dataset[dataset[f"{split_i}_test"]]
-            train_index, test_index = (
-                None,
-                None,
-            )  # train_index and test_index no longer have the same meaning as before
+        if not TRAIN_EQUALS_TEST:
+            train_set = dataset.iloc[train_index]
+            test_set = dataset.iloc[test_index]
+            if EQUALIZE_TEST_WITH_NON_SECS:
+                # Ignores the train_index and test_index
+                train_set = dataset[dataset[f"{split_i}_train"]]
+                test_set = dataset[dataset[f"{split_i}_test"]]
+                train_index, test_index = (
+                    None,
+                    None,
+                )  # train_index and test_index no longer have the same meaning as before
+        else:
+            train_set = dataset.copy()
+            test_set = dataset.copy()
         if NO_TEST_SAME_DAY:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if NO_TRAIN_SAME_DAY:
@@ -3283,7 +3288,8 @@ def process(user_id):
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
-                assert train_partition["review_th"].max() < test_set["review_th"].min()
+                if not TRAIN_EQUALS_TEST:
+                    assert train_partition["review_th"].max() < test_set["review_th"].min()
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
@@ -3324,6 +3330,9 @@ def process(user_id):
                     raise e
                 partition_weights[partition] = Model().state_dict()
         w_list.append(partition_weights)
+
+        if TRAIN_EQUALS_TEST:
+            break
 
     p = []
     y = []

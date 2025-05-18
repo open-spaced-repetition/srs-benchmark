@@ -35,5 +35,5 @@ python -m rwkv.get_result --config rwkv/get_result_config.toml
 
 ### Run on a single user
 ```bash
-python -m rwkv.run_as_rnn --config rwkv\run_as_rnn_config.toml
+python -m rwkv.run_as_rnn --config rwkv/run_as_rnn_config.toml
 ```

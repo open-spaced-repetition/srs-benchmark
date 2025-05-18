@@ -28,6 +28,7 @@ from rwkv.data_processing import (
 from rwkv.get_result import get_benchmark_info, get_stats
 import torch
 from rwkv.model.srs_model_rnn import SrsRwkvRnn
+from rwkv.parse_toml import parse_toml
 from rwkv.rwkv_config import DEFAULT_ANKI_RWKV_CONFIG
 
 
@@ -421,11 +422,13 @@ def run(data_path, model_path, label_db_path, label_db_size, user_id):
 if __name__ == "__main__":
     from pathlib import Path
 
+    config = parse_toml()
     run(
-        Path("../anki-revlogs-10k"),
-        "pretrain/RWKV_trained_on_5000_10000.pth",
-        # "pretrain/RWKV_trained_on_101_4999.pth",
-        "label_filter_db",
-        int(7e9),
-        user_id=107,
+        data_path=Path(
+            config.DATA_PATH,
+        ),
+        model_path=config.MODEL_PATH,
+        label_db_path=config.LABEL_FILTER_LMDB_PATH,
+        label_db_size=config.LABEL_FILTER_LMDB_SIZE,
+        user_id=config.USER,
     )

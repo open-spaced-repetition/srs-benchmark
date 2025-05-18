@@ -14,8 +14,8 @@ import torch
 from rwkv.data_fetcher import DataFetcher
 from rwkv.model.srs_model import AnkiRWKV, extract_p
 from rwkv.parse_toml import parse_toml
+from rwkv.prepare_batch import prepare_data
 from rwkv.rwkv_config import *
-from rwkv.train_rwkv import prepare_data
 import pyarrow.parquet as pq
 from rwkv.utils import load_tensor, save_tensor  # type: ignore
 
@@ -67,12 +67,6 @@ def get_stats(
     assert len(equalize_review_ths) == len(gather_pred)
     rmse_raw = root_mean_squared_error(y_true=gather_y, y_pred=gather_pred)
     logloss = log_loss(y_true=gather_y, y_pred=gather_pred, labels=[0, 1])
-    # y_true = torch.tensor(gather_y, dtype=torch.float32)
-    # y_pred = torch.tensor(gather_pred, dtype=torch.float32)
-    # loss_torch = torch.nn.functional.binary_cross_entropy(y_pred, y_true, reduction='none').mean().item()
-    # print(f"torch loss: {loss_torch}")
-    # print(f"y sum, {np.array(gather_y, dtype=int).sum()}")
-    # print(f"pred sum, {np.array(gather_pred).sum()}")
 
     try:
         auc = round(roc_auc_score(y_true=gather_y, y_score=gather_pred), 6)

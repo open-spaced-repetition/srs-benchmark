@@ -20,7 +20,7 @@ python -m rwkv.data_processing --config rwkv/data_processing_config_test.toml
 ```
 ## Training
 RWKV uses the WSD lr scheduler. There are two distinct phases in training, the warmup + stable phase and then a decay phase.
-To switch between the two phases, refer to the config file.
+To switch between the two phases, refer to the config file. RWKV was trained on approximately 10 epochs in the warmup + stable phase and 2 epochs in the decay phase.
 ```bash
 python -m rwkv.train_rwkv --config rwkv/train_rwkv_config.toml
 ```

@@ -27,7 +27,7 @@ from rwkv.data_processing import (
 )
 from rwkv.get_result import get_benchmark_info, get_stats
 import torch
-from rwkv.model.srs_model_rnn import AnkiRWKVRNN
+from rwkv.model.srs_model_rnn import SrsRwkvRnn
 from rwkv.rwkv_config import DEFAULT_ANKI_RWKV_CONFIG
 
 
@@ -39,7 +39,7 @@ class RNNProcess:
         dtype,
         config=DEFAULT_ANKI_RWKV_CONFIG,
     ):
-        self.rnn = AnkiRWKVRNN(config).to(device)
+        self.rnn = SrsRwkvRnn(config).to(device)
         if path is not None:
             self.rnn.load_state_dict(torch.load(path, weights_only=True))
             print(f"Loaded: {path}")

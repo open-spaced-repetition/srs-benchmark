@@ -43,7 +43,7 @@ FunctionType = __nop
 # FunctionType = torch.jit.script_method
 
 
-class AnkiRWKVRNN(ModuleType):
+class SrsRwkvRnn(ModuleType):
     def __init__(self, anki_rwkv_config: AnkiRWKVConfig):
         super().__init__()
         self.card_features_dim = 92

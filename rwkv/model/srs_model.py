@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import math
 
 import numpy as np
-from rwkv.config import RWKV_SUBMODULES
+from rwkv.rwkv_config import RWKV_SUBMODULES
 from rwkv.data_processing import RWKVSample
 from rwkv.model.rwkv_model import RWKV7, RWKV7Config
 import torch

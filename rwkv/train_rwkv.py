@@ -8,7 +8,7 @@ import traceback
 
 import numpy as np
 from rwkv.data_fetcher import DataFetcher
-from rwkv.config import *
+from rwkv.rwkv_config import *
 import lmdb
 import re
 import random

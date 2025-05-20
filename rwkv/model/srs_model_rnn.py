@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from rwkv.config import (
+from rwkv.rwkv_config import (
     DAY_OFFSET_ENCODE_PERIODS,
     ID_ENCODE_DIMS,
     ID_SPLIT,

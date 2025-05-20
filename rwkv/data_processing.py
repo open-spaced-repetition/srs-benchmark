@@ -15,7 +15,7 @@ import pyarrow.parquet as pq  # type: ignore
 import pandas as pd
 import random
 import matplotlib.pyplot as plt
-from rwkv.config import RWKV_SUBMODULES
+from rwkv.rwkv_config import RWKV_SUBMODULES
 from rwkv.parse_toml import parse_toml
 from rwkv.utils import save_tensor
 

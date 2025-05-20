@@ -1,5 +1,3 @@
-import queue
-
 class DataFetcher:
     def __init__(self, task_queue, out_queue):
         self.task_queue = task_queue
@@ -14,6 +12,6 @@ class DataFetcher:
         out = self.storage[key]
         del self.storage[key]
         return out
-        
+
     def enqueue(self, task):
         self.task_queue.put(task)

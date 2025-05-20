@@ -1,4 +1,3 @@
-from io import BytesIO
 from multiprocessing import Pool
 import torch
 from tqdm import tqdm

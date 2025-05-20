@@ -16,7 +16,6 @@ from rwkv.model.srs_model import AnkiRWKV, extract_p
 from rwkv.parse_toml import parse_toml
 from rwkv.prepare_batch import prepare_data
 from rwkv.rwkv_config import *
-import pyarrow.parquet as pq
 from rwkv.utils import load_tensor, save_tensor  # type: ignore
 
 FETCH_AHEAD = 20

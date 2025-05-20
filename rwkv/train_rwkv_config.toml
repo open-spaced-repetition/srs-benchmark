@@ -15,6 +15,9 @@ LABEL_FILTER_LMDB_SIZE = 7_000_000_000
 # Number of CPU processes for preprocessing the dataset
 NUM_FETCH_PROCESSES = 10
 
+# The maximum global length of a batch
+MAX_TRAIN_GLOBAL_LEN = 66000
+
 # Available modes are "WS" and "D" for the corresponding phases of the WSD learning rate scheduler.
 TRAIN_MODE = "WS"
 # Set a step offset, useful for resuming WANDB runs

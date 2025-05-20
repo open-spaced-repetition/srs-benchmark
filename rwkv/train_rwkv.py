@@ -5,7 +5,6 @@ import time
 import traceback
 
 import numpy as np
-from rwkv.config import MAX_TRAIN_GLOBAL_LEN
 from rwkv.data_fetcher import DataFetcher
 import lmdb
 import re
@@ -128,7 +127,7 @@ def log_model(log, model: SrsRWKV):
             log[f"{name}.grad.75th"] = torch.quantile(param.grad, 0.75).item()
 
 
-def get_groups(db_path, db_size, users):
+def get_groups(db_path, db_size, max_train_global_len, users):
     lmdb_env = lmdb.open(db_path, map_size=db_size)
     with lmdb_env.begin(write=False) as txn:
         keys = []
@@ -148,7 +147,7 @@ def get_groups(db_path, db_size, users):
         l = 0
         while l < len(keys):
             _, _, _, size = keys[l]
-            max_batch = math.floor(MAX_TRAIN_GLOBAL_LEN / size - 1e-6)
+            max_batch = math.floor(max_train_global_len / size - 1e-6)
             if max_batch == 0:
                 l += 1
                 continue
@@ -359,6 +358,7 @@ def main_loop(config, task_queue, batch_queue):
     groups = get_groups(
         config.TRAIN_DATASET_LMDB_PATH,
         config.TRAIN_DATASET_LMDB_SIZE,
+        config.MAX_TRAIN_GLOBAL_LEN,
         users=TRAIN_USERS,
     )
     VALIDATION_USERS = list(
@@ -557,7 +557,7 @@ def main(config):
                     config.VALIDATE_DATASET_LMDB_SIZE,
                     task_queue,
                     batch_queue,
-                    MAX_TRAIN_GLOBAL_LEN,
+                    config.MAX_TRAIN_GLOBAL_LEN,
                     None,
                 ),
             )

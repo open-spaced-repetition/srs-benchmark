@@ -2,7 +2,7 @@ import math
 import lmdb
 import numpy as np
 import torch
-from rwkv.rwkv_config import (
+from rwkv.config import (
     DAY_OFFSET_ENCODE_PERIODS,
     ID_ENCODE_DIMS,
     ID_SPLIT,
@@ -10,7 +10,7 @@ from rwkv.rwkv_config import (
 )
 from rwkv.data_processing import ModuleData, RWKVSample
 from rwkv.model.srs_model import PreparedBatch
-from rwkv.rwkv_config import DEFAULT_ANKI_RWKV_CONFIG
+from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.utils import load_tensor
 
 

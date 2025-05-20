@@ -1,33 +1,11 @@
 import numpy as np
-import pandas as pd
-from rwkv.rwkv_config import (
-    DAY_OFFSET_ENCODE_PERIODS,
-    ID_ENCODE_DIMS,
-    ID_SPLIT,
-    RWKV_SUBMODULES,
-)
+from rwkv.architecture import AnkiRWKVConfig
 from rwkv.data_processing import (
     CARD_FEATURE_COLUMNS,
-    ID_PLACEHOLDER,
-    scale_cum_new_cards_today,
-    scale_cum_reviews_today,
-    scale_day_offset_diff,
-    scale_diff_new_cards,
-    scale_diff_reviews,
-    scale_duration,
-    scale_elapsed_days,
-    scale_elapsed_days_cumulative,
-    scale_elapsed_seconds,
-    scale_elapsed_seconds_cumulative,
-    scale_state,
 )
-from rwkv.get_result import get_benchmark_info, get_stats
 from rwkv.model.rwkv_rnn_model import RWKV7RNN
 from rwkv.model.srs_model import is_excluded
 import torch
-from rwkv.rwkv_config import DEFAULT_ANKI_RWKV_CONFIG
-
-from rwkv.rwkv_config import AnkiRWKVConfig
 
 # An RNN implementation of srs_model.
 
@@ -43,7 +21,7 @@ FunctionType = __nop
 # FunctionType = torch.jit.script_method
 
 
-class SrsRwkvRnn(ModuleType):
+class SrsRWKVRnn(ModuleType):
     def __init__(self, anki_rwkv_config: AnkiRWKVConfig):
         super().__init__()
         self.card_features_dim = 92

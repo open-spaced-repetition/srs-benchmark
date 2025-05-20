@@ -4,7 +4,7 @@ This script demonstrates RWKV run as an RNN.
 
 import numpy as np
 import pandas as pd
-from rwkv.rwkv_config import (
+from rwkv.config import (
     DAY_OFFSET_ENCODE_PERIODS,
     ID_ENCODE_DIMS,
     ID_SPLIT,
@@ -27,9 +27,9 @@ from rwkv.data_processing import (
 )
 from rwkv.get_result import get_benchmark_info, get_stats
 import torch
-from rwkv.model.srs_model_rnn import SrsRwkvRnn
+from rwkv.model.srs_model_rnn import SrsRWKVRnn
 from rwkv.parse_toml import parse_toml
-from rwkv.rwkv_config import DEFAULT_ANKI_RWKV_CONFIG
+from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 
 
 class RNNProcess:
@@ -40,7 +40,7 @@ class RNNProcess:
         dtype,
         config=DEFAULT_ANKI_RWKV_CONFIG,
     ):
-        self.rnn = SrsRwkvRnn(config).to(device)
+        self.rnn = SrsRWKVRnn(config).to(device)
         if path is not None:
             self.rnn.load_state_dict(torch.load(path, weights_only=True))
             print(f"Loaded: {path}")

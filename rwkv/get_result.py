@@ -11,11 +11,11 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import log_loss, roc_auc_score, root_mean_squared_error
 import torch
+from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.data_fetcher import DataFetcher
-from rwkv.model.srs_model import AnkiRWKV, extract_p
+from rwkv.model.srs_model import SrsRWKV, extract_p
 from rwkv.parse_toml import parse_toml
 from rwkv.prepare_batch import prepare_data
-from rwkv.rwkv_config import *
 from rwkv.utils import load_tensor, save_tensor  # type: ignore
 
 FETCH_AHEAD = 20
@@ -150,9 +150,9 @@ def run(
 ):
     data_fetcher = DataFetcher(task_queue=task_queue, out_queue=batch_queue)
 
-    master_model = AnkiRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(config.DEVICE)
+    master_model = SrsRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(config.DEVICE)
     model = (
-        AnkiRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG)
+        SrsRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG)
         .selective_cast(config.DTYPE)
         .to(config.DEVICE)
     )

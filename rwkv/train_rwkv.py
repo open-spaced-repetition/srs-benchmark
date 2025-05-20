@@ -5,8 +5,8 @@ import time
 import traceback
 
 import numpy as np
+from rwkv.config import MAX_TRAIN_GLOBAL_LEN
 from rwkv.data_fetcher import DataFetcher
-from rwkv.rwkv_config import *
 import lmdb
 import re
 import random
@@ -15,8 +15,8 @@ import wandb
 
 from rwkv.parse_toml import parse_toml
 from rwkv.prepare_batch import prepare_data_train_test
-from rwkv.model.srs_model import AnkiRWKV
-from rwkv.rwkv_config import *
+from rwkv.model.srs_model import SrsRWKV
+from rwkv.architecture import *
 from rwkv.utils import (
     KeyValueAverage,
     get_number_of_trainable_parameters,
@@ -109,7 +109,7 @@ def get_optimizer(config, model):
     )
 
 
-def log_model(log, model: AnkiRWKV):
+def log_model(log, model: SrsRWKV):
     for name, param in model.named_parameters():
         log[f"{name}.data.mean"] = param.mean().item()
         log[f"{name}.data.std"] = param.std().item()
@@ -179,7 +179,7 @@ def get_grad_norm(model):
     return total_norm
 
 
-def evaluate_on_user(user_id, batch, model: AnkiRWKV):
+def evaluate_on_user(user_id, batch, model: SrsRWKV):
     model.eval()
     with torch.no_grad():
         stats = model.get_loss(batch)
@@ -329,9 +329,9 @@ class KeyValueStatistics:
 def main_loop(config, task_queue, batch_queue):
     data_fetcher = DataFetcher(task_queue=task_queue, out_queue=batch_queue)
 
-    master_model = AnkiRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(config.DEVICE)
+    master_model = SrsRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(config.DEVICE)
     model = (
-        AnkiRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG)
+        SrsRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG)
         .selective_cast(config.DTYPE)
         .to(config.DEVICE)
     )

@@ -1,15 +1,14 @@
-import copy
 from dataclasses import dataclass
 import math
 
 import numpy as np
-from rwkv.rwkv_config import RWKV_SUBMODULES
+from rwkv.config import RWKV_SUBMODULES
 from rwkv.data_processing import RWKVSample
-from rwkv.model.rwkv_model import RWKV7, RWKV7Config
+from rwkv.model.rwkv_model import RWKV7
 import torch
 from typing import NamedTuple
 
-from rwkv.rwkv_config import AnkiRWKVConfig
+from rwkv.architecture import AnkiRWKVConfig
 
 
 # def __nop(ob):
@@ -23,7 +22,7 @@ ModuleType = torch.jit.ScriptModule
 FunctionType = torch.jit.script_method
 
 
-class AnkiRWKVIterStatistics(NamedTuple):
+class SrsRWKVIterStatistics(NamedTuple):
     average_loss: torch.Tensor
     loss_tensor: torch.Tensor
     w_loss_avg: torch.Tensor
@@ -100,7 +99,7 @@ def is_excluded(name):
     return False
 
 
-class AnkiRWKV(ModuleType):
+class SrsRWKV(ModuleType):
     def __init__(self, anki_rwkv_config: AnkiRWKVConfig):
         super().__init__()
 
@@ -383,7 +382,7 @@ class AnkiRWKV(ModuleType):
             p_binary_loss * immediate_equalize_mask
         ).sum() / (1e-8 + immediate_equalize_mask.sum())
 
-        return AnkiRWKVIterStatistics(
+        return SrsRWKVIterStatistics(
             average_loss=loss_avg,
             p_curve=curve_probs.detach(),
             p_imm=out_p_binary.detach(),
@@ -456,7 +455,7 @@ class AnkiRWKVDictStatistics:
     w: dict
 
 
-def extract_p(stats: AnkiRWKVIterStatistics):
+def extract_p(stats: SrsRWKVIterStatistics):
     """Creates a nicer summary"""
     assert stats.label_review_th.size(0) == 1  # Only allow batch sizes of 1
     ahead_ps_dict = {}
@@ -582,7 +581,7 @@ def naive_splits(data_list: list[RWKVSample]):
 
 
 if __name__ == "__main__":
-    model = AnkiRWKV()
+    model = SrsRWKV()
     t_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Number of trainable parameters:", t_param)
     a_param = sum(p.numel() for p in model.parameters())

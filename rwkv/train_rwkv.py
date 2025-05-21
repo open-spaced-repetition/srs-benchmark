@@ -576,4 +576,5 @@ def main(config):
 
 if __name__ == "__main__":
     config = parse_toml()
+    assert config.DEVICE.type == "cuda", "Only cuda is supported for training."
     main(config)

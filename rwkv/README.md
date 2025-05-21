@@ -1,6 +1,6 @@
-For fast performance, a GPU that supports CUDA is recommended. The code in this directory has only been tested on a single 3090 RTX on Windows.
+For fast performance, a device that supports CUDA is required. The code in this directory has only been tested on a single 3090 RTX on Windows.
 
-RWKV can still be run on CPU mode for individual users. See the section [Run on a single user](#run-on-a-single-user).
+RWKV can still be run on non-CUDA devices for individual users. See the section [Run on a single user](#run-on-a-single-user).
 
 
 ## Setup

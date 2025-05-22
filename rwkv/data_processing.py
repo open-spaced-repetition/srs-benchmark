@@ -546,8 +546,8 @@ def create_sample(
     )
     return RWKVSample(
         user_id=user_id,
-        start_th=section_df["review_th"].min(),
-        end_th=section_df["review_th"].max(),
+        start_th=int(section_df["review_th"].min()),
+        end_th=int(section_df["review_th"].max()),
         length=len(section_df),
         modules=module_infos,
         ids=ids,
@@ -599,7 +599,6 @@ def job(config, user_id, max_size, done, writer_queue, progress_queue):
             dtype=config.DTYPE,
             device=torch.device("cpu"),
         )
-        key = [df["review_th"].min(), df["review_th"].max(), sample.length]
         writer_queue.put(sample)
     else:
         allowable_size = max_size // 2
@@ -617,9 +616,8 @@ def job(config, user_id, max_size, done, writer_queue, progress_queue):
                 dtype=config.DTYPE,
                 device=torch.device("cpu"),
             )
-            key = [df["review_th"].min(), df["review_th"].max(), sample.length]
             writer_queue.put(sample)
-            print("New", user_id, start_i, end_i, len(section_df), key)
+            print("New", user_id, start_i, end_i, len(section_df))
 
     progress_queue.put(1)
 

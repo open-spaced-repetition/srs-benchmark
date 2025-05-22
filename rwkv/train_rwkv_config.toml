@@ -33,6 +33,7 @@ LOAD_MODEL_FOLDER = "pretrain/rwkv"
 LOAD_MODEL_NAME = "RWKV_trained_on_5000_10000"
 SAVE_MODEL_FOLDER = "pretrain/rwkv/train"
 SAVE_MODEL_PREFIX = "rwkv_test"
+# Only cuda is supported at the moment
 DEVICE = "cuda"
 DTYPE = "bfloat16"
 

@@ -51,7 +51,17 @@ setup(
     name="srs-benchmark",
     packages=find_packages(),
     ext_modules=get_rwkv_extensions(),
-    install_requires=["torch"],
+    install_requires=[
+        "torch",
+        "tqdm",
+        "lmdb",
+        "tomli",
+        "pandas",
+        "pyarrow",
+        "fastparquet",
+        "wandb",
+        "scikit-learn",
+    ],
     cmdclass={"build_ext": BuildExtension},
     options={},
 )

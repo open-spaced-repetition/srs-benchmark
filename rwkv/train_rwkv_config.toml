@@ -1,0 +1,45 @@
+# Start and end indices of the users used for training
+TRAIN_USERS_START = 5000
+TRAIN_USERS_END = 10000
+
+VALIDATE_USERS_START = 1
+VALIDATE_USERS_END = 100
+
+TRAIN_DATASET_LMDB_PATH = "train_db"
+TRAIN_DATASET_LMDB_SIZE = 205_000_000_000
+VALIDATE_DATASET_LMDB_PATH = "test_db"
+VALIDATE_DATASET_LMDB_SIZE = 195_000_000_000
+LABEL_FILTER_LMDB_PATH = "label_filter_db"
+LABEL_FILTER_LMDB_SIZE = 7_000_000_000
+
+# Number of CPU processes for preprocessing the dataset
+NUM_FETCH_PROCESSES = 10
+
+# The maximum global length of a batch
+MAX_TRAIN_GLOBAL_LEN = 66000
+
+# Available modes are "WS" and "D" for the corresponding phases of the WSD learning rate scheduler.
+TRAIN_MODE = "WS"
+# Set a step offset, useful for resuming WANDB runs
+STEP_OFFSET = 1
+
+# If TRAIN_MODE is "WS", warmup steps is used
+WARMUP_STEPS = 20000
+EPOCHS = 1000000
+PEAK_LR = 7e-4
+
+LOAD_MODEL = false
+LOAD_MODEL_FOLDER = "pretrain/rwkv"
+LOAD_MODEL_NAME = "RWKV_trained_on_5000_10000"
+SAVE_MODEL_FOLDER = "pretrain/rwkv/train"
+SAVE_MODEL_PREFIX = "rwkv_test"
+# Only cuda is supported at the moment
+DEVICE = "cuda"
+DTYPE = "bfloat16"
+
+USE_WANDB = true
+# Only relevant if USE_WANDB is set to true
+WANDB_PROJECT_NAME = "rwkv"
+WANDB_RESUME = false
+# Only relevant if WANDB_RESUME is set to true
+WANDB_RESUME_ID = ""

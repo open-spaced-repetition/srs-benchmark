@@ -12,6 +12,8 @@ warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     models = [
+        "RWKV-P",
+        "RWKV",
         "LSTM-short-secs-equalize_test_with_non_secs",
         "FSRS-6-recency",
         "GRU-P-short",
@@ -167,7 +169,7 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=17,
+                    fontsize=15,
                 )
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=15, rotation=45)

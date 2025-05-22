@@ -25,8 +25,9 @@ import pyarrow.parquet as pq  # type: ignore
 from config import create_parser
 from utils import catch_exceptions, rmse_matrix
 
+
 parser = create_parser()
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 DEV_MODE = args.dev
 DRY_RUN = args.dry

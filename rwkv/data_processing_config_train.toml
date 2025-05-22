@@ -1,0 +1,13 @@
+DEVICE = "cuda"
+DTYPE = "bfloat16"
+DATA_PATH = "../anki-revlogs-10k"
+
+LMDB_PATH = "train_db"
+LMDB_SIZE = 205_000_000_000
+LABEL_FILTER_LMDB_PATH = "label_filter_db"
+LABEL_FILTER_LMDB_SIZE = 7_000_000_000
+
+USER_START = 1
+USER_END = 10000
+MAX_BATCH_SIZE = 65536
+RWKV_SUBMODULES = ["card_id", "note_id", "deck_id", "preset_id", "user_id"]

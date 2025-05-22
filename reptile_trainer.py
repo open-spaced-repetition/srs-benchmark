@@ -55,7 +55,7 @@ DEFAULT_FINETUNE_PARAMS = {
 }
 
 parser = create_parser()
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 MODEL_NAME = args.algo
 SHORT_TERM = args.short

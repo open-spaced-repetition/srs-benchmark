@@ -19,7 +19,7 @@ from multiprocess import Pool  # type: ignore
 optuna_nonce = random.randint(0, 100000000)
 
 parser = create_parser()
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 ENSURE_RESET = False  # Trade speed but try to ensure that no data leakage is going on by reloading the model from storage.
 BATCH_SIZE = 16384

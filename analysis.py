@@ -8,7 +8,7 @@ import os
 import sys
 
 parser = create_parser()
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 DEV_MODE = args.dev
 if DEV_MODE:

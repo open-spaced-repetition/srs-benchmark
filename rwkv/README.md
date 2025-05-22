@@ -1,4 +1,4 @@
-For fast performance, a device that supports CUDA is required. The code in this directory has only been tested on a single 3090 RTX on Windows.
+For fast performance, a device that supports CUDA is required. The code in this directory has been tested on a 3090 RTX on Windows.
 
 RWKV can still be run on non-CUDA devices for individual users. See the section [Run on a single user](#run-on-a-single-user).
 
@@ -22,7 +22,7 @@ python -m rwkv.data_processing --config rwkv/data_processing_config_train.toml
 python -m rwkv.data_processing --config rwkv/data_processing_config_test.toml
 ```
 ## Training
-RWKV uses the WSD lr scheduler. There are two distinct phases in training, the warmup + stable phase and then a decay phase.
+RWKV uses the WSD lr scheduler. There are two distinct phases in training, a warmup + stable phase and then a decay phase.
 To switch between the two phases, refer to the config file. RWKV was trained on approximately 10 epochs in the warmup + stable phase and 2 epochs in the decay phase.
 ```bash
 python -m rwkv.train_rwkv --config rwkv/train_rwkv_config.toml

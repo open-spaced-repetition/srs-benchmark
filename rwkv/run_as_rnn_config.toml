@@ -1,0 +1,11 @@
+USER = 1
+
+DATA_PATH = "../anki-revlogs-10k"
+MODEL_PATH = "pretrain/RWKV_trained_on_5000_10000.pth"
+DEVICE = "cpu"
+DTYPE = "float"
+
+LABEL_FILTER_LMDB_PATH = "label_filter_db"
+LABEL_FILTER_LMDB_SIZE = 7_000_000_000
+
+VERBOSE = true

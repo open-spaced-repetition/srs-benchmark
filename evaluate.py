@@ -20,9 +20,7 @@ def sigdig(value, CI):
             f"{round(CI, decimals - 1):.{decimals - 1}f}"
         )
     else:
-        return str(f"{rounded_value:.{decimals}f}"), str(
-            f"{rounded_CI:.{decimals}f}"
-        )
+        return str(f"{rounded_value:.{decimals}f}"), str(f"{rounded_CI:.{decimals}f}")
 
 
 # tests to ensure that sigdigs is working as intended
@@ -105,6 +103,8 @@ if __name__ == "__main__":
     models = (
         [
             (dev_mode_name, None, None),
+            ("RWKV-P", 2762884, ""),
+            ("RWKV", 2762884, ""),
             ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL, G, SR, AT"),
             ("GRU-P-short", 297, "IL, G, SR"),
             ("FSRS-6-recency", 21, "IL, G, SR"),

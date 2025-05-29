@@ -22,6 +22,8 @@ In the SRS benchmark, we use a tool called `TimeSeriesSplit`. This is part of th
 
 Note: TimeSeriesSplit will remove the first split from evaluation. This is because the first split is used for training, and we don't want to evaluate the algorithm on the same data it was trained on.
 
+RWKV and RMSE-BINS-EXPLOIT do not use TimeSeriesSplit.
+
 ### Metrics
 
 We use three metrics in the SRS benchmark to evaluate how well these algorithms work: Log Loss, AUC, and a custom RMSE that we call RMSE (bins).
@@ -62,13 +64,13 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
         - GRU-P: a variant of GRU that removes the fixed forgetting curve and predicts the probability of recall directly. This makes it more flexible than GRU, but also more prone to making strange predictions, such as the probability of recall *increasing* over time.
     - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews, fractional intervals, and the duration of review as part of its input.
       The three aforementioned neural networks were first pretrained on 100 users and then further optimized on each user individually.
-
+    - RWKV: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture, which combines the properties of an RNN and a Transformer. It has too many input features to list, so here is a *short* version: fractional interval lengths, grades, duration of the review, note ID, deck ID, preset ID, sibling card information, hour of the day, day of the week, and the number of reviews done today. Unlike other algorithms in this benchmark, RWKV is not optimized on each user individually. Instead, it is trained on 5 thousand users and evaluated on another 5 thousand; this process is repeated twice to get full coverage of the dataset. <a id="param-note"></a>Regarding the number of parameters: since we count FSRS-6 with default parameters as 0, by the same logic RWKV should also count as 0, since parameters don't change for each user individually.
+        - RWKV-P: predicts the result of a review at the time of the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. Just like GRU-P, it may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
 - SM-2-based algorithms:
     - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve. The algorithm is described by Piotr Wozniak [here](https://super-memory.com/english/ol/sm2.htm).
         - SM-2 trainable: SM-2 algorithm with optimizable parameters.
     - Anki-SM-2: a variant of the SM-2 algorithm that is used in Anki.
         - Anki-SM-2 trainable: Anki algorithm with optimizable parameters.
-
 - Other:
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline. An algorithm that doesn't outperform AVG cannot be considered good.
     - RMSE-BINS-EXPLOIT: an algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.
@@ -100,7 +102,9 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **LSTM** | 8869 | **0.3115±0.0079** | 0.0354±0.0011 | **0.7332±0.0038** | FIL, G, SR, AT |
+| **RWKV-P** | 2762884 [(0)](#param-note) | **0.2709±0.0074** | 0.01450±0.00037 | **0.8233±0.0040** | Yes |
+| RWKV | 2762884 [(0)](#param-note) | 0.2991±0.0075 | 0.0341±0.0012 | 0.7699±0.0032 | Yes |
+| LSTM | 8869 | 0.3115±0.0079 | 0.0354±0.0011 | 0.7332±0.0038 | FIL, G, SR, AT |
 | GRU-P-short | 297 | 0.3195±0.0080 | 0.0421±0.0013 | 0.7096±0.0047 | IL, G, SR|
 | FSRS-6 recency | 21 | 0.3198±0.0080 | 0.0437±0.0013 | 0.7096±0.0041 | IL, G, SR |
 | FSRS-rs | 21 | 0.3198±0.0083 | 0.0437±0.0012 | 0.7095±0.0040 | IL, G, SR |
@@ -138,7 +142,9 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **LSTM** | 8869 | **0.3332±0.0041** | 0.05378±0.00096 | **0.7329±0.0020** | FIL, G, SR, AT |
+| **RWKV-P** | 2762884 | **0.2773±0.0036** | 0.02502±0.00038 | **0.8329±0.0017** | Yes |
+| RWKV | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0020 | Yes |
+| LSTM | 8869 | 0.3332±0.0041 | 0.05378±0.00096 | 0.7329±0.0020 | FIL, G, SR, AT |
 | FSRS-6 recency | 21 | 0.3436±0.0042 | 0.0630±0.0010 | 0.7099±0.0022 | IL, G, SR |
 | FSRS-rs | 21 | 0.3436±0.0042 | 0.0630±0.0010 | 0.7100±0.0022 | IL, G, SR |
 | FSRS-6 | 21 | 0.3455±0.0042 | 0.0655±0.0011 | 0.7069±0.0023 | IL, G, SR |

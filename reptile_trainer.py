@@ -5,7 +5,7 @@ import torch.nn as nn
 from pathlib import Path
 from config import create_parser
 from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
-from multiprocess import Pool  # type: ignore
+from multiprocessing import Pool  # type: ignore
 import copy
 import numpy as np
 import wandb
@@ -55,7 +55,7 @@ DEFAULT_FINETUNE_PARAMS = {
 }
 
 parser = create_parser()
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 MODEL_NAME = args.algo
 SHORT_TERM = args.short

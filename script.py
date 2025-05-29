@@ -17,7 +17,7 @@ from config import create_parser
 from utils import catch_exceptions
 
 parser = create_parser()
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 DEV_MODE = args.dev
 DRY_RUN = args.dry

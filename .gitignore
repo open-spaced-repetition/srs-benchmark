@@ -145,6 +145,10 @@ collection/
 # Dataset
 dataset/FSRS-Anki-20k
 dataset/*.csv
+train_db
+test_db
+label_filter_db
+
 
 # Raw results
 raw/
@@ -152,3 +156,12 @@ evaluation/
 
 # Weights
 weights/
+
+# temp files
+rwkv/temp
+
+# test files
+**/test/
+
+# wandb
+wandb/

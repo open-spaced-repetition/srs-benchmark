@@ -5,7 +5,7 @@ import torch.nn as nn
 from pathlib import Path
 from config import create_parser
 from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
-from multiprocess import Pool  # type: ignore
+from multiprocessing import Pool  # type: ignore
 import copy
 import numpy as np
 import wandb

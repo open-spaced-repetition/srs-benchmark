@@ -1,6 +1,7 @@
 import json
 import math
 import multiprocessing
+from pathlib import Path
 import time
 import traceback
 
@@ -511,6 +512,7 @@ def main_loop(config, task_queue, batch_queue):
                     f"{config.SAVE_MODEL_FOLDER}/{config.SAVE_MODEL_PREFIX}_{step}.pth"
                 )
                 save_optim_path = f"{config.SAVE_MODEL_FOLDER}/{config.SAVE_MODEL_PREFIX}_optim_{step}.pth"
+                Path(config.SAVE_MODEL_FOLDER).mkdir(parents=True, exist_ok=True)               
                 torch.save(master_model.state_dict(), save_model_path)
                 torch.save(optimizer.state_dict(), save_optim_path)
                 print("MODEL SAVED.")

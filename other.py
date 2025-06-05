@@ -1180,27 +1180,27 @@ class FSRS6ParameterClipper:
 
 class FSRS6(FSRS):
     init_w = [
-        0.2172,
-        1.1771,
-        3.2602,
-        16.1507,
-        7.0114,
-        0.57,
-        2.0966,
-        0.0069,
-        1.5261,
-        0.112,
-        1.0178,
-        1.849,
-        0.1133,
-        0.3127,
-        2.2934,
-        0.2191,
-        3.0004,
-        0.7536,
-        0.3332,
-        0.1437,
-        0.2,
+        0.212,
+        1.2931,
+        2.3065,
+        8.2956,
+        6.4133,
+        0.8334,
+        3.0194,
+        0.001,
+        1.8722,
+        0.1666,
+        0.796,
+        1.4835,
+        0.0614,
+        0.2629,
+        1.6483,
+        0.6014,
+        1.8729,
+        0.5425,
+        0.0912,
+        0.0658,
+        0.1542,
     ]
     clipper = FSRS6ParameterClipper()
     lr: float = 4e-2
@@ -3289,7 +3289,9 @@ def process(user_id):
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
                 if not TRAIN_EQUALS_TEST:
-                    assert train_partition["review_th"].max() < test_set["review_th"].min()
+                    assert (
+                        train_partition["review_th"].max() < test_set["review_th"].min()
+                    )
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)

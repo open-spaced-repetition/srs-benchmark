@@ -2877,6 +2877,7 @@ def rmse_bins_exploit(user_id):
 
 def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     df["review_th"] = range(1, df.shape[0] + 1)
+    df["nth_today"] = df.groupby("day_offset").cumcount() + 1
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
 

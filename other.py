@@ -1319,7 +1319,7 @@ class FSRS6(FSRS):
 
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
-        :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
+        :param X: shape[batch_size, 3], X[:,0] is elapsed time, X[:,1] is rating, X[:,2] is nth_today
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
         :return state:
         """
@@ -1354,7 +1354,7 @@ class FSRS6(FSRS):
         self, inputs: Tensor, state: Optional[Tensor] = None
     ) -> tuple[Tensor, Tensor]:
         """
-        :param inputs: shape[seq_len, batch_size, 2]
+        :param inputs: shape[seq_len, batch_size, 3]
         """
         if state is None:
             state = torch.zeros((inputs.shape[1], 2))
@@ -2912,6 +2912,9 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     r_history_list = df.groupby("card_id", group_keys=False)["rating"].apply(
         lambda x: cum_concat([[i] for i in x])
     )
+    n_history_list = df.groupby("card_id", group_keys=False)["nth_today"].apply(
+        lambda x: cum_concat([[i] for i in x])
+    )
     last_rating = []
     for t_sublist, r_sublist in zip(t_history_non_secs_list, r_history_list):
         for t_history, r_history in zip(t_sublist, r_sublist):
@@ -2931,6 +2934,9 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         ",".join(map(str, item[:-1]))
         for sublist in t_history_non_secs_list
         for item in sublist
+    ]
+    df["n_history"] = [
+        ",".join(map(str, item[1:])) for sublist in n_history_list for item in sublist
     ]
     if secs_ivl:
         if EQUALIZE_TEST_WITH_NON_SECS:
@@ -2964,11 +2970,13 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         "90%",
     ):
         df["tensor"] = [
-            torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
-                0, 1
+            torch.tensor(
+                (t_item[:-1], r_item[:-1], n_item[1:]), dtype=torch.float32
+            ).transpose(0, 1)
+            for t_sublist, r_sublist, n_sublist in zip(
+                t_history_used, r_history_list, n_history_list
             )
-            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
+            for t_item, r_item, n_item in zip(t_sublist, r_sublist, n_sublist)
         ]
     elif model_name in "LSTM":
         # Create features (currently unused):

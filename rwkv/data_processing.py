@@ -274,9 +274,7 @@ def get_rwkv_data(data_path, user_id, equalize_review_ths=[]):
         ]
     ] = df.groupby("card_id")[
         ["elapsed_seconds", "elapsed_days", "y", "rating", "review_th"]
-    ].shift(
-        -1
-    )
+    ].shift(-1)
     # Pi as an obvious placeholder for NaN values
     df["label_elapsed_seconds"] = df["label_elapsed_seconds"].fillna(np.pi)
     df["label_elapsed_days"] = df["label_elapsed_days"].fillna(np.pi)

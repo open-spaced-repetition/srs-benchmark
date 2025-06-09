@@ -2,8 +2,8 @@ import numpy as np
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
-from config import create_parser
-from reptile_trainer import (
+from ..config import create_parser
+from .reptile_trainer import (
     DEFAULT_FINETUNE_PARAMS,
     finetune,
     get_inner_opt,
@@ -129,7 +129,7 @@ def objective(trial, df_list, model, inner_opt_state):
 
 
 def main():
-    from other import create_features, Transformer, LSTM
+    from ..other import create_features, Transformer, LSTM
 
     def process_user(user_id):
         print("Process:", user_id)

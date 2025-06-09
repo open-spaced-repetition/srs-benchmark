@@ -1,3 +1,16 @@
+"""
+Main training script for the SrsRWKV model.
+
+This script orchestrates the training process, including:
+- Setting up the model, optimizer, and learning rate schedulers.
+- Managing data loading and preprocessing through `DataFetcher` and `prepare_batch`.
+- Executing the main training loop, handling forward and backward passes, and optimizer steps.
+- Performing periodic validation against a test set.
+- Logging metrics to Weights & Biases (WandB).
+- Saving model checkpoints.
+- Handling mixed-precision training by maintaining a master model in float32 and
+  a training model in a specified data type (e.g., bfloat16).
+"""
 import json
 import math
 import multiprocessing
@@ -32,10 +45,20 @@ WEIGHT_DECAY = 0.01
 WEIGHT_DECAY_CHANNEL_MIXER = 0.01
 WEIGHT_DECAY_HEAD = 0.01
 CLIP = 0.5
-FETCH_AHEAD = 5
+FETCH_AHEAD = 5 # Number of batches to prefetch for data loading
 
 
 def extract_numbers(name):
+    """
+    Extracts user_id, start_th, end_th, and length from a string key
+    formatted like "USERID_STARTTH-ENDTH_LENGTH_...".
+
+    Args:
+        name: The string key.
+
+    Returns:
+        A tuple of integers (user_id, start_th, end_th, length) if found, else None.
+    """
     match = re.findall(r"(\d+)_([\d]+)-([\d]+)_([\d]+)", name)
     if match:
         return tuple(map(int, match[0]))
@@ -43,6 +66,23 @@ def extract_numbers(name):
 
 
 def get_optimizer(config, model):
+    """
+    Configures the AdamW optimizer with different weight decay settings for various parameter groups.
+
+    Parameters are grouped into:
+    - `decay_params`: General parameters that undergo weight decay.
+    - `channel_mixer_params`: Parameters specific to channel mixer layers, with potentially different decay.
+    - `decay_head_params`: Parameters related to output heads.
+    - `encode_params`: Parameters for input feature encoding layers.
+    - `other_params`: Parameters that do not undergo weight decay (e.g., biases, LayerNorm scales).
+
+    Args:
+        config: Configuration object containing learning rate and other optimizer settings.
+        model: The model whose parameters are to be optimized.
+
+    Returns:
+        A torch.optim.AdamW optimizer instance.
+    """
     encode_params = []
     decay_params = []
     channel_mixer_params = []
@@ -110,6 +150,14 @@ def get_optimizer(config, model):
 
 
 def log_model(log, model: SrsRWKV):
+    """
+    Logs detailed statistics (mean, std, min, max, quantiles) of model parameters
+    and their gradients to a dictionary for WandB logging.
+
+    Args:
+        log: The dictionary to which statistics will be added.
+        model: The model (typically the master_model with float32 gradients).
+    """
     for name, param in model.named_parameters():
         log[f"{name}.data.mean"] = param.mean().item()
         log[f"{name}.data.std"] = param.std().item()
@@ -129,6 +177,22 @@ def log_model(log, model: SrsRWKV):
 
 
 def get_groups(db_path, db_size, max_train_global_len, users):
+    """
+    Loads keys from an LMDB database and groups them into batches for training.
+
+    Keys identify RWKVSample data segments. They are grouped such that the total
+    length of sequences in a group (when padded to the length of the longest sequence
+    in that group) does not exceed `max_train_global_len`.
+
+    Args:
+        db_path: Path to the LMDB database.
+        db_size: Size of the LMDB database.
+        max_train_global_len: Maximum total length of sequences in a batch (sum of padded lengths).
+        users: A list of user IDs to fetch data for.
+
+    Returns:
+        A list of groups, where each group is a list of keys.
+    """
     lmdb_env = lmdb.open(db_path, map_size=db_size)
     with lmdb_env.begin(write=False) as txn:
         keys = []
@@ -170,6 +234,7 @@ def get_groups(db_path, db_size, max_train_global_len, users):
 
 
 def get_grad_norm(model):
+    """Computes the L2 norm of gradients for all model parameters."""
     total_norm = 0.0
     for p in model.parameters():
         if p.grad is not None:
@@ -180,6 +245,22 @@ def get_grad_norm(model):
 
 
 def evaluate_on_user(user_id, batch, model: SrsRWKV):
+    """
+    Evaluates the model on a single user's batch of data.
+
+    Args:
+        user_id: The ID of the user being evaluated.
+        batch: The PreparedBatch data for the user.
+        model: The SrsRWKV model.
+
+    Returns:
+        A tuple containing:
+        - ahead_equalize_loss * n_ahead_equalize
+        - n_ahead_equalize
+        - ahead_raw_equalize_loss * n_ahead_equalize
+        - imm_binary_equalize_loss * n_imm_binary_equalize
+        - n_imm_binary_equalize
+    """
     model.eval()
     with torch.no_grad():
         stats = model.get_loss(batch)
@@ -198,6 +279,23 @@ def evaluate_on_user(user_id, batch, model: SrsRWKV):
 
 
 def validate(model, data_fetcher, all_db_keys, users, device):
+    """
+    Performs validation on a set of users.
+
+    Iterates through the specified users, fetches their data using `data_fetcher`,
+    evaluates the model, and aggregates loss metrics.
+
+    Args:
+        model: The SrsRWKV model.
+        data_fetcher: DataFetcher instance to get preprocessed batches.
+        all_db_keys: Dictionary mapping user_id to their data keys in LMDB.
+        users: List of user IDs to validate on.
+        device: The device to run validation on.
+
+    Returns:
+        A tuple (mean_ahead_loss, mean_imm_loss) if validation is successful,
+        otherwise None.
+    """
     torch.cuda.empty_cache()
     tot_ahead_loss = 0
     tot_ahead_raw_loss = 0
@@ -247,9 +345,17 @@ def validate(model, data_fetcher, all_db_keys, users, device):
 
 
 def transfer_child_grad_to_master(master, child):
+    """
+    Transfers gradients from a child model (e.g., bfloat16) to a master model (float32).
+    Used in mixed-precision training.
+
+    Args:
+        master: The master model (typically float32 parameters and grads).
+        child: The child model (lower precision, where loss was computed).
+    """
     master_params = dict(master.named_parameters())
     for name, param in child.named_parameters():
-        # print(name, param.grad)
+        # print(name, param.grad) # For debugging
         master_param = master_params[name]
         if (
             param.grad is not None
@@ -266,6 +372,18 @@ def transfer_child_grad_to_master(master, child):
 
 
 def get_test_keys(dataset_path, dataset_size, users):
+    """
+    Loads the primary data keys for a list of users from a given LMDB dataset.
+    Assumes each user has exactly one main data entry (batch) in this dataset.
+
+    Args:
+        dataset_path: Path to the LMDB database.
+        dataset_size: Size of the LMDB database.
+        users: List of user IDs.
+
+    Returns:
+        A dictionary mapping user_id to their data key tuple (user_id, start_th, end_th, length).
+    """
     dataset = lmdb.open(dataset_path, map_size=dataset_size)
     keys = {}
     with dataset.begin(write=False) as txn:
@@ -283,7 +401,12 @@ def get_test_keys(dataset_path, dataset_size, users):
 
 
 class KeyValueStatistics:
+    """
+    A helper class to maintain and log running averages of various loss components.
+    Uses KeyValueAverage from rwkv.utils to store averages per training group (identified by `keys`).
+    """
     def __init__(self):
+        """Initializes KeyValueAverage instances for different metrics."""
         self.ahead_average = KeyValueAverage()
         self.ahead_raw_average = KeyValueAverage()
         self.ahead_raw_diff_average = KeyValueAverage()
@@ -292,6 +415,13 @@ class KeyValueStatistics:
         self.imm_binary_equalize_average = KeyValueAverage()
 
     def add(self, keys, stats):
+        """
+        Adds new statistics from a training step.
+
+        Args:
+            keys: A unique identifier for the current training group/batch (e.g., string representation of keys).
+            stats: The statistics object (e.g., SrsModelOutput) from the model's forward pass.
+        """
         self.ahead_average.add_value(
             key=keys, avg=stats.ahead_avg.detach(), weight=stats.ahead_n
         )
@@ -318,6 +448,12 @@ class KeyValueStatistics:
         )
 
     def add_log(self, log):
+        """
+        Adds the current aggregated averages to a log dictionary for WandB.
+
+        Args:
+            log: The dictionary to which the averages will be added.
+        """
         log[f"ahead_avg"] = self.ahead_average.get_value()
         log[f"ahead_raw_avg"] = self.ahead_raw_average.get_value()
         log[f"ahead_raw_diff_avg"] = self.ahead_raw_diff_average.get_value()
@@ -327,6 +463,23 @@ class KeyValueStatistics:
 
 
 def main_loop(config, task_queue, batch_queue):
+    """
+    The main training and validation loop.
+
+    Orchestrates:
+    - Model and optimizer setup.
+    - Data fetching and preparation.
+    - Epoch and step iteration.
+    - Learning rate scheduling.
+    - Training steps (forward, loss, backward, optimizer step).
+    - Periodic validation and model saving.
+    - Logging to WandB.
+
+    Args:
+        config: Configuration object.
+        task_queue: Multiprocessing queue for sending data loading tasks.
+        batch_queue: Multiprocessing queue for receiving prepared batches.
+    """
     data_fetcher = DataFetcher(task_queue=task_queue, out_queue=batch_queue)
 
     master_model = SrsRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(config.DEVICE)
@@ -544,6 +697,15 @@ def main_loop(config, task_queue, batch_queue):
 
 
 def main(config):
+    """
+    Entry point for the training script.
+
+    Sets up multiprocessing for data preparation and then starts the `main_loop`.
+    Handles graceful termination of data preparation processes.
+
+    Args:
+        config: Configuration object loaded from TOML.
+    """
     with multiprocessing.Manager() as manager:
         task_queue = manager.Queue()
         batch_queue = manager.Queue()

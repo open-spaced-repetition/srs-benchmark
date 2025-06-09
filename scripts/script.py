@@ -13,8 +13,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import accumulate
 import pyarrow.parquet as pq  # type: ignore
 import torch
-from config import create_parser
-from utils import catch_exceptions
+from ..config import create_parser
+from ..utils import catch_exceptions
 
 parser = create_parser()
 args, _ = parser.parse_known_args()

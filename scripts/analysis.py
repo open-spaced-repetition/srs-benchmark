@@ -3,7 +3,7 @@ import numpy as np
 import json
 import pathlib
 from KDEpy import FFTKDE  # type: ignore
-from config import create_parser
+from ..config import create_parser
 import os
 import sys
 

@@ -1,7 +1,13 @@
 """
-This script takes a trained model and a list of users and produces a result file.
-"""
+Evaluates a trained SrsRWKV model on a given set of users and produces result files.
 
+This script loads a pre-trained model, processes data for specified users from an LMDB database,
+runs inference to get predictions (both "ahead" for recall probability over time, and
+"immediate" for button press probability), calculates various performance metrics
+(RMSE, LogLoss, AUC), and saves these metrics along with raw predictions to JSONL files.
+It handles fetching data in batches and can resume processing if some users' results
+are already present in the output files.
+"""
 import json
 import multiprocessing
 from pathlib import Path
@@ -18,11 +24,25 @@ from rwkv.parse_toml import parse_toml
 from rwkv.prepare_batch import prepare_data
 from rwkv.utils import load_tensor, save_tensor  # type: ignore
 
-FETCH_AHEAD = 20
+FETCH_AHEAD = 20 # Number of user data batches to prefetch
 
 
 def get_benchmark_info(db_path, db_size, user_id):
-    equalize_env = lmdb.open(db_path, db_size)
+    """
+    Loads benchmark-related information (equalization review thresholds and RMSE bins)
+    for a specific user from an LMDB database.
+
+    This data is typically precomputed by `rwkv.data.find_equalize_test_reviews`.
+
+    Args:
+        db_path: Path to the LMDB database containing benchmark info.
+        db_size: Size of the LMDB database.
+        user_id: The ID of the user.
+
+    Returns:
+        A tuple (equalize_review_ths_list, rmse_bins_list) if found, otherwise None.
+    """
+    equalize_env = lmdb.open(db_path, map_size=db_size) # Corrected parameter name
     key_review_ths = f"{user_id}_review_ths"
     key_rmse_bins = f"{user_id}_rmse_bins"
     with equalize_env.begin(write=False) as txn:
@@ -37,6 +57,25 @@ def get_benchmark_info(db_path, db_size, user_id):
 def get_stats(
     user_id, equalize_review_ths, rmse_bins_dict, pred_dict, label_rating_dict
 ):
+    """
+    Calculates and prints performance metrics for a user's predictions.
+
+    Metrics include RMSE (raw and binned), LogLoss, and AUC.
+
+    Args:
+        user_id: The ID of the user.
+        equalize_review_ths: List of review_th values to be included in the metrics,
+                             typically from `get_benchmark_info`.
+        rmse_bins_dict: Dictionary mapping review_th to its RMSE bin.
+        pred_dict: Dictionary mapping review_th to its predicted probability.
+        label_rating_dict: Dictionary mapping review_th to the true rating (1-4).
+                           Ratings are converted to binary labels (0 or 1) for metric calculation.
+
+    Returns:
+        A tuple (stats_dict, raw_results_dict):
+        - stats_dict: Contains calculated metrics, user ID, and size.
+        - raw_results_dict: Contains user ID, size, lists of predictions, labels, and review_ths.
+    """
     gather_pred = []
     gather_y = []
     bin_pred = {}
@@ -119,6 +158,18 @@ def get_stats(
 
 
 def get_test_keys_batch(config, users):
+    """
+    Loads all data keys (identifying RWKVSample segments) for a list of users
+    from the main dataset LMDB.
+
+    Args:
+        config: Configuration object with DATASET_LMDB_PATH and DATASET_LMDB_SIZE.
+        users: List of user IDs.
+
+    Returns:
+        A dictionary mapping user_id to a list of their data key tuples.
+        Each key tuple is (user_id, start_th, end_th, length).
+    """
     dataset = lmdb.open(config.DATASET_LMDB_PATH, map_size=config.DATASET_LMDB_SIZE)
     keys = {}
     with dataset.begin(write=False) as txn:
@@ -148,6 +199,23 @@ def run(
     imm_path_result,
     imm_path_raw,
 ):
+    """
+    Main worker function to process a list of users, generate predictions,
+    and save results.
+
+    Iterates through users, fetches their data batches, runs model inference,
+    calculates statistics using `get_stats`, and appends results to output files.
+
+    Args:
+        config: Configuration object.
+        task_queue: Queue for requesting data preparation.
+        batch_queue: Queue for receiving prepared batches.
+        users: List of user IDs to process.
+        ahead_users_result, imm_users_result: Sets of user IDs whose aggregated results are already saved.
+        ahead_users_raw, imm_users_raw: Sets of user IDs whose raw predictions are already saved.
+        ahead_path_result, imm_path_result: Paths to save aggregated ahead/immediate results.
+        ahead_path_raw, imm_path_raw: Paths to save raw ahead/immediate predictions.
+    """
     data_fetcher = DataFetcher(task_queue=task_queue, out_queue=batch_queue)
 
     master_model = SrsRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(config.DEVICE)
@@ -271,19 +339,43 @@ def run(
                 write(imm_raw, imm_users_raw, imm_path_raw)
 
 
-def sort_jsonl(file):
-    data = list(map(lambda x: json.loads(x), open(file).readlines()))
+def sort_jsonl(file_path: Path):
+    """
+    Sorts a JSONL file in place by the "user" field in each JSON object.
+
+    Args:
+        file_path: Path object for the JSONL file.
+    """
+    if not file_path.exists() or file_path.stat().st_size == 0:
+        return # Skip empty or non-existent files
+
+    data = [json.loads(line) for line in file_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not data:
+        return
+
     data.sort(key=lambda x: x["user"])
-    with file.open("w", encoding="utf-8") as jsonl_file:
+    with file_path.open("w", encoding="utf-8") as jsonl_file:
         for json_data in data:
             jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
     return data
 
 
 def main(config):
+    """
+    Main entry point for the get_result script.
+
+    1. Sets up paths for output files.
+    2. Identifies users whose results are already processed to avoid re-computation.
+    3. Sets up multiprocessing for data preparation (`prepare_data`).
+    4. Calls the `run` function to process users and generate results.
+    5. Ensures output files are sorted by user ID upon completion.
+
+    Args:
+        config: Configuration object loaded from TOML.
+    """
     target_users = list(range(config.USER_START, config.USER_END + 1))
-    if 4371 in target_users:
-        target_users.remove(4371)  # this user has no reviews
+    if 4371 in target_users: # User 4371 might be problematic or empty
+        target_users.remove(4371)
 
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)

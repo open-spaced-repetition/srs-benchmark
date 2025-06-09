@@ -1,3 +1,9 @@
+"""
+Utility functions and classes for the RWKV model training and inference.
+
+This module provides helper functions for tensor manipulation,
+parameter counting, and data averaging.
+"""
 from io import BytesIO
 import torch
 from collections import deque
@@ -15,12 +21,31 @@ def get_number_of_trainable_parameters(model):
 
 
 def load_tensor(txn, key, device):
+    """
+    Loads a PyTorch tensor from an LMDB transaction.
+
+    Args:
+        txn: The LMDB transaction object.
+        key: The key under which the tensor is stored (will be UTF-8 encoded).
+        device: The device to load the tensor onto.
+
+    Returns:
+        The loaded PyTorch tensor.
+    """
     tensor_bytes = txn.get(key.encode())
     buffer = BytesIO(tensor_bytes)
     return torch.load(buffer, weights_only=True, map_location=device)
 
 
 def save_tensor(txn, key, tensor):
+    """
+    Saves a PyTorch tensor to an LMDB transaction.
+
+    Args:
+        txn: The LMDB transaction object.
+        key: The key under which to store the tensor (will be UTF-8 encoded).
+        tensor: The PyTorch tensor to save.
+    """
     tensor = tensor.clone().contiguous()
     buffer = BytesIO()
     torch.save(tensor, buffer)
@@ -35,9 +60,19 @@ class SlidingWindowAverage:
         self.n = 0
 
     def at_capacity(self):
+        """Checks if the sliding window is at full capacity."""
         return self.len == len(self.queue)
 
     def add_value(self, avg, weight=1):
+        """
+        Adds a new value to the sliding window.
+
+        If the window is at capacity, the oldest value is removed.
+
+        Args:
+            avg: The value to add.
+            weight: The weight of the value (default is 1).
+        """
         self.tot += avg * weight
         self.n += weight
 
@@ -48,6 +83,15 @@ class SlidingWindowAverage:
             self.n -= prev_n
 
     def get_value(self):
+        """
+        Calculates the current average of the values in the window.
+
+        Returns:
+            The weighted average of the values.
+
+        Raises:
+            AssertionError: If there are no values in the window (n=0).
+        """
         assert self.n > 0
         return self.tot / self.n
 
@@ -60,6 +104,14 @@ class KeyValueAverage:
         self.n = 0
 
     def add_value(self, key, avg, weight=1):
+        """
+        Adds or updates a value associated with a key.
+
+        Args:
+            key: The key for the value.
+            avg: The new value.
+            weight: The weight of the value (default is 1).
+        """
         if key not in self.values:
             self.values[key] = 0
             self.weights[key] = 0
@@ -72,5 +124,14 @@ class KeyValueAverage:
         self.n += self.weights[key]
 
     def get_value(self):
+        """
+        Calculates the current overall weighted average of all key-value pairs.
+
+        Returns:
+            The weighted average.
+
+        Raises:
+            AssertionError: If there are no values (n=0).
+        """
         assert self.n > 0
         return self.tot / self.n

@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
 import torch.nn as nn
-from other import (
+from ..other import (
     create_features,
     Trainer,
     RNN,
@@ -15,7 +15,7 @@ from other import (
     Collection,
 )
 from fsrs_optimizer import plot_brier, Optimizer  # type: ignore
-from config import create_parser
+from ..config import create_parser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 

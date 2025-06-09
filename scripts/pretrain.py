@@ -7,13 +7,13 @@ import torch.nn as nn
 from ..other import (
     create_features,
     Trainer,
-    RNN,
-    Transformer,
-    NN_17,
-    GRU_P,
-    FSRS6,
     Collection,
 )
+from ..models.rnn import RNN
+from ..models.transformer import Transformer
+from ..models.nn17 import NN_17
+from ..models.gru_p import GRU_P
+from ..models.fsrs6 import FSRS6
 from fsrs_optimizer import plot_brier, Optimizer  # type: ignore
 from ..config import create_parser
 from concurrent.futures import ThreadPoolExecutor, as_completed

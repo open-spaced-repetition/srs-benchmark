@@ -506,7 +506,9 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
 
 
 def main():
-    from ..other import create_features, Transformer, LSTM
+    from ..other import create_features
+    from ..models.transformer import Transformer
+    from ..models.lstm import LSTM
 
     def process_user(user_id):
         print("Process user:", user_id)

@@ -129,7 +129,7 @@ class FSRS6(FSRS):
         )
         return output
 
-    def forgetting_curve(self, t, s, decay=-0.2):
+    def forgetting_curve(self, t, s, decay=-init_w[20]):
         factor = 0.9 ** (1 / decay) - 1
         return (1 + factor * t / s) ** decay
 

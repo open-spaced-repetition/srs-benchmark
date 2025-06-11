@@ -10,6 +10,17 @@ class DASH(nn.Module):
     lr: float = 4e-2
     wd: float = 1e-5
     n_epoch: int = 5
+    init_w = [
+        0.2024,
+        0.5967,
+        0.1255,
+        0.6039,
+        -0.1485,
+        0.572,
+        0.0933,
+        0.4801,
+        0.787,
+    ]
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super(DASH, self).__init__()
@@ -32,17 +43,7 @@ class DASH(nn.Module):
                 ]
             else:
                 w = (
-                    [
-                        0.2024,
-                        0.5967,
-                        0.1255,
-                        0.6039,
-                        -0.1485,
-                        0.572,
-                        0.0933,
-                        0.4801,
-                        0.787,
-                    ]
+                    self.init_w
                     if "MCM" not in config.model_name
                     else [
                         0.2783,

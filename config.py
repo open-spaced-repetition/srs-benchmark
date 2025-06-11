@@ -257,7 +257,6 @@ class Config:
 
         # Seed for reproducibility
         self.seed: int = 42
-        torch.manual_seed(self.seed)  # Set seed for PyTorch operations
 
         # Apply global warning filters (can also be done in main.py)
         # warnings.filterwarnings("ignore", category=UserWarning, module="torch.optim.lr_scheduler") # Example for scheduler

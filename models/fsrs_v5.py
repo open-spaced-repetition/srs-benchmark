@@ -15,10 +15,10 @@ class FSRS5ParameterClipper:
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
-            w[0] = w[0].clamp(self.config.s_min, 100)
-            w[1] = w[1].clamp(self.config.s_min, 100)
-            w[2] = w[2].clamp(self.config.s_min, 100)
-            w[3] = w[3].clamp(self.config.s_min, 100)
+            w[0] = w[0].clamp(self.config.s_min, self.config.init_s_max)
+            w[1] = w[1].clamp(self.config.s_min, self.config.init_s_max)
+            w[2] = w[2].clamp(self.config.s_min, self.config.init_s_max)
+            w[3] = w[3].clamp(self.config.s_min, self.config.init_s_max)
             w[4] = w[4].clamp(1, 10)
             w[5] = w[5].clamp(0.001, 4)
             w[6] = w[6].clamp(0.001, 4)

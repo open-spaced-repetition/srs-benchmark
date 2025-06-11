@@ -91,7 +91,7 @@ if config.model_name.startswith("Ebisu"):
     import ebisu  # type: ignore
 
 warnings.filterwarnings("ignore", category=UserWarning)
-torch.manual_seed(42)
+torch.manual_seed(config.seed)
 tqdm.pandas()
 
 DEVICE = torch.device(

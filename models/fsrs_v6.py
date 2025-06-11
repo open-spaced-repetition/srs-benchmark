@@ -4,11 +4,11 @@ from torch import nn, Tensor
 from typing import Optional
 from models.fsrs import FSRS
 
-from config import ModelConfig
+from config import Config
 
 
 class FSRS6ParameterClipper:
-    def __init__(self, config: ModelConfig = None, frequency: int = 1):
+    def __init__(self, config: Config = None, frequency: int = 1):
         self.frequency = frequency
         self.config = config
 
@@ -102,7 +102,7 @@ class FSRS6(FSRS):
         ]
     )
 
-    def __init__(self, config: ModelConfig, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: Optional[List[float]] = None):
         super(FSRS6, self).__init__(config)
         if w is None:
             w = self.init_w

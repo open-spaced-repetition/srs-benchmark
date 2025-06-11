@@ -3,11 +3,11 @@ from torch import nn, Tensor
 import numpy as np
 from scipy.optimize import minimize  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
-from config import ModelConfig
+from config import Config
 
 
 class FSRS(nn.Module):
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config: Config):
         super(FSRS, self).__init__()
         self.config = config
 

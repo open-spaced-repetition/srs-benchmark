@@ -2,7 +2,7 @@ import torch
 from torch import nn, Tensor
 from typing import List
 from typing import Optional
-from config import ModelConfig
+from config import Config
 
 
 class DASH(nn.Module):
@@ -11,14 +11,14 @@ class DASH(nn.Module):
     wd: float = 1e-5
     n_epoch: int = 5
 
-    def __init__(self, config: ModelConfig, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: Optional[List[float]] = None):
         super(DASH, self).__init__()
         self.config = config
         self.fc = nn.Linear(8, 1)
         self.sigmoid = nn.Sigmoid()
 
         if w is None:
-            if config.effective_short_term:
+            if config.include_short_term:
                 w = [
                     -0.1766,
                     0.4483,

@@ -1,10 +1,10 @@
 import torch
 from torch import nn, Tensor
-from config import ModelConfig
+from config import Config
 
 
 class NN_17ParameterClipper:
-    def __init__(self, config: ModelConfig, frequency: int = 1):
+    def __init__(self, config: Config, frequency: int = 1):
         self.frequency = frequency
         self.config = config
 
@@ -54,7 +54,7 @@ class NN_17(nn.Module):
     wd: float = 1e-5
     n_epoch: int = 5
 
-    def __init__(self, config: ModelConfig, state_dict=None) -> None:
+    def __init__(self, config: Config, state_dict=None) -> None:
         self.config = config
         super(NN_17, self).__init__()
         self.hidden_size = 1

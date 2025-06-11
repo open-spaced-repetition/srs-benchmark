@@ -21,7 +21,7 @@ from reptile_trainer import get_inner_opt, finetune
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
-from config import create_parser, ModelConfig
+from config import create_parser, Config
 from utils import catch_exceptions, rmse_matrix
 
 # Import all models from /models directory
@@ -46,28 +46,7 @@ from models.anki import Anki
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
-model_config = ModelConfig(args)
-
-DEV_MODE = args.dev
-DRY_RUN = args.dry
-MODEL_NAME = args.algo
-SHORT_TERM = args.short
-SECS_IVL = args.secs
-NO_TEST_SAME_DAY = args.no_test_same_day
-NO_TRAIN_SAME_DAY = args.no_train_same_day
-EQUALIZE_TEST_WITH_NON_SECS = args.equalize_test_with_non_secs
-TWO_BUTTONS = args.two_buttons
-FILE = args.file
-PLOT = args.plot
-WEIGHTS = args.weights
-PARTITIONS = args.partitions
-RAW = args.raw
-PROCESSES = args.processes
-DATA_PATH = Path(args.data)
-RECENCY = args.recency
-TRAIN_EQUALS_TEST = args.train_equals_test
-torch.set_num_threads(1)
-# torch.set_num_interop_threads(1)
+config = Config(args)
 
 model_list = (
     "FSRSv1",
@@ -97,15 +76,15 @@ model_list = (
     "Anki",
 )
 
-if MODEL_NAME not in model_list:
+if config.model_name not in model_list:
     raise ValueError(f"Model name must be one of {model_list}")
 
-if DEV_MODE:
-    sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
+if config.dev_mode:
+    sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
 
 from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier  # type: ignore
 
-if MODEL_NAME.startswith("Ebisu"):
+if config.model_name.startswith("Ebisu"):
     import ebisu  # type: ignore
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -115,35 +94,10 @@ tqdm.pandas()
 DEVICE = torch.device(
     "cuda"
     if torch.cuda.is_available()
-    and MODEL_NAME in ["GRU", "GRU-P", "LSTM", "RNN", "NN-17", "Transformer"]
+    and config.model_name in ["GRU", "GRU-P", "LSTM", "RNN", "NN-17", "Transformer"]
     else "cpu"
 )
 # DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-
-n_splits: int = 5
-batch_size: int = 512
-max_seq_len: int = 64
-verbose: bool = False
-verbose_inadequate_data: bool = False
-
-FILE_NAME = (
-    MODEL_NAME
-    + ("-dry-run" if DRY_RUN else "")
-    + ("-short" if SHORT_TERM else "")
-    + ("-secs" if SECS_IVL else "")
-    + ("-recency" if RECENCY else "")
-    + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
-    + ("-no_train_same_day" if NO_TRAIN_SAME_DAY else "")
-    + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
-    + ("-train_equals_test" if TRAIN_EQUALS_TEST else "")
-    + ("-" + PARTITIONS if PARTITIONS != "none" else "")
-    + ("-dev" if DEV_MODE else "")
-)
-OPT_NAME = FILE_NAME + "_opt"
-
-S_MIN = 1e-6 if SECS_IVL else 0.01
-INIT_S_MAX = 100
-S_MAX = 36500
 
 
 def sm2(r_history):
@@ -166,7 +120,7 @@ def sm2(r_history):
             ivl = 1
             reps = 0
         ef = max(1.3, ef + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)))
-        ivl = min(max(1, round(ivl + 0.01)), S_MAX)
+        ivl = min(max(1, round(ivl + 0.01)), config.s_max)
     return float(ivl)
 
 
@@ -464,19 +418,23 @@ class Collection:
 
 def process_untrainable(user_id):
     df_revlogs = pd.read_parquet(
-        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    df_cards = pd.read_parquet(DATA_PATH / "cards", filters=[("user_id", "=", user_id)])
-    df_decks = pd.read_parquet(DATA_PATH / "decks", filters=[("user_id", "=", user_id)])
+    df_cards = pd.read_parquet(
+        config.data_path / "cards", filters=[("user_id", "=", user_id)]
+    )
+    df_decks = pd.read_parquet(
+        config.data_path / "decks", filters=[("user_id", "=", user_id)]
+    )
     df_join = df_revlogs.merge(df_cards, on="card_id", how="left").merge(
         df_decks, on="deck_id", how="left"
     )
     df_join.fillna({"deck_id": -1, "preset_id": -1}, inplace=True)
-    dataset = create_features(df_join, MODEL_NAME)
+    dataset = create_features(df_join, config.model_name)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
     testsets = []
-    tscv = TimeSeriesSplit(n_splits=n_splits)
+    tscv = TimeSeriesSplit(n_splits=config.n_splits)
     for _, test_index in tscv.split(dataset):
         test_set = dataset.iloc[test_index].copy()
         testsets.append(test_set)
@@ -486,12 +444,12 @@ def process_untrainable(user_id):
     save_tmp = []
 
     for i, testset in enumerate(testsets):
-        if MODEL_NAME == "SM2":
+        if config.model_name == "SM2":
             testset["stability"] = testset["sequence"].map(sm2)
             testset["p"] = np.exp(
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
             )
-        elif MODEL_NAME == "Ebisu-v2":
+        elif config.model_name == "Ebisu-v2":
             testset["model"] = testset["sequence"].map(ebisu_v2)
             testset["p"] = testset.apply(
                 lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
@@ -502,21 +460,21 @@ def process_untrainable(user_id):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    stats, raw = evaluate(y, p, save_tmp, MODEL_NAME, user_id)
+    stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
     return stats, raw
 
 
 def baseline(user_id):
     model_name = "AVG"
     dataset = pd.read_parquet(
-        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
     testsets = []
     avg_ps = []
-    tscv = TimeSeriesSplit(n_splits=n_splits)
+    tscv = TimeSeriesSplit(n_splits=config.n_splits)
     for train_index, test_index in tscv.split(dataset):
         test_set = dataset.iloc[test_index].copy()
         testsets.append(test_set)
@@ -541,13 +499,13 @@ def rmse_bins_exploit(user_id):
     """This model attempts to exploit rmse(bins) by keeping track of per-bin statistics"""
     model_name = "RMSE-BINS-EXPLOIT"
     dataset = pd.read_parquet(
-        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
     dataset = create_features(dataset, model_name)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
 
-    tscv = TimeSeriesSplit(n_splits=n_splits)
+    tscv = TimeSeriesSplit(n_splits=config.n_splits)
     save_tmp = []
     first_test_index = int(1e9)
     for _, test_index in tscv.split(dataset):
@@ -573,15 +531,15 @@ def rmse_bins_exploit(user_id):
     return stats, raw
 
 
-def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
+def create_features_helper(df, model_name, secs_ivl=config.use_secs_intervals):
     df["review_th"] = range(1, df.shape[0] + 1)
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
 
-    if TWO_BUTTONS:
+    if config.two_buttons:
         df["rating"] = df["rating"].replace({2: 3, 4: 3})
     df["i"] = df.groupby("card_id").cumcount() + 1
-    df.drop(df[df["i"] > max_seq_len * 2].index, inplace=True)
+    df.drop(df[df["i"] > config.max_seq_len * 2].index, inplace=True)
     if (
         "delta_t" not in df.columns
         and "elapsed_days" in df.columns
@@ -591,10 +549,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         if secs_ivl:
             df["delta_t_secs"] = df["elapsed_seconds"] / 86400
             df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
-    global SHORT_TERM
-    if model_name.startswith("FSRS-5") or model_name.startswith("FSRS-6"):
-        SHORT_TERM = True
-    if not SHORT_TERM:
+    if not config.include_short_term:
         # exclude reviews that are on the same day from features and labels
         df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
         df["i"] = df.groupby("card_id").cumcount() + 1
@@ -630,7 +585,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
         for item in sublist
     ]
     if secs_ivl:
-        if EQUALIZE_TEST_WITH_NON_SECS:
+        if config.equalize_test_with_non_secs:
             df["t_history"] = [
                 ",".join(map(str, item[:-1]))
                 for sublist in t_history_non_secs_list
@@ -822,7 +777,7 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
 
     df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
     df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    if SHORT_TERM:
+    if config.include_short_term:
         df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
     df["i"] = (
         df.groupby("card_id")
@@ -846,8 +801,8 @@ def create_features_helper(df, model_name, secs_ivl=SECS_IVL):
     return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
 
-def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL):
-    if secs_ivl and EQUALIZE_TEST_WITH_NON_SECS:
+def create_features(df, model_name="FSRSv3", secs_ivl=config.use_secs_intervals):
+    if secs_ivl and config.equalize_test_with_non_secs:
         df_non_secs = create_features_helper(df.copy(), model_name, False)
         df_secs = create_features_helper(df.copy(), model_name, True)
         df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
@@ -857,7 +812,7 @@ def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL):
         assert np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all()
         assert np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all()
 
-        tscv = TimeSeriesSplit(n_splits=n_splits)
+        tscv = TimeSeriesSplit(n_splits=config.n_splits)
         for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
             non_secs_test_set = df_non_secs.iloc[non_secs_test_index]
             # For the resulting train set, only allow reviews that are less than the smallest review_th in non_secs_test_set
@@ -882,90 +837,89 @@ def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL):
 def process(user_id):
     plt.close("all")
     global S_MIN
-    if MODEL_NAME == "SM2" or MODEL_NAME.startswith("Ebisu"):
+    if config.model_name == "SM2" or config.model_name.startswith("Ebisu"):
         return process_untrainable(user_id)
-    if MODEL_NAME == "AVG":
+    if config.model_name == "AVG":
         return baseline(user_id)
-    if MODEL_NAME == "RMSE-BINS-EXPLOIT":
+    if config.model_name == "RMSE-BINS-EXPLOIT":
         return rmse_bins_exploit(user_id)
     df_revlogs = pd.read_parquet(
-        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
-    if MODEL_NAME in ("RNN", "GRU"):
+    if config.model_name in ("RNN", "GRU"):
         Model = RNN
-    elif MODEL_NAME == "GRU-P":
+    elif config.model_name == "GRU-P":
         Model = GRU_P
-    elif MODEL_NAME == "LSTM":
+    elif config.model_name == "LSTM":
         Model = LSTM
-    elif MODEL_NAME == "FSRSv1":
+    elif config.model_name == "FSRSv1":
         Model = FSRS1
-    elif MODEL_NAME == "FSRSv2":
+    elif config.model_name == "FSRSv2":
         Model = FSRS2
-    elif MODEL_NAME == "FSRSv3":
+    elif config.model_name == "FSRSv3":
         Model = FSRS3
-    elif MODEL_NAME == "FSRSv4":
+    elif config.model_name == "FSRSv4":
         Model = FSRS4
-    elif MODEL_NAME == "FSRS-4.5":
+    elif config.model_name == "FSRS-4.5":
         Model = FSRS4dot5
-    elif MODEL_NAME == "FSRS-5":
+    elif config.model_name == "FSRS-5":
         Model = FSRS5
-    elif MODEL_NAME == "FSRS-6":
-        S_MIN = 0.001 if not SECS_IVL else S_MIN
+    elif config.model_name == "FSRS-6":
         Model = FSRS6
-    elif MODEL_NAME == "HLR":
+    elif config.model_name == "HLR":
         Model = HLR
-    elif MODEL_NAME == "Transformer":
+    elif config.model_name == "Transformer":
         Model = Transformer
-    elif MODEL_NAME == "ACT-R":
+    elif config.model_name == "ACT-R":
         Model = ACT_R
-    elif MODEL_NAME in ("DASH", "DASH[MCM]"):
+    elif config.model_name in ("DASH", "DASH[MCM]"):
         Model = DASH
-    elif MODEL_NAME == "DASH[ACT-R]":
+    elif config.model_name == "DASH[ACT-R]":
         Model = DASH_ACTR
-    elif MODEL_NAME == "NN-17":
+    elif config.model_name == "NN-17":
         Model = NN_17
-    elif MODEL_NAME == "SM2-trainable":
+    elif config.model_name == "SM2-trainable":
         Model = SM2
-    elif MODEL_NAME == "Anki":
+    elif config.model_name == "Anki":
         Model = Anki
-    elif MODEL_NAME == "90%":
+    elif config.model_name == "90%":
 
         def get_constant_model(state_dict=None):
             return ConstantModel(0.9)
 
         Model = get_constant_model
 
-    dataset = create_features(df_revlogs, MODEL_NAME, SECS_IVL)
+    dataset = create_features(df_revlogs, config.model_name, config.use_secs_intervals)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
-    if PARTITIONS != "none":
+    if config.partitions != "none":
         df_cards = pd.read_parquet(
-            DATA_PATH / "cards", filters=[("user_id", "=", user_id)]
+            config.data_path / "cards", filters=[("user_id", "=", user_id)]
         )
         df_cards.drop(columns=["user_id"], inplace=True)
         df_decks = pd.read_parquet(
-            DATA_PATH / "decks", filters=[("user_id", "=", user_id)]
+            config.data_path / "decks", filters=[("user_id", "=", user_id)]
         )
         df_decks.drop(columns=["user_id"], inplace=True)
         dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
             df_decks, on="deck_id", how="left"
         )
         dataset.fillna(-1, inplace=True)
-        if PARTITIONS == "preset":
+        if config.partitions == "preset":
             dataset["partition"] = dataset["preset_id"].astype(int)
-        elif PARTITIONS == "deck":
+        elif config.partitions == "deck":
             dataset["partition"] = dataset["deck_id"].astype(int)
     else:
         dataset["partition"] = 0
     w_list = []
     testsets = []
-    tscv = TimeSeriesSplit(n_splits=n_splits)
+    tscv = TimeSeriesSplit(n_splits=config.n_splits)
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
-        if not TRAIN_EQUALS_TEST:
+        if not config.train_equals_test:
             train_set = dataset.iloc[train_index]
             test_set = dataset.iloc[test_index]
-            if EQUALIZE_TEST_WITH_NON_SECS:
+            if config.equalize_test_with_non_secs:
                 # Ignores the train_index and test_index
                 train_set = dataset[dataset[f"{split_i}_train"]]
                 test_set = dataset[dataset[f"{split_i}_test"]]
@@ -976,9 +930,9 @@ def process(user_id):
         else:
             train_set = dataset.copy()
             test_set = dataset.copy()
-        if NO_TEST_SAME_DAY:
+        if config.no_test_same_day:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
-        if NO_TRAIN_SAME_DAY:
+        if config.no_train_same_day:
             train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
         testsets.append(test_set)
@@ -986,23 +940,24 @@ def process(user_id):
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
-                if not TRAIN_EQUALS_TEST:
+                if not config.train_equals_test:
                     assert (
                         train_partition["review_th"].max() < test_set["review_th"].min()
                     )
-                if RECENCY:
+                if config.use_recency_weighting:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
 
-                model = Model(model_config)
-                if DRY_RUN:
+                model = Model(config)
+                if config.dry_run:
                     partition_weights[partition] = model.state_dict()
                     continue
 
-                if MODEL_NAME == "LSTM":
+                if config.model_name == "LSTM":
                     model = model.to(DEVICE)
                     inner_opt = get_inner_opt(
-                        model.parameters(), path=f"./pretrain/{OPT_NAME}_pretrain.pth"
+                        model.parameters(),
+                        path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
                     )
                     trained_model = finetune(
                         train_partition, model, inner_opt.state_dict()
@@ -1018,12 +973,12 @@ def process(user_id):
                         n_epoch=model.n_epoch,
                         lr=model.lr,
                         wd=model.wd,
-                        batch_size=batch_size,
+                        batch_size=config.batch_size,
                     )
                     partition_weights[partition] = trainer.train()
             except Exception as e:
                 if str(e).endswith("inadequate."):
-                    if verbose_inadequate_data:
+                    if config.verbose_inadequate_data:
                         print("Skipping - Inadequate data")
                 else:
                     print(f"User: {user_id}")
@@ -1031,7 +986,7 @@ def process(user_id):
                 partition_weights[partition] = Model().state_dict()
         w_list.append(partition_weights)
 
-        if TRAIN_EQUALS_TEST:
+        if config.train_equals_test:
             break
 
     p = []
@@ -1043,7 +998,7 @@ def process(user_id):
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(
-                Model(model_config, weights) if weights else Model(model_config)
+                Model(config, weights) if weights else Model(config)
             )
             retentions, stabilities, difficulties = my_collection.batch_predict(
                 partition_testset
@@ -1059,15 +1014,21 @@ def process(user_id):
 
     save_tmp = pd.concat(save_tmp)
     del save_tmp["tensor"]
-    if FILE:
-        save_tmp.to_csv(f"evaluation/{FILE_NAME}/{user_id}.tsv", sep="\t", index=False)
+    if config.save_evaluation_file:
+        save_tmp.to_csv(
+            f"evaluation/{config.get_evaluation_file_name()}/{user_id}.tsv",
+            sep="\t",
+            index=False,
+        )
 
-    stats, raw = evaluate(y, p, save_tmp, FILE_NAME, user_id, w_list)
+    stats, raw = evaluate(
+        y, p, save_tmp, config.get_evaluation_file_name(), user_id, w_list
+    )
     return stats, raw
 
 
 def evaluate(y, p, df, file_name, user_id, w_list=None):
-    if PLOT:
+    if config.generate_plots:
         fig = plt.figure()
         plot_brier(p, y, ax=fig.add_subplot(111))
         fig.savefig(f"evaluation/{file_name}/{user_id}.png")
@@ -1102,10 +1063,10 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
             int(partition): list(map(lambda x: round(x, 6), w))
             for partition, w in w_list[-1].items()
         }
-    elif WEIGHTS:
+    elif config.save_weights:
         Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
         torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
-    if RAW:
+    if config.save_raw_output:
         raw = {
             "user": int(user_id),
             "p": list(map(lambda x: round(x, 4), p)),
@@ -1119,19 +1080,21 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     unprocessed_users = []
-    dataset = pq.ParquetDataset(DATA_PATH / "revlogs")
-    Path(f"evaluation/{FILE_NAME}").mkdir(parents=True, exist_ok=True)
+    dataset = pq.ParquetDataset(config.data_path / "revlogs")
+    Path(f"evaluation/{config.get_evaluation_file_name()}").mkdir(
+        parents=True, exist_ok=True
+    )
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)
-    result_file = Path(f"result/{FILE_NAME}.jsonl")
-    raw_file = Path(f"raw/{FILE_NAME}.jsonl")
+    result_file = Path(f"result/{config.get_evaluation_file_name()}.jsonl")
+    raw_file = Path(f"raw/{config.get_evaluation_file_name()}.jsonl")
     if result_file.exists():
         data = sort_jsonl(result_file)
         processed_user = set(map(lambda x: x["user"], data))
     else:
         processed_user = set()
 
-    if RAW and raw_file.exists():
+    if config.save_raw_output and raw_file.exists():
         sort_jsonl(raw_file)
 
     for user_id in dataset.partitioning.dictionaries[0]:
@@ -1141,7 +1104,7 @@ if __name__ == "__main__":
 
     unprocessed_users.sort()
 
-    with ProcessPoolExecutor(max_workers=PROCESSES) as executor:
+    with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
         futures = [
             executor.submit(
                 process,
@@ -1168,5 +1131,5 @@ if __name__ == "__main__":
                 tqdm.write(str(e))
 
     sort_jsonl(result_file)
-    if RAW:
+    if config.save_raw_output:
         sort_jsonl(raw_file)

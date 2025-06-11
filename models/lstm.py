@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 
-from config import ModelConfig
+from config import Config
 
 
 class ResBlock(nn.Module):
@@ -43,7 +43,7 @@ class LSTM(nn.Module):
     """
 
     def __init__(
-        self, config: ModelConfig, state_dict=None, input_mean=None, input_std=None
+        self, config: Config, state_dict=None, input_mean=None, input_std=None
     ):
         self.config = config
         self.register_buffer(

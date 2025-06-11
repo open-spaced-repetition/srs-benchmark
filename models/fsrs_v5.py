@@ -4,11 +4,11 @@ from torch import nn, Tensor
 from typing import Optional
 from models.fsrs import FSRS
 
-from config import ModelConfig
+from config import Config
 
 
 class FSRS5ParameterClipper:
-    def __init__(self, config: ModelConfig, frequency: int = 1):
+    def __init__(self, config: Config, frequency: int = 1):
         self.frequency = frequency
         self.config = config
 
@@ -89,7 +89,7 @@ class FSRS5(FSRS):
     decay = -0.5
     factor = 0.9 ** (1 / decay) - 1
 
-    def __init__(self, config: ModelConfig, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: Optional[List[float]] = None):
         super(FSRS5, self).__init__(config)
         if w is None:
             w = self.init_w

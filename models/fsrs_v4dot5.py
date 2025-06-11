@@ -4,7 +4,7 @@ from torch import nn, Tensor
 from typing import Optional
 from models.fsrs import FSRS
 
-from config import ModelConfig
+from config import Config
 
 
 class FSRS4dot5ParameterClipper:
@@ -41,7 +41,7 @@ class FSRS4dot5(FSRS):
     wd: float = 1e-5
     n_epoch: int = 5
 
-    def __init__(self, config: ModelConfig, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: Optional[List[float]] = None):
         super(FSRS4dot5, self).__init__(config)
 
         if w is None:

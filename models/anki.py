@@ -1,11 +1,11 @@
 import torch
 from torch import nn, Tensor
 from typing import List, Optional
-from config import ModelConfig
+from config import Config
 
 
 class AnkiParameterClipper:
-    def __init__(self, config: ModelConfig, frequency: int = 1):
+    def __init__(self, config: Config, frequency: int = 1):
         self.frequency = frequency
         self.config = config
 
@@ -38,7 +38,7 @@ class Anki(nn.Module):
     wd: float = 1e-5
     n_epoch: int = 5
 
-    def __init__(self, config: ModelConfig, w: List[float] = init_w):
+    def __init__(self, config: Config, w: List[float] = init_w):
         self.config = config
         super(Anki, self).__init__()
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))

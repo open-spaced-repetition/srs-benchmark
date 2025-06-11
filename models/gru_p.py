@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 
-from config import ModelConfig
+from config import Config
 
 
 class GRU_P(nn.Module):
@@ -10,7 +10,7 @@ class GRU_P(nn.Module):
     wd: float = 1e-5
     n_epoch: int = 16
 
-    def __init__(self, config: ModelConfig, state_dict=None):
+    def __init__(self, config: Config, state_dict=None):
         self.config = config
         self.n_input = 2
         self.n_hidden = 8

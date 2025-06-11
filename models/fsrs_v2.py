@@ -4,7 +4,7 @@ from torch import nn, Tensor
 from typing import Optional
 from models.fsrs import FSRS
 
-from config import ModelConfig
+from config import Config
 
 
 class FSRS2ParameterClipper:
@@ -39,7 +39,7 @@ class FSRS2(FSRS):
     wd: float = 1e-5
     n_epoch: int = 5
 
-    def __init__(self, config: ModelConfig, w: List[float] = init_w):
+    def __init__(self, config: Config, w: List[float] = init_w):
         super(FSRS2, self).__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 

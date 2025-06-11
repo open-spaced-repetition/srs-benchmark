@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 
-from config import ModelConfig
+from config import Config
 
 
 class RNN(nn.Module):
@@ -12,7 +12,7 @@ class RNN(nn.Module):
     decay = -0.5
     factor = 0.9 ** (1 / decay) - 1
 
-    def __init__(self, config: ModelConfig, state_dict=None):
+    def __init__(self, config: Config, state_dict=None):
         self.config = config
         self.n_input = 2
         self.n_hidden = 2

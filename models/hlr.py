@@ -3,7 +3,7 @@ from torch import nn, Tensor
 from typing import List
 from typing import Optional
 
-from config import ModelConfig
+from config import Config
 
 
 class HLR(nn.Module):
@@ -13,7 +13,7 @@ class HLR(nn.Module):
     wd: float = 1e-5
     n_epoch: int = 5
 
-    def __init__(self, config: ModelConfig, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: Optional[List[float]] = None):
         self.config = config
         self.n_input = 2
         self.n_out = 1

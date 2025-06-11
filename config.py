@@ -3,7 +3,6 @@ import torch
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-# Model list from the original script
 MODEL_LIST: Tuple[str, ...] = (
     "FSRSv1",
     "FSRSv2",
@@ -145,7 +144,7 @@ def create_parser():
     return parser
 
 
-class ModelConfig:
+class Config:
     """Holds all application configurations derived from command-line arguments and defaults."""
 
     def __init__(self, args: argparse.Namespace):
@@ -176,12 +175,12 @@ class ModelConfig:
         self.batch_size: int = args.batch_size
         self.max_seq_len: int = args.max_seq_len
 
-        # Handle `effective_short_term` based on model name and initial arg
+        # Handle `include_short_term` based on model name and initial arg
         self.initial_short_term_setting: bool = args.short
         if self.model_name.startswith("FSRS-5") or self.model_name.startswith("FSRS-6"):
-            self.effective_short_term: bool = True
+            self.include_short_term: bool = True
         else:
-            self.effective_short_term: bool = self.initial_short_term_setting
+            self.include_short_term: bool = self.initial_short_term_setting
 
         # PyTorch threading settings
         self.torch_num_threads: int = args.torch_num_threads
@@ -224,7 +223,7 @@ class ModelConfig:
         _file_name_parts = [self.model_name]
         if self.dry_run:
             _file_name_parts.append("-dry-run")
-        if self.effective_short_term:
+        if self.initial_short_term_setting:
             _file_name_parts.append("-short")
         if self.use_secs_intervals:
             _file_name_parts.append("-secs")
@@ -282,10 +281,10 @@ class ModelConfig:
         return f"AppConfig({attrs})"
 
 
-_app_config_instance: Optional[ModelConfig] = None
+_config_instance: Optional[Config] = None
 
 
-def load_app_config(custom_args_list: Optional[List[str]] = None) -> ModelConfig:
+def load_config(custom_args_list: Optional[List[str]] = None) -> Config:
     """
     Parses command-line arguments (or custom arguments) and returns a singleton AppConfig instance.
 
@@ -296,9 +295,9 @@ def load_app_config(custom_args_list: Optional[List[str]] = None) -> ModelConfig
     Returns:
         The AppConfig instance.
     """
-    global _app_config_instance
+    global _config_instance
     if (
-        _app_config_instance is None or custom_args_list is not None
+        _config_instance is None or custom_args_list is not None
     ):  # Re-parse if custom_args are given
         parser = create_parser()
         if custom_args_list is not None:
@@ -306,24 +305,24 @@ def load_app_config(custom_args_list: Optional[List[str]] = None) -> ModelConfig
         else:
             args, _ = parser.parse_known_args()  # Uses sys.argv by default
 
-        current_config = ModelConfig(args)
+        current_config = Config(args)
         if (
             custom_args_list is not None
         ):  # Don't overwrite global instance if it's a custom load for test
             return current_config
-        _app_config_instance = current_config
+        _config_instance = current_config
 
-    return _app_config_instance
+    return _config_instance
 
 
 # --- Example Usage (typically this would be in your main script) ---
 if __name__ == "__main__":
     print("--- Loading default configuration (from command line or defaults) ---")
-    config = load_app_config()
+    config = load_config()
     print(f"Model Name: {config.model_name}")
     print(f"Device: {config.device}")
     print(f"S_MIN: {config.s_min}")
-    print(f"Effective Short Term: {config.effective_short_term}")
+    print(f"Effective Short Term: {config.include_short_term}")
     print(f"Evaluation File Name: {config.get_evaluation_file_name()}")
     print(f"Optimizer File Name: {config.get_optimizer_file_name()}")
     print(f"Data Path: {config.data_path}")
@@ -333,35 +332,35 @@ if __name__ == "__main__":
 
     print("\n--- Loading configuration with custom arguments for testing ---")
     test_args = ["--algo", "FSRSv2", "--secs", "--dev", "--short"]
-    test_config = load_app_config(custom_args_list=test_args)
+    test_config = load_config(custom_args_list=test_args)
     print(f"Test Model Name: {test_config.model_name}")
     print(f"Test Use Secs: {test_config.use_secs_intervals}")
     print(f"Test Dev Mode: {test_config.dev_mode}")
     print(f"Test S_MIN: {test_config.s_min}")  # Should be 1e-6
     print(f"Test Initial Short Term: {test_config.initial_short_term_setting}")  # True
-    print(f"Test Effective Short Term: {test_config.effective_short_term}")  # True
+    print(f"Test Effective Short Term: {test_config.include_short_term}")  # True
 
     print("\n--- Testing FSRS-6 S_MIN logic ---")
-    fsrs6_no_secs_config = load_app_config(custom_args_list=["--algo", "FSRS-6"])
+    fsrs6_no_secs_config = load_config(custom_args_list=["--algo", "FSRS-6"])
     print(f"FSRS-6 (no secs) S_MIN: {fsrs6_no_secs_config.s_min}")  # Expected: 0.001
 
-    fsrs6_secs_config = load_app_config(custom_args_list=["--algo", "FSRS-6", "--secs"])
+    fsrs6_secs_config = load_config(custom_args_list=["--algo", "FSRS-6", "--secs"])
     print(f"FSRS-6 (with secs) S_MIN: {fsrs6_secs_config.s_min}")  # Expected: 1e-6
 
     print("\n--- Testing effective_short_term logic ---")
-    fsrs5_config_no_short_arg = load_app_config(custom_args_list=["--algo", "FSRS-5"])
+    fsrs5_config_no_short_arg = load_config(custom_args_list=["--algo", "FSRS-5"])
     print(
-        f"FSRS-5 (no --short arg) Initial: {fsrs5_config_no_short_arg.initial_short_term_setting}, Effective: {fsrs5_config_no_short_arg.effective_short_term}"
+        f"FSRS-5 (no --short arg) Initial: {fsrs5_config_no_short_arg.initial_short_term_setting}, Effective: {fsrs5_config_no_short_arg.include_short_term}"
     )  # E: True
 
-    fsrs4_config_with_short_arg = load_app_config(
+    fsrs4_config_with_short_arg = load_config(
         custom_args_list=["--algo", "FSRS-4.5", "--short"]
     )
     print(
-        f"FSRS-4.5 (with --short arg) Initial: {fsrs4_config_with_short_arg.initial_short_term_setting}, Effective: {fsrs4_config_with_short_arg.effective_short_term}"
+        f"FSRS-4.5 (with --short arg) Initial: {fsrs4_config_with_short_arg.initial_short_term_setting}, Effective: {fsrs4_config_with_short_arg.include_short_term}"
     )  # E: True
 
-    fsrs4_config_no_short_arg = load_app_config(custom_args_list=["--algo", "FSRS-4.5"])
+    fsrs4_config_no_short_arg = load_config(custom_args_list=["--algo", "FSRS-4.5"])
     print(
-        f"FSRS-4.5 (no --short arg) Initial: {fsrs4_config_no_short_arg.initial_short_term_setting}, Effective: {fsrs4_config_no_short_arg.effective_short_term}"
+        f"FSRS-4.5 (no --short arg) Initial: {fsrs4_config_no_short_arg.initial_short_term_setting}, Effective: {fsrs4_config_no_short_arg.include_short_term}"
     )  # E: False

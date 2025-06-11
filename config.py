@@ -278,7 +278,7 @@ class Config:
             for k, v in self.__dict__.items()
             if k != "raw_args" and not k.startswith("_")
         }
-        return f"AppConfig({attrs})"
+        return f"Config({attrs})"
 
 
 _config_instance: Optional[Config] = None
@@ -286,14 +286,14 @@ _config_instance: Optional[Config] = None
 
 def load_config(custom_args_list: Optional[List[str]] = None) -> Config:
     """
-    Parses command-line arguments (or custom arguments) and returns a singleton AppConfig instance.
+    Parses command-line arguments (or custom arguments) and returns a singleton Config instance.
 
     Args:
         custom_args_list: An optional list of strings representing command-line arguments.
                           If None, sys.argv will be used.
 
     Returns:
-        The AppConfig instance.
+        The Config instance.
     """
     global _config_instance
     if (

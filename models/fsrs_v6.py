@@ -8,26 +8,17 @@ from config import Config
 
 
 class FSRS6ParameterClipper:
-    def __init__(self, config: Config = None, frequency: int = 1):
+    def __init__(self, config: Config, frequency: int = 1):
         self.frequency = frequency
         self.config = config
 
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
-            # Use module's config if available, otherwise use self.config
-            config = getattr(module, "config", self.config)
-            if config:
-                w[0] = w[0].clamp(config.s_min, 100)
-                w[1] = w[1].clamp(config.s_min, 100)
-                w[2] = w[2].clamp(config.s_min, 100)
-                w[3] = w[3].clamp(config.s_min, 100)
-            else:
-                # Use default values if no config
-                w[0] = w[0].clamp(0.001, 100)
-                w[1] = w[1].clamp(0.001, 100)
-                w[2] = w[2].clamp(0.001, 100)
-                w[3] = w[3].clamp(0.001, 100)
+            w[0] = w[0].clamp(self.config.s_min, 100)
+            w[1] = w[1].clamp(self.config.s_min, 100)
+            w[2] = w[2].clamp(self.config.s_min, 100)
+            w[3] = w[3].clamp(self.config.s_min, 100)
             w[4] = w[4].clamp(1, 10)
             w[5] = w[5].clamp(0.001, 4)
             w[6] = w[6].clamp(0.001, 4)

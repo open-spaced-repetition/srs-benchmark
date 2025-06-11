@@ -11,12 +11,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 import json
 from torch import nn
-from torch import Tensor
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
+from models.model_factory import create_model
 from reptile_trainer import get_inner_opt, finetune
 from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
 import multiprocessing as mp
@@ -828,49 +828,6 @@ def process(user_id):
         config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
-    if config.model_name in ("RNN", "GRU"):
-        Model = RNN
-    elif config.model_name == "GRU-P":
-        Model = GRU_P
-    elif config.model_name == "LSTM":
-        Model = LSTM
-    elif config.model_name == "FSRSv1":
-        Model = FSRS1
-    elif config.model_name == "FSRSv2":
-        Model = FSRS2
-    elif config.model_name == "FSRSv3":
-        Model = FSRS3
-    elif config.model_name == "FSRSv4":
-        Model = FSRS4
-    elif config.model_name == "FSRS-4.5":
-        Model = FSRS4dot5
-    elif config.model_name == "FSRS-5":
-        Model = FSRS5
-    elif config.model_name == "FSRS-6":
-        Model = FSRS6
-    elif config.model_name == "HLR":
-        Model = HLR
-    elif config.model_name == "Transformer":
-        Model = Transformer
-    elif config.model_name == "ACT-R":
-        Model = ACT_R
-    elif config.model_name in ("DASH", "DASH[MCM]"):
-        Model = DASH
-    elif config.model_name == "DASH[ACT-R]":
-        Model = DASH_ACTR
-    elif config.model_name == "NN-17":
-        Model = NN_17
-    elif config.model_name == "SM2-trainable":
-        Model = SM2
-    elif config.model_name == "Anki":
-        Model = Anki
-    elif config.model_name == "90%":
-
-        def get_constant_model(state_dict=None):
-            return ConstantModel(0.9)
-
-        Model = get_constant_model
-
     dataset = create_features(df_revlogs, config.model_name, config.use_secs_intervals)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
@@ -929,7 +886,7 @@ def process(user_id):
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
 
-                model = Model(config)
+                model = create_model(config.model_name, config)
                 if config.dry_run:
                     partition_weights[partition] = model.state_dict()
                     continue
@@ -964,7 +921,9 @@ def process(user_id):
                 else:
                     print(f"User: {user_id}")
                     raise e
-                partition_weights[partition] = Model().state_dict()
+                partition_weights[partition] = create_model(
+                    config.model_name, config
+                ).state_dict()
         w_list.append(partition_weights)
 
         if config.train_equals_test:
@@ -979,7 +938,9 @@ def process(user_id):
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(
-                Model(config, weights) if weights else Model(config)
+                create_model(config.model_name, config, weights)
+                if weights
+                else create_model(config.model_name, config)
             )
             retentions, stabilities, difficulties = my_collection.batch_predict(
                 partition_testset

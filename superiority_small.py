@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
-from scipy import stats  # type: ignore
 
 warnings.filterwarnings("ignore")
 
@@ -52,7 +51,7 @@ if __name__ == "__main__":
         series = pd.Series(LogLoss_list, name=f"{model}, LogLoss")
         df = pd.concat([df, series], axis=1)
 
-    df = pd.concat([df, pd.Series(sizes, name=f"Sizes")], axis=1)
+    df = pd.concat([df, pd.Series(sizes, name="Sizes")], axis=1)
     df.to_csv(csv_name)
 
     df = pd.read_csv(csv_name)
@@ -116,7 +115,7 @@ if __name__ == "__main__":
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(
-        f"Percent of collections where algorithm A (row) outperforms algorithm B (column)",
+        "Percent of collections where algorithm A (row) outperforms algorithm B (column)",
         fontsize=22,
         pad=10,
     )
@@ -161,7 +160,7 @@ if __name__ == "__main__":
             if percentages[i, j] == -1:
                 pass
             else:
-                string = f"{100*percentages[i, j]:.1f}%"
+                string = f"{100 * percentages[i, j]:.1f}%"
                 text = ax.text(
                     j,
                     i,

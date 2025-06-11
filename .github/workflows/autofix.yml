@@ -1,0 +1,25 @@
+name: autofix.ci
+on:
+  workflow_call:
+  pull_request:
+  push:
+    branches: [ "main" ]
+permissions:
+  contents: read
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Use uv to ensure we have the same ruff version in CI and locally.
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb
+        with:
+          version: "0.4.20"
+      # Fix lint errors
+      - run: uvx ruff check --fix-only .
+      # Format code
+      - run: uvx ruff format .
+
+      - uses: autofix-ci/action@635ffb0c9798bd160680f18fd73371e355b85f27

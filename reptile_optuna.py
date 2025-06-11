@@ -1,4 +1,3 @@
-import numpy as np
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn

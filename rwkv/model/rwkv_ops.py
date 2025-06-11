@@ -1,5 +1,4 @@
 import torch
-from torch import Tensor
 
 
 class RWKV7_WKV(torch.autograd.Function):

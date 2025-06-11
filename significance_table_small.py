@@ -68,7 +68,7 @@ if __name__ == "__main__":
         "Anki-dry-run",
     ]
     csv_name = f"{len(models)} models.csv"
-    print(f"Number of tests={(len(models)-1) ** 2}")
+    print(f"Number of tests={(len(models) - 1) ** 2}")
     df = pd.DataFrame()
     sizes = []
     for model in models:
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         df = pd.concat([df, series1], axis=1)
         df = pd.concat([df, series2], axis=1)
 
-    df = pd.concat([df, pd.Series(sizes, name=f"Sizes")], axis=1)
+    df = pd.concat([df, pd.Series(sizes, name="Sizes")], axis=1)
     df.to_csv(csv_name)
 
     # you have to run the commented out code above first

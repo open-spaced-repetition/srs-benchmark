@@ -1,5 +1,6 @@
 import copy
 from itertools import accumulate
+import math
 import sys
 import os
 import pandas as pd
@@ -73,7 +74,7 @@ if config.model_name not in model_list:
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
 
-from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier  # type: ignore
+from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier, Optimizer  # type: ignore
 
 if config.model_name.startswith("Ebisu"):
     import ebisu  # type: ignore
@@ -961,7 +962,18 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
     if config.generate_plots:
         fig = plt.figure()
         plot_brier(p, y, ax=fig.add_subplot(111))
-        fig.savefig(f"evaluation/{file_name}/{user_id}.png")
+        fig.savefig(f"evaluation/{file_name}/calibration-retention-{user_id}.png")
+        fig = plt.figure()
+        optimizer = Optimizer()
+        df["stability"] = df["s"]
+        optimizer.calibration_helper(
+            df[["stability", "p", "y"]].copy(),
+            "stability",
+            lambda x: math.pow(1.2, math.floor(math.log(x, 1.2))),
+            True,
+            fig.add_subplot(111),
+        )
+        fig.savefig(f"evaluation/{file_name}/calibration-stability-{user_id}.png")
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )

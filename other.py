@@ -25,24 +25,27 @@ from config import create_parser, Config
 from utils import catch_exceptions, rmse_matrix
 
 # Import all models from /models directory
-from models.fsrs_v1 import FSRS1
-from models.fsrs_v2 import FSRS2
-from models.fsrs_v3 import FSRS3
-from models.fsrs_v4 import FSRS4
-from models.fsrs_v4dot5 import FSRS4dot5
-from models.fsrs_v5 import FSRS5
-from models.fsrs_v6 import FSRS6
-from models.rnn import RNN
-from models.gru_p import GRU_P
-from models.lstm import LSTM
-from models.transformer import Transformer
-from models.hlr import HLR
-from models.act_r import ACT_R
-from models.dash import DASH
-from models.dash_act_r import DASH_ACTR
-from models.nn_17 import NN_17
-from models.sm_2 import SM2
-from models.anki import Anki
+from models import (
+    FSRS1,
+    FSRS2,
+    FSRS3,
+    FSRS4,
+    FSRS4dot5,
+    FSRS5,
+    FSRS6,
+    RNN,
+    GRU_P,
+    LSTM,
+    Transformer,
+    HLR,
+    ACT_R,
+    DASH,
+    DASH_ACTR,
+    NN_17,
+    SM2,
+    Anki,
+    ConstantModel,
+)
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -195,28 +198,6 @@ class RMSEBinsExploit:
         pred = np.clip(truth_sum + estimated_p - pred_sum, a_min=0, a_max=1)
         self.state[bin_key] = (pred_sum + pred, truth_sum, bin_n)
         return pred
-
-
-class ConstantModel(nn.Module):
-    n_epoch = 0
-    lr = 0
-    wd = 0
-
-    def __init__(self, value=0.9):
-        super().__init__()
-        self.value = value
-        self.placeholder = torch.nn.Linear(
-            1, 1
-        )  # So that the optimizer gets a nonempty list
-
-    def iter(
-        self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
-        real_batch_size: int,
-    ) -> dict[str, Tensor]:
-        return {"retentions": torch.full((real_batch_size,), self.value)}
 
 
 class Trainer:

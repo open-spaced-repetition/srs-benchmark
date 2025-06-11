@@ -26,25 +26,13 @@ from utils import catch_exceptions, rmse_matrix
 
 # Import all models from /models directory
 from models import (
-    FSRS1,
-    FSRS2,
-    FSRS3,
     FSRS4,
     FSRS4dot5,
     FSRS5,
     FSRS6,
     RNN,
     GRU_P,
-    LSTM,
     Transformer,
-    HLR,
-    ACT_R,
-    DASH,
-    DASH_ACTR,
-    NN_17,
-    SM2,
-    Anki,
-    ConstantModel,
 )
 
 parser = create_parser()

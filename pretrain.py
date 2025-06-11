@@ -1,5 +1,3 @@
-import math
-from matplotlib import pyplot as plt
 import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
@@ -12,9 +10,7 @@ from other import (
     NN_17,
     GRU_P,
     FSRS6,
-    Collection,
 )
-from fsrs_optimizer import plot_brier, Optimizer  # type: ignore
 from config import create_parser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path

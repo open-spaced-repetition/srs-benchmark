@@ -177,9 +177,9 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                             ).view(data_split_B, data_split_len)
                             skip_arr = skip.numpy()
                             time_shift_select = np.zeros((data_split_B, data_split_len))
-                            assert (
-                                skip_arr[0] == False
-                            ).any(), "Cannot skip the start; otherwise we need to be careful for consecutive Trues at the start."
+                            assert (skip_arr[0] == False).any(), (
+                                "Cannot skip the start; otherwise we need to be careful for consecutive Trues at the start."
+                            )
                             for b in range(data_split_B):
                                 last = 0
                                 for t in range(data_split_len):

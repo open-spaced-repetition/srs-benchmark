@@ -82,7 +82,7 @@ else:
     if ONLY_PRETRAIN:
         path += "-pretrain"
     if SECS_IVL:
-        path += f"-secs"
+        path += "-secs"
 if RECENCY:
     path += "-recency"
 if NO_TEST_SAME_DAY:

@@ -405,9 +405,9 @@ def add_queries(section_df, equalize_review_ths):
 
     for column in section_df.columns:
         assert column in keep_columns or column in reject_columns, f"{column} not found"
-    assert len(keep_columns) + len(reject_columns) == len(
-        section_df.columns
-    ), "Ensure that all columns are explicitly listed"
+    assert len(keep_columns) + len(reject_columns) == len(section_df.columns), (
+        "Ensure that all columns are explicitly listed"
+    )
 
     query_df = section_df.copy()
     query_df = query_df[query_df["is_first_review"] == False]

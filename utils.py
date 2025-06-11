@@ -10,7 +10,7 @@ def catch_exceptions(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs), None
-        except Exception as e:
+        except Exception:
             return None, traceback.format_exc()
 
     return wrapper

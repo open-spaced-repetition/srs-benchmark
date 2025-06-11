@@ -1,6 +1,6 @@
-from typing import List, Optional, Tuple
-from rwkv.model.rwkv_model import LoraMLP, LoraSimple, RWKV7ChannelMixer, RWKV7Config
-from rwkv.model.rwkv_ops import RWKV7_WKV, reference_rwkv7, single_timestep
+from typing import Optional, Tuple
+from rwkv.model.rwkv_model import LoraMLP, LoraSimple, RWKV7Config
+from rwkv.model.rwkv_ops import single_timestep
 import torch
 import copy
 

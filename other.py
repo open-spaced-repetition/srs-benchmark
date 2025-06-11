@@ -855,8 +855,8 @@ def process(user_id):
                     None,
                 )  # train_index and test_index no longer have the same meaning as before
         else:
-            train_set = dataset.copy()
-            test_set = dataset.copy()
+            train_set = dataset.iloc[test_index]
+            test_set = dataset.iloc[test_index]
         if config.no_test_same_day:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if config.no_train_same_day:
@@ -914,9 +914,6 @@ def process(user_id):
                     config.model_name, config
                 ).state_dict()
         w_list.append(partition_weights)
-
-        if config.train_equals_test:
-            break
 
     p = []
     y = []

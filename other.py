@@ -204,51 +204,47 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.model = MODEL.to(device=DEVICE)
-        if isinstance(MODEL, (FSRS4, FSRS4dot5, FSRS5, FSRS6)):
-            self.model.pretrain(train_set)  # type: ignore
+
+        # Model-specific setup (e.g., pretrain)
+        if hasattr(self.model, "pretrain"):
+            self.model.pretrain(train_set)
+
+        # Setup optimizer
         if isinstance(MODEL, (RNN, Transformer, GRU_P)):
             self.optimizer = torch.optim.AdamW(
                 self.model.parameters(), lr=lr, weight_decay=wd
             )
         else:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
-        self.clipper = MODEL.clipper if hasattr(MODEL, "clipper") else None
+
         self.batch_size = batch_size
         self.max_seq_len = max_seq_len
-        self.build_dataset(train_set, test_set)
         self.n_epoch = n_epoch
-        self.batch_nums = (
-            self.next_train_data_loader.batch_nums
-            if isinstance(MODEL, (FSRS4, FSRS4dot5))
-            else self.train_data_loader.batch_nums
+
+        # Build datasets
+        self.build_dataset(train_set, test_set)
+
+        # Get training dataset - let model filter if needed
+        training_dataset = self.get_training_dataset(train_set)
+        training_data_loader = BatchLoader(
+            BatchDataset(
+                training_dataset,
+                self.batch_size,
+                max_seq_len=self.max_seq_len,
+                device=DEVICE,
+            )
         )
+
+        # Setup scheduler
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=self.batch_nums * n_epoch
+            self.optimizer, T_max=training_data_loader.batch_nums * n_epoch
         )
+
         self.avg_train_losses: list[float] = []
         self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
-        if isinstance(self.model, (FSRS4, FSRS4dot5)):
-            pre_train_set = train_set[train_set["i"] == 2]
-            self.pre_train_set = BatchDataset(
-                pre_train_set.copy(),
-                self.batch_size,
-                max_seq_len=self.max_seq_len,
-                device=DEVICE,
-            )
-            self.pre_train_data_loader = BatchLoader(self.pre_train_set)
-
-            next_train_set = train_set[train_set["i"] > 2]
-            self.next_train_set = BatchDataset(
-                next_train_set.copy(),
-                self.batch_size,
-                max_seq_len=self.max_seq_len,
-                device=DEVICE,
-            )
-            self.next_train_data_loader = BatchLoader(self.next_train_set)
-
         self.train_set = BatchDataset(
             train_set.copy(),
             self.batch_size,
@@ -271,19 +267,35 @@ class Trainer:
             [] if test_set is None else BatchLoader(self.test_set, shuffle=False)
         )
 
+    def get_training_dataset(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        """Let model filter training data if needed"""
+        if hasattr(self.model, "filter_training_data"):
+            return self.model.filter_training_data(train_set)
+        else:
+            return train_set
+
     def train(self):
         best_loss = np.inf
         epoch_len = len(self.train_set.y_train)
+
+        # Get the actual training data loader
+        training_dataset = self.get_training_dataset(self.train_set.dataset)
+        training_data_loader = BatchLoader(
+            BatchDataset(
+                training_dataset,
+                self.batch_size,
+                max_seq_len=self.max_seq_len,
+                device=DEVICE,
+            )
+        )
+
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
             if weighted_loss < best_loss:
                 best_loss = weighted_loss
                 best_w = w
-            for i, batch in enumerate(
-                self.train_data_loader
-                if not isinstance(self.model, (FSRS4, FSRS4dot5))
-                else self.next_train_data_loader  # FSRS4 and FSRS-4.5 have two training stages
-            ):
+
+            for i, batch in enumerate(training_data_loader):
                 self.model.train()
                 self.optimizer.zero_grad()
                 result = iter(self.model, batch)
@@ -294,15 +306,18 @@ class Trainer:
                 if "penalty" in result:
                     loss += result["penalty"] / epoch_len
                 loss.backward()
-                if isinstance(
-                    self.model, (FSRS4, FSRS4dot5)
-                ):  # the initial stability is not trainable
-                    for param in self.model.parameters():
-                        param.grad[:4] = torch.zeros(4)
+
+                # Apply model-specific gradient constraints
+                if hasattr(self.model, "apply_gradient_constraints"):
+                    self.model.apply_gradient_constraints()
+
                 self.optimizer.step()
                 self.scheduler.step()
-                if self.clipper:
-                    self.model.apply(self.clipper)
+
+                # Apply model-specific parameter constraints (clipper)
+                if hasattr(self.model, "clipper") and self.model.clipper:
+                    self.model.apply(self.model.clipper)
+
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
             best_loss = weighted_loss

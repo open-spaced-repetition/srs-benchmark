@@ -3,7 +3,7 @@ import torch
 from torch import nn, Tensor
 from models.fsrs import FSRS
 from config import Config
-
+import pandas as pd
 from typing import Optional
 
 
@@ -59,6 +59,16 @@ class FSRS4(FSRS):
     def __init__(self, config: Config, w: List[float] = init_w):
         super(FSRS4, self).__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        """FSRS4 only trains on data where i > 2"""
+        return train_set[train_set["i"] > 2]
+
+    def apply_gradient_constraints(self):
+        """Don't train the first 4 parameters (initial stability)"""
+        for param in self.parameters():
+            if param.grad is not None and param.grad.shape[0] >= 4:
+                param.grad[:4] = torch.zeros(4)
 
     def forgetting_curve(self, t, s):
         return (1 + t / (9 * s)) ** -1

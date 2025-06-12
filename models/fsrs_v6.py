@@ -2,7 +2,7 @@ from typing import List, Union
 import torch
 from torch import nn, Tensor
 from typing import Optional
-from models.fsrs import FSRS
+from models.fsrs_v5 import FSRS5
 
 from config import Config
 
@@ -39,7 +39,7 @@ class FSRS6ParameterClipper:
             module.w.data = w
 
 
-class FSRS6(FSRS):
+class FSRS6(FSRS5):
     init_w = [
         0.212,
         1.2931,
@@ -133,52 +133,12 @@ class FSRS6(FSRS):
         factor = 0.9 ** (1 / decay) - 1
         return (1 + factor * t / s) ** decay
 
-    def stability_after_success(
-        self, state: Tensor, r: Tensor, rating: Tensor
-    ) -> Tensor:
-        hard_penalty = torch.where(rating == 2, self.w[15], 1)
-        easy_bonus = torch.where(rating == 4, self.w[16], 1)
-        new_s = state[:, 0] * (
-            1
-            + torch.exp(self.w[8])
-            * (11 - state[:, 1])
-            * torch.pow(state[:, 0], -self.w[9])
-            * (torch.exp((1 - r) * self.w[10]) - 1)
-            * hard_penalty
-            * easy_bonus
-        )
-        return new_s
-
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
-        old_s = state[:, 0]
-        new_s = (
-            self.w[11]
-            * torch.pow(state[:, 1], -self.w[12])
-            * (torch.pow(old_s + 1, self.w[13]) - 1)
-            * torch.exp((1 - r) * self.w[14])
-        )
-        new_minimum_s = old_s / torch.exp(self.w[17] * self.w[18])
-        return torch.minimum(new_s, new_minimum_s)
-
     def stability_short_term(self, state: Tensor, rating: Tensor) -> Tensor:
         sinc = torch.exp(self.w[17] * (rating - 3 + self.w[18])) * torch.pow(
             state[:, 0], -self.w[19]
         )
         new_s = state[:, 0] * torch.where(rating >= 3, sinc.clamp(min=1), sinc)
         return new_s
-
-    def init_d(self, rating: Union[int, Tensor]) -> Tensor:
-        new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
-        return new_d
-
-    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
-        return delta_d * (10 - old_d) / 9
-
-    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
-        delta_d = -self.w[6] * (rating - 3)
-        new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
-        new_d = self.mean_reversion(self.init_d(4), new_d)
-        return new_d
 
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
@@ -212,28 +172,3 @@ class FSRS6(FSRS):
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(self.config.s_min, 36500)
         return torch.stack([new_s, new_d], dim=1)
-
-    def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
-    ) -> tuple[Tensor, Tensor]:
-        """
-        :param inputs: shape[seq_len, batch_size, 2]
-        """
-        if state is None:
-            state = torch.zeros((inputs.shape[1], 2))
-        outputs = []
-        for X in inputs:
-            state = self.step(X, state)
-            outputs.append(state)
-        return torch.stack(outputs), state
-
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
-        return self.w[7] * init + (1 - self.w[7]) * current
-
-    def state_dict(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )

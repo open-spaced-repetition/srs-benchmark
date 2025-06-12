@@ -107,20 +107,6 @@ class FSRS3(FSRS):
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
-    ) -> tuple[Tensor, Tensor]:
-        """
-        :param inputs: shape[seq_len, batch_size, 2]
-        """
-        if state is None:
-            state = torch.zeros((inputs.shape[1], 2))
-        outputs = []
-        for X in inputs:
-            state = self.step(X, state)
-            outputs.append(state)
-        return torch.stack(outputs), state
-
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[5] * init + (1 - self.w[5]) * current
 

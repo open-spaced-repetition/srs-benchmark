@@ -2,9 +2,9 @@ from typing import List, Union
 import torch
 from torch import nn, Tensor
 from typing import Optional
-from models.fsrs import FSRS
 
 from config import Config
+from models.fsrs_v4dot5 import FSRS4dot5
 
 
 class FSRS5ParameterClipper:
@@ -37,7 +37,7 @@ class FSRS5ParameterClipper:
             module.w.data = w
 
 
-class FSRS5(FSRS):
+class FSRS5(FSRS4dot5):
     init_w = [
         0.40255,
         1.18385,
@@ -86,8 +86,6 @@ class FSRS5(FSRS):
             0.39,
         ]
     )
-    decay = -0.5
-    factor = 0.9 ** (1 / decay) - 1
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super(FSRS5, self).__init__(config)
@@ -114,25 +112,6 @@ class FSRS5(FSRS):
             * self.gamma
         )
         return output
-
-    def forgetting_curve(self, t, s):
-        return (1 + self.factor * t / s) ** self.decay
-
-    def stability_after_success(
-        self, state: Tensor, r: Tensor, rating: Tensor
-    ) -> Tensor:
-        hard_penalty = torch.where(rating == 2, self.w[15], 1)
-        easy_bonus = torch.where(rating == 4, self.w[16], 1)
-        new_s = state[:, 0] * (
-            1
-            + torch.exp(self.w[8])
-            * (11 - state[:, 1])
-            * torch.pow(state[:, 0], -self.w[9])
-            * (torch.exp((1 - r) * self.w[10]) - 1)
-            * hard_penalty
-            * easy_bonus
-        )
-        return new_s
 
     def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
         old_s = state[:, 0]
@@ -194,28 +173,3 @@ class FSRS5(FSRS):
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(self.config.s_min, 36500)
         return torch.stack([new_s, new_d], dim=1)
-
-    def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
-    ) -> tuple[Tensor, Tensor]:
-        """
-        :param inputs: shape[seq_len, batch_size, 2]
-        """
-        if state is None:
-            state = torch.zeros((inputs.shape[1], 2))
-        outputs = []
-        for X in inputs:
-            state = self.step(X, state)
-            outputs.append(state)
-        return torch.stack(outputs), state
-
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
-        return self.w[7] * init + (1 - self.w[7]) * current
-
-    def state_dict(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )

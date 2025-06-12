@@ -33,8 +33,8 @@ class FSRS4dot5(FSRS4):
     """FSRS4.5 inherits from FSRS4 and overrides specific methods"""
 
     clipper = FSRS4dot5ParameterClipper()
-    DECAY = -0.5
-    FACTOR = 0.9 ** (1 / DECAY) - 1
+    decay = -0.5
+    factor = 0.9 ** (1 / decay) - 1
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         # Handle dynamic weight selection based on config
@@ -85,7 +85,7 @@ class FSRS4dot5(FSRS4):
 
     def forgetting_curve(self, t, s):
         """Override forgetting curve with FSRS4.5 formula"""
-        return (1 + self.FACTOR * t / s) ** self.DECAY
+        return (1 + self.factor * t / s) ** self.decay
 
     def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
         """Override to add minimum constraint"""

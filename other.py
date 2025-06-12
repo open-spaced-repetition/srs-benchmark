@@ -26,11 +26,6 @@ from config import create_parser, Config
 from utils import catch_exceptions, rmse_matrix
 
 # Import all models from /models directory
-from models import (
-    RNN,
-    GRU_P,
-    Transformer,
-)
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -206,10 +201,9 @@ class Trainer:
             self.model.pretrain(train_set)
 
         # Setup optimizer
-        if isinstance(MODEL, (RNN, Transformer, GRU_P)):
-            self.optimizer = torch.optim.AdamW(
-                self.model.parameters(), lr=lr, weight_decay=wd
-            )
+        # Let model decide optimizer, default to Adam
+        if hasattr(self.model, "get_optimizer"):
+            self.optimizer = self.model.get_optimizer(lr=lr, wd=wd)
         else:
             self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
 

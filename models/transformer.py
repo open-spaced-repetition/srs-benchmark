@@ -66,3 +66,7 @@ class Transformer(nn.Module):
 
     def forgetting_curve(self, t, s):
         return (1 + self.factor * t / s) ** self.decay
+
+    def get_optimizer(self, lr: float, wd: float = 1e-4):
+        """Return AdamW optimizer for Transformer models"""
+        return torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=wd)

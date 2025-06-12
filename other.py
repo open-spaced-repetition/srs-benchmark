@@ -855,8 +855,8 @@ def process(user_id):
                     None,
                 )  # train_index and test_index no longer have the same meaning as before
         else:
-            train_set = dataset.iloc[test_index]
             test_set = dataset.iloc[test_index]
+            train_set = dataset.iloc[np.concatenate([test_index, train_index])]
         if config.no_test_same_day:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if config.no_train_same_day:

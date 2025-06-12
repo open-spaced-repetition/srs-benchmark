@@ -856,7 +856,9 @@ def process(user_id):
                 )  # train_index and test_index no longer have the same meaning as before
         else:
             train_set = dataset.copy()
-            test_set = dataset.copy()
+            test_set = dataset[
+                dataset["review_th"] >= dataset.iloc[test_index]["review_th"].min()
+            ].copy()
         if config.no_test_same_day:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if config.no_train_same_day:

@@ -9,6 +9,7 @@ from config import Config
 
 class FSRS4dot5ParameterClipper(FSRS4ParameterClipper):
     """FSRS4dot5 parameter clipper with adjusted constraints"""
+
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -30,6 +31,7 @@ class FSRS4dot5ParameterClipper(FSRS4ParameterClipper):
 
 class FSRS4dot5(FSRS4):
     """FSRS4.5 inherits from FSRS4 and overrides specific methods"""
+
     clipper = FSRS4dot5ParameterClipper()
     DECAY = -0.5
     FACTOR = 0.9 ** (1 / DECAY) - 1
@@ -77,7 +79,7 @@ class FSRS4dot5(FSRS4):
                     0.2358,
                     3.3175,
                 ]
-        
+
         # Call parent constructor with the selected weights
         super(FSRS4dot5, self).__init__(config, w)
 

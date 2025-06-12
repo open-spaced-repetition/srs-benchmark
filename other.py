@@ -27,10 +27,6 @@ from utils import catch_exceptions, rmse_matrix
 
 # Import all models from /models directory
 from models import (
-    FSRS4,
-    FSRS4dot5,
-    FSRS5,
-    FSRS6,
     RNN,
     GRU_P,
     Transformer,

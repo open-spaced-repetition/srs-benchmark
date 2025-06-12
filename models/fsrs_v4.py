@@ -4,7 +4,6 @@ from torch import nn, Tensor
 from models.fsrs import FSRS
 from config import Config
 import pandas as pd
-from typing import Optional
 from tqdm.auto import tqdm  # type: ignore
 import numpy as np
 from scipy.optimize import minimize  # type: ignore
@@ -140,7 +139,6 @@ class FSRS4(FSRS):
                 dict(self.named_parameters())["w"].data,
             )
         )
-
 
     def pretrain(self, train_set):
         S0_dataset_group = (

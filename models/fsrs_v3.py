@@ -1,7 +1,6 @@
 from typing import List
 import torch
 from torch import nn, Tensor
-from typing import Optional
 from models.fsrs import FSRS
 
 from config import Config

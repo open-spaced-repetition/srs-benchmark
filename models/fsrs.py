@@ -1,8 +1,5 @@
 import torch
 from torch import nn, Tensor
-import numpy as np
-from scipy.optimize import minimize  # type: ignore
-from tqdm.auto import tqdm  # type: ignore
 from config import Config
 
 

@@ -1,7 +1,7 @@
 from typing import List
 import torch
 from torch import nn, Tensor
-from models.fsrs import FSRS
+from models.fsrs_v2 import FSRS2
 
 from config import Config
 
@@ -29,7 +29,7 @@ class FSRS3ParameterClipper:
             module.w.data = w
 
 
-class FSRS3(FSRS):
+class FSRS3(FSRS2):
     # 13 params
     init_w = [
         0.9605,
@@ -54,9 +54,6 @@ class FSRS3(FSRS):
     def __init__(self, config: Config, w: List[float] = init_w):
         super(FSRS3, self).__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
-
-    def forgetting_curve(self, t, s):
-        return 0.9 ** (t / s)
 
     def stability_after_success(
         self, state: Tensor, new_d: Tensor, r: Tensor
@@ -105,14 +102,3 @@ class FSRS3(FSRS):
             )
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d], dim=1)
-
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
-        return self.w[5] * init + (1 - self.w[5]) * current
-
-    def state_dict(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )

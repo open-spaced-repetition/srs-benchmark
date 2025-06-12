@@ -1,4 +1,5 @@
 from typing import List, Union
+import pandas as pd
 import torch
 from torch import nn, Tensor
 from typing import Optional
@@ -94,6 +95,12 @@ class FSRS5(FSRS4dot5):
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS5ParameterClipper(config)
+
+    def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        return train_set
+
+    def apply_gradient_constraints(self):
+        pass
 
     def iter(
         self,

@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 from torch import nn, Tensor
 from config import Config
@@ -29,3 +30,13 @@ class FSRS(nn.Module):
             "stabilities": stabilities,
             "difficulties": difficulties,
         }
+
+    def state_dict(self):
+        """Override to use precision based on config.use_secs_intervals"""
+        precision = 6 if self.config.use_secs_intervals else 4
+        return list(
+            map(
+                lambda x: round(float(x), precision),
+                dict(self.named_parameters())["w"].data,
+            )
+        )

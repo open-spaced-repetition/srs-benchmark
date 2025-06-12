@@ -96,13 +96,3 @@ class FSRS4dot5(FSRS4):
             * torch.exp((1 - r) * self.w[14])
         )
         return torch.minimum(new_s, state[:, 0])
-
-    def state_dict(self):
-        """Override to use precision based on config.use_secs_intervals"""
-        precision = 6 if self.config.use_secs_intervals else 4
-        return list(
-            map(
-                lambda x: round(float(x), precision),
-                dict(self.named_parameters())["w"].data,
-            )
-        )

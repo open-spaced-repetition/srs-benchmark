@@ -1,7 +1,7 @@
 from typing import List
 import torch
 from torch import nn, Tensor
-from models.fsrs import FSRS
+from models.fsrs_v3 import FSRS3
 from config import Config
 import pandas as pd
 from tqdm.auto import tqdm  # type: ignore
@@ -32,7 +32,7 @@ class FSRS4ParameterClipper:
             module.w.data = w
 
 
-class FSRS4(FSRS):
+class FSRS4(FSRS3):
     # 17 params
     init_w = [
         0.4,

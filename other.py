@@ -19,13 +19,12 @@ from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
 from models.model_factory import create_model
 from reptile_trainer import get_inner_opt, finetune
-from script import cum_concat, remove_non_continuous_rows, remove_outliers, sort_jsonl
+from script import sort_jsonl
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser, Config
 from utils import catch_exceptions, rmse_matrix
-
-# Import all models from /models directory
+from features import create_features
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -384,7 +383,7 @@ def process_untrainable(user_id):
         df_decks, on="deck_id", how="left"
     )
     df_join.fillna({"deck_id": -1, "preset_id": -1}, inplace=True)
-    dataset = create_features(df_join, config.model_name)
+    dataset = create_features(df_join, config=config)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
     testsets = []
@@ -419,11 +418,10 @@ def process_untrainable(user_id):
 
 
 def baseline(user_id):
-    model_name = "AVG"
     dataset = pd.read_parquet(
         config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    dataset = create_features(dataset, model_name)
+    dataset = create_features(dataset, config=config)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
     testsets = []
@@ -445,17 +443,16 @@ def baseline(user_id):
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
     save_tmp = pd.concat(save_tmp)
-    stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
+    stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
     return stats, raw
 
 
 def rmse_bins_exploit(user_id):
     """This model attempts to exploit rmse(bins) by keeping track of per-bin statistics"""
-    model_name = "RMSE-BINS-EXPLOIT"
     dataset = pd.read_parquet(
         config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    dataset = create_features(dataset, model_name)
+    dataset = create_features(dataset, config=config)
     if dataset.shape[0] < 6:
         return Exception("Not enough data")
 
@@ -481,310 +478,8 @@ def rmse_bins_exploit(user_id):
 
     save_tmp = pd.concat(save_tmp)
     save_tmp["p"] = p
-    stats, raw = evaluate(y, p, save_tmp, model_name, user_id)
+    stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
     return stats, raw
-
-
-def create_features_helper(df, model_name, secs_ivl=config.use_secs_intervals):
-    df["review_th"] = range(1, df.shape[0] + 1)
-    df.sort_values(by=["card_id", "review_th"], inplace=True)
-    df.drop(df[~df["rating"].isin([1, 2, 3, 4])].index, inplace=True)
-
-    if config.two_buttons:
-        df["rating"] = df["rating"].replace({2: 3, 4: 3})
-    df["i"] = df.groupby("card_id").cumcount() + 1
-    df.drop(df[df["i"] > config.max_seq_len * 2].index, inplace=True)
-    if (
-        "delta_t" not in df.columns
-        and "elapsed_days" in df.columns
-        and "elapsed_seconds" in df.columns
-    ):
-        df["delta_t"] = df["elapsed_days"]
-        if secs_ivl:
-            df["delta_t_secs"] = df["elapsed_seconds"] / 86400
-            df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
-    if not config.include_short_term:
-        # exclude reviews that are on the same day from features and labels
-        df.drop(df[df["elapsed_days"] == 0].index, inplace=True)
-        df["i"] = df.groupby("card_id").cumcount() + 1
-    df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
-    t_history_non_secs_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
-        lambda x: cum_concat([[i] for i in x])
-    )
-    if secs_ivl:
-        t_history_secs_list = df.groupby("card_id", group_keys=False)[
-            "delta_t_secs"
-        ].apply(lambda x: cum_concat([[i] for i in x]))
-    r_history_list = df.groupby("card_id", group_keys=False)["rating"].apply(
-        lambda x: cum_concat([[i] for i in x])
-    )
-    last_rating = []
-    for t_sublist, r_sublist in zip(t_history_non_secs_list, r_history_list):
-        for t_history, r_history in zip(t_sublist, r_sublist):
-            flag = True
-            for t, r in zip(reversed(t_history[:-1]), reversed(r_history[:-1])):
-                if t > 0:
-                    last_rating.append(r)
-                    flag = False
-                    break
-            if flag:
-                last_rating.append(r_history[0])
-    df["last_rating"] = last_rating
-    df["r_history"] = [
-        ",".join(map(str, item[:-1])) for sublist in r_history_list for item in sublist
-    ]
-    df["t_history"] = [
-        ",".join(map(str, item[:-1]))
-        for sublist in t_history_non_secs_list
-        for item in sublist
-    ]
-    if secs_ivl:
-        if config.equalize_test_with_non_secs:
-            df["t_history"] = [
-                ",".join(map(str, item[:-1]))
-                for sublist in t_history_non_secs_list
-                for item in sublist
-            ]
-            df["t_history_secs"] = [
-                ",".join(map(str, item[:-1]))
-                for sublist in t_history_secs_list
-                for item in sublist
-            ]
-        else:
-            df["t_history"] = [
-                ",".join(map(str, item[:-1]))
-                for sublist in t_history_secs_list
-                for item in sublist
-            ]
-        df["delta_t"] = df["delta_t_secs"]
-        t_history_used = t_history_secs_list
-    else:
-        t_history_used = t_history_non_secs_list
-
-    if model_name.startswith("FSRS") or model_name in (
-        "RNN",
-        "GRU",
-        "Transformer",
-        "SM2-trainable",
-        "Anki",
-        "90%",
-    ):
-        df["tensor"] = [
-            torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
-                0, 1
-            )
-            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-    elif model_name in "LSTM":
-        # Create features (currently unused):
-        # # - number of unique cards in the revlog
-        # # - the number of new cards that were introduced today so far
-        # # - the number of reviews that were done today so far
-        # # - the number of new cards that were introduced since the last review of this card
-        # # - the number of reviews that were done since the last review of this card
-        df["is_new_card"] = (~df["card_id"].duplicated()).astype(int)
-        df["cum_new_cards"] = df["is_new_card"].cumsum()
-        df["diff_new_cards"] = df.groupby("card_id")["cum_new_cards"].diff().fillna(0)
-        df["diff_reviews"] = np.maximum(
-            0, -1 + df.groupby("card_id")["review_th"].diff().fillna(0)
-        )
-        df["cum_new_cards_today"] = df.groupby("day_offset")["is_new_card"].cumsum()
-        df["cum_reviews_today"] = df.groupby("day_offset").cumcount()
-        df["delta_t_days"] = df["elapsed_days"].map(lambda x: max(0, x))
-
-        if secs_ivl:
-            # Use days for the forgetting curve
-            # This also indirectly causes --no_train_on_same_day and --no_test_on_same_day.
-            df["delta_t"] = df["delta_t_days"]
-
-        features = ["delta_t_secs" if secs_ivl else "delta_t", "duration", "rating"]
-
-        def get_history(group):
-            rows = group.apply(
-                lambda row: torch.tensor(
-                    [row[feature] for feature in features],
-                    dtype=torch.float32,
-                    requires_grad=False,
-                ),
-                axis=1,
-            ).tolist()
-
-            cum_rows = list(
-                accumulate(
-                    rows,
-                    lambda x, y: torch.cat((x, y.unsqueeze(0))),
-                    initial=torch.empty(
-                        (0, len(features)), dtype=torch.float32, requires_grad=False
-                    ),
-                )
-            )[:-1]
-            return pd.Series(cum_rows, index=group.index)
-
-        grouped = df.groupby("card_id", group_keys=False)
-        df["tensor"] = grouped[df.columns.difference(["card_id"])].apply(get_history)
-    elif model_name in "GRU-P":
-        df["tensor"] = [
-            torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-    elif model_name == "HLR":
-        df["tensor"] = [
-            torch.tensor(
-                [
-                    np.sqrt(
-                        r_item[:-1].count(2)
-                        + r_item[:-1].count(3)
-                        + r_item[:-1].count(4)
-                    ),
-                    np.sqrt(r_item[:-1].count(1)),
-                ],
-                dtype=torch.float32,
-            )
-            for r_sublist in r_history_list
-            for r_item in r_sublist
-        ]
-    elif model_name == "ACT-R":
-        df["tensor"] = [
-            (torch.cumsum(torch.tensor([t_item]), dim=1)).transpose(0, 1)
-            for t_sublist in t_history_used
-            for t_item in t_sublist
-        ]
-    elif model_name in ("DASH", "DASH[MCM]"):
-
-        def dash_tw_features(r_history, t_history, enable_decay=False):
-            features = np.zeros(8)
-            r_history = np.array(r_history) > 1
-            tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426])
-            time_windows = np.array([1, 7, 30, np.inf])
-
-            # Compute the cumulative sum of t_history in reverse order
-            cumulative_times = np.cumsum(t_history[::-1])[::-1]
-
-            for j, time_window in enumerate(time_windows):
-                # Calculate decay factors for each time window
-                if enable_decay:
-                    decay_factors = np.exp(-cumulative_times / tau_w[j])
-                else:
-                    decay_factors = np.ones_like(cumulative_times)
-
-                # Identify the indices where cumulative times are within the current time window
-                valid_indices = cumulative_times <= time_window
-
-                # Update features using decay factors where valid
-                features[j * 2] += np.sum(decay_factors[valid_indices])
-                features[j * 2 + 1] += np.sum(
-                    r_history[valid_indices] * decay_factors[valid_indices]
-                )
-
-            return features
-
-        df["tensor"] = [
-            torch.tensor(
-                dash_tw_features(r_item[:-1], t_item[1:], "MCM" in model_name),
-                dtype=torch.float32,
-            )
-            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-    elif model_name == "DASH[ACT-R]":
-
-        def dash_actr_features(r_history, t_history):
-            r_history = torch.tensor(np.array(r_history) > 1, dtype=torch.float32)
-            sp_history = torch.tensor(t_history, dtype=torch.float32)
-            cumsum = torch.cumsum(sp_history, dim=0)
-            features = [r_history, sp_history - cumsum + cumsum[-1:None]]
-            return torch.stack(features, dim=1)
-
-        df["tensor"] = [
-            torch.tensor(
-                dash_actr_features(r_item[:-1], t_item[1:]),
-                dtype=torch.float32,
-            )
-            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-    elif model_name == "NN-17":
-
-        def r_history_to_l_history(r_history):
-            l_history = [0 for _ in range(len(r_history) + 1)]
-            for i, r in enumerate(r_history):
-                l_history[i + 1] = l_history[i] + (r == 1)
-            return l_history[:-1]
-
-        df["tensor"] = [
-            torch.tensor(
-                (t_item[:-1], r_item[:-1], r_history_to_l_history(r_item[:-1]))
-            ).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-    elif model_name == "SM2":
-        df["sequence"] = df["r_history"]
-    elif model_name.startswith("Ebisu"):
-        df["sequence"] = [
-            tuple(zip(t_item[:-1], r_item[:-1]))
-            for t_sublist, r_sublist in zip(t_history_used, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-
-    df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
-    df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
-    if config.include_short_term:
-        df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
-    df["i"] = (
-        df.groupby("card_id")
-        .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
-        .reset_index(level=0, drop=True)
-        + 1
-    )
-    if not secs_ivl:
-        filtered_dataset = (
-            df[df["i"] == 2]
-            .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
-            .apply(remove_outliers)
-        )
-        if filtered_dataset.empty:
-            return pd.DataFrame()
-        df[df["i"] == 2] = filtered_dataset
-        df.dropna(inplace=True)
-        df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
-            remove_non_continuous_rows
-        )
-    return df[df["delta_t"] > 0].sort_values(by=["review_th"])
-
-
-def create_features(df, model_name="FSRSv3", secs_ivl=config.use_secs_intervals):
-    if secs_ivl and config.equalize_test_with_non_secs:
-        df_non_secs = create_features_helper(df.copy(), model_name, False)
-        df_secs = create_features_helper(df.copy(), model_name, True)
-        df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
-        # rmse_bins requires that delta_t, i, r_history, t_history remains the same as with non secs
-        assert len(df_intersect) == len(df_non_secs)
-        assert np.equal(df_intersect["i"], df_non_secs["i"]).all()
-        assert np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all()
-        assert np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all()
-
-        tscv = TimeSeriesSplit(n_splits=config.n_splits)
-        for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
-            non_secs_test_set = df_non_secs.iloc[non_secs_test_index]
-            # For the resulting train set, only allow reviews that are less than the smallest review_th in non_secs_test_set
-            allowed_train = df_secs[
-                df_secs["review_th"] < non_secs_test_set["review_th"].min()
-            ]
-            df_secs[f"{split_i}_train"] = df_secs["review_th"].isin(
-                allowed_train["review_th"]
-            )
-
-            # For the resulting test set, only allow reviews that exist in non_secs_test_set
-            df_secs[f"{split_i}_test"] = df_secs["review_th"].isin(
-                non_secs_test_set["review_th"]
-            )
-
-        return df_secs
-    else:
-        return create_features_helper(df, model_name, secs_ivl)
 
 
 @catch_exceptions
@@ -801,7 +496,7 @@ def process(user_id):
         config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
-    dataset = create_features(df_revlogs, config.model_name, config.use_secs_intervals)
+    dataset = create_features(df_revlogs, config=config)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
     if config.partitions != "none":

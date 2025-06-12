@@ -20,6 +20,7 @@ args, _ = parser.parse_known_args()
 config = Config(args)
 config.model_name = "FSRS-5"
 
+
 def process(user_id):
     key_review_ths = f"{user_id}_review_ths"
     key_rmse_bins = f"{user_id}_rmse_bins"

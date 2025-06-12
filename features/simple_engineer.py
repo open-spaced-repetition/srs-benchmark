@@ -7,7 +7,7 @@ class AVGFeatureEngineer(BaseFeatureEngineer):
     Feature engineer for AVG model
     AVG model only needs basic features (y labels) for computing averages
     """
-    
+
     def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         AVG model doesn't need any special features beyond the basic preprocessing
@@ -22,7 +22,7 @@ class RMSEBinsExploitFeatureEngineer(BaseFeatureEngineer):
     Feature engineer for RMSE-BINS-EXPLOIT model
     This model needs basic features plus the ability to create bins from r_history, t_history, and i
     """
-    
+
     def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         RMSE-BINS-EXPLOIT model needs basic features for bin creation
@@ -30,4 +30,4 @@ class RMSEBinsExploitFeatureEngineer(BaseFeatureEngineer):
         """
         # No additional tensor features needed, just the basic preprocessing
         # The bin creation logic is handled in the model's predict/adapt methods
-        return df 
+        return df

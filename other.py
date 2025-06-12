@@ -26,11 +26,6 @@ from config import create_parser, Config
 from utils import catch_exceptions, rmse_matrix
 
 # Import all models from /models directory
-from models import (
-    RNN,
-    GRU_P,
-    Transformer,
-)
 
 parser = create_parser()
 args, _ = parser.parse_known_args()

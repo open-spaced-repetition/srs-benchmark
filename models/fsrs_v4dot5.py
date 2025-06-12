@@ -81,7 +81,7 @@ class FSRS4dot5(FSRS4):
                 ]
 
         # Call parent constructor with the selected weights
-        super(FSRS4dot5, self).__init__(config, w)
+        super().__init__(config, w)
 
     def forgetting_curve(self, t, s):
         """Override forgetting curve with FSRS4.5 formula"""

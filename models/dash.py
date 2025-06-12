@@ -1,7 +1,6 @@
 import torch
 from torch import nn, Tensor
 from typing import List
-from typing import Optional
 from config import Config
 
 
@@ -22,8 +21,8 @@ class DASH(nn.Module):
         0.787,
     ]
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
-        super(DASH, self).__init__()
+    def __init__(self, config: Config, w: List[float] = init_w):
+        super().__init__()
         self.config = config
         self.fc = nn.Linear(8, 1)
         self.sigmoid = nn.Sigmoid()

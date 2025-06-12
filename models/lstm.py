@@ -45,6 +45,7 @@ class LSTM(nn.Module):
     def __init__(
         self, config: Config, state_dict=None, input_mean=None, input_std=None
     ):
+        super().__init__()
         self.config = config
         self.register_buffer(
             "input_mean", torch.tensor(0.0) if input_mean is None else input_mean

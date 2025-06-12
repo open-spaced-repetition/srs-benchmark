@@ -39,8 +39,8 @@ class Anki(nn.Module):
     n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
+        super().__init__()
         self.config = config
-        super(Anki, self).__init__()
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.clipper = AnkiParameterClipper(config)
 

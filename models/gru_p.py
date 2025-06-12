@@ -11,6 +11,7 @@ class GRU_P(nn.Module):
     n_epoch: int = 16
 
     def __init__(self, config: Config, state_dict=None):
+        super().__init__()
         self.config = config
         self.n_input = 2
         self.n_hidden = 8

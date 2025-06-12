@@ -13,6 +13,7 @@ class RNN(nn.Module):
     factor = 0.9 ** (1 / decay) - 1
 
     def __init__(self, config: Config, state_dict=None):
+        super().__init__()
         self.config = config
         self.n_input = 2
         self.n_hidden = 2

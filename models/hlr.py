@@ -13,7 +13,8 @@ class HLR(nn.Module):
     wd: float = 1e-5
     n_epoch: int = 5
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: List[float] = init_w):
+        super().__init__()
         self.config = config
         self.n_input = 2
         self.n_out = 1

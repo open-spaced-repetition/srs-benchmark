@@ -808,7 +808,6 @@ def process(user_id):
     )
     df_revlogs.drop(columns=["user_id"], inplace=True)
     dataset = create_features(df_revlogs, config.model_name, config.use_secs_intervals)
-    dataset.to_csv("dataset.tsv", sep="\t", index=False)
     if dataset.shape[0] < 6:
         raise Exception(f"{user_id} does not have enough data.")
     if config.partitions != "none":

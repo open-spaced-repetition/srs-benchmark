@@ -94,9 +94,8 @@ def create_model(
                     f"For {model_name}, model_params must be a List[float] or None, got {type(model_params)}"
                 )
             constructor_kwargs["w"] = model_params  # type: ignore
-        else:
-            # Models will use their internal init_w or config-dependent init_w
-            constructor_kwargs["w"] = None  # type: ignore
+        # Don't add 'w' to constructor_kwargs when model_params is None
+        # This allows models to use their default parameter values
         instance = model_cls(**constructor_kwargs)  # type: ignore
 
     elif model_name in [

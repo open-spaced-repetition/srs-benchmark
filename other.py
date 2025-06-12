@@ -218,22 +218,12 @@ class Trainer:
         self.n_epoch = n_epoch
 
         # Build datasets
-        self.build_dataset(train_set, test_set)
-
-        # Get training dataset - let model filter if needed
         training_dataset = self.get_training_dataset(train_set)
-        training_data_loader = BatchLoader(
-            BatchDataset(
-                training_dataset,
-                self.batch_size,
-                max_seq_len=self.max_seq_len,
-                device=DEVICE,
-            )
-        )
+        self.build_dataset(training_dataset, test_set)
 
         # Setup scheduler
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=training_data_loader.batch_nums * n_epoch
+            self.optimizer, T_max=self.train_data_loader.batch_nums * n_epoch
         )
 
         self.avg_train_losses: list[float] = []
@@ -274,24 +264,13 @@ class Trainer:
         best_loss = np.inf
         epoch_len = len(self.train_set.y_train)
 
-        # Get the actual training data loader
-        training_dataset = self.get_training_dataset(self.train_set.dataset)
-        training_data_loader = BatchLoader(
-            BatchDataset(
-                training_dataset,
-                self.batch_size,
-                max_seq_len=self.max_seq_len,
-                device=DEVICE,
-            )
-        )
-
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
             if weighted_loss < best_loss:
                 best_loss = weighted_loss
                 best_w = w
 
-            for i, batch in enumerate(training_data_loader):
+            for i, batch in enumerate(self.train_data_loader):
                 self.model.train()
                 self.optimizer.zero_grad()
                 result = iter(self.model, batch)

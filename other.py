@@ -23,7 +23,6 @@ import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser, Config
 from utils import catch_exceptions, rmse_matrix
-from features import create_features
 from data_loader import UserDataLoader
 
 parser = create_parser()
@@ -369,7 +368,9 @@ class Collection:
         return retentions, stabilities, difficulties
 
 
-def process_untrainable(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+def process_untrainable(
+    user_id: int, dataset: pd.DataFrame
+) -> tuple[dict, Optional[dict]]:
     """Process untrainable models (SM2, Ebisu-v2)."""
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
@@ -426,7 +427,9 @@ def baseline(dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
     return stats, raw
 
 
-def rmse_bins_exploit(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+def rmse_bins_exploit(
+    user_id: int, dataset: pd.DataFrame
+) -> tuple[dict, Optional[dict]]:
     """Process RMSE-BINS-EXPLOIT model."""
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     save_tmp = []
@@ -458,11 +461,11 @@ def rmse_bins_exploit(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Option
 def process(user_id: int) -> tuple[dict, Optional[dict]]:
     """Main processing function for all models."""
     plt.close("all")
-    
+
     # Load data once for all models
     data_loader = UserDataLoader(config)
     dataset = data_loader.load_user_data(user_id)
-    
+
     # Handle special cases
     if config.model_name == "SM2" or config.model_name.startswith("Ebisu"):
         return process_untrainable(user_id, dataset)
@@ -470,7 +473,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
         return baseline(user_id, dataset)
     if config.model_name == "RMSE-BINS-EXPLOIT":
         return rmse_bins_exploit(user_id, dataset)
-        
+
     # Process trainable models
     w_list = []
     testsets = []

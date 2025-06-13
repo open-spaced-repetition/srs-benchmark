@@ -1,12 +1,12 @@
 import torch
 from torch import nn, Tensor
 from config import Config
-from models.base import BaseModel
+from models.base import BaseModel, BaseParameterClipper
 
 
-class NN_17ParameterClipper:
-    def __init__(self, config: Config, frequency: int = 1):
-        self.frequency = frequency
+class NN_17ParameterClipper(BaseParameterClipper):
+    def __init__(self, config: Config):
+        super().__init__()
         self.config = config
 
     def __call__(self, module):

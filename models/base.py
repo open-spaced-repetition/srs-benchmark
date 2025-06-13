@@ -4,6 +4,14 @@ import pandas as pd
 from config import Config
 
 
+class BaseParameterClipper:
+    def __init__(self):
+        pass
+
+    def __call__(self, module):
+        pass
+
+
 class BaseModel(nn.Module):
     lr: float = 4e-2
     wd: float = 1e-5
@@ -26,3 +34,6 @@ class BaseModel(nn.Module):
         self.lr = lr
         self.wd = wd
         self.n_epoch = n_epoch
+
+    def apply_gradient_constraints(self):
+        pass

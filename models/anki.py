@@ -2,13 +2,12 @@ import torch
 from torch import nn, Tensor
 from typing import List, Optional
 from config import Config
-from models.base import BaseModel
+from models.base import BaseModel, BaseParameterClipper
 
 
-class AnkiParameterClipper:
-    def __init__(self, config: Config, frequency: int = 1):
-        self.frequency = frequency
-        self.config = config
+class AnkiParameterClipper(BaseParameterClipper):
+    def __init__(self):
+        super().__init__()
 
     def __call__(self, module):
         if hasattr(module, "w"):
@@ -35,11 +34,11 @@ class Anki(BaseModel):
         0,  # new interval
         1,  # interval multiplier
     ]
+    clipper = AnkiParameterClipper()
 
     def __init__(self, config: Config, w: List[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
-        self.clipper = AnkiParameterClipper(config)
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)

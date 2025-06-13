@@ -4,13 +4,10 @@ from torch import nn, Tensor
 from typing import Optional
 
 from config import Config
-from models.fsrs import FSRS
+from models.fsrs import FSRS, FSRSParameterClipper
 
 
-class FSRS1ParameterClipper:
-    def __init__(self, frequency: int = 1):
-        self.frequency = frequency
-
+class FSRS1ParameterClipper(FSRSParameterClipper):
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data

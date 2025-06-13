@@ -18,6 +18,7 @@ try:
 except Exception:
     pass
 
+
 def chen_rule(data, weights=None):
     # https://www.hindawi.com/journals/jps/2015/242683/
     data = np.asarray(data)

@@ -14,7 +14,7 @@ class BaseModel(nn.Module):
         self.config = config
     
     def get_optimizer(self, lr: float, wd: float) -> torch.optim.Optimizer:
-        return torch.optim.Adam(self.parameters(), lr=lr, weight_decay=wd)
+        return torch.optim.Adam(self.parameters(), lr=lr)
     
     def pretrain(self, train_set: pd.DataFrame) -> None:
         pass

@@ -132,5 +132,5 @@ class DashACTRFeatureEngineer(BaseFeatureEngineer):
         cumsum = torch.cumsum(sp_history, dim=0)
 
         # Features: [success_indicator, time_since_start]
-        features = [r_history, sp_history - cumsum + cumsum[-1:None]]
+        features = [r_history, sp_history - cumsum + cumsum[-1:]]
         return torch.stack(features, dim=1)

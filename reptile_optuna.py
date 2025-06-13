@@ -1,6 +1,5 @@
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
-import torch.nn as nn
 from config import create_parser, Config
 from reptile_trainer import (
     DEFAULT_FINETUNE_PARAMS,
@@ -9,7 +8,6 @@ from reptile_trainer import (
     compute_df_loss,
 )
 import pandas as pd
-from pathlib import Path
 import optuna  # type: ignore
 from functools import partial
 import random
@@ -22,27 +20,8 @@ args, _ = parser.parse_known_args()
 config = Config(args)
 
 ENSURE_RESET = False  # Trade speed but try to ensure that no data leakage is going on by reloading the model from storage.
-BATCH_SIZE = 16384
-MODEL_NAME = args.model
-SHORT_TERM = args.short
-SECS_IVL = args.secs
-NO_TEST_SAME_DAY = args.no_test_same_day
-EQUALIZE_TEST_WITH_NON_SECS = args.equalize_test_with_non_secs
-TWO_BUTTONS = args.two_buttons
-FILE_NAME = (
-    MODEL_NAME
-    + ("-short" if SHORT_TERM else "")
-    + ("-secs" if SECS_IVL else "")
-    + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
-    + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
-)
-PROCESSES = args.processes
-MODEL_PATH = f"./pretrain/{FILE_NAME}_pretrain.pth"
-OPT_PATH = f"./pretrain/{FILE_NAME}_opt_pretrain.pth"
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DATA_PATH = Path(args.data)
-MAX_SEQ_LEN = 64
-n_splits = 5
+MODEL_PATH = f"./pretrain/{config.get_evaluation_file_name()}_pretrain.pth"
+OPT_PATH = f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth"
 
 
 def objective(trial, df_list, model, inner_opt_state):
@@ -85,7 +64,7 @@ def objective(trial, df_list, model, inner_opt_state):
     all_test_loss = 0
     all_test_n = 0
     for step, df in enumerate(df_list):
-        tscv = TimeSeriesSplit(n_splits=n_splits)
+        tscv = TimeSeriesSplit(n_splits=config.n_splits)
         for split_i, (train_index, test_index) in enumerate(tscv.split(df)):
             if ENSURE_RESET:
                 model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
@@ -95,7 +74,7 @@ def objective(trial, df_list, model, inner_opt_state):
 
             train_set = df.iloc[train_index]
             test_set = df.iloc[test_index]
-            if EQUALIZE_TEST_WITH_NON_SECS:
+            if config.equalize_test_with_non_secs:
                 # Ignores the train_index and test_index
                 train_set = df[df[f"{split_i}_train"]]
                 test_set = df[df[f"{split_i}_test"]]
@@ -129,22 +108,22 @@ def objective(trial, df_list, model, inner_opt_state):
 
 
 def main():
-    from other import create_features, Transformer, LSTM
+    from features import create_features
+    from models import Transformer, LSTM
 
     def process_user(user_id):
         print("Process:", user_id)
         dataset = pd.read_parquet(
-            DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+            config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
         )
         dataset = create_features(dataset, config=config)
         print("Done:", user_id)
         return user_id, dataset
 
-    model: nn.Module
-    if MODEL_NAME == "Transformer":
-        model = Transformer()
-    elif MODEL_NAME == "LSTM":
-        model = LSTM()
+    if config.model_name == "Transformer":
+        model = Transformer(config)
+    elif config.model_name == "LSTM":
+        model = LSTM(config)
     else:
         raise ValueError("Not found.")
 
@@ -158,7 +137,7 @@ def main():
         model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
     except FileNotFoundError:
         print("Model file not found.")
-    model = model.to(DEVICE)
+    model = model.to(config.device)
     inner_opt = get_inner_opt(params=model.parameters())
     # print("Warning: not loading optimizer file.")
     try:
@@ -172,7 +151,7 @@ def main():
     def worker(user_id):
         return process_user(user_id)
 
-    with Pool(processes=PROCESSES) as pool:
+    with Pool(processes=config.num_processes) as pool:
         results = pool.map(worker, users)
 
     for user, result in results:
@@ -185,7 +164,7 @@ def main():
     )
 
     study.enqueue_trial(DEFAULT_FINETUNE_PARAMS)
-    study.optimize(objective_wrapped, n_trials=100)
+    study.optimize(objective_wrapped, n_trials=100, show_progress_bar=True)
     print(study.best_params)
     print(study.best_value)
 

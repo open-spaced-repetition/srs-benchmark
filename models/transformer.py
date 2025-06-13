@@ -2,19 +2,16 @@ import torch
 from torch import nn, Tensor
 
 from config import Config
+from models.base import BaseModel
 
 
-class Transformer(nn.Module):
+class Transformer(BaseModel):
     # 127 params with default settings
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
     decay = -0.5
     factor = 0.9 ** (1 / decay) - 1
 
     def __init__(self, config: Config, state_dict=None):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.n_input = 2
         self.n_hidden = 2
         self.n_out = 1

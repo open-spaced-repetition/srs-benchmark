@@ -43,7 +43,7 @@ class DashFeatureEngineer(BaseFeatureEngineer):
             Feature vector of length 8
         """
         features = np.zeros(8)
-        r_history = np.array(r_history) > 1  # Convert to binary success/failure
+        r_history_binary = np.array(r_history) > 1  # Convert to binary success/failure
         tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426])  # Decay constants
         time_windows = np.array([1, 7, 30, np.inf])  # Time windows in days
 
@@ -63,7 +63,7 @@ class DashFeatureEngineer(BaseFeatureEngineer):
             # Update features using decay factors where valid
             features[j * 2] += np.sum(decay_factors[valid_indices])  # Total count
             features[j * 2 + 1] += np.sum(
-                r_history[valid_indices] * decay_factors[valid_indices]
+                r_history_binary[valid_indices] * decay_factors[valid_indices]
             )  # Success count
 
         return features
@@ -127,10 +127,10 @@ class DashACTRFeatureEngineer(BaseFeatureEngineer):
         Returns:
             Feature tensor with shape (sequence_length, 2)
         """
-        r_history = torch.tensor(np.array(r_history) > 1, dtype=torch.float32)
+        r_history_tensor = torch.tensor(np.array(r_history) > 1, dtype=torch.float32)
         sp_history = torch.tensor(t_history, dtype=torch.float32)
         cumsum = torch.cumsum(sp_history, dim=0)
 
         # Features: [success_indicator, time_since_start]
-        features = [r_history, sp_history - cumsum + cumsum[-1:]]
+        features = [r_history_tensor, sp_history - cumsum + cumsum[-1:]]
         return torch.stack(features, dim=1)

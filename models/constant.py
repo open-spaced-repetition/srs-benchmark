@@ -1,15 +1,17 @@
 import torch
-from torch import nn
 from torch import Tensor
 
+from config import Config
+from models.base import BaseModel
 
-class ConstantModel(nn.Module):
+
+class ConstantModel(BaseModel):
     n_epoch = 0
     lr = 0
     wd = 0
 
-    def __init__(self, value=0.9):
-        super().__init__()
+    def __init__(self, config: Config, value=0.9):
+        super().__init__(config)
         self.value = value
         self.placeholder = torch.nn.Linear(
             1, 1

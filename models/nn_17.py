@@ -1,6 +1,7 @@
 import torch
 from torch import nn, Tensor
 from config import Config
+from models.base import BaseModel
 
 
 class NN_17ParameterClipper:
@@ -45,18 +46,14 @@ class ExpActivation(nn.Module):
         return exp_activ(input)
 
 
-class NN_17(nn.Module):
+class NN_17(BaseModel):
     # 39 params
     init_s = [1, 2.5, 4.5, 10]
     init_d = [1, 0.72, 0.07, 0.05]
     w = [1.26, 0.0, 0.67]
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
 
     def __init__(self, config: Config, state_dict=None) -> None:
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.hidden_size = 1
         self.S0 = nn.Parameter(
             torch.tensor(

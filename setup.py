@@ -1,7 +1,7 @@
 import os
 import torch
 import glob
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup  # type: ignore
 
 from torch.utils.cpp_extension import (
     CppExtension,

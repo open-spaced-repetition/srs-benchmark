@@ -1,15 +1,12 @@
 from typing import List
 import torch
 from torch import nn, Tensor
-from models.fsrs_v2 import FSRS2
+from models.fsrs_v2 import FSRS2, FSRS2ParameterClipper
 
 from config import Config
 
 
-class FSRS3ParameterClipper:
-    def __init__(self, frequency: int = 1):
-        self.frequency = frequency
-
+class FSRS3ParameterClipper(FSRS2ParameterClipper):
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -67,7 +64,7 @@ class FSRS3(FSRS2):
         )
         return new_s
 
-    def stability_after_failure(
+    def stability_after_failure(  # type: ignore[override]
         self, state: Tensor, new_d: Tensor, r: Tensor
     ) -> Tensor:
         new_s = (

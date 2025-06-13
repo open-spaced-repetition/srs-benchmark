@@ -3,7 +3,7 @@ from typing import Optional, List, Tuple
 import pandas as pd
 from config import Config
 from utils import cum_concat
-from fsrs_optimizer import remove_outliers, remove_non_continuous_rows
+from fsrs_optimizer import remove_outliers, remove_non_continuous_rows  # type: ignore
 
 
 class BaseFeatureEngineer(ABC):
@@ -132,7 +132,7 @@ class BaseFeatureEngineer(ABC):
         return df
 
     def _compute_last_rating(
-        self, t_history_list: List, r_history_list: List
+        self, t_history_list: pd.Series, r_history_list: pd.Series
     ) -> List[int]:
         """
         Calculate the previous rating for each review
@@ -153,13 +153,13 @@ class BaseFeatureEngineer(ABC):
     def _set_time_histories(
         self,
         df: pd.DataFrame,
-        t_history_non_secs_list: List,
-        t_history_secs_list: Optional[List] = None,
+        t_history_non_secs_list: pd.Series,
+        t_history_secs_list: Optional[pd.Series] = None,
     ) -> pd.DataFrame:
         """
         Set time history string fields
         """
-        if self.config.use_secs_intervals:
+        if t_history_secs_list:
             if self.config.equalize_test_with_non_secs:
                 df["t_history"] = [
                     ",".join(map(str, item[:-1]))
@@ -246,7 +246,7 @@ class BaseFeatureEngineer(ABC):
         )
         return df
 
-    def get_history_lists(self, df: pd.DataFrame) -> Tuple[List, List]:
+    def get_history_lists(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
         """
         Get history record lists for feature engineering
 

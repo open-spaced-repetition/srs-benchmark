@@ -16,6 +16,7 @@ from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # 
 from tqdm.auto import tqdm  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
+from models.base import BaseModel
 from models.model_factory import create_model
 from reptile_trainer import get_inner_opt, finetune
 from script import sort_jsonl
@@ -183,39 +184,28 @@ class Trainer:
 
     def __init__(
         self,
-        MODEL: nn.Module,
+        model: BaseModel,
         train_set: pd.DataFrame,
         test_set: Optional[pd.DataFrame],
-        n_epoch: int = 1,
-        lr: float = 1e-2,
-        wd: float = 1e-4,
         batch_size: int = 256,
         max_seq_len: int = 64,
     ) -> None:
-        self.model = MODEL.to(device=DEVICE)
-
-        # Model-specific setup (e.g., pretrain)
-        if hasattr(self.model, "pretrain"):
-            self.model.pretrain(train_set)
+        self.model = model.to(device=DEVICE)
+        self.model.pretrain(train_set)
 
         # Setup optimizer
-        # Let model decide optimizer, default to Adam
-        if hasattr(self.model, "get_optimizer"):
-            self.optimizer = self.model.get_optimizer(lr=lr, wd=wd)
-        else:
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+        self.optimizer = self.model.get_optimizer(lr=self.model.lr, wd=self.model.wd)
 
         self.batch_size = batch_size
         self.max_seq_len = max_seq_len
-        self.n_epoch = n_epoch
+        self.n_epoch = self.model.n_epoch
 
         # Build datasets
-        training_dataset = self.get_training_dataset(train_set)
-        self.build_dataset(training_dataset, test_set)
+        self.build_dataset(self.model.filter_training_data(train_set), test_set)
 
         # Setup scheduler
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=self.train_data_loader.batch_nums * n_epoch
+            self.optimizer, T_max=self.train_data_loader.batch_nums * self.n_epoch
         )
 
         self.avg_train_losses: list[float] = []
@@ -244,13 +234,6 @@ class Trainer:
         self.test_data_loader = (
             [] if test_set is None else BatchLoader(self.test_set, shuffle=False)
         )
-
-    def get_training_dataset(self, train_set: pd.DataFrame) -> pd.DataFrame:
-        """Let model filter training data if needed"""
-        if hasattr(self.model, "filter_training_data"):
-            return self.model.filter_training_data(train_set)
-        else:
-            return train_set
 
     def train(self):
         best_loss = np.inf
@@ -451,9 +434,9 @@ def rmse_bins_exploit(
             y.append(row["y"])
             model.adapt(bin, row["y"])
 
-    save_tmp = pd.concat(save_tmp)
-    save_tmp["p"] = p
-    stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
+    save_tmp_df = pd.concat(save_tmp)
+    save_tmp_df["p"] = p
+    stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
     return stats, raw
 
 
@@ -513,7 +496,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
 
-                model = create_model(config.model_name, config)
+                model = create_model(config)
                 if config.dry_run:
                     partition_weights[partition] = model.state_dict()
                     continue
@@ -532,12 +515,9 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     )
                 else:
                     trainer = Trainer(
-                        model,
-                        train_partition,
-                        None,
-                        n_epoch=model.n_epoch,
-                        lr=model.lr,
-                        wd=model.wd,
+                        model=model,
+                        train_set=train_partition,
+                        test_set=None,
                         batch_size=config.batch_size,
                     )
                     partition_weights[partition] = trainer.train()
@@ -548,9 +528,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                 else:
                     print(f"User: {user_id}")
                     raise e
-                partition_weights[partition] = create_model(
-                    config.model_name, config
-                ).state_dict()
+                partition_weights[partition] = create_model(config).state_dict()
         w_list.append(partition_weights)
 
         if config.train_equals_test:
@@ -565,9 +543,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(
-                create_model(config.model_name, config, weights)
-                if weights
-                else create_model(config.model_name, config)
+                create_model(config, weights) if weights else create_model(config)
             )
             retentions, stabilities, difficulties = my_collection.batch_predict(
                 partition_testset
@@ -581,17 +557,17 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)
 
-    save_tmp = pd.concat(save_tmp)
-    del save_tmp["tensor"]
+    save_tmp_df = pd.concat(save_tmp)
+    del save_tmp_df["tensor"]
     if config.save_evaluation_file:
-        save_tmp.to_csv(
+        save_tmp_df.to_csv(
             f"evaluation/{config.get_evaluation_file_name()}/{user_id}.tsv",
             sep="\t",
             index=False,
         )
 
     stats, raw = evaluate(
-        y, p, save_tmp, config.get_evaluation_file_name(), user_id, w_list
+        y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, w_list
     )
     return stats, raw
 

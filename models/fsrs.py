@@ -1,12 +1,12 @@
 import torch
-from torch import nn, Tensor
+from torch import Tensor
 from config import Config
+from models.base import BaseModel
 
 
-class FSRS(nn.Module):
+class FSRS(BaseModel):
     def __init__(self, config: Config):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
 
     def forgetting_curve(self, t, s):
         raise NotImplementedError("Forgetting curve not implemented")

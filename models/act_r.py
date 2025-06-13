@@ -3,6 +3,7 @@ from torch import nn, Tensor
 from typing import List
 
 from config import Config
+from models.base import BaseModel
 
 
 class ACT_RParameterClipper:
@@ -20,7 +21,7 @@ class ACT_RParameterClipper:
             module.w.data = w
 
 
-class ACT_R(nn.Module):
+class ACT_R(BaseModel):
     # 5 params
     a = 0.176786766570677  # decay intercept
     c = 0.216967308403809  # decay scale
@@ -29,13 +30,9 @@ class ACT_R(nn.Module):
     h = 0.025  # interference scalar
     init_w = [a, c, s, tau, h]
     clipper = ACT_RParameterClipper()
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
     def forward(self, sp: Tensor):

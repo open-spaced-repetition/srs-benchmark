@@ -87,7 +87,7 @@ class FSRS4dot5(FSRS4):
         """Override forgetting curve with FSRS4.5 formula"""
         return (1 + self.factor * t / s) ** self.decay
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
+    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
         """Override to add minimum constraint"""
         new_s = (
             self.w[11]

@@ -2,16 +2,12 @@ from typing import List
 import torch
 from torch import nn, Tensor
 from typing import Optional
-from models.fsrs_v5 import FSRS5
+from models.fsrs_v5 import FSRS5, FSRS5ParameterClipper
 
 from config import Config
 
 
-class FSRS6ParameterClipper:
-    def __init__(self, config: Config, frequency: int = 1):
-        self.frequency = frequency
-        self.config = config
-
+class FSRS6ParameterClipper(FSRS5ParameterClipper):
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data

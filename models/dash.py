@@ -2,13 +2,11 @@ import torch
 from torch import nn, Tensor
 from typing import List, Optional
 from config import Config
+from models.base import BaseModel
 
 
-class DASH(nn.Module):
+class DASH(BaseModel):
     # 9 params
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
     init_w = [
         0.2024,
         0.5967,
@@ -22,8 +20,7 @@ class DASH(nn.Module):
     ]
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.fc = nn.Linear(8, 1)
         self.sigmoid = nn.Sigmoid()
 

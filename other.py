@@ -403,7 +403,7 @@ def process_untrainable(
     return stats, raw
 
 
-def baseline(dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+def baseline(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
     testsets = []
     avg_ps = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)

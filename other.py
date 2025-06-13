@@ -528,9 +528,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                 else:
                     print(f"User: {user_id}")
                     raise e
-                partition_weights[partition] = create_model(
-                    config
-                ).state_dict()
+                partition_weights[partition] = create_model(config).state_dict()
         w_list.append(partition_weights)
 
         if config.train_equals_test:
@@ -545,9 +543,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(
-                create_model(config, weights)
-                if weights
-                else create_model(config)
+                create_model(config, weights) if weights else create_model(config)
             )
             retentions, stabilities, difficulties = my_collection.batch_predict(
                 partition_testset

@@ -126,10 +126,10 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
 
 def cum_concat(x):
     """Concatenate a list of lists using accumulate.
-    
+
     Args:
         x: A list of lists to be concatenated
-        
+
     Returns:
         A list of accumulated concatenated lists
     """

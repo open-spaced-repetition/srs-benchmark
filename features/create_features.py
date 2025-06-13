@@ -45,7 +45,9 @@ def _create_features_standard(df: pd.DataFrame, config) -> pd.DataFrame:
     return processed_df
 
 
-def _create_features_with_equalized_test(df: pd.DataFrame, config: Config) -> pd.DataFrame:
+def _create_features_with_equalized_test(
+    df: pd.DataFrame, config: Config
+) -> pd.DataFrame:
     """
     Create features with equalized test handling for seconds intervals
     This ensures test sets are consistent between seconds and non-seconds intervals

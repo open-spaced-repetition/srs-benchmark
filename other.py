@@ -43,7 +43,9 @@ torch.manual_seed(config.seed)
 tqdm.pandas()
 
 
-def iter(model: BaseModel, batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]) -> dict[str, Tensor]:
+def iter(
+    model: BaseModel, batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
+) -> dict[str, Tensor]:
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}

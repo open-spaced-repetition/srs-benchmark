@@ -28,7 +28,13 @@ class BaseModel(nn.Module):
     def pretrain(self, train_set: pd.DataFrame) -> None:
         pass
 
-    def iter(self, sequences: Tensor, delta_ts: Tensor, seq_lens: Tensor, real_batch_size: int) -> dict[str, Tensor]:
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
         raise NotImplementedError("Subclasses must implement iter() method")
 
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:

@@ -13,9 +13,10 @@ args, _ = parser.parse_known_args()
 DEV_MODE = args.dev
 if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
-
-from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
-
+try:
+    from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
+except Exception:
+    pass
 
 def chen_rule(data, weights=None):
     # https://www.hindawi.com/journals/jps/2015/242683/
@@ -218,7 +219,7 @@ if __name__ == "__main__":
     sizes = []
     n_params = len(DEFAULT_PARAMETER)
     for result in data:
-        if type(result["parameters"]) == dict:
+        if isinstance(result["parameters"], dict):
             for partition in result["parameters"]:
                 for i in range(n_params):
                     if (

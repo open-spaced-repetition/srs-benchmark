@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 import json
-from torch import nn
+from torch import Tensor, nn
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
@@ -27,7 +27,7 @@ from utils import catch_exceptions, get_bin, rmse_matrix
 from data_loader import UserDataLoader
 from models.rmse_bins_exploit import RMSEBinsExploit
 from models.sm2 import sm2
-from models.ebisu import ebisu_v2
+from models.ebisu import Ebisu
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -38,15 +38,12 @@ if config.dev_mode:
 
 from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier, Optimizer  # type: ignore
 
-if config.model_name.startswith("Ebisu"):
-    import ebisu  # type: ignore
-
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(config.seed)
 tqdm.pandas()
 
 
-def iter(model, batch):
+def iter(model: BaseModel, batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]) -> dict[str, Tensor]:
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
@@ -238,6 +235,7 @@ def process_untrainable(
     p = []
     y = []
     save_tmp = []
+    ebisu = Ebisu()
 
     for i, testset in enumerate(testsets):
         if config.model_name == "SM2":
@@ -246,9 +244,9 @@ def process_untrainable(
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
             )
         elif config.model_name == "Ebisu-v2":
-            testset["model"] = testset["sequence"].map(ebisu_v2)
+            testset["model"] = testset["sequence"].map(ebisu.ebisu_v2)
             testset["p"] = testset.apply(
-                lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
+                lambda x: ebisu.predict(x["model"], x["delta_t"]),
                 axis=1,
             )
 

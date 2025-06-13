@@ -5,10 +5,10 @@ from torch import nn, Tensor
 from typing import Optional
 
 from config import Config
-from models.fsrs_v4dot5 import FSRS4dot5
+from models.fsrs_v4dot5 import FSRS4dot5, FSRS4dot5ParameterClipper
 
 
-class FSRS5ParameterClipper:
+class FSRS5ParameterClipper(FSRS4dot5ParameterClipper):
     def __init__(self, config: Config, frequency: int = 1):
         self.frequency = frequency
         self.config = config
@@ -120,7 +120,7 @@ class FSRS5(FSRS4dot5):
         )
         return output
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
+    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
         old_s = state[:, 0]
         new_s = (
             self.w[11]

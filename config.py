@@ -178,9 +178,9 @@ class Config:
         # Handle `include_short_term` based on model name and initial arg
         self.initial_short_term_setting: bool = args.short
         if self.model_name.startswith("FSRS-5") or self.model_name.startswith("FSRS-6"):
-            self.include_short_term: bool = True
+            self.include_short_term = True
         else:
-            self.include_short_term: bool = self.initial_short_term_setting
+            self.include_short_term = self.initial_short_term_setting
 
         # PyTorch threading settings
         self.torch_num_threads: int = args.torch_num_threads
@@ -196,9 +196,7 @@ class Config:
             )
 
         # Path for fsrs_optimizer (used for dynamic import)
-        self.fsrs_optimizer_module_path: Optional[str] = (
-            "../fsrs-optimizer/src/fsrs_optimizer/" if self.dev_mode else None
-        )
+        self.fsrs_optimizer_module_path: str = "../fsrs-optimizer/src/fsrs_optimizer/"
 
         # Device configuration
         if torch.cuda.is_available() and self.model_name in [
@@ -213,7 +211,7 @@ class Config:
         # elif torch.backends.mps.is_available(): # Support for MPS if uncommented in original
         #     self.device = torch.device("mps")
         else:
-            self.device: torch.device = torch.device("cpu")
+            self.device = torch.device("cpu")
 
         # Verbosity (can be made configurable later)
         self.verbose_logging: bool = False
@@ -250,7 +248,7 @@ class Config:
         if self.model_name == "FSRS-6":
             self.s_min: float = 0.001 if not self.use_secs_intervals else _s_min_base
         else:
-            self.s_min: float = _s_min_base
+            self.s_min = _s_min_base
 
         self.init_s_max: float = 100.0  # Max initial stability
         self.s_max: float = 36500.0  # Max stability (e.g., 100 years)

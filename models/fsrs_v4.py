@@ -1,7 +1,7 @@
 from typing import List
 import torch
 from torch import nn, Tensor
-from models.fsrs_v3 import FSRS3
+from models.fsrs_v3 import FSRS3, FSRS3ParameterClipper
 from config import Config
 import pandas as pd
 from tqdm.auto import tqdm  # type: ignore
@@ -9,7 +9,7 @@ import numpy as np
 from scipy.optimize import minimize  # type: ignore
 
 
-class FSRS4ParameterClipper:
+class FSRS4ParameterClipper(FSRS3ParameterClipper):
     def __init__(self, frequency: int = 1):
         self.frequency = frequency
 
@@ -75,7 +75,7 @@ class FSRS4(FSRS3):
     def forgetting_curve(self, t, s):
         return (1 + t / (9 * s)) ** -1
 
-    def stability_after_success(
+    def stability_after_success(  # type: ignore[override]
         self, state: Tensor, r: Tensor, rating: Tensor
     ) -> Tensor:
         hard_penalty = torch.where(rating == 2, self.w[15], 1)
@@ -91,7 +91,7 @@ class FSRS4(FSRS3):
         )
         return new_s
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
+    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
         new_s = (
             self.w[11]
             * torch.pow(state[:, 1], -self.w[12])

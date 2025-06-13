@@ -451,9 +451,9 @@ def rmse_bins_exploit(
             y.append(row["y"])
             model.adapt(bin, row["y"])
 
-    save_tmp = pd.concat(save_tmp)
-    save_tmp["p"] = p
-    stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
+    save_tmp_df = pd.concat(save_tmp)
+    save_tmp_df["p"] = p
+    stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
     return stats, raw
 
 
@@ -581,17 +581,17 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)
 
-    save_tmp = pd.concat(save_tmp)
-    del save_tmp["tensor"]
+    save_tmp_df = pd.concat(save_tmp)
+    del save_tmp_df["tensor"]
     if config.save_evaluation_file:
-        save_tmp.to_csv(
+        save_tmp_df.to_csv(
             f"evaluation/{config.get_evaluation_file_name()}/{user_id}.tsv",
             sep="\t",
             index=False,
         )
 
     stats, raw = evaluate(
-        y, p, save_tmp, config.get_evaluation_file_name(), user_id, w_list
+        y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, w_list
     )
     return stats, raw
 

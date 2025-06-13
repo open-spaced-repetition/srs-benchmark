@@ -11,6 +11,7 @@ class FSRSParameterClipper(BaseParameterClipper):
     def __call__(self, module):
         pass
 
+
 class FSRS(BaseModel):
     clipper = FSRSParameterClipper()
 

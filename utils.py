@@ -136,7 +136,6 @@ def cum_concat(x):
     return list(accumulate(x))
 
 
-
 def count_lapse(r_history, t_history):
     lapse = 0
     for r, t in zip(r_history.split(","), t_history.split(",")):

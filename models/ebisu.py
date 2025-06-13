@@ -4,10 +4,10 @@ import ebisu  # type: ignore
 def ebisu_v2(sequence):
     """
     Implementation of the Ebisu v2 algorithm.
-    
+
     Args:
         sequence: A sequence of (delta_t, rating) tuples
-        
+
     Returns:
         The trained Ebisu model
     """
@@ -19,4 +19,4 @@ def ebisu_v2(sequence):
         model = ebisu.updateRecall(
             model, successes=1 if rating > 1 else 0, total=1, tnow=max(delta_t, 0.001)
         )
-    return model 
+    return model

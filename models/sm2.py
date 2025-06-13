@@ -4,11 +4,11 @@ from config import Config
 def sm2(r_history: str, config: Config) -> float:
     """
     Implementation of the SM-2 algorithm.
-    
+
     Args:
         r_history: A comma-separated string of ratings
         config: Configuration object containing s_max parameter
-        
+
     Returns:
         float: The calculated interval
     """

@@ -1,3 +1,4 @@
+import copy
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import TimeSeriesSplit
@@ -44,7 +45,7 @@ def _create_features_standard(df: pd.DataFrame, config) -> pd.DataFrame:
     return processed_df
 
 
-def _create_features_with_equalized_test(df: pd.DataFrame, config) -> pd.DataFrame:
+def _create_features_with_equalized_test(df: pd.DataFrame, config: Config) -> pd.DataFrame:
     """
     Create features with equalized test handling for seconds intervals
     This ensures test sets are consistent between seconds and non-seconds intervals
@@ -57,13 +58,13 @@ def _create_features_with_equalized_test(df: pd.DataFrame, config) -> pd.DataFra
         Processed dataframe with split indicators
     """
     # Create non-seconds features
-    config_non_secs = type(config)(config.__dict__)  # Create a copy of config
+    config_non_secs = copy.deepcopy(config)
     config_non_secs.use_secs_intervals = False
     engineer_non_secs = create_feature_engineer(config_non_secs)
     df_non_secs = engineer_non_secs.create_features(df.copy())
 
     # Create seconds features
-    config_secs = type(config)(config.__dict__)  # Create a copy of config
+    config_secs = copy.deepcopy(config)
     config_secs.use_secs_intervals = True
     engineer_secs = create_feature_engineer(config_secs)
     df_secs = engineer_secs.create_features(df.copy())

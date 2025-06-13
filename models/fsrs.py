@@ -5,7 +5,7 @@ from config import Config
 
 class FSRS(nn.Module):
     def __init__(self, config: Config):
-        super(FSRS, self).__init__()
+        super().__init__()
         self.config = config
 
     def forgetting_curve(self, t, s):

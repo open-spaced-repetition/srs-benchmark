@@ -28,8 +28,8 @@ class SM2(nn.Module):
     n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
+        super().__init__()
         self.config = config
-        super(SM2, self).__init__()
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.clipper = SM2ParameterClipper(config)
 

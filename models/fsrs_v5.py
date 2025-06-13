@@ -89,7 +89,7 @@ class FSRS5(FSRS4dot5):
     )
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
-        super(FSRS5, self).__init__(config)
+        super().__init__(config)
         if w is None:
             w = self.init_w
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))

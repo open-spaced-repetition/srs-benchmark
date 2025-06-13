@@ -39,7 +39,7 @@ class FSRS2(FSRS1):
     n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super(FSRS2, self).__init__(config)
+        super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
     def stability_after_success(

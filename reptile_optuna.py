@@ -1,7 +1,7 @@
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
-from config import create_parser
+from config import create_parser, Config
 from reptile_trainer import (
     DEFAULT_FINETUNE_PARAMS,
     finetune,
@@ -19,6 +19,7 @@ optuna_nonce = random.randint(0, 100000000)
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
+config = Config(args)
 
 ENSURE_RESET = False  # Trade speed but try to ensure that no data leakage is going on by reloading the model from storage.
 BATCH_SIZE = 16384
@@ -135,7 +136,7 @@ def main():
         dataset = pd.read_parquet(
             DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
         )
-        dataset = create_features(dataset, model_name=MODEL_NAME)
+        dataset = create_features(dataset, config=config)
         print("Done:", user_id)
         return user_id, dataset
 

@@ -59,7 +59,7 @@ class FSRS4(FSRS3):
     n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super(FSRS4, self).__init__(config)
+        super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:

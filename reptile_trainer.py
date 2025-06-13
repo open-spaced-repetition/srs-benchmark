@@ -3,7 +3,7 @@ from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
 from pathlib import Path
-from config import create_parser
+from config import create_parser, Config
 from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
 from multiprocessing import Pool  # type: ignore
 import copy
@@ -56,6 +56,7 @@ DEFAULT_FINETUNE_PARAMS = {
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
+config = Config(args)
 
 MODEL_NAME = args.algo
 SHORT_TERM = args.short
@@ -513,7 +514,7 @@ def main():
         dataset = pd.read_parquet(
             DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
         )
-        dataset = create_features(dataset, model_name=MODEL_NAME)
+        dataset = create_features(dataset, config=config)
         print("Done:", user_id)
         return user_id, dataset
 

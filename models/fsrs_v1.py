@@ -33,7 +33,7 @@ class FSRS1(FSRS):
     n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super(FSRS1, self).__init__(config)
+        super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
     def forgetting_curve(self, t, s):

@@ -11,12 +11,13 @@ from other import (
     GRU_P,
     FSRS6,
 )
-from config import create_parser
+from config import create_parser, Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
+config = Config(args)
 
 MODEL_NAME = args.algo
 SHORT_TERM = args.short
@@ -31,7 +32,7 @@ def process_user(user_id):
     dataset = pd.read_parquet(
         DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    dataset = create_features(dataset, model_name=MODEL_NAME, secs_ivl=SECS_IVL)
+    dataset = create_features(dataset, config=config)
     return user_id, dataset
 
 

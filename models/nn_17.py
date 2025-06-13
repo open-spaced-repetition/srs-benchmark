@@ -55,8 +55,8 @@ class NN_17(nn.Module):
     n_epoch: int = 5
 
     def __init__(self, config: Config, state_dict=None) -> None:
+        super().__init__()
         self.config = config
-        super(NN_17, self).__init__()
         self.hidden_size = 1
         self.S0 = nn.Parameter(
             torch.tensor(

@@ -519,7 +519,6 @@ def main():
         print("Done:", user_id)
         return user_id, dataset
 
-    model: nn.Module
     if MODEL_NAME == "Transformer":
         model = Transformer(config)
     elif MODEL_NAME == "LSTM":

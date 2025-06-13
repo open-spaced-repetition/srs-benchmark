@@ -121,7 +121,7 @@ def main():
         print("Done:", user_id)
         return user_id, dataset
 
-    model: nn.Module
+    
     if config.model_name == "Transformer":
         model = Transformer(config)
     elif config.model_name == "LSTM":

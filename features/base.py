@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Tuple
 import pandas as pd
 from config import Config
+from utils import cum_concat
+from fsrs_optimizer import remove_outliers, remove_non_continuous_rows
 
 
 class BaseFeatureEngineer(ABC):
@@ -93,8 +95,6 @@ class BaseFeatureEngineer(ABC):
         """
         Compute time and rating history records
         """
-        from script import cum_concat  # Import here to avoid circular imports
-
         # Calculate time history (non-seconds)
         t_history_non_secs_list = df.groupby("card_id", group_keys=False)[
             "delta_t"
@@ -230,7 +230,6 @@ class BaseFeatureEngineer(ABC):
         """
         Handle outliers and non-continuous rows
         """
-        from script import remove_outliers, remove_non_continuous_rows  # Import here
 
         filtered_dataset = (
             df[df["i"] == 2]
@@ -254,13 +253,14 @@ class BaseFeatureEngineer(ABC):
         Returns:
             Tuple of (time_history_list, rating_history_list)
         """
-        from script import cum_concat
 
         if self.config.use_secs_intervals:
             t_history_list = df.groupby("card_id", group_keys=False)[
-                "delta_t_secs"
-                if not self.config.equalize_test_with_non_secs
-                else "delta_t"
+                (
+                    "delta_t_secs"
+                    if not self.config.equalize_test_with_non_secs
+                    else "delta_t"
+                )
             ].apply(lambda x: cum_concat([[i] for i in x]))
         else:
             t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(

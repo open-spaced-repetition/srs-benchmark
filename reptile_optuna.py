@@ -1,6 +1,5 @@
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
-import torch.nn as nn
 from config import create_parser, Config
 from reptile_trainer import (
     DEFAULT_FINETUNE_PARAMS,
@@ -121,7 +120,6 @@ def main():
         print("Done:", user_id)
         return user_id, dataset
 
-    
     if config.model_name == "Transformer":
         model = Transformer(config)
     elif config.model_name == "LSTM":

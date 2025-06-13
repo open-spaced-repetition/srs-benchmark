@@ -2,7 +2,7 @@ import torch
 from torch import nn, Tensor
 from typing import List
 from config import Config
-
+from models.base import BaseModel
 
 class DASH_ACTRParameterClipper:
     def __init__(self, frequency: int = 1):
@@ -16,17 +16,13 @@ class DASH_ACTRParameterClipper:
             module.w.data = w
 
 
-class DASH_ACTR(nn.Module):
+class DASH_ACTR(BaseModel):
     # 5 params
     init_w = [1.4164, 0.516, -0.0564, 1.9223, 1.0549]
     clipper = DASH_ACTRParameterClipper()
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.sigmoid = nn.Sigmoid()
 

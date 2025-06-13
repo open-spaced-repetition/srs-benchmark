@@ -3,18 +3,14 @@ from torch import nn, Tensor
 from typing import List
 
 from config import Config
+from models.base import BaseModel
 
-
-class HLR(nn.Module):
+class HLR(BaseModel):
     # 3 params
     init_w = [2.5819, -0.8674, 2.7245]
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.n_input = 2
         self.n_out = 1
         self.fc = nn.Linear(self.n_input, self.n_out)

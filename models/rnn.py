@@ -1,34 +1,31 @@
+from typing import Union
 import torch
 from torch import nn, Tensor
 
 from config import Config
+from models.base import BaseModel
 
-
-class RNN(nn.Module):
+class RNN(BaseModel):
     # 39 params with default settings
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
     decay = -0.5
     factor = 0.9 ** (1 / decay) - 1
 
     def __init__(self, config: Config, state_dict=None):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.n_input = 2
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
         if self.config.model_name == "GRU":
-            self.rnn = nn.GRU(
+            self.rnn: Union[nn.GRU, nn.RNN] = nn.GRU(
                 input_size=self.n_input,
                 hidden_size=self.n_hidden,
                 num_layers=self.n_layers,
             )
             nn.init.orthogonal_(self.rnn.weight_ih_l0)
             nn.init.orthogonal_(self.rnn.weight_hh_l0)
-            self.rnn.bias_ih_l0.data.fill_(0)
-            self.rnn.bias_hh_l0.data.fill_(0)
+            self.rnn.bias_ih_l0.data.fill_(0)  # type: ignore
+            self.rnn.bias_hh_l0.data.fill_(0)  # type: ignore
         else:
             self.rnn = nn.RNN(
                 input_size=self.n_input,

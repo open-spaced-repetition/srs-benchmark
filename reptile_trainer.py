@@ -507,7 +507,8 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
 
 
 def main():
-    from other import create_features, Transformer, LSTM
+    from features import create_features
+    from models import Transformer, LSTM
 
     def process_user(user_id):
         print("Process user:", user_id)
@@ -520,9 +521,9 @@ def main():
 
     model: nn.Module
     if MODEL_NAME == "Transformer":
-        model = Transformer()
+        model = Transformer(config)
     elif MODEL_NAME == "LSTM":
-        model = LSTM()
+        model = LSTM(config)
     else:
         raise ValueError("Not found.")
 

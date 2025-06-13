@@ -3,10 +3,10 @@ from tqdm import tqdm  # type: ignore
 import torch
 import torch.nn as nn
 from features import create_features
+from models.base import BaseModel
 from other import Trainer
 from config import create_parser, Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from models.fsrs_v6 import FSRS6
 from models.gru_p import GRU_P
 from models.rnn import RNN
@@ -17,44 +17,40 @@ parser = create_parser()
 args, _ = parser.parse_known_args()
 config = Config(args)
 
-MODEL_NAME = args.algo
-SHORT_TERM = args.short
-SECS_IVL = args.secs
-FILE_NAME = (
-    MODEL_NAME + ("-short" if SHORT_TERM else "") + ("-secs" if SECS_IVL else "")
-)
-DATA_PATH = Path(args.data)
-
 
 def process_user(user_id):
     dataset = pd.read_parquet(
-        DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
     )
     dataset = create_features(dataset, config=config)
     return user_id, dataset
 
 
 if __name__ == "__main__":
-    model: nn.Module
+    model: BaseModel
     n_epoch = 32
     lr = 4e-2
     wd = 1e-4
     batch_size = 65536
-    if MODEL_NAME == "GRU":
+    if config.model_name == "GRU":
         model = RNN(config)
-    elif MODEL_NAME == "GRU-P":
+        model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
+    elif config.model_name == "GRU-P":
         model = GRU_P(config)
-    elif MODEL_NAME == "Transformer":
+        model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
+    elif config.model_name == "Transformer":
         model = Transformer(config)
-    elif MODEL_NAME == "NN-17":
+        model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
+    elif config.model_name == "NN-17":
         model = NN_17(config)
-    elif MODEL_NAME == "FSRS-6":
-        SHORT_TERM = True
+        model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
+    elif config.model_name == "FSRS-6":
         n_epoch = 5
         lr = 4e-2
         wd = 0
         batch_size = 512
         model = FSRS6(config)
+        model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
 
     total = 0
     for param in model.parameters():
@@ -86,14 +82,13 @@ if __name__ == "__main__":
         model,
         df,
         None,
-        n_epoch=n_epoch,
-        lr=lr,
-        wd=wd,
         batch_size=batch_size,
     )
     parameters = trainer.train()
     print(parameters)
-    torch.save(parameters, f"./pretrain/{FILE_NAME}_pretrain.pth")
+    torch.save(
+        parameters, f"./pretrain/{config.get_evaluation_file_name()}_pretrain.pth"
+    )
 
     # my_collection = Collection(FSRS6(parameters))
     # retentions, stabilities, difficulties = my_collection.batch_predict(df)

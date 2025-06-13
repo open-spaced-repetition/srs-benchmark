@@ -2,6 +2,7 @@ import torch
 from torch import nn, Tensor
 
 from config import Config
+from models.base import BaseModel
 
 
 class ResBlock(nn.Module):
@@ -23,7 +24,7 @@ class RNNWrapper(nn.Module):
         return outputs
 
 
-class LSTM(nn.Module):
+class LSTM(BaseModel):
     """
     This model is trained with reptile_trainer.py, and was run with the flags
     ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
@@ -45,8 +46,7 @@ class LSTM(nn.Module):
     def __init__(
         self, config: Config, state_dict=None, input_mean=None, input_std=None
     ):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.register_buffer(
             "input_mean", torch.tensor(0.0) if input_mean is None else input_mean
         )
@@ -60,12 +60,12 @@ class LSTM(nn.Module):
         self.process = nn.Sequential(
             nn.Linear(self.n_input, self.n_hidden),
             nn.SiLU(),
-            nn.LayerNorm((self.n_hidden,), bias=False),
+            nn.LayerNorm(self.n_hidden, bias=False),
             nn.Linear(self.n_hidden, self.n_hidden),
             nn.SiLU(),
             ResBlock(
                 nn.Sequential(
-                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.LayerNorm(self.n_hidden, bias=False),
                     RNNWrapper(
                         nn.LSTM(
                             input_size=self.n_hidden,
@@ -77,7 +77,7 @@ class LSTM(nn.Module):
             ),
             ResBlock(
                 nn.Sequential(
-                    nn.LayerNorm((self.n_hidden,)),
+                    nn.LayerNorm(self.n_hidden),
                     RNNWrapper(
                         nn.LSTM(
                             input_size=self.n_hidden,
@@ -89,15 +89,15 @@ class LSTM(nn.Module):
             ),
             ResBlock(
                 nn.Sequential(
-                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.LayerNorm(self.n_hidden, bias=False),
                     nn.Linear(self.n_hidden, self.n_hidden),
                     nn.SiLU(),
-                    nn.LayerNorm((self.n_hidden,), bias=False),
+                    nn.LayerNorm(self.n_hidden, bias=False),
                     nn.Linear(self.n_hidden, self.n_hidden),
                     nn.SiLU(),
                 )
             ),
-            nn.LayerNorm((self.n_hidden,), bias=False),
+            nn.LayerNorm(self.n_hidden, bias=False),
             nn.Linear(self.n_hidden, self.n_hidden),
             nn.SiLU(),
         )

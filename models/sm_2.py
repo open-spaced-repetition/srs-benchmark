@@ -2,7 +2,7 @@ import torch
 from torch import nn, Tensor
 from typing import List
 from config import Config
-
+from models.base import BaseModel
 
 class SM2ParameterClipper:
     def __init__(self, config: Config, frequency: int = 1):
@@ -20,7 +20,7 @@ class SM2ParameterClipper:
             module.w.data = w
 
 
-class SM2(nn.Module):
+class SM2(BaseModel):
     # 6 params
     init_w = [1, 6, 2.5, 0.02, 7, 0.18]
     lr: float = 4e-2
@@ -28,8 +28,7 @@ class SM2(nn.Module):
     n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super().__init__()
-        self.config = config
+        super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.clipper = SM2ParameterClipper(config)
 

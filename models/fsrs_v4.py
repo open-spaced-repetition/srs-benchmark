@@ -140,7 +140,7 @@ class FSRS4(FSRS3):
             )
         )
 
-    def pretrain(self, train_set):
+    def pretrain(self, train_set: pd.DataFrame) -> None:
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
             .groupby(by=["first_rating", "delta_t"], group_keys=False)
@@ -220,7 +220,7 @@ class FSRS4(FSRS3):
         elif len(rating_stability) == 1:
             rating = list(rating_stability.keys())[0]
             factor = rating_stability[rating] / r_s0_default[str(rating)]
-            init_s0 = list(map(lambda x: x * factor, r_s0_default.values()))
+            initial_stabilities = list(map(lambda x: x * factor, r_s0_default.values()))
         elif len(rating_stability) == 2:
             if 1 not in rating_stability and 2 not in rating_stability:
                 rating_stability[2] = np.power(
@@ -264,7 +264,7 @@ class FSRS4(FSRS3):
                 rating_stability[4] = np.power(
                     rating_stability[2], 1 - 1 / w2
                 ) * np.power(rating_stability[3], 1 / w2)
-            init_s0 = [
+            initial_stabilities = [
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         elif len(rating_stability) == 3:
@@ -284,18 +284,18 @@ class FSRS4(FSRS3):
                 rating_stability[4] = np.power(
                     rating_stability[2], 1 - 1 / w2
                 ) * np.power(rating_stability[3], 1 / w2)
-            init_s0 = [
+            initial_stabilities = [
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         elif len(rating_stability) == 4:
-            init_s0 = [
+            initial_stabilities = [
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         self.w.data[0:4] = Tensor(
             list(
                 map(
                     lambda x: max(min(self.config.init_s_max, x), self.config.s_min),
-                    init_s0,
+                    initial_stabilities,
                 )
             )
         )

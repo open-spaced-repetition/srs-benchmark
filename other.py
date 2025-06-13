@@ -24,6 +24,7 @@ import pyarrow.parquet as pq  # type: ignore
 from config import create_parser, Config
 from utils import catch_exceptions, rmse_matrix
 from features import create_features
+from data_loader import UserDataLoader
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -368,23 +369,8 @@ class Collection:
         return retentions, stabilities, difficulties
 
 
-def process_untrainable(user_id):
-    df_revlogs = pd.read_parquet(
-        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
-    )
-    df_cards = pd.read_parquet(
-        config.data_path / "cards", filters=[("user_id", "=", user_id)]
-    )
-    df_decks = pd.read_parquet(
-        config.data_path / "decks", filters=[("user_id", "=", user_id)]
-    )
-    df_join = df_revlogs.merge(df_cards, on="card_id", how="left").merge(
-        df_decks, on="deck_id", how="left"
-    )
-    df_join.fillna({"deck_id": -1, "preset_id": -1}, inplace=True)
-    dataset = create_features(df_join, config=config)
-    if dataset.shape[0] < 6:
-        return Exception("Not enough data")
+def process_untrainable(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+    """Process untrainable models (SM2, Ebisu-v2)."""
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     for _, test_index in tscv.split(dataset):
@@ -416,13 +402,7 @@ def process_untrainable(user_id):
     return stats, raw
 
 
-def baseline(user_id):
-    dataset = pd.read_parquet(
-        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
-    )
-    dataset = create_features(dataset, config=config)
-    if dataset.shape[0] < 6:
-        return Exception("Not enough data")
+def baseline(dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
     testsets = []
     avg_ps = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
@@ -446,15 +426,8 @@ def baseline(user_id):
     return stats, raw
 
 
-def rmse_bins_exploit(user_id):
-    """This model attempts to exploit rmse(bins) by keeping track of per-bin statistics"""
-    dataset = pd.read_parquet(
-        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
-    )
-    dataset = create_features(dataset, config=config)
-    if dataset.shape[0] < 6:
-        return Exception("Not enough data")
-
+def rmse_bins_exploit(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+    """Process RMSE-BINS-EXPLOIT model."""
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     save_tmp = []
     first_test_index = int(1e9)
@@ -482,41 +455,23 @@ def rmse_bins_exploit(user_id):
 
 
 @catch_exceptions
-def process(user_id):
+def process(user_id: int) -> tuple[dict, Optional[dict]]:
+    """Main processing function for all models."""
     plt.close("all")
-    global S_MIN
+    
+    # Load data once for all models
+    data_loader = UserDataLoader(config)
+    dataset = data_loader.load_user_data(user_id)
+    
+    # Handle special cases
     if config.model_name == "SM2" or config.model_name.startswith("Ebisu"):
-        return process_untrainable(user_id)
+        return process_untrainable(user_id, dataset)
     if config.model_name == "AVG":
-        return baseline(user_id)
+        return baseline(user_id, dataset)
     if config.model_name == "RMSE-BINS-EXPLOIT":
-        return rmse_bins_exploit(user_id)
-    df_revlogs = pd.read_parquet(
-        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
-    )
-    df_revlogs.drop(columns=["user_id"], inplace=True)
-    dataset = create_features(df_revlogs, config=config)
-    if dataset.shape[0] < 6:
-        raise Exception(f"{user_id} does not have enough data.")
-    if config.partitions != "none":
-        df_cards = pd.read_parquet(
-            config.data_path / "cards", filters=[("user_id", "=", user_id)]
-        )
-        df_cards.drop(columns=["user_id"], inplace=True)
-        df_decks = pd.read_parquet(
-            config.data_path / "decks", filters=[("user_id", "=", user_id)]
-        )
-        df_decks.drop(columns=["user_id"], inplace=True)
-        dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
-            df_decks, on="deck_id", how="left"
-        )
-        dataset.fillna(-1, inplace=True)
-        if config.partitions == "preset":
-            dataset["partition"] = dataset["preset_id"].astype(int)
-        elif config.partitions == "deck":
-            dataset["partition"] = dataset["deck_id"].astype(int)
-    else:
-        dataset["partition"] = 0
+        return rmse_bins_exploit(user_id, dataset)
+        
+    # Process trainable models
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)

@@ -42,17 +42,17 @@ if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 try:
     from fsrs_optimizer import (  # type: ignore
-    Optimizer,
-    Trainer,
-    FSRS,
-    Collection,
-    power_forgetting_curve,
-    remove_outliers,
-    remove_non_continuous_rows,
-    plot_brier,
-    rmse_matrix,
-    DEFAULT_PARAMETER,
-)
+        Optimizer,
+        Trainer,
+        FSRS,
+        Collection,
+        power_forgetting_curve,
+        remove_outliers,
+        remove_non_continuous_rows,
+        plot_brier,
+        rmse_matrix,
+        DEFAULT_PARAMETER,
+    )
 except Exception:
     pass
 

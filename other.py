@@ -496,7 +496,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
 
-                model = create_model(config.model_name, config)
+                model = create_model(config)
                 if config.dry_run:
                     partition_weights[partition] = model.state_dict()
                     continue
@@ -529,7 +529,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     print(f"User: {user_id}")
                     raise e
                 partition_weights[partition] = create_model(
-                    config.model_name, config
+                    config
                 ).state_dict()
         w_list.append(partition_weights)
 
@@ -545,9 +545,9 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             my_collection = Collection(
-                create_model(config.model_name, config, weights)
+                create_model(config, weights)
                 if weights
-                else create_model(config.model_name, config)
+                else create_model(config)
             )
             retentions, stabilities, difficulties = my_collection.batch_predict(
                 partition_testset

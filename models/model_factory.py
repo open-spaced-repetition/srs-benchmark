@@ -38,7 +38,6 @@ MODEL_REGISTRY: Dict[str, Type[BaseModel]] = {
 
 
 def create_model(
-    model_name: str,
     config: Config,
     model_params: Optional[Union[List[float], Dict[str, torch.Tensor], float]] = None,
 ) -> BaseModel:
@@ -46,7 +45,6 @@ def create_model(
     Creates and returns an instance of the specified model.
 
     Args:
-        model_name: The name of the model (must be in MODEL_REGISTRY).
         config: The application configuration object.
         model_params: Optional parameters for model initialization.
                       - List[float]: For FSRS-like models' 'w' parameter.
@@ -61,6 +59,7 @@ def create_model(
         ValueError: If model_name is not supported by the factory.
         TypeError: If model_params are of an incorrect type for the model.
     """
+    model_name = config.model_name
     if model_name not in MODEL_REGISTRY:
         raise ValueError(
             f"Model '{model_name}' is not supported by the model factory. "

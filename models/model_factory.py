@@ -1,6 +1,5 @@
 from typing import Dict, Type, Union, List, Optional
 import torch
-from torch import nn
 from config import Config
 
 from models import *

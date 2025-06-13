@@ -4,6 +4,7 @@ from typing import List
 from config import Config
 from models.base import BaseModel
 
+
 class DASH_ACTRParameterClipper:
     def __init__(self, frequency: int = 1):
         self.frequency = frequency

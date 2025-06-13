@@ -4,6 +4,7 @@ from typing import List, Optional
 from config import Config
 from models.base import BaseModel
 
+
 class AnkiParameterClipper:
     def __init__(self, config: Config, frequency: int = 1):
         self.frequency = frequency

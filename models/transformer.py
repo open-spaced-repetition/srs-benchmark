@@ -4,6 +4,7 @@ from torch import nn, Tensor
 from config import Config
 from models.base import BaseModel
 
+
 class Transformer(BaseModel):
     # 127 params with default settings
     decay = -0.5

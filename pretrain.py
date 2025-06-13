@@ -1,7 +1,6 @@
 import pandas as pd
 from tqdm import tqdm  # type: ignore
 import torch
-import torch.nn as nn
 from features import create_features
 from models.base import BaseModel
 from other import Trainer

@@ -200,7 +200,7 @@ class Trainer:
         self.max_seq_len = max_seq_len
         self.n_epoch = self.model.n_epoch
 
-        # Build datasets 
+        # Build datasets
         self.build_dataset(self.model.filter_training_data(train_set), test_set)
 
         # Setup scheduler

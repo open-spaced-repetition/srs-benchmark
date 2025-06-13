@@ -5,6 +5,7 @@ from typing import List
 from config import Config
 from models.base import BaseModel
 
+
 class HLR(BaseModel):
     # 3 params
     init_w = [2.5819, -0.8674, 2.7245]

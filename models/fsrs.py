@@ -3,6 +3,7 @@ from torch import Tensor
 from config import Config
 from models.base import BaseModel
 
+
 class FSRS(BaseModel):
     def __init__(self, config: Config):
         super().__init__(config)

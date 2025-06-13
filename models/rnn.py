@@ -5,6 +5,7 @@ from torch import nn, Tensor
 from config import Config
 from models.base import BaseModel
 
+
 class RNN(BaseModel):
     # 39 params with default settings
     decay = -0.5

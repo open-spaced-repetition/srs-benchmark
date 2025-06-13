@@ -4,6 +4,7 @@ from typing import List, Optional
 from config import Config
 from models.base import BaseModel
 
+
 class DASH(BaseModel):
     # 9 params
     init_w = [

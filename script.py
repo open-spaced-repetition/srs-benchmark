@@ -10,11 +10,10 @@ from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from itertools import accumulate
 import pyarrow.parquet as pq  # type: ignore
 import torch
 from config import create_parser
-from utils import catch_exceptions
+from utils import catch_exceptions, cum_concat
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -161,10 +160,6 @@ def convert_to_items(df):  # -> list[FSRSItem]
     result_list = list(map(lambda x: x[1], sorted(result_list, key=lambda x: x[0])))
 
     return result_list
-
-
-def cum_concat(x):
-    return list(accumulate(x))
 
 
 def create_time_series(df):

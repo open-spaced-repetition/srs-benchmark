@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import root_mean_squared_error  # type: ignore
 import traceback
 from functools import wraps
+from itertools import accumulate
 
 
 def catch_exceptions(func):
@@ -121,3 +122,15 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
         ax.set_xticks(np.arange(0, 1.1, 0.1))
         fig.show()
     return universal_metric_list
+
+
+def cum_concat(x):
+    """Concatenate a list of lists using accumulate.
+    
+    Args:
+        x: A list of lists to be concatenated
+        
+    Returns:
+        A list of accumulated concatenated lists
+    """
+    return list(accumulate(x))

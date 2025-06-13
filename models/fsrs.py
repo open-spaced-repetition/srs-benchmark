@@ -1,10 +1,20 @@
 import torch
 from torch import Tensor
 from config import Config
-from models.base import BaseModel
+from models.base import BaseModel, BaseParameterClipper
+
+
+class FSRSParameterClipper(BaseParameterClipper):
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, module):
+        pass
 
 
 class FSRS(BaseModel):
+    clipper = FSRSParameterClipper()
+
     def __init__(self, config: Config):
         super().__init__(config)
 

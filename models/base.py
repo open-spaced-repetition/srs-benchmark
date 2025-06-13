@@ -1,13 +1,22 @@
 import torch
-from torch import nn
+from torch import nn, Tensor
 import pandas as pd
 from config import Config
+
+
+class BaseParameterClipper:
+    def __init__(self):
+        pass
+
+    def __call__(self, module):
+        pass
 
 
 class BaseModel(nn.Module):
     lr: float = 4e-2
     wd: float = 1e-5
     n_epoch: int = 5
+    clipper: BaseParameterClipper = BaseParameterClipper()
 
     def __init__(self, config: Config):
         super().__init__()
@@ -19,6 +28,15 @@ class BaseModel(nn.Module):
     def pretrain(self, train_set: pd.DataFrame) -> None:
         pass
 
+    def iter(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        raise NotImplementedError("Subclasses must implement iter() method")
+
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
         return train_set
 
@@ -26,3 +44,9 @@ class BaseModel(nn.Module):
         self.lr = lr
         self.wd = wd
         self.n_epoch = n_epoch
+
+    def apply_gradient_constraints(self):
+        pass
+
+    def apply_parameter_clipper(self):
+        self.apply(self.clipper)

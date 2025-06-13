@@ -3,12 +3,12 @@ from torch import nn, Tensor
 from typing import List
 
 from config import Config
-from models.base import BaseModel
+from models.base import BaseModel, BaseParameterClipper
 
 
-class ACT_RParameterClipper:
-    def __init__(self, frequency: int = 1):
-        self.frequency = frequency
+class ACT_RParameterClipper(BaseParameterClipper):
+    def __init__(self):
+        super().__init__()
 
     def __call__(self, module):
         if hasattr(module, "w"):

@@ -2,7 +2,8 @@ from multiprocessing import Pool
 import torch
 from tqdm import tqdm
 from config import Config, create_parser
-from other import create_features, get_bin
+from utils import get_bin
+from features import create_features
 import pandas as pd
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import lmdb

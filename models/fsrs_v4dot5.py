@@ -8,8 +8,6 @@ from config import Config
 
 
 class FSRS4dot5ParameterClipper(FSRS4ParameterClipper):
-    """FSRS4dot5 parameter clipper with adjusted constraints"""
-
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data

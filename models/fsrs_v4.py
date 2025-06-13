@@ -10,9 +10,6 @@ from scipy.optimize import minimize  # type: ignore
 
 
 class FSRS4ParameterClipper(FSRS3ParameterClipper):
-    def __init__(self, frequency: int = 1):
-        self.frequency = frequency
-
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data

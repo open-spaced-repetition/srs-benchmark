@@ -2,12 +2,12 @@ import torch
 from torch import nn, Tensor
 from typing import List
 from config import Config
-from models.base import BaseModel
+from models.base import BaseModel, BaseParameterClipper
 
 
-class DASH_ACTRParameterClipper:
-    def __init__(self, frequency: int = 1):
-        self.frequency = frequency
+class DASH_ACTRParameterClipper(BaseParameterClipper):
+    def __init__(self):
+        super().__init__()
 
     def __call__(self, module):
         if hasattr(module, "w"):

@@ -15,7 +15,7 @@ from .act_r import ACT_R
 from .dash import DASH
 from .dash_act_r import DASH_ACTR
 from .nn_17 import NN_17
-from .sm_2 import SM2
+from .sm2_trainable import SM2
 from .anki import Anki
 from .constant import ConstantModel
 

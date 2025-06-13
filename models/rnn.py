@@ -1,7 +1,6 @@
 from typing import Union
 import torch
 from torch import nn, Tensor
-
 from config import Config
 from models.base import BaseModel
 

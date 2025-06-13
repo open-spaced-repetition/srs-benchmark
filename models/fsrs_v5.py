@@ -9,8 +9,8 @@ from models.fsrs_v4dot5 import FSRS4dot5, FSRS4dot5ParameterClipper
 
 
 class FSRS5ParameterClipper(FSRS4dot5ParameterClipper):
-    def __init__(self, config: Config, frequency: int = 1):
-        self.frequency = frequency
+    def __init__(self, config: Config):
+        super().__init__()
         self.config = config
 
     def __call__(self, module):

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 import json
-from torch import nn
+from torch import Tensor, nn
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
@@ -23,160 +23,35 @@ from script import sort_jsonl
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser, Config
-from utils import catch_exceptions, rmse_matrix
+from utils import catch_exceptions, get_bin, rmse_matrix
 from data_loader import UserDataLoader
+from models.rmse_bins_exploit import RMSEBinsExploit
+from models.sm2 import sm2
+from models.ebisu import Ebisu
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
 config = Config(args)
-
-model_list = (
-    "FSRSv1",
-    "FSRSv2",
-    "FSRSv3",
-    "FSRSv4",
-    "FSRS-4.5",
-    "FSRS-5",
-    "FSRS-6",
-    "Ebisu-v2",
-    "SM2",
-    "HLR",
-    "GRU",
-    "GRU-P",
-    "LSTM",
-    "RNN",
-    "AVG",
-    "RMSE-BINS-EXPLOIT",
-    "90%",
-    "DASH",
-    "DASH[MCM]",
-    "DASH[ACT-R]",
-    "ACT-R",
-    "NN-17",
-    "Transformer",
-    "SM2-trainable",
-    "Anki",
-)
-
-if config.model_name not in model_list:
-    raise ValueError(f"Model name must be one of {model_list}")
 
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
 
 from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier, Optimizer  # type: ignore
 
-if config.model_name.startswith("Ebisu"):
-    import ebisu  # type: ignore
-
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(config.seed)
 tqdm.pandas()
 
-DEVICE = torch.device(
-    "cuda"
-    if torch.cuda.is_available()
-    and config.model_name in ["GRU", "GRU-P", "LSTM", "RNN", "NN-17", "Transformer"]
-    else "cpu"
-)
-# DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-
-def sm2(r_history):
-    ivl = 0
-    ef = 2.5
-    reps = 0
-    for rating in r_history.split(","):
-        rating = int(rating) + 1
-        if rating > 2:
-            if reps == 0:
-                ivl = 1
-                reps = 1
-            elif reps == 1:
-                ivl = 6
-                reps = 2
-            else:
-                ivl = ivl * ef
-                reps += 1
-        else:
-            ivl = 1
-            reps = 0
-        ef = max(1.3, ef + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02)))
-        ivl = min(max(1, round(ivl + 0.01)), config.s_max)
-    return float(ivl)
-
-
-def ebisu_v2(sequence):
-    init_ivl = 512
-    alpha = 0.2
-    beta = 0.2
-    model = ebisu.defaultModel(init_ivl, alpha, beta)
-    for delta_t, rating in sequence:
-        model = ebisu.updateRecall(
-            model, successes=1 if rating > 1 else 0, total=1, tnow=max(delta_t, 0.001)
-        )
-    return model
-
-
-def iter(model, batch):
+def iter(
+    model: BaseModel, batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
+) -> dict[str, Tensor]:
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
     outputs = model.iter(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     return result
-
-
-def count_lapse(r_history, t_history):
-    lapse = 0
-    for r, t in zip(r_history.split(","), t_history.split(",")):
-        if t != "0" and r == "1":
-            lapse += 1
-    return lapse
-
-
-def get_bin(row):
-    raw_lapse = count_lapse(row["r_history"], row["t_history"])
-    lapse = (
-        round(1.65 * np.power(1.73, np.floor(np.log(raw_lapse) / np.log(1.73))), 0)
-        if raw_lapse != 0
-        else 0
-    )
-    delta_t = round(
-        2.48 * np.power(3.62, np.floor(np.log(row["delta_t"]) / np.log(3.62))), 2
-    )
-    i = round(1.99 * np.power(1.89, np.floor(np.log(row["i"]) / np.log(1.89))), 0)
-    return (lapse, delta_t, i)
-
-
-class RMSEBinsExploit:
-    def __init__(self):
-        super().__init__()
-        self.state = {}
-        self.global_succ = 0
-        self.global_n = 0
-
-    def adapt(self, bin_key, y):
-        if bin_key not in self.state:
-            self.state[bin_key] = (0, 0, 0)
-
-        pred_sum, truth_sum, bin_n = self.state[bin_key]
-        self.state[bin_key] = (pred_sum, truth_sum + y, bin_n + 1)
-        self.global_succ += y
-        self.global_n += 1
-
-    def predict(self, bin_key):
-        if self.global_n == 0:
-            return 0.5
-
-        if bin_key not in self.state:
-            self.state[bin_key] = (0, 0, 0)
-
-        pred_sum, truth_sum, bin_n = self.state[bin_key]
-        estimated_p = self.global_succ / self.global_n
-        pred = np.clip(truth_sum + estimated_p - pred_sum, a_min=0, a_max=1)
-        self.state[bin_key] = (pred_sum + pred, truth_sum, bin_n)
-        return pred
 
 
 class Trainer:
@@ -190,7 +65,7 @@ class Trainer:
         batch_size: int = 256,
         max_seq_len: int = 64,
     ) -> None:
-        self.model = model.to(device=DEVICE)
+        self.model = model.to(device=config.device)
         self.model.pretrain(train_set)
 
         # Setup optimizer
@@ -217,7 +92,7 @@ class Trainer:
             train_set.copy(),
             self.batch_size,
             max_seq_len=self.max_seq_len,
-            device=DEVICE,
+            device=config.device,
         )
         self.train_data_loader = BatchLoader(self.train_set)
 
@@ -228,7 +103,7 @@ class Trainer:
                 test_set.copy(),
                 batch_size=self.batch_size,
                 max_seq_len=self.max_seq_len,
-                device=DEVICE,
+                device=config.device,
             )
         )
         self.test_data_loader = (
@@ -258,15 +133,13 @@ class Trainer:
                 loss.backward()
 
                 # Apply model-specific gradient constraints
-                if hasattr(self.model, "apply_gradient_constraints"):
-                    self.model.apply_gradient_constraints()
+                self.model.apply_gradient_constraints()
 
                 self.optimizer.step()
                 self.scheduler.step()
 
                 # Apply model-specific parameter constraints (clipper)
-                if hasattr(self.model, "clipper") and self.model.clipper:
-                    self.model.apply(self.model.clipper)
+                self.model.apply_parameter_clipper()
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
@@ -328,12 +201,12 @@ class Trainer:
 
 class Collection:
     def __init__(self, MODEL) -> None:
-        self.model = MODEL.to(device=DEVICE)
+        self.model = MODEL.to(device=config.device)
         self.model.eval()
 
     def batch_predict(self, dataset):
         batch_dataset = BatchDataset(
-            dataset, batch_size=8192, sort_by_length=False, device=DEVICE
+            dataset, batch_size=8192, sort_by_length=False, device=config.device
         )
         batch_loader = BatchLoader(batch_dataset, shuffle=False)
         retentions = []
@@ -364,17 +237,18 @@ def process_untrainable(
     p = []
     y = []
     save_tmp = []
+    ebisu = Ebisu()
 
     for i, testset in enumerate(testsets):
         if config.model_name == "SM2":
-            testset["stability"] = testset["sequence"].map(sm2)
+            testset["stability"] = testset["sequence"].map(lambda x: sm2(x, config))
             testset["p"] = np.exp(
                 np.log(0.9) * testset["delta_t"] / testset["stability"]
             )
         elif config.model_name == "Ebisu-v2":
-            testset["model"] = testset["sequence"].map(ebisu_v2)
+            testset["model"] = testset["sequence"].map(ebisu.ebisu_v2)
             testset["p"] = testset.apply(
-                lambda x: ebisu.predictRecall(x["model"], x["delta_t"], exact=True),
+                lambda x: ebisu.predict(x["model"], x["delta_t"]),
                 axis=1,
             )
 
@@ -502,7 +376,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     continue
 
                 if config.model_name == "LSTM":
-                    model = model.to(DEVICE)
+                    model = model.to(config.device)
                     inner_opt = get_inner_opt(
                         model.parameters(),
                         path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",

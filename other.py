@@ -35,8 +35,10 @@ config = Config(args)
 
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
-
-from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier, Optimizer  # type: ignore
+try:
+    from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier, Optimizer  # type: ignore
+except Exception:
+    pass
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(config.seed)
@@ -471,7 +473,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
     rmse_bins = rmse_matrix(df)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
-    except:
+    except Exception:
         auc = None
     stats = {
         "metrics": {
@@ -486,7 +488,7 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
     }
     if (
         w_list
-        and type(w_list[0]) == dict
+        and isinstance(w_list[0], dict)
         and all(isinstance(w, list) for w in w_list[0].values())
     ):
         stats["parameters"] = {

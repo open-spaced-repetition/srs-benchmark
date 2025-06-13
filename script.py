@@ -40,8 +40,8 @@ torch.set_num_threads(1)
 if DEV_MODE:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
-
-from fsrs_optimizer import (  # type: ignore
+try:
+    from fsrs_optimizer import (  # type: ignore
     Optimizer,
     Trainer,
     FSRS,
@@ -53,6 +53,8 @@ from fsrs_optimizer import (  # type: ignore
     rmse_matrix,
     DEFAULT_PARAMETER,
 )
+except Exception:
+    pass
 
 
 model = FSRS
@@ -330,7 +332,7 @@ def process(user_id):
     rmse_bins = rmse_matrix(evaluation)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
-    except:
+    except Exception:
         auc = None
 
     result = {

@@ -410,7 +410,7 @@ def add_queries(section_df, equalize_review_ths):
     )
 
     query_df = section_df.copy()
-    query_df = query_df[query_df["is_first_review"] == False]
+    query_df = query_df[not query_df["is_first_review"]]
     if len(query_df) > 0:
         query_rating = query_df["rating"]
         query_review_ths = query_df["review_th"]

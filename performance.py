@@ -28,7 +28,8 @@ TITLE = "Generic"
 USER_COUNT = 10000
 
 if not MEMORY:
-    noop = lambda: (0, 0)
+    def noop():
+        return (0, 0)
     tracemalloc.start = noop
     tracemalloc.stop = noop
     tracemalloc.get_tracemalloc_memory = noop

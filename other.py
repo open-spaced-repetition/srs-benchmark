@@ -140,8 +140,7 @@ class Trainer:
                 self.scheduler.step()
 
                 # Apply model-specific parameter constraints (clipper)
-                if hasattr(self.model, "clipper") and self.model.clipper:
-                    self.model.apply(self.model.clipper)
+                self.model.apply_parameter_clipper()
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:

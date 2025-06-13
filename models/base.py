@@ -16,6 +16,7 @@ class BaseModel(nn.Module):
     lr: float = 4e-2
     wd: float = 1e-5
     n_epoch: int = 5
+    clipper: BaseParameterClipper = BaseParameterClipper()
 
     def __init__(self, config: Config):
         super().__init__()
@@ -37,3 +38,6 @@ class BaseModel(nn.Module):
 
     def apply_gradient_constraints(self):
         pass
+
+    def apply_parameter_clipper(self):
+        self.apply(self.clipper)

@@ -2,12 +2,12 @@ import torch
 from torch import nn, Tensor
 from typing import List
 from config import Config
-from models.base import BaseModel
+from models.base import BaseModel, BaseParameterClipper
 
 
-class SM2ParameterClipper:
-    def __init__(self, config: Config, frequency: int = 1):
-        self.frequency = frequency
+class SM2ParameterClipper(BaseParameterClipper):
+    def __init__(self, config: Config):
+        super().__init__()
         self.config = config
 
     def __call__(self, module):

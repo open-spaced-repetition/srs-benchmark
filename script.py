@@ -53,7 +53,7 @@ try:
         rmse_matrix,
         DEFAULT_PARAMETER,
     )
-except Exception as e:
+except Exception:
     logging.error("Failed to import fsrs_optimizer module.", exc_info=True)
 
 

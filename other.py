@@ -35,10 +35,11 @@ config = Config(args)
 
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
+import logging
 try:
     from fsrs_optimizer import BatchDataset, BatchLoader, plot_brier, Optimizer  # type: ignore
-except Exception:
-    pass
+except Exception as e:
+    logging.exception("Failed to import fsrs_optimizer: %s", e)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(config.seed)

@@ -53,8 +53,8 @@ try:
         rmse_matrix,
         DEFAULT_PARAMETER,
     )
-except Exception:
-    pass
+except Exception as e:
+    logging.error("Failed to import fsrs_optimizer module.", exc_info=True)
 
 
 model = FSRS

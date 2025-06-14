@@ -15,8 +15,8 @@ if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 try:
     from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
-except Exception:
-    pass
+except Exception as e:
+    logging.exception("Failed to import fsrs_optimizer: %s", e)
 
 
 def chen_rule(data, weights=None):

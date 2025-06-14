@@ -14,6 +14,7 @@ DEV_MODE = args.dev
 if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 import logging
+
 try:
     from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
 except Exception as e:

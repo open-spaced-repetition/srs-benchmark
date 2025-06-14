@@ -41,6 +41,7 @@ if DEV_MODE:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 import logging
+
 try:
     from fsrs_optimizer import (  # type: ignore
         Optimizer,

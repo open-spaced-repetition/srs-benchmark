@@ -56,7 +56,7 @@ try:
         DEFAULT_PARAMETER,
     )
 except Exception:
-    logging.error("Failed to import fsrs_optimizer module.", exc_info=True)
+    logging.exception("Failed to import fsrs_optimizer module.")
 
 
 model = FSRS

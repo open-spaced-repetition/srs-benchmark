@@ -40,19 +40,23 @@ torch.set_num_threads(1)
 if DEV_MODE:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
+import logging
 
-from fsrs_optimizer import (  # type: ignore
-    Optimizer,
-    Trainer,
-    FSRS,
-    Collection,
-    power_forgetting_curve,
-    remove_outliers,
-    remove_non_continuous_rows,
-    plot_brier,
-    rmse_matrix,
-    DEFAULT_PARAMETER,
-)
+try:
+    from fsrs_optimizer import (  # type: ignore
+        Optimizer,
+        Trainer,
+        FSRS,
+        Collection,
+        power_forgetting_curve,
+        remove_outliers,
+        remove_non_continuous_rows,
+        plot_brier,
+        rmse_matrix,
+        DEFAULT_PARAMETER,
+    )
+except Exception:
+    logging.exception("Failed to import fsrs_optimizer module.")
 
 
 model = FSRS
@@ -330,7 +334,7 @@ def process(user_id):
     rmse_bins = rmse_matrix(evaluation)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
-    except:
+    except Exception:
         auc = None
 
     result = {

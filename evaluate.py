@@ -292,7 +292,7 @@ if __name__ == "__main__":
 
             # Step 4: Print the sorted table
             print(
-                "| Model | #Params | Rank | LogLoss | RMSE(bins) | AUC | Input features |"
+                "| Model | Parameters | Rank | LogLoss | RMSE(bins) | AUC | Input features |"
             )
             print("| --- | --- | --- | --- | --- | --- | --- |")
 

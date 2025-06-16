@@ -2,6 +2,7 @@ import pathlib
 import json
 import numpy as np
 import scipy  # type: ignore
+from scipy.stats import rankdata
 import math
 import argparse
 
@@ -69,15 +70,29 @@ def weighted_avg_and_std(values, weights):
     weights = np.float64(weights)  # force 64-bit precision to avoid errors sometimes
     average = np.average(values, weights=weights)
     # Bevington, P. R., Data Reduction and Error Analysis for the Physical Sciences, 336 pp., McGraw-Hill, 1969
-    # https://seismo.berkeley.edu/~kirchner/Toolkits/Toolkit_12.pdf
     n_eff = np.square(np.sum(weights)) / np.sum(np.square(weights))
-    variance = np.average((values - average) ** 2, weights=weights) * (
-        n_eff / (n_eff - 1)
-    )
+    if n_eff <= 1:  # Avoid division by zero or negative number if there's only one effective sample
+        variance = np.average((values - average) ** 2, weights=weights)
+    else:
+        variance = np.average((values - average) ** 2, weights=weights) * (
+                n_eff / (n_eff - 1)
+        )
     return (average, np.sqrt(variance))
 
 
+def norm(metric, auc=False):
+    min_x = min(metric)
+    max_x = max(metric)
+    if not auc:
+        norm_0_1 = [(x - min_x) / (max_x - min_x) for x in metric]
+    else:
+        norm_0_1 = [(max_x - x) / (max_x - min_x) for x in metric]
+    norm_0_1 = np.asarray(norm_0_1)
+    return norm_0_1
+
+
 if __name__ == "__main__":
+    limit_to_n_users = 10000  # to evaluate only on the first N users
     dev_mode_name = "FSRS-6-dev"
     dev_file = pathlib.Path(f"./result/{dev_mode_name}.jsonl")
     if dev_file.exists():
@@ -89,20 +104,16 @@ if __name__ == "__main__":
     parser.add_argument("--fast", action="store_true")
     parser.add_argument("--secs", action="store_true")
     args = parser.parse_args()
+    args.fast = False
 
     # IL = interval lengths
-
     # FIL = fractional (aka non-integer) interval lengths
-
     # G = grades (Again/Hard/Good/Easy)
-
     # SR = same-day (or short-term) reviews
-
     # AT = answer time (duration of the review)
 
     models = (
         [
-            (dev_mode_name, None, None),
             ("RWKV-P", 2762884, ""),
             ("RWKV", 2762884, ""),
             ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL, G, SR, AT"),
@@ -125,7 +136,7 @@ if __name__ == "__main__":
             ("DASH[ACT-R]", 5, "IL, G"),
             ("FSRSv2", 14, "IL, G"),
             ("FSRSv3", 13, "IL, G"),
-            ("NN-17", 39, "IL, G"),
+            # ("NN-17", 39, "IL, G"),
             ("FSRS-6-dry-run", 0, "IL, G, SR"),
             ("ACT-R", 5, "IL"),
             ("FSRSv1", 7, "IL, G"),
@@ -138,12 +149,11 @@ if __name__ == "__main__":
             ("SM2-short", 0, "IL, G, SR"),
             ("SM2", 0, "IL, G"),
             ("Ebisu-v2", 0, "IL, G"),
-            ("Transformer", 127, "IL, G"),
-            ("RMSE-BINS-EXPLOIT", 0, "IL, G"),
+            # ("Transformer", 127, "IL, G"),
+            # ("RMSE-BINS-EXPLOIT", 0, "IL, G"),
         ]
         if not args.secs
         else [
-            (dev_mode_name, None, None),
             ("GRU-P-secs", 297, "FIL, G, SR"),
             ("DASH[MCM]-secs", 9, "FIL, G, SR"),
             ("DASH-secs", 9, "FIL, G, SR"),
@@ -155,6 +165,9 @@ if __name__ == "__main__":
             ("AVG-secs", 0, "---"),
         ]
     )
+    if dev_file.exists():
+        models.insert(0, (dev_mode_name, None, None))
+
     if args.fast:
         for model, n_param, features in models:
             print(f"Model: {model}")
@@ -169,8 +182,6 @@ if __name__ == "__main__":
             for result in data:
                 if common_set and result["user"] not in common_set:
                     continue
-                # if result["size"] > 1000:
-                #     continue
                 m.append(result["metrics"])
                 sizes.append(result["size"])
                 if "parameters" in result:
@@ -183,9 +194,9 @@ if __name__ == "__main__":
             print(f"Total number of users: {len(sizes)}")
             print(f"Total number of reviews: {sum(sizes)}")
             for scale, size in (
-                ("reviews", np.array(sizes)),
-                ("log(reviews)", np.log(sizes)),
-                ("users", np.ones_like(sizes)),
+                    ("reviews", np.array(sizes)),
+                    ("log(reviews)", np.log(sizes)),
+                    ("users", np.ones_like(sizes)),
             ):
                 print(f"Weighted average by {scale}:")
                 for metric in ("LogLoss", "RMSE(bins)", "AUC"):
@@ -196,22 +207,19 @@ if __name__ == "__main__":
                     print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
                 print()
 
-            # print(f"LogLoss 99%: {round(np.percentile(np.array([item['LogLoss'] for item in m]), 99), 4)}")
-            # print(f"RMSE(bins) 99%: {round(np.percentile(np.array([item['RMSE(bins)'] for item in m]), 99), 4)}")
             if len(parameters) > 0:
                 print(
                     f"parameters: {np.median(parameters, axis=0).round(6).tolist()}\n"
                 )
-                # print(f"parameters: {np.std(parameters, axis=0).round(2).tolist()}\n")
 
     else:
         for scale in ("reviews", "users"):
             print(f"Weighted by number of {scale}\n")
-            print("| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |")
-            print("| --- | --- | --- | --- | --- | --- |")
+
+            # Step 1: Collect data for all models first
+            results_data = []
             for model, n_param, input_features in models:
                 m = []
-                parameters = []
                 sizes = []
                 result_file = pathlib.Path(f"./result/{model}.jsonl")
                 if not result_file.exists():
@@ -223,19 +231,73 @@ if __name__ == "__main__":
                         continue
                     m.append(result["metrics"])
                     sizes.append(result["size"])
-                    if "parameters" in result:
-                        parameters.append(result["parameters"])
+                    if len(m) == limit_to_n_users:
+                        break
                 if len(sizes) == 0:
                     continue
 
-                size = np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
-                result = f"| {model} | {n_param} |"
+                size_weights = np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
+
+                model_metrics = {
+                    "model": model,
+                    "n_param": n_param,
+                    "input_features": input_features
+                }
+
                 for metric in ("LogLoss", "RMSE(bins)", "AUC"):
                     metrics = np.array([item[metric] for item in m])
-                    size = size[~np.isnan(metrics.astype(float))]
-                    metrics = metrics[~np.isnan(metrics.astype(float))]
-                    wmean, wstd = weighted_avg_and_std(metrics, size)
-                    CI = confidence_interval(metrics, size)
-                    rounded_mean, rounded_CI = sigdig(wmean, CI)
-                    result += f" {rounded_mean}±{rounded_CI} |"
-                print(result + f" {input_features} |")
+                    # Filter out NaNs and adjust weights accordingly
+                    valid_indices = ~np.isnan(metrics.astype(float))
+                    metrics_filtered = metrics[valid_indices]
+                    size_weights_filtered = size_weights[valid_indices]
+
+                    if len(metrics_filtered) == 0:
+                        wmean, CI = np.nan, np.nan
+                    else:
+                        wmean, wstd = weighted_avg_and_std(metrics_filtered, size_weights_filtered)
+                        CI = confidence_interval(metrics_filtered, size_weights_filtered)
+
+                    model_metrics[f"wmean_{metric}"] = wmean
+                    model_metrics[f"CI_{metric}"] = CI
+
+                results_data.append(model_metrics)
+
+            if not results_data:
+                continue
+
+            # Step 2: Calculate ranks
+            wmeans_logloss = [d["wmean_LogLoss"] for d in results_data]
+            wmeans_rmse = [d["wmean_RMSE(bins)"] for d in results_data]
+            wmeans_auc = [d["wmean_AUC"] for d in results_data]
+
+            norm_logloss = norm(wmeans_logloss)
+            norm_RMSE = norm(wmeans_rmse)
+            norm_AUC = norm(wmeans_auc, True)
+            average_norm = (norm_logloss + norm_RMSE + norm_AUC) / 3
+            ranks = rankdata(average_norm)
+
+            # Step 3: Add ranks to the data and sort
+            for i, data in enumerate(results_data):
+                data['rank'] = int(ranks[i])
+
+            sorted_results = sorted(results_data, key=lambda x: x['rank'])
+
+            # Step 4: Print the sorted table
+            print("| Model | #Params | Rank | LogLoss | RMSE(bins) | AUC | Input features |")
+            print("| --- | --- | --- | --- | --- | --- | --- |")
+
+            for data in sorted_results:
+                logloss_mean, logloss_ci = sigdig(data['wmean_LogLoss'], data['CI_LogLoss'])
+                rmse_mean, rmse_ci = sigdig(data['wmean_RMSE(bins)'], data['CI_RMSE(bins)'])
+                auc_mean, auc_ci = sigdig(data['wmean_AUC'], data['CI_AUC'])
+
+                result_line = (
+                    f"| {data['model']} | {data['n_param']} | {data['rank']} |"
+                    f" {logloss_mean}±{logloss_ci} |"
+                    f" {rmse_mean}±{rmse_ci} |"
+                    f" {auc_mean}±{auc_ci} |"
+                    f" {data['input_features']} |"
+                )
+                print(result_line)
+
+            print('')  # Add a newline for better separation between scales

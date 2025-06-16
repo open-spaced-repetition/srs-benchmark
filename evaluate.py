@@ -71,11 +71,13 @@ def weighted_avg_and_std(values, weights):
     average = np.average(values, weights=weights)
     # Bevington, P. R., Data Reduction and Error Analysis for the Physical Sciences, 336 pp., McGraw-Hill, 1969
     n_eff = np.square(np.sum(weights)) / np.sum(np.square(weights))
-    if n_eff <= 1:  # Avoid division by zero or negative number if there's only one effective sample
+    if (
+        n_eff <= 1
+    ):  # Avoid division by zero or negative number if there's only one effective sample
         variance = np.average((values - average) ** 2, weights=weights)
     else:
         variance = np.average((values - average) ** 2, weights=weights) * (
-                n_eff / (n_eff - 1)
+            n_eff / (n_eff - 1)
         )
     return (average, np.sqrt(variance))
 
@@ -194,9 +196,9 @@ if __name__ == "__main__":
             print(f"Total number of users: {len(sizes)}")
             print(f"Total number of reviews: {sum(sizes)}")
             for scale, size in (
-                    ("reviews", np.array(sizes)),
-                    ("log(reviews)", np.log(sizes)),
-                    ("users", np.ones_like(sizes)),
+                ("reviews", np.array(sizes)),
+                ("log(reviews)", np.log(sizes)),
+                ("users", np.ones_like(sizes)),
             ):
                 print(f"Weighted average by {scale}:")
                 for metric in ("LogLoss", "RMSE(bins)", "AUC"):
@@ -236,12 +238,14 @@ if __name__ == "__main__":
                 if len(sizes) == 0:
                     continue
 
-                size_weights = np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
+                size_weights = (
+                    np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
+                )
 
                 model_metrics = {
                     "model": model,
                     "n_param": n_param,
-                    "input_features": input_features
+                    "input_features": input_features,
                 }
 
                 for metric in ("LogLoss", "RMSE(bins)", "AUC"):
@@ -254,8 +258,12 @@ if __name__ == "__main__":
                     if len(metrics_filtered) == 0:
                         wmean, CI = np.nan, np.nan
                     else:
-                        wmean, wstd = weighted_avg_and_std(metrics_filtered, size_weights_filtered)
-                        CI = confidence_interval(metrics_filtered, size_weights_filtered)
+                        wmean, wstd = weighted_avg_and_std(
+                            metrics_filtered, size_weights_filtered
+                        )
+                        CI = confidence_interval(
+                            metrics_filtered, size_weights_filtered
+                        )
 
                     model_metrics[f"wmean_{metric}"] = wmean
                     model_metrics[f"CI_{metric}"] = CI
@@ -278,18 +286,24 @@ if __name__ == "__main__":
 
             # Step 3: Add ranks to the data and sort
             for i, data in enumerate(results_data):
-                data['rank'] = int(ranks[i])
+                data["rank"] = int(ranks[i])
 
-            sorted_results = sorted(results_data, key=lambda x: x['rank'])
+            sorted_results = sorted(results_data, key=lambda x: x["rank"])
 
             # Step 4: Print the sorted table
-            print("| Model | #Params | Rank | LogLoss | RMSE(bins) | AUC | Input features |")
+            print(
+                "| Model | #Params | Rank | LogLoss | RMSE(bins) | AUC | Input features |"
+            )
             print("| --- | --- | --- | --- | --- | --- | --- |")
 
             for data in sorted_results:
-                logloss_mean, logloss_ci = sigdig(data['wmean_LogLoss'], data['CI_LogLoss'])
-                rmse_mean, rmse_ci = sigdig(data['wmean_RMSE(bins)'], data['CI_RMSE(bins)'])
-                auc_mean, auc_ci = sigdig(data['wmean_AUC'], data['CI_AUC'])
+                logloss_mean, logloss_ci = sigdig(
+                    data["wmean_LogLoss"], data["CI_LogLoss"]
+                )
+                rmse_mean, rmse_ci = sigdig(
+                    data["wmean_RMSE(bins)"], data["CI_RMSE(bins)"]
+                )
+                auc_mean, auc_ci = sigdig(data["wmean_AUC"], data["CI_AUC"])
 
                 result_line = (
                     f"| {data['model']} | {data['n_param']} | {data['rank']} |"
@@ -300,4 +314,4 @@ if __name__ == "__main__":
                 )
                 print(result_line)
 
-            print('')  # Add a newline for better separation between scales
+            print("")  # Add a newline for better separation between scales

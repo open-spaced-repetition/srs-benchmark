@@ -1,12 +1,12 @@
 from typing import Dict, Type, Union, List, Optional
 import torch
-from config import Config
+from config import Config, ModelName
 
 from models import *
 from models.base import BaseModel
 
 
-MODEL_REGISTRY: Dict[str, Type[BaseModel]] = {
+MODEL_REGISTRY: Dict[ModelName, Type[BaseModel]] = {
     "FSRSv1": FSRS1,
     "FSRSv2": FSRS2,
     "FSRSv3": FSRS3,

@@ -1,9 +1,10 @@
 import argparse
 import torch
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Literal, get_args
 
-MODEL_LIST: Tuple[str, ...] = (
+ModelName = Literal[
+    # FSRS family
     "FSRSv1",
     "FSRSv2",
     "FSRSv3",
@@ -11,25 +12,29 @@ MODEL_LIST: Tuple[str, ...] = (
     "FSRS-4.5",
     "FSRS-5",
     "FSRS-6",
-    "Ebisu-v2",
-    "SM2",
-    "HLR",
+    # Neural networks
+    "RNN",
     "GRU",
     "GRU-P",
     "LSTM",
-    "RNN",
-    "AVG",
-    "RMSE-BINS-EXPLOIT",
-    "90%",
+    "Transformer",
+    "NN-17",
+    # Memory models
+    "SM2",
+    "SM2-trainable",
+    "Ebisu-v2",
+    "HLR",
+    "ACT-R",
+    "Anki",
+    # DASH variants
     "DASH",
     "DASH[MCM]",
     "DASH[ACT-R]",
-    "ACT-R",
-    "NN-17",
-    "Transformer",
-    "SM2-trainable",
-    "Anki",
-)
+    # Other models
+    "AVG",
+    "RMSE-BINS-EXPLOIT",
+    "90%",
+]
 
 
 def create_parser():
@@ -154,7 +159,7 @@ class Config:
         # Basic arguments from parser
         self.dev_mode: bool = args.dev
         self.dry_run: bool = args.dry
-        self.model_name: str = args.algo
+        self.model_name: ModelName = args.algo
         self.use_secs_intervals: bool = args.secs
         self.no_test_same_day: bool = args.no_test_same_day
         self.no_train_same_day: bool = args.no_train_same_day
@@ -189,10 +194,9 @@ class Config:
         #     torch.set_num_interop_threads(args.torch_num_interop_threads)
 
         # Validate model name
-        self.model_list: Tuple[str, ...] = MODEL_LIST
-        if self.model_name not in self.model_list:
+        if self.model_name not in get_args(ModelName):
             raise ValueError(
-                f"Model name '{self.model_name}' must be one of {self.model_list}"
+                f"Model name '{self.model_name}' must be one of {get_args(ModelName)}"
             )
 
         # Path for fsrs_optimizer (used for dynamic import)
@@ -218,7 +222,7 @@ class Config:
         self.verbose_inadequate_data: bool = False
 
         # Derived file names
-        _file_name_parts = [self.model_name]
+        _file_name_parts: list[str] = [self.model_name]
         if self.dry_run:
             _file_name_parts.append("-dry-run")
         if self.initial_short_term_setting:

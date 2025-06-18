@@ -44,9 +44,9 @@ def get_stats(
     y_dict = {}
     for label_review_th in equalize_review_ths:
         assert label_review_th in pred_dict, f"{label_review_th} not found in pred_dict"
-        assert (
-            label_review_th in label_rating_dict
-        ), f"{label_review_th} not found in label_rating_dict"
+        assert label_review_th in label_rating_dict, (
+            f"{label_review_th} not found in label_rating_dict"
+        )
         label_y = np.clip(
             label_rating_dict[label_review_th], a_min=0, a_max=1
         )  # 0-3 -> 0-1
@@ -69,7 +69,7 @@ def get_stats(
 
     try:
         auc = round(roc_auc_score(y_true=gather_y, y_score=gather_pred), 6)
-    except:
+    except Exception:
         auc = None
     if np.isnan(auc):
         auc = None
@@ -362,7 +362,7 @@ def main(config):
                 path_imm_result,
                 path_imm_raw,
             )
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
         finally:
             for process in prepare_processes:

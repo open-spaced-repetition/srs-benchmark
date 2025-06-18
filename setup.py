@@ -1,7 +1,7 @@
 import os
 import torch
 import glob
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup  # type: ignore
 
 from torch.utils.cpp_extension import (
     CppExtension,
@@ -18,7 +18,8 @@ def get_rwkv_extensions():
     extra_link_args = []
     extra_compile_args = {
         "cxx": [
-            "-O3" "-fdiagnostics-color=always",
+            "-O3",
+            "-fdiagnostics-color=always",
             "-DPy_LIMITED_API=0x03090000",  # min CPython version 3.9
         ],
         "nvcc": ["-O3"],

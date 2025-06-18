@@ -28,7 +28,10 @@ TITLE = "Generic"
 USER_COUNT = 10000
 
 if not MEMORY:
-    noop = lambda: (0, 0)
+
+    def noop():
+        return (0, 0)
+
     tracemalloc.start = noop
     tracemalloc.stop = noop
     tracemalloc.get_tracemalloc_memory = noop
@@ -173,7 +176,7 @@ if __name__ == "__main__":
 
     plt.subplot(1, GRAPHS, 1)
     plt.xlabel(f"Revlogs (total={sum(row_counts)})")
-    plt.ylabel(f"Seconds")
+    plt.ylabel("Seconds")
     plt.plot(
         row_counts,
         a_times,
@@ -185,36 +188,36 @@ if __name__ == "__main__":
             b_times,
             label=f"{B_NAME} {N} in {sum(b_times):.2f}s, estimated={estimate_time(total_b_time) / 60 / 60:.2f}h",
         )
-    plt.title(f"Time Spent")
+    plt.title("Time Spent")
     plt.legend()
 
     if MEMORY:
         plt.subplot(1, GRAPHS, 2)
-        plt.xlabel(f"Revlogs")
+        plt.xlabel("Revlogs")
 
-        plt.ylabel(f"Memory (MB)")
+        plt.ylabel("Memory (MB)")
         plt.plot(
             row_counts,
             [x / 1024 / 1024 for x in a_memory],
-            label=f"{A_NAME} avg={mean(a_memory)/1024/1024:.1f}MB",
+            label=f"{A_NAME} avg={mean(a_memory) / 1024 / 1024:.1f}MB",
         )
         if B_TIME:
             plt.plot(
                 row_counts,
                 [x / 1024 / 1024 for x in b_memory],
-                label=f"{B_NAME} avg={mean(b_memory)/1024/1024:.1f}MB",
+                label=f"{B_NAME} avg={mean(b_memory) / 1024 / 1024:.1f}MB",
             )
-        plt.title(f"Memory")
+        plt.title("Memory")
         plt.legend()
 
     plt.subplot(1, GRAPHS, GRAPHS)
-    plt.xlabel(f"Revlogs")
+    plt.xlabel("Revlogs")
 
-    plt.ylabel(f"Log Loss")
+    plt.ylabel("Log Loss")
     plt.plot(row_counts, a_losses, label=f"{A_NAME} avg={mean(a_losses):.5f}")
     if B_TIME:
         plt.plot(row_counts, b_losses, label=f"{B_NAME} avg={mean(b_losses):.5f}")
-    plt.title(f"Loss")
+    plt.title("Loss")
     plt.legend()
 
     plt.show()

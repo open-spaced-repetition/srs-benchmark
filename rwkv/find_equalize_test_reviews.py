@@ -1,7 +1,9 @@
 from multiprocessing import Pool
 import torch
 from tqdm import tqdm
-from other import create_features, get_bin
+from config import Config, create_parser
+from utils import get_bin
+from features import create_features
 import pandas as pd
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import lmdb
@@ -9,10 +11,15 @@ import lmdb
 from rwkv.parse_toml import parse_toml
 from rwkv.utils import save_tensor
 
-config = parse_toml()
+rwkv_config = parse_toml()
 lmdb_env = lmdb.open(
-    config.LABEL_FILTER_LMDB_PATH, map_size=config.LABEL_FILTER_LMDB_SIZE
+    rwkv_config.LABEL_FILTER_LMDB_PATH, map_size=rwkv_config.LABEL_FILTER_LMDB_SIZE
 )
+
+parser = create_parser()
+args, _ = parser.parse_known_args()
+config = Config(args)
+config.model_name = "FSRS-5"
 
 
 def process(user_id):
@@ -27,9 +34,9 @@ def process(user_id):
             return
 
     df = pd.read_parquet(
-        config.DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
+        rwkv_config.DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
     )
-    df = create_features(df.copy(), model_name="FSRS-5")
+    df = create_features(df.copy(), config=config)
     if len(df) == 0:  # that one user
         return
 
@@ -68,9 +75,9 @@ def process(user_id):
 
 
 def main():
-    user_ids = list(range(config.USER_START, config.USER_END + 1))
+    user_ids = list(range(rwkv_config.USER_START, rwkv_config.USER_END + 1))
 
-    with Pool(processes=config.PROCESSES) as pool:
+    with Pool(processes=rwkv_config.PROCESSES) as pool:
         _ = list(tqdm(pool.imap(process, user_ids), total=len(user_ids)))
 
 

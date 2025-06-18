@@ -10,11 +10,10 @@ from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 from sklearn.metrics import root_mean_squared_error, log_loss, roc_auc_score  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from itertools import accumulate
 import pyarrow.parquet as pq  # type: ignore
 import torch
 from config import create_parser
-from utils import catch_exceptions
+from utils import catch_exceptions, cum_concat
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -41,19 +40,23 @@ torch.set_num_threads(1)
 if DEV_MODE:
     # for local development
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
+import logging
 
-from fsrs_optimizer import (  # type: ignore
-    Optimizer,
-    Trainer,
-    FSRS,
-    Collection,
-    power_forgetting_curve,
-    remove_outliers,
-    remove_non_continuous_rows,
-    plot_brier,
-    rmse_matrix,
-    DEFAULT_PARAMETER,
-)
+try:
+    from fsrs_optimizer import (  # type: ignore
+        Optimizer,
+        Trainer,
+        FSRS,
+        Collection,
+        power_forgetting_curve,
+        remove_outliers,
+        remove_non_continuous_rows,
+        plot_brier,
+        rmse_matrix,
+        DEFAULT_PARAMETER,
+    )
+except Exception:
+    logging.exception("Failed to import fsrs_optimizer module.")
 
 
 model = FSRS
@@ -82,7 +85,7 @@ else:
     if ONLY_PRETRAIN:
         path += "-pretrain"
     if SECS_IVL:
-        path += f"-secs"
+        path += "-secs"
 if RECENCY:
     path += "-recency"
 if NO_TEST_SAME_DAY:
@@ -161,10 +164,6 @@ def convert_to_items(df):  # -> list[FSRSItem]
     result_list = list(map(lambda x: x[1], sorted(result_list, key=lambda x: x[0])))
 
     return result_list
-
-
-def cum_concat(x):
-    return list(accumulate(x))
 
 
 def create_time_series(df):
@@ -335,7 +334,7 @@ def process(user_id):
     rmse_bins = rmse_matrix(evaluation)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
-    except:
+    except Exception:
         auc = None
 
     result = {

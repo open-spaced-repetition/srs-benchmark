@@ -318,12 +318,12 @@ class KeyValueStatistics:
         )
 
     def add_log(self, log):
-        log[f"ahead_avg"] = self.ahead_average.get_value()
-        log[f"ahead_raw_avg"] = self.ahead_raw_average.get_value()
-        log[f"ahead_raw_diff_avg"] = self.ahead_raw_diff_average.get_value()
-        log[f"ahead_equalize_avg"] = self.ahead_equalize_average.get_value()
-        log[f"imm_avg"] = self.imm_average.get_value()
-        log[f"imm_binary_equalize_avg"] = self.imm_binary_equalize_average.get_value()
+        log["ahead_avg"] = self.ahead_average.get_value()
+        log["ahead_raw_avg"] = self.ahead_raw_average.get_value()
+        log["ahead_raw_diff_avg"] = self.ahead_raw_diff_average.get_value()
+        log["ahead_equalize_avg"] = self.ahead_equalize_average.get_value()
+        log["imm_avg"] = self.imm_average.get_value()
+        log["imm_binary_equalize_avg"] = self.imm_binary_equalize_average.get_value()
 
 
 def main_loop(config, task_queue, batch_queue):
@@ -568,7 +568,7 @@ def main(config):
 
         try:
             main_loop(config=config, task_queue=task_queue, batch_queue=batch_queue)
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
         finally:
             for process in prepare_processes:

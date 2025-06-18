@@ -3,7 +3,7 @@ from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
 from pathlib import Path
-from config import create_parser
+from config import create_parser, Config
 from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
 from multiprocessing import Pool  # type: ignore
 import copy
@@ -56,6 +56,7 @@ DEFAULT_FINETUNE_PARAMS = {
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
+config = Config(args)
 
 MODEL_NAME = args.algo
 SHORT_TERM = args.short
@@ -506,22 +507,22 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
 
 
 def main():
-    from other import create_features, Transformer, LSTM
+    from features import create_features
+    from models import Transformer, LSTM
 
     def process_user(user_id):
         print("Process user:", user_id)
         dataset = pd.read_parquet(
             DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
         )
-        dataset = create_features(dataset, model_name=MODEL_NAME)
+        dataset = create_features(dataset, config=config)
         print("Done:", user_id)
         return user_id, dataset
 
-    model: nn.Module
     if MODEL_NAME == "Transformer":
-        model = Transformer()
+        model = Transformer(config)
     elif MODEL_NAME == "LSTM":
-        model = LSTM()
+        model = LSTM(config)
     else:
         raise ValueError("Not found.")
 

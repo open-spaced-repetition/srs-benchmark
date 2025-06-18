@@ -51,9 +51,6 @@ class FSRS4(FSRS3):
         2.61,
     ]
     clipper = FSRS4ParameterClipper()
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
         super().__init__(config)

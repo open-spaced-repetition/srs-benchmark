@@ -6,7 +6,7 @@ from models import *
 from models.base import BaseModel
 
 
-MODEL_REGISTRY: Dict[ModelName, Type[BaseModel]] = {
+MODEL_REGISTRY: dict[ModelName, Type[BaseModel]] = {
     "FSRSv1": FSRS1,
     "FSRSv2": FSRS2,
     "FSRSv3": FSRS3,

@@ -14,7 +14,42 @@ from .neural_engineer import (
 )
 from .memory_engineer import SM2FeatureEngineer, EbisuFeatureEngineer
 from .simple_engineer import AVGFeatureEngineer, RMSEBinsExploitFeatureEngineer
-from config import Config
+from config import Config, ModelName
+from typing import Type, get_args
+
+
+FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
+    # FSRS family and similar models that use standard tensor format
+    "FSRSv1": FSRSFeatureEngineer,
+    "FSRSv2": FSRSFeatureEngineer,
+    "FSRSv3": FSRSFeatureEngineer,
+    "FSRSv4": FSRSFeatureEngineer,
+    "FSRS-4.5": FSRSFeatureEngineer,
+    "FSRS-5": FSRSFeatureEngineer,
+    "FSRS-6": FSRSFeatureEngineer,
+    "RNN": FSRSFeatureEngineer,
+    "GRU": FSRSFeatureEngineer,
+    "Transformer": FSRSFeatureEngineer,
+    "SM2-trainable": FSRSFeatureEngineer,
+    "Anki": FSRSFeatureEngineer,
+    "90%": FSRSFeatureEngineer,
+    # Specialized models
+    "LSTM": LSTMFeatureEngineer,
+    "GRU-P": GRUPFeatureEngineer,
+    "HLR": HLRFeatureEngineer,
+    "ACT-R": ACTRFeatureEngineer,
+    "NN-17": NN17FeatureEngineer,
+    # DASH variants
+    "DASH": DashFeatureEngineer,
+    "DASH[MCM]": DashMCMFeatureEngineer,
+    "DASH[ACT-R]": DashACTRFeatureEngineer,
+    # Memory models that don't use tensors
+    "SM2": SM2FeatureEngineer,
+    "Ebisu-v2": EbisuFeatureEngineer,
+    # Simple models that only need basic features
+    "AVG": AVGFeatureEngineer,
+    "RMSE-BINS-EXPLOIT": RMSEBinsExploitFeatureEngineer,
+}
 
 
 def create_feature_engineer(config: Config) -> BaseFeatureEngineer:
@@ -30,100 +65,18 @@ def create_feature_engineer(config: Config) -> BaseFeatureEngineer:
     Raises:
         ValueError: If config.model_name is not supported
     """
-    # Get model name from config
     model_name = config.model_name
 
-    # FSRS family and similar models that use standard tensor format
-    if model_name.startswith("FSRS") or model_name in (
-        "RNN",
-        "GRU",
-        "Transformer",
-        "SM2-trainable",
-        "Anki",
-        "90%",
-    ):
-        return FSRSFeatureEngineer(config)
-
-    # LSTM model with special features
-    elif model_name == "LSTM":
-        return LSTMFeatureEngineer(config)
-
-    # GRU-P model with shifted time intervals
-    elif model_name == "GRU-P":
-        return GRUPFeatureEngineer(config)
-
-    # HLR model with success/failure counts
-    elif model_name == "HLR":
-        return HLRFeatureEngineer(config)
-
-    # ACT-R model with cumulative time features
-    elif model_name == "ACT-R":
-        return ACTRFeatureEngineer(config)
-
-    # DASH variants
-    elif model_name == "DASH":
-        return DashFeatureEngineer(config)
-    elif model_name == "DASH[MCM]":
-        return DashMCMFeatureEngineer(config)
-    elif model_name == "DASH[ACT-R]":
-        return DashACTRFeatureEngineer(config)
-
-    # NN-17 model with lapse history
-    elif model_name == "NN-17":
-        return NN17FeatureEngineer(config)
-
-    # Memory models that don't use tensors
-    elif model_name == "SM2":
-        return SM2FeatureEngineer(config)
-    elif model_name.startswith("Ebisu"):
-        return EbisuFeatureEngineer(config)
-
-    # Simple models that only need basic features
-    elif model_name == "AVG":
-        return AVGFeatureEngineer(config)
-    elif model_name == "RMSE-BINS-EXPLOIT":
-        return RMSEBinsExploitFeatureEngineer(config)
-
-    else:
-        raise ValueError(f"Unsupported model name: {model_name}")
+    # Create and return the appropriate feature engineer
+    feature_engineer_cls = FEATURE_ENGINEER_REGISTRY[model_name]
+    return feature_engineer_cls(config)
 
 
-def get_supported_models():
+def get_supported_models() -> tuple[str, ...]:
     """
     Get list of all supported model names
 
     Returns:
         List of supported model names
     """
-    return [
-        # FSRS family
-        "FSRSv1",
-        "FSRSv2",
-        "FSRSv3",
-        "FSRSv4",
-        "FSRS-4.5",
-        "FSRS-5",
-        "FSRS-6",
-        # Neural networks
-        "RNN",
-        "GRU",
-        "GRU-P",
-        "LSTM",
-        "Transformer",
-        "NN-17",
-        # Memory models
-        "SM2",
-        "SM2-trainable",
-        "Ebisu-v2",
-        "HLR",
-        "ACT-R",
-        "Anki",
-        # DASH variants
-        "DASH",
-        "DASH[MCM]",
-        "DASH[ACT-R]",
-        # Other models
-        "AVG",
-        "RMSE-BINS-EXPLOIT",
-        "90%",
-    ]
+    return get_args(ModelName)

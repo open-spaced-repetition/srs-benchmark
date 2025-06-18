@@ -627,6 +627,7 @@ def create_features(df, model_name="FSRSv3", secs_ivl=SECS_IVL):
                 non_secs_test_set["review_th"]
             )
 
+
 @catch_exceptions
 def process(user_id: int) -> tuple[dict, Optional[dict]]:
     """Main processing function for all models."""

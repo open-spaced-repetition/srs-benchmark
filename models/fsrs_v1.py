@@ -25,9 +25,6 @@ class FSRS1(FSRS):
     # 7 params
     init_w = [2, 5, 3, -0.7, -0.2, 1, -0.3]
     clipper = FSRS1ParameterClipper()
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
         super().__init__(config)

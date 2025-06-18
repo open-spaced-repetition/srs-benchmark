@@ -60,10 +60,7 @@ class FSRS5(FSRS4dot5):
         0.51655,
         0.6621,
     ]
-    lr: float = 4e-2
     gamma: float = 1
-    wd: float = 1e-5
-    n_epoch: int = 5
     default_params_stddev_tensor = torch.tensor(
         [
             6.61,

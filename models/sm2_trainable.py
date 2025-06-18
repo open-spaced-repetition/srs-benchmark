@@ -24,9 +24,6 @@ class SM2ParameterClipper(BaseParameterClipper):
 class SM2(BaseModel):
     # 6 params
     init_w = [1, 6, 2.5, 0.02, 7, 0.18]
-    lr: float = 4e-2
-    wd: float = 1e-5
-    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
         super().__init__(config)

@@ -16,8 +16,8 @@ from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # 
 from tqdm.auto import tqdm  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
-from models.base import BaseModel
 from models.model_factory import create_model
+from models.trainable import TrainableModel
 from reptile_trainer import get_inner_opt, finetune
 from script import sort_jsonl
 import multiprocessing as mp
@@ -48,7 +48,7 @@ tqdm.pandas()
 
 
 def iter(
-    model: BaseModel, batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
+    model: TrainableModel, batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
 ) -> dict[str, Tensor]:
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
@@ -63,7 +63,7 @@ class Trainer:
 
     def __init__(
         self,
-        model: BaseModel,
+        model: TrainableModel,
         train_set: pd.DataFrame,
         test_set: Optional[pd.DataFrame],
         batch_size: int = 256,
@@ -204,8 +204,8 @@ class Trainer:
 
 
 class Collection:
-    def __init__(self, MODEL) -> None:
-        self.model = MODEL.to(device=config.device)
+    def __init__(self, model: TrainableModel) -> None:
+        self.model = model.to(device=config.device)
         self.model.eval()
 
     def batch_predict(self, dataset):

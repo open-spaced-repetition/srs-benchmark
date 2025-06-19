@@ -40,7 +40,7 @@ MODEL_REGISTRY: dict[ModelName, Type[BaseModel]] = {
 def create_model(
     config: Config,
     model_params: Optional[Union[List[float], Dict[str, torch.Tensor], float]] = None,
-) -> BaseModel:
+) -> TrainableModel:
     """
     Creates and returns an instance of the specified model.
 
@@ -67,7 +67,7 @@ def create_model(
         )
 
     model_cls = MODEL_REGISTRY[model_name]
-    instance: BaseModel
+    instance: TrainableModel
 
     # Common arguments for all model constructors
     constructor_kwargs = {"config": config}

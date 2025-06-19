@@ -19,6 +19,9 @@ from .sm2_trainable import SM2
 from .anki import Anki
 from .constant import ConstantModel
 
+# Import Protocol for type checking
+from .trainable import TrainableModel
+
 # List of all available models for easy reference
 __all__ = [
     "FSRS1",
@@ -40,4 +43,6 @@ __all__ = [
     "SM2",
     "Anki",
     "ConstantModel",
+    "TrainableModel",  # Protocol for type checking
 ]
+

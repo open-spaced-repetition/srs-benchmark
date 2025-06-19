@@ -154,7 +154,7 @@ class LSTM(BaseModel):
         d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
         return w_lnh, s_lnh, d_lnh
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_n: Tensor,

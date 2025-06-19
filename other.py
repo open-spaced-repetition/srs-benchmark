@@ -47,13 +47,13 @@ torch.manual_seed(config.seed)
 tqdm.pandas()
 
 
-def iter(
+def batch_process_wrapper(
     model: TrainableModel, batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
 ) -> dict[str, Tensor]:
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
-    outputs = model.iter(sequences, delta_ts, seq_lens, real_batch_size)
+    outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     return result
 
@@ -127,7 +127,7 @@ class Trainer:
             for i, batch in enumerate(self.train_data_loader):
                 self.model.train()
                 self.optimizer.zero_grad()
-                result = iter(self.model, batch)
+                result = batch_process_wrapper(self.model, batch)
                 loss = (
                     self.loss_fn(result["retentions"], result["labels"])
                     * result["weights"]
@@ -164,7 +164,7 @@ class Trainer:
                 total = 0
                 epoch_len = len(data_loader.dataset.y_train)
                 for batch in data_loader:
-                    result = iter(self.model, batch)
+                    result = batch_process_wrapper(self.model, batch)
                     loss += (
                         (
                             self.loss_fn(result["retentions"], result["labels"])
@@ -218,7 +218,7 @@ class Collection:
         difficulties = []
         with torch.no_grad():
             for batch in batch_loader:
-                result = iter(self.model, batch)
+                result = batch_process_wrapper(self.model, batch)
                 retentions.extend(result["retentions"].cpu().tolist())
                 if "stabilities" in result:
                     stabilities.extend(result["stabilities"].cpu().tolist())

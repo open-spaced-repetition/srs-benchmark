@@ -1,4 +1,5 @@
 from typing import Iterator, Protocol, Union
+from typing_extensions import Self
 import torch
 from torch import Tensor
 import pandas as pd
@@ -41,7 +42,7 @@ class TrainableModel(Protocol):
         """
         ...
     
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,
@@ -49,7 +50,7 @@ class TrainableModel(Protocol):
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         """
-        Core iteration method for model inference.
+        Core batch processing method for model inference.
         
         Args:
             sequences: Input sequences tensor
@@ -110,14 +111,14 @@ class TrainableModel(Protocol):
         """Return model state dictionary."""
         ...
     
-    def train(self, mode: bool = True) -> 'TrainableModel':
+    def train(self, mode: bool = True) -> Self:
         """Set model to training mode."""
         ...
     
-    def eval(self) -> 'TrainableModel':
+    def eval(self) -> Self:
         """Set model to evaluation mode."""
         ...
     
-    def to(self, device: torch.device) -> 'TrainableModel':
+    def to(self, device: torch.device) -> Self:
         """Move model to specified device."""
         ... 

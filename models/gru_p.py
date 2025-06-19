@@ -48,7 +48,7 @@ class GRU_P(BaseModel):
         output = torch.sigmoid(self.fc(x))
         return output, h
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

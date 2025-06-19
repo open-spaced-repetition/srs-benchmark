@@ -7,8 +7,8 @@ from models.base import BaseModel
 
 class ConstantModel(BaseModel):
     n_epoch = 0
-    lr = 0
-    wd = 0
+    lr = 0.0
+    wd = 0.0
 
     def __init__(self, config: Config, value=0.9):
         super().__init__(config)
@@ -17,7 +17,7 @@ class ConstantModel(BaseModel):
             1, 1
         )  # So that the optimizer gets a nonempty list
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

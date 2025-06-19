@@ -52,7 +52,7 @@ class ACT_R(BaseModel):
             m[i] = act
         return self.activation(m[1:])
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

@@ -48,7 +48,7 @@ class DASH_ACTR(BaseModel):
         )
         return retentions
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

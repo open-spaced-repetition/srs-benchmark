@@ -93,7 +93,7 @@ class FSRS6(FSRS5):
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS6ParameterClipper(config)
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

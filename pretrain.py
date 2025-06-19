@@ -3,6 +3,7 @@ from tqdm import tqdm  # type: ignore
 import torch
 from features import create_features
 from models.base import BaseModel
+from models.trainable import TrainableModel
 from other import Trainer
 from config import create_parser, Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,7 +27,7 @@ def process_user(user_id):
 
 
 if __name__ == "__main__":
-    model: BaseModel
+    model: TrainableModel
     n_epoch = 32
     lr = 4e-2
     wd = 1e-4

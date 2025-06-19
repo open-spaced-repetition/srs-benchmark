@@ -63,7 +63,7 @@ class DASH(BaseModel):
         x = self.sigmoid(x)
         return x
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

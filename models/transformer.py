@@ -46,7 +46,7 @@ class Transformer(BaseModel):
         output = torch.exp(output).repeat(src.shape[0], 1, 1)
         return output, None
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

@@ -42,7 +42,7 @@ class SM2(BaseModel):
             outputs.append(state)
         return torch.stack(outputs), state
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

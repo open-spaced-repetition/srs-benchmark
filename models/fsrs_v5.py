@@ -99,14 +99,14 @@ class FSRS5(FSRS4dot5):
     def apply_gradient_constraints(self):
         pass
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,
         seq_lens: Tensor,
         real_batch_size: int,
     ) -> dict[str, Tensor]:
-        output = super().iter(sequences, delta_ts, seq_lens, real_batch_size)
+        output = super().batch_process(sequences, delta_ts, seq_lens, real_batch_size)
         output["penalty"] = (
             torch.sum(
                 torch.square(self.w - self.init_w_tensor)

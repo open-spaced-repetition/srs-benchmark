@@ -54,7 +54,7 @@ class RNN(BaseModel):
         output = torch.exp(self.fc(x))
         return output, h
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

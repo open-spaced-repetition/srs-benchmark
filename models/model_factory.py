@@ -3,10 +3,9 @@ import torch
 from config import Config, ModelName
 
 from models import *
-from models.base import BaseModel
 
 
-MODEL_REGISTRY: dict[ModelName, Type[BaseModel]] = {
+MODEL_REGISTRY: dict[ModelName, Type[TrainableModel]] = {
     "FSRSv1": FSRS1,
     "FSRSv2": FSRS2,
     "FSRSv3": FSRS3,
@@ -40,7 +39,7 @@ MODEL_REGISTRY: dict[ModelName, Type[BaseModel]] = {
 def create_model(
     config: Config,
     model_params: Optional[Union[List[float], Dict[str, torch.Tensor], float]] = None,
-) -> BaseModel:
+) -> TrainableModel:
     """
     Creates and returns an instance of the specified model.
 
@@ -67,7 +66,6 @@ def create_model(
         )
 
     model_cls = MODEL_REGISTRY[model_name]
-    instance: BaseModel
 
     # Common arguments for all model constructors
     constructor_kwargs = {"config": config}

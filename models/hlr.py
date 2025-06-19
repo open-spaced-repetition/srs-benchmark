@@ -23,7 +23,7 @@ class HLR(BaseModel):
         dp = self.fc(x)
         return 2**dp
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

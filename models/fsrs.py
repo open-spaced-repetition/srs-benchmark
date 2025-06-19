@@ -21,7 +21,7 @@ class FSRS(BaseModel):
     def forgetting_curve(self, t, s):
         raise NotImplementedError("Forgetting curve not implemented")
 
-    def iter(
+    def batch_process(
         self,
         sequences: Tensor,
         delta_ts: Tensor,

@@ -45,4 +45,3 @@ __all__ = [
     "ConstantModel",
     "TrainableModel",  # Protocol for type checking
 ]
-

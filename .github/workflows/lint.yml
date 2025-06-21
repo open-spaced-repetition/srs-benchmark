@@ -30,4 +30,4 @@ jobs:
 
       - name: Run Mypy
         run: |
-          uv sync --only-binary :all: && uv tool install ty && ty check .
+          uv sync && uv tool install ty && ty check .

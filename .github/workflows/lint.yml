@@ -27,6 +27,5 @@ jobs:
       - name: Run Ruff
         run: uvx ruff check --output-format=github .
 
- #     - name: Run Mypy
- #       run: uv init && uv add -r requirements.txt && uv tool install ty && ty check .
- # disable type check for now.
+      - name: Run Mypy
+        run: uv sync && uv tool install ty && ty check .

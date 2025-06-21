@@ -29,4 +29,5 @@ jobs:
         run: uvx ruff check --output-format=github .
 
       - name: Run Mypy
-        run: uv sync --only-binary :all: && uv tool install ty && ty check .
+        run: |
+          uv sync --only-binary :all: && uv tool install ty && ty check .

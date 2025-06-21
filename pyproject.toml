@@ -1,5 +1,5 @@
 [project]
-name = "fsrs-optimizer-project"
+name = "srs-benchmark"
 version = "0.1.0"
 dependencies = [
     "pandas",
@@ -8,10 +8,4 @@ dependencies = [
     "fsrs-optimizer",
     "huggingface_hub",
     "wandb",
-    "torch",
 ]
-
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-backend-path = "."

@@ -30,4 +30,5 @@ jobs:
 
       - name: Run Mypy
         run: |
-          uv sync && uv tool install ty && ty check .
+          uv sync && uv tool install ty && ty check . || true
+          uvx mypy .

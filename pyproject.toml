@@ -1,0 +1,31 @@
+[project]
+name = "fsrs-optimizer-project"
+version = "0.1.0"
+dependencies = [
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "fsrs-optimizer",
+    "huggingface_hub",
+    "wandb",
+    "torch",
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "torch"]
+build-backend = "setuptools.build_meta"
+backend-path = "."
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "torch",
+    "torch.*",
+    "matplotlib",
+    "matplotlib.*",
+    "wandb",
+    "wandb.*"
+]
+ignore_missing_imports = true

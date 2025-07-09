@@ -31,7 +31,9 @@ def rmse_matrix(df):
         lambda x: count_lapse(x["r_history"], x["t_history"]), axis=1
     )
     tmp["delta_t"] = tmp["elapsed_days"].map(
-        lambda x: round(2.48 * np.power(3.62, np.floor(np.log(max(x, 1e-6)) / np.log(3.62))), 2)
+        lambda x: round(
+            2.48 * np.power(3.62, np.floor(np.log(max(x, 1e-6)) / np.log(3.62))), 2
+        )
     )
     tmp["i"] = tmp["i"].map(
         lambda x: round(1.99 * np.power(1.89, np.floor(np.log(x) / np.log(1.89))), 0)

@@ -134,7 +134,7 @@ class FSRS4(FSRS3):
             )
         )
 
-    def pretrain(self, train_set: pd.DataFrame) -> None:
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
             .groupby(by=["first_rating", "delta_t"], group_keys=False)
@@ -210,7 +210,7 @@ class FSRS4(FSRS3):
         w2 = 0.54
 
         if len(rating_stability) == 0:
-            raise Exception("Not enough data for pretraining!")
+            raise Exception("Not enough data for initializing parameters!")
         elif len(rating_stability) == 1:
             rating = list(rating_stability.keys())[0]
             factor = rating_stability[rating] / r_s0_default[str(rating)]

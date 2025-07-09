@@ -1,5 +1,5 @@
 import torch
-from torch import nn, Tensor
+from torch import nn
 import pandas as pd
 from config import Config
 
@@ -25,7 +25,7 @@ class BaseModel(nn.Module):
     def get_optimizer(self, lr: float, wd: float) -> torch.optim.Optimizer:
         return torch.optim.Adam(self.parameters(), lr=lr)
 
-    def pretrain(self, train_set: pd.DataFrame) -> None:
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         pass
 
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:

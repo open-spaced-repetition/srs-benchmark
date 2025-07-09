@@ -159,7 +159,7 @@ class BaseFeatureEngineer(ABC):
         """
         Set time history string fields
         """
-        if t_history_secs_list:
+        if t_history_secs_list is not None:
             if self.config.equalize_test_with_non_secs:
                 df["t_history"] = [
                     ",".join(map(str, item[:-1]))

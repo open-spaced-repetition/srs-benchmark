@@ -2,12 +2,14 @@ import pandas as pd
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
+from torch import Tensor
 from pathlib import Path
 from config import create_parser, Config
 from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
 from multiprocessing import Pool  # type: ignore
 import copy
 import numpy as np
+from models.trainable import TrainableModel
 import wandb
 import time
 from itertools import chain
@@ -128,11 +130,15 @@ def print_grad_norm(model):
     print(torch.cat(grads).norm())
 
 
-def compute_data_loss(model, data, batch_size_exp=1.0):
-    sequences, delta_ts, labels, seq_lens, weights = data
+def compute_data_loss(
+    model: TrainableModel,
+    batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor],
+    batch_size_exp=1.0,
+):
+    sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
-    outputs = model.iter(sequences, delta_ts, seq_lens, real_batch_size)
+    outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     loss_fn = nn.BCELoss(reduction="none")
     loss_vec = loss_fn(result["retentions"], result["labels"]) * result["weights"]

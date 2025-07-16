@@ -54,11 +54,6 @@ class LSTMFeatureEngineer(BaseFeatureEngineer):
         # Time in days for forgetting curve
         df["delta_t_days"] = df["elapsed_days"].map(lambda x: max(0, x))
 
-        # Use days for the forgetting curve when using seconds intervals
-        # This also indirectly causes --no_train_on_same_day and --no_test_on_same_day
-        if self.config.use_secs_intervals:
-            df["delta_t"] = df["delta_t_days"]
-
         return df
 
     def _create_lstm_tensors(self, df: pd.DataFrame) -> pd.DataFrame:

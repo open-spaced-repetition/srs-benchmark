@@ -14,7 +14,6 @@ dependencies = [
 [build-system]
 requires = ["setuptools", "wheel", "torch"]
 build-backend = "setuptools.build_meta"
-backend-path = ["."]
 
 [tool.mypy]
 ignore_missing_imports = true

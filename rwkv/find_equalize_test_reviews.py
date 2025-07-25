@@ -1,3 +1,4 @@
+import psutil
 from multiprocessing import Pool
 import torch
 from tqdm import tqdm
@@ -74,10 +75,18 @@ def process(user_id):
     print("Done:", user_id)
 
 
+def set_low_priority():
+    try:
+        p = psutil.Process()
+        p.nice(psutil.IDLE_PRIORITY_CLASS)
+    except Exception as e:
+        print(f"Failed to set priority: {e}")
+
+
 def main():
     user_ids = list(range(rwkv_config.USER_START, rwkv_config.USER_END + 1))
 
-    with Pool(processes=rwkv_config.PROCESSES) as pool:
+    with Pool(processes=rwkv_config.PROCESSES, initializer=set_low_priority) as pool:
         _ = list(tqdm(pool.imap(process, user_ids), total=len(user_ids)))
 
 

@@ -457,15 +457,16 @@ def evaluate(y, p, df, file_name, user_id, w_list=None):
         fig.savefig(f"evaluation/{file_name}/calibration-retention-{user_id}.png")
         fig = plt.figure()
         optimizer = Optimizer()
-        df["stability"] = df["s"]
-        optimizer.calibration_helper(
-            df[["stability", "p", "y"]].copy(),
-            "stability",
-            lambda x: math.pow(1.2, math.floor(math.log(x, 1.2))),
-            True,
-            fig.add_subplot(111),
-        )
-        fig.savefig(f"evaluation/{file_name}/calibration-stability-{user_id}.png")
+        if "s" in df.columns:
+            df["stability"] = df["s"]
+            optimizer.calibration_helper(
+                df[["stability", "p", "y"]].copy(),
+                "stability",
+                lambda x: math.pow(1.2, math.floor(math.log(x, 1.2))),
+                True,
+                fig.add_subplot(111),
+            )
+            fig.savefig(f"evaluation/{file_name}/calibration-stability-{user_id}.png")
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )

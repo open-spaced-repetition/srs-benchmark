@@ -224,7 +224,9 @@ class BaseFeatureEngineer(ABC):
         if not self.config.use_secs_intervals:
             df = self._handle_outliers_and_continuity(df)
             if df.empty:
-                raise ValueError("No data after handling outliers and non-continuous rows")
+                raise ValueError(
+                    "No data after handling outliers and non-continuous rows"
+                )
 
         return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 

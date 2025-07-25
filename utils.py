@@ -12,7 +12,20 @@ def catch_exceptions(func):
         try:
             return func(*args, **kwargs), None
         except Exception:
-            return None, traceback.format_exc()
+            # Try to extract user_id from function arguments
+            user_id = None
+            if args:
+                # Assume user_id is the first argument
+                user_id = args[0]
+            elif "user_id" in kwargs:
+                user_id = kwargs["user_id"]
+
+            # Include user_id in the error message if available
+            error_msg = traceback.format_exc()
+            if user_id is not None:
+                error_msg = f"User {user_id}:\n{error_msg}"
+
+            return None, error_msg
 
     return wrapper
 

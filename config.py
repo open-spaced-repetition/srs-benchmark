@@ -248,7 +248,7 @@ class Config:
         self.optimizer_name_suffix: str = "_opt"
 
         # Stability (S) parameters
-        _s_min_base = 1e-6 if self.use_secs_intervals else 0.01
+        _s_min_base = 0.0001 if self.use_secs_intervals else 0.01
         if self.model_name == "FSRS-6":
             self.s_min: float = 0.001 if not self.use_secs_intervals else _s_min_base
         else:

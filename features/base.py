@@ -51,6 +51,7 @@ class BaseFeatureEngineer(ABC):
         """
         # Add review sequence number
         df["review_th"] = range(1, df.shape[0] + 1)
+        df["nth_today"] = df.groupby("day_offset").cumcount() + 1
         df.sort_values(by=["card_id", "review_th"], inplace=True)
 
         # Filter invalid ratings

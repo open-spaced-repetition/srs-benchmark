@@ -51,6 +51,7 @@ class BaseFeatureEngineer(ABC):
         """
         # Add review sequence number
         df["review_th"] = range(1, df.shape[0] + 1)
+        df["nth_today"] = df.groupby("day_offset").cumcount() + 1
         df.sort_values(by=["card_id", "review_th"], inplace=True)
 
         # Filter invalid ratings
@@ -250,14 +251,16 @@ class BaseFeatureEngineer(ABC):
         )
         return df
 
-    def get_history_lists(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
+    def get_time_history_list(self, df: pd.DataFrame) -> pd.Series:
         """
-        Get history record lists for feature engineering
+        Get time history list for feature engineering
+
+        Args:
+            df: Input dataframe
 
         Returns:
-            Tuple of (time_history_list, rating_history_list)
+            Time history list as pandas Series
         """
-
         if self.config.use_secs_intervals:
             t_history_list = df.groupby("card_id", group_keys=False)[
                 (
@@ -270,9 +273,39 @@ class BaseFeatureEngineer(ABC):
             t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
                 lambda x: cum_concat([[i] for i in x])
             )
+        return t_history_list
 
+    def get_rating_history_list(self, df: pd.DataFrame) -> pd.Series:
+        """
+        Get rating history list for feature engineering
+
+        Args:
+            df: Input dataframe
+
+        Returns:
+            Rating history list as pandas Series
+        """
         r_history_list = df.groupby("card_id", group_keys=False)["rating"].apply(
             lambda x: cum_concat([[i] for i in x])
         )
+        return r_history_list
 
+    def get_nth_today_history_list(self, df: pd.DataFrame) -> pd.Series:
+        """
+        Get nth today history list for feature engineering
+        """
+        n_history_list = df.groupby("card_id", group_keys=False)["nth_today"].apply(
+            lambda x: cum_concat([[i] for i in x])
+        )
+        return n_history_list
+
+    def get_history_lists(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
+        """
+        Get history record lists for feature engineering
+
+        Returns:
+            Tuple of (time_history_list, rating_history_list)
+        """
+        t_history_list = self.get_time_history_list(df)
+        r_history_list = self.get_rating_history_list(df)
         return t_history_list, r_history_list

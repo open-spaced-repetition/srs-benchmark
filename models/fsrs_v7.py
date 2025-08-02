@@ -178,7 +178,7 @@ class FSRS7(FSRS6):
         blending_function = blend_start * 2.718281828459045 ** (-k * t_over_s)
         return blending_function * R1 + (1 - blending_function) * R2
 
-    def stability_after_success(
+    def stability_after_success(  # type: ignore[override]
         self, state: Tensor, r: Tensor, rating: Tensor
     ) -> Tensor:
         hard_penalty = torch.where(rating == 2, self.w[15], 1)

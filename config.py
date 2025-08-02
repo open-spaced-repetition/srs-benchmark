@@ -183,8 +183,11 @@ class Config:
 
         # Handle `include_short_term` based on model name and initial arg
         self.initial_short_term_setting: bool = args.short
-        if self.model_name.startswith("FSRS-5") or self.model_name.startswith("FSRS-6") \
-                or self.model_name.startswith("FSRS-7"):
+        if (
+            self.model_name.startswith("FSRS-5")
+            or self.model_name.startswith("FSRS-6")
+            or self.model_name.startswith("FSRS-7")
+        ):
             self.include_short_term = True
         else:
             self.include_short_term = self.initial_short_term_setting

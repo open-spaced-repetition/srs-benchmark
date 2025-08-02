@@ -73,14 +73,54 @@ class FSRS7ParameterClipper(FSRS6ParameterClipper):
 
 
 class FSRS7(FSRS6):
-    init_w = [0.0100, 0.68, 0.8178, 11.4235,  # Initial S
-              6.3789, 0.9251, 1.4993, 0.0018,  # Difficulty
-              0.6477, 0.294, 2.1419, 0.0721, 0.1575, 0.2735, 0.0, 0.567, 2.0,  # Stability
-              0.015, 0.1302, 0.35, 0.45]
-    default_params_stddev_tensor = torch.tensor([3.3663, 14.7671, 28.908, 34.1989,  # Initial S
-                                                 0.4291, 0.252, 0.4474, 0.0726,  # Difficulty
-                                                 0.4975, 0.2029, 0.3904, 0.196, 0.0563, 0.2129, 0.5327, 0.2292, 0.7145,  # Stability
-                                                 0.0204, 0.0781, 0.1011, 0.0646])
+    init_w = [
+        0.0100,
+        0.68,
+        0.8178,
+        11.4235,  # Initial S
+        6.3789,
+        0.9251,
+        1.4993,
+        0.0018,  # Difficulty
+        0.6477,
+        0.294,
+        2.1419,
+        0.0721,
+        0.1575,
+        0.2735,
+        0.0,
+        0.567,
+        2.0,  # Stability
+        0.015,
+        0.1302,
+        0.35,
+        0.45,
+    ]
+    default_params_stddev_tensor = torch.tensor(
+        [
+            3.3663,
+            14.7671,
+            28.908,
+            34.1989,  # Initial S
+            0.4291,
+            0.252,
+            0.4474,
+            0.0726,  # Difficulty
+            0.4975,
+            0.2029,
+            0.3904,
+            0.196,
+            0.0563,
+            0.2129,
+            0.5327,
+            0.2292,
+            0.7145,  # Stability
+            0.0204,
+            0.0781,
+            0.1011,
+            0.0646,
+        ]
+    )
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super().__init__(config)
@@ -102,7 +142,9 @@ class FSRS7(FSRS6):
             seq_lens - 1,
             torch.arange(real_batch_size, device=self.config.device),
         ].transpose(0, 1)
-        retentions = self.forgetting_curve(delta_ts, stabilities, -self.w[17], -self.w[18], self.w[19], self.w[20])
+        retentions = self.forgetting_curve(
+            delta_ts, stabilities, -self.w[17], -self.w[18], self.w[19], self.w[20]
+        )
         output = {
             "retentions": retentions,
             "stabilities": stabilities,
@@ -118,7 +160,15 @@ class FSRS7(FSRS6):
         )
         return output
 
-    def forgetting_curve(self, t, s, decay1=-init_w[17], decay2=-init_w[18], k=init_w[19], blend_start=init_w[20]):
+    def forgetting_curve(
+        self,
+        t,
+        s,
+        decay1=-init_w[17],
+        decay2=-init_w[18],
+        k=init_w[19],
+        blend_start=init_w[20],
+    ):
         factor1 = 0.9 ** (1 / decay1) - 1
         factor2 = 0.9 ** (1 / decay2) - 1
         t_over_s = t / s
@@ -127,26 +177,28 @@ class FSRS7(FSRS6):
         blending_function = blend_start * 2.718281828459045 ** (-k * t_over_s)
         return blending_function * R1 + (1 - blending_function) * R2
 
-    def stability_after_success(self, state: Tensor, r: Tensor, rating: Tensor) -> Tensor:
+    def stability_after_success(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> Tensor:
         hard_penalty = torch.where(rating == 2, self.w[15], 1)
         easy_bonus = torch.where(rating == 4, self.w[16], 1)
         new_s = state[:, 0] * (
-                1
-                + torch.exp(self.w[8])
-                * (11 - state[:, 1])
-                * torch.pow(state[:, 0], -self.w[9])
-                * (torch.exp((1 - r) * self.w[10]) - 1)
-                * hard_penalty
-                * easy_bonus
+            1
+            + torch.exp(self.w[8])
+            * (11 - state[:, 1])
+            * torch.pow(state[:, 0], -self.w[9])
+            * (torch.exp((1 - r) * self.w[10]) - 1)
+            * hard_penalty
+            * easy_bonus
         )
         return new_s
 
     def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
         new_s = (
-                self.w[11]
-                * torch.pow(state[:, 1], -self.w[12])
-                * (torch.pow(state[:, 0] + 1, self.w[13]) - 1)
-                * torch.exp((1 - r) * self.w[14])
+            self.w[11]
+            * torch.pow(state[:, 1], -self.w[12])
+            * (torch.pow(state[:, 0] + 1, self.w[13]) - 1)
+            * torch.exp((1 - r) * self.w[14])
         )
         return new_s
 
@@ -161,7 +213,9 @@ class FSRS7(FSRS6):
         if isinstance(delta_t, pd.Series):
             intervals = delta_t.values
         else:
-            intervals = np.array([delta_t]) if not isinstance(delta_t, np.ndarray) else delta_t
+            intervals = (
+                np.array([delta_t]) if not isinstance(delta_t, np.ndarray) else delta_t
+            )
 
         # Define bin boundaries in days
         ten_minutes = 10 / (24 * 60)  # 0.006944...
@@ -174,21 +228,21 @@ class FSRS7(FSRS6):
         mask_short = intervals < two_hours
         binned[mask_short] = np.maximum(
             np.floor(intervals[mask_short] / ten_minutes) * ten_minutes,
-            ten_minutes  # Ensure minimum of 10 minutes
+            ten_minutes,  # Ensure minimum of 10 minutes
         )
 
         # 2-24 hours: 2-hour bins
         mask_medium = (intervals >= two_hours) & (intervals < one_day)
         binned[mask_medium] = np.maximum(
             np.floor(intervals[mask_medium] / two_hours) * two_hours,
-            two_hours  # Ensure minimum of 2 hours
+            two_hours,  # Ensure minimum of 2 hours
         )
 
         # > 24 hours: 1-day bins
         mask_long = intervals >= one_day
         binned[mask_long] = np.maximum(
             np.floor(intervals[mask_long]),
-            one_day  # Ensure minimum of 1 day
+            one_day,  # Ensure minimum of 1 day
         )
 
         return binned if len(binned) > 1 else binned[0]
@@ -197,7 +251,9 @@ class FSRS7(FSRS6):
         # Create binned intervals if using seconds
         if self.config.use_secs_intervals:
             train_set_copy = train_set.copy()
-            train_set_copy['delta_t_binned'] = self.bin_interval(train_set_copy['delta_t'])
+            train_set_copy["delta_t_binned"] = self.bin_interval(
+                train_set_copy["delta_t"]
+            )
             group_by_cols = ["first_rating", "delta_t_binned"]
         else:
             train_set_copy = train_set
@@ -228,7 +284,9 @@ class FSRS7(FSRS6):
                 delta_t = group["delta_t_binned"]
             else:
                 delta_t = group["delta_t"]
-            recall = (group["y"]["mean"] * group["y"]["count"] + average_recall * 1) / (group["y"]["count"] + 1)
+            recall = (group["y"]["mean"] * group["y"]["count"] + average_recall * 1) / (
+                group["y"]["count"] + 1
+            )
             count = group["y"]["count"]
 
             init_s0 = r_s0_default[first_rating]
@@ -240,7 +298,7 @@ class FSRS7(FSRS6):
                     -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
                     * count
                 )
-                l1 = (np.abs(stability - init_s0))/ 16
+                l1 = (np.abs(stability - init_s0)) / 16
                 return logloss + l1
 
             res = minimize(
@@ -376,12 +434,14 @@ class FSRS7(FSRS6):
             new_d = self.init_d(X[:, 1])
             new_d = new_d.clamp(1, 10)
         else:
-            r = self.forgetting_curve(X[:, 0], state[:, 0], -self.w[17], -self.w[18], self.w[19], self.w[20])
+            r = self.forgetting_curve(
+                X[:, 0], state[:, 0], -self.w[17], -self.w[18], self.w[19], self.w[20]
+            )
             success = X[:, 1] > 1
             new_s = torch.where(
-                    success,
-                    self.stability_after_success(state, r, X[:, 1]),
-                    self.stability_after_failure(state, r),
+                success,
+                self.stability_after_success(state, r, X[:, 1]),
+                self.stability_after_failure(state, r),
             )
             new_d = self.next_d(state, X[:, 1])
             new_d = new_d.clamp(1, 10)

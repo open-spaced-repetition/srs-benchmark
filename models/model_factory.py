@@ -13,6 +13,7 @@ MODEL_REGISTRY: dict[ModelName, Type[TrainableModel]] = {
     "FSRS-4.5": FSRS4dot5,
     "FSRS-5": FSRS5,
     "FSRS-6": FSRS6,
+    "FSRS-7": FSRS7,
     "HLR": HLR,
     "ACT-R": ACT_R,
     "DASH": DASH,

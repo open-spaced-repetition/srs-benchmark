@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch.nn import Sigmoid
 import pandas as pd
 import numpy as np
+from tqdm.auto import tqdm  # type: ignore
 from scipy.optimize import minimize  # type: ignore
 
 from config import Config

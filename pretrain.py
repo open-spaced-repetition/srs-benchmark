@@ -8,6 +8,7 @@ from other import Trainer
 from config import create_parser, Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from models.fsrs_v6 import FSRS6
+from models.fsrs_v7 import FSRS7
 from models.gru_p import GRU_P
 from models.rnn import RNN
 from models.transformer import Transformer
@@ -51,12 +52,20 @@ if __name__ == "__main__":
         batch_size = 512
         model = FSRS6(config)
         model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
+    elif config.model_name == "FSRS-7":
+        n_epoch = 15
+        lr = 4e-2
+        wd = 0
+        batch_size = 512
+        model = FSRS7(config)
+        model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
 
     total = 0
     for param in model.parameters():
         total += param.numel()
 
-    print(total)
+    print(f'N parameters={total}')
+    print(f'Epochs={n_epoch}')
 
     pretrain_num = 500
     pretrain_users = [i for i in range(1, pretrain_num + 1)]
@@ -85,32 +94,11 @@ if __name__ == "__main__":
         batch_size=batch_size,
     )
     parameters = trainer.train()
-    print(parameters)
+    
+    if config.model_name == "FSRS-6" or config.model_name == "FSRS-7":
+        print(parameters)
+    
+    print('Done')
     torch.save(
         parameters, f"./pretrain/{config.get_evaluation_file_name()}_pretrain.pth"
     )
-
-    # my_collection = Collection(FSRS6(parameters))
-    # retentions, stabilities, difficulties = my_collection.batch_predict(df)
-    # df["p"] = retentions
-    # if stabilities:
-    #     df["stability"] = stabilities
-    # if difficulties:
-    #     df["difficulty"] = difficulties
-    # fig = plt.figure()
-    # plot_brier(
-    #     df["p"],
-    #     df["y"],
-    #     ax=fig.add_subplot(111),
-    # )
-    # fig.savefig(f"./{str(pretrain_users)}_calibration.png")
-    # fig2 = plt.figure()
-    # optimizer = Optimizer()
-    # optimizer.calibration_helper(
-    #     df[["stability", "p", "y"]].copy(),
-    #     "stability",
-    #     lambda x: math.pow(1.2, math.floor(math.log(x, 1.2))),
-    #     True,
-    #     fig2.add_subplot(111),
-    # )
-    # fig2.savefig(f"./{str(pretrain_users)}_stability.png")

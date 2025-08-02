@@ -64,8 +64,8 @@ if __name__ == "__main__":
     for param in model.parameters():
         total += param.numel()
 
-    print(f'N parameters={total}')
-    print(f'Epochs={n_epoch}')
+    print(f"N parameters={total}")
+    print(f"Epochs={n_epoch}")
 
     pretrain_num = 500
     pretrain_users = [i for i in range(1, pretrain_num + 1)]
@@ -94,11 +94,11 @@ if __name__ == "__main__":
         batch_size=batch_size,
     )
     parameters = trainer.train()
-    
+
     if config.model_name == "FSRS-6" or config.model_name == "FSRS-7":
         print(parameters)
-    
-    print('Done')
+
+    print("Done")
     torch.save(
         parameters, f"./pretrain/{config.get_evaluation_file_name()}_pretrain.pth"
     )

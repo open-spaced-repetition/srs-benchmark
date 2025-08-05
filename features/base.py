@@ -213,16 +213,15 @@ class BaseFeatureEngineer(ABC):
         if self.config.include_short_term:
             df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
 
-        # Recalculate review sequence number
-        df["i"] = (
-            df.groupby("card_id")
-            .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
-            .reset_index(level=0, drop=True)
-            + 1
-        )
-
         # Handle outliers and non-continuous rows (only for non-seconds intervals)
         if not self.config.use_secs_intervals:
+            # Recalculate review sequence number
+            df["i"] = (
+                df.groupby("card_id")
+                .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
+                .reset_index(level=0, drop=True)
+                + 1
+            )
             df = self._handle_outliers_and_continuity(df)
             if df.empty:
                 raise ValueError(

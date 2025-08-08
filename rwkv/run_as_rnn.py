@@ -346,7 +346,7 @@ def run(data_path, model_path, label_db_path, label_db_size, user_id, verbose):
     - JIT may fuse some floating point operations
     However, the performance should be similar.
     """
-    df = pd.read_parquet(data_path / "revlogs", filters=[("user_id", "=", user_id)])
+    df = pd.read_parquet(data_path / "revlogs" / f"{user_id=}")
     df["review_th"] = range(1, df.shape[0] + 1)
     df_cards = pd.read_parquet(data_path / "cards", filters=[("user_id", "=", user_id)])
     df_cards.drop(columns=["user_id"], inplace=True)

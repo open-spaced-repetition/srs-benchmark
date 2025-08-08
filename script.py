@@ -237,8 +237,8 @@ def process(user_id):
     if SECS_IVL:
         columns.append("elapsed_seconds")
     df_revlogs = pd.read_parquet(
-        DATA_PATH / "revlogs",
-        filters=[("user_id", "=", user_id), ("rating", "in", [1, 2, 3, 4])],
+        DATA_PATH / "revlogs" / f"{user_id=}",
+        filters=[("rating", "in", [1, 2, 3, 4])],
         columns=columns,
     )
     dataset = create_time_series(df_revlogs)

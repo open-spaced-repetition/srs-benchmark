@@ -518,9 +518,7 @@ def main():
 
     def process_user(user_id):
         print("Process user:", user_id)
-        dataset = pd.read_parquet(
-            DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
-        )
+        dataset = pd.read_parquet(DATA_PATH / "revlogs" / f"{user_id=}")
         dataset = create_features(dataset, config=config)
         print("Done:", user_id)
         return user_id, dataset

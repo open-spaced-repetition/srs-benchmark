@@ -256,7 +256,7 @@ class Config:
         _s_min_base = 0.0001 if self.use_secs_intervals else 0.01
         if self.model_name == "FSRS-6":
             self.s_min: float = 0.001 if not self.use_secs_intervals else _s_min_base
-        if self.model_name == "FSRS-7":
+        elif self.model_name == "FSRS-7":
             self.s_min: float = 0.001
         else:
             self.s_min = _s_min_base

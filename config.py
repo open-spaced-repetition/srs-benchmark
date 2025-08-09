@@ -254,8 +254,10 @@ class Config:
 
         # Stability (S) parameters
         _s_min_base = 0.0001 if self.use_secs_intervals else 0.01
-        if self.model_name == "FSRS-6" or self.model_name == "FSRS-7":
+        if self.model_name == "FSRS-6":
             self.s_min: float = 0.001 if not self.use_secs_intervals else _s_min_base
+        if self.model_name == "FSRS-7":
+            self.s_min: float = 0.001
         else:
             self.s_min = _s_min_base
 
@@ -352,6 +354,10 @@ if __name__ == "__main__":
 
     fsrs6_secs_config = load_config(custom_args_list=["--algo", "FSRS-6", "--secs"])
     print(f"FSRS-6 (with secs) S_MIN: {fsrs6_secs_config.s_min}")  # Expected: 1e-6
+
+        print("\n--- Testing FSRS-7 S_MIN logic ---")
+    fsrs7_no_secs_config = load_config(custom_args_list=["--algo", "FSRS-7", "--secs"])
+    print(f"FSRS-7 (no secs) S_MIN: {fsrs7_no_secs_config.s_min}")  # Expected: 0.001
 
     print("\n--- Testing effective_short_term logic ---")
     fsrs5_config_no_short_arg = load_config(custom_args_list=["--algo", "FSRS-5"])

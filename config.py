@@ -355,7 +355,7 @@ if __name__ == "__main__":
     fsrs6_secs_config = load_config(custom_args_list=["--algo", "FSRS-6", "--secs"])
     print(f"FSRS-6 (with secs) S_MIN: {fsrs6_secs_config.s_min}")  # Expected: 1e-6
 
-        print("\n--- Testing FSRS-7 S_MIN logic ---")
+    print("\n--- Testing FSRS-7 S_MIN logic ---")
     fsrs7_no_secs_config = load_config(custom_args_list=["--algo", "FSRS-7", "--secs"])
     print(f"FSRS-7 (no secs) S_MIN: {fsrs7_no_secs_config.s_min}")  # Expected: 0.001
 

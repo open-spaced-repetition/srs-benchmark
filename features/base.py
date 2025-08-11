@@ -217,10 +217,10 @@ class BaseFeatureEngineer(ABC):
         if not self.config.use_secs_intervals:
             # Recalculate review sequence number
             df["i"] = (
-            df.groupby("card_id")
-            .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
-            .reset_index(level=0, drop=True)
-            + 1
+                df.groupby("card_id")
+                .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
+                .reset_index(level=0, drop=True)
+                + 1
             )
             df = self._handle_outliers_and_continuity(df)
             if df.empty:

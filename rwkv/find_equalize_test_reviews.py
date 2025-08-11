@@ -34,9 +34,7 @@ def process(user_id):
             print(f"Found for {user_id}.")
             return
 
-    df = pd.read_parquet(
-        rwkv_config.DATA_PATH / "revlogs", filters=[("user_id", "=", user_id)]
-    )
+    df = pd.read_parquet(rwkv_config.DATA_PATH / "revlogs" / f"{user_id=}")
     df = create_features(df.copy(), config=config)
     if len(df) == 0:  # that one user
         return

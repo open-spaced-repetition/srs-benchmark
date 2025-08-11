@@ -20,7 +20,7 @@ config = Config(args)
 
 def process_user(user_id):
     dataset = pd.read_parquet(
-        config.data_path / "revlogs", filters=[("user_id", "=", user_id)]
+        config.data_path / "revlogs" / f"{user_id=}",
     )
     dataset = create_features(dataset, config=config)
     return user_id, dataset

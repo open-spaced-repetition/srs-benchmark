@@ -318,6 +318,41 @@ def rmse_bins_exploit(
     return stats, raw
 
 
+def moving_avg(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+    tscv = TimeSeriesSplit(n_splits=config.n_splits)
+    save_tmp = []
+
+    # Get the first index of the reviews that the benchmark uses
+    first_test_index = int(1e9)
+    for _, test_index in tscv.split(dataset):
+        first_test_index = min(first_test_index, test_index.min())
+        test_set = dataset.iloc[test_index].copy()
+        save_tmp.append(test_set)
+
+    x = 1.2
+    w = 0.3
+    p = []
+    y = []
+
+    for i in range(len(dataset)):
+        row = dataset.iloc[i].copy()
+        y_pred = 1 / (np.e**-x + 1)
+        if i >= first_test_index:
+            p.append(y_pred)
+            y.append(row["y"])
+
+        # gradient step
+        if row["y"] == 1:
+            x += w / (np.e**x + 1)
+        else:
+            x -= w * (np.e**x) / (np.e**x + 1)
+
+    save_tmp_df = pd.concat(save_tmp)
+    save_tmp_df["p"] = p
+    stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
+    return stats, raw
+
+
 @catch_exceptions
 def process(user_id: int) -> tuple[dict, Optional[dict]]:
     """Main processing function for all models."""
@@ -334,6 +369,8 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
         return baseline(user_id, dataset)
     if config.model_name == "RMSE-BINS-EXPLOIT":
         return rmse_bins_exploit(user_id, dataset)
+    if config.model_name == "MOVING-AVG":
+        return moving_avg(user_id, dataset)
 
     # Process trainable models
     w_list = []

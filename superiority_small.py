@@ -24,7 +24,6 @@ if __name__ == "__main__":
         "ACT-R",
         "HLR",
         "Ebisu-v2",
-        "Anki-dry-run",
     ]
     csv_name = f"{len(models)} models.csv"
 
@@ -104,12 +103,10 @@ if __name__ == "__main__":
 
     # small changes to labels
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
-    index_anki_dry_run = models.index("Anki-dry-run")
     index_v4 = models.index("FSRSv4")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     index_FSRS_6_recency = models.index("FSRS-6-recency")
     models[index_lstm] = "LSTM"
-    models[index_anki_dry_run] = "Anki-SM-2\ndef. param."
     models[index_v4] = "FSRS v4"
     models[index_Ebisu_v2] = "Ebisu v2"
     models[index_FSRS_6_recency] = "FSRS-6\nrecency"

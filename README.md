@@ -66,11 +66,6 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
       The three aforementioned neural networks were first pretrained on 100 users and then further optimized on each user individually.
     - RWKV: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture, which combines the properties of an RNN and a Transformer. <a id="features-note"></a>It has too many input features to list, so here is a *short* version: fractional interval lengths, grades, duration of the review, sibling card information, deck and preset structure/hierarchy, hour of the day, day of the week, and the number of reviews done today. Unlike other algorithms in this benchmark, RWKV is not optimized on each user individually. Instead, it is trained on 5 thousand users and evaluated on another 5 thousand; this process is repeated twice to get full coverage of the dataset. <a id="param-note"></a>Regarding the number of parameters: since we count FSRS-6 with default parameters as 0, by the same logic RWKV should also count as 0, since parameters don't change for each user individually.
         - RWKV-P: predicts the result of a review at the time of the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. Just like GRU-P, it may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
-- SM-2-based algorithms:
-    - SM-2: one of the early algorithms used by SuperMemo, the first spaced repetition software. It was developed more than 30 years ago, and it's still popular today. [Anki's default algorithm is based on SM-2](https://faqs.ankiweb.net/what-spaced-repetition-algorithm.html), [Mnemosyne](https://mnemosyne-proj.org/principles.php) also uses it. This algorithm does not predict the probability of recall natively; therefore, for the sake of the benchmark, the output was modified based on some assumptions about the forgetting curve. The algorithm is described by Piotr Wozniak [here](https://super-memory.com/english/ol/sm2.htm).
-        - SM-2 trainable: SM-2 algorithm with optimizable parameters.
-    - Anki-SM-2: a variant of the SM-2 algorithm that is used in Anki.
-        - Anki-SM-2 trainable: Anki algorithm with optimizable parameters.
 - Other:
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline. An algorithm that doesn't outperform AVG cannot be considered good.
     - RMSE-BINS-EXPLOIT: an algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.
@@ -132,11 +127,6 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS v1 | 7 | 0.4913±0.0079 | 0.1316±0.0023 | 0.6295±0.0025 | IL, G |
 | HLR-short | 3 | 0.4929±0.0078 | 0.1397±0.0021 | 0.6115±0.0029 | IL, G, SR|
 | Ebisu v2 | 0 | 0.4989±0.0078 | 0.1627±0.0022 | 0.6051±0.0025 | IL, G |
-| Anki-SM-2 trainable | 7 | 0.5129±0.0089 | 0.1397±0.0024 | 0.6179±0.0023 | IL, G |
-| SM-2 trainable | 6 | 0.581±0.012 | 0.1699±0.0027 | 0.5970±0.0025 | IL, G |
-| Anki-SM-2 | 0 | 0.616±0.011 | 0.1724±0.0026 | 0.6133±0.0023 | IL, G |
-| SM-2-short | 0 | 0.653±0.015 | 0.1701±0.0027 | 0.5901±0.0027 | IL, G, SR |
-| SM-2 | 0 | 0.722±0.017 | 0.2031±0.0031 | 0.6026±0.0025 | IL, G |
 | **RMSE-BINS-EXPLOIT** | 0 | 4.608±0.067 | **0.01350±0.00027** | 0.6548±0.0022 | IL, G |
 
 ### With same-day reviews
@@ -158,13 +148,10 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-5-secs | 19 | 0.4658±0.0070 | 0.1189±0.0017 | 0.6707±0.0022 | FIL, G, SR |
 | GRU-short-secs | 39 | 0.590±0.010 | 0.1846±0.0027 | 0.5984±0.0031 | FIL, G, SR |
 | HLR-short-secs | 3 | 0.705±0.014 | 0.1715±0.0024 | 0.6104±0.0028 | FIL, G, SR |
-| Anki-short-secs | 7 | 0.794±0.018 | 0.1721±0.0028 | 0.5808±0.0030 | FIL, G, SR |
-| SM2-trainable-short-secs | 6 | 0.824±0.017 | 0.2017±0.0028 | 0.5641±0.0029 | FIL, G, SR |
-| SM2-short-secs | 0 | 0.910±0.021 | 0.1999±0.0029 | 0.5715±0.0029 | FIL, G, SR |
 
 ### Superiority
 
-The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column). For example, FSRS-6-recency has a 99.5% superiority over the Anki's variant of SM-2 with default parameters, meaning that for 99.5% of all collections in this benchmark, FSRS-6-recency can estimate the probability of recall more accurately. However, please keep in mind that SM-2 wasn't designed to predict probabilities, and the only reason it does so in this benchmark is because extra formulae have been added to it.
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column).
 
 This table is based on 9,999 collections. To make the table easier to read, not all the algorithms are included.
 

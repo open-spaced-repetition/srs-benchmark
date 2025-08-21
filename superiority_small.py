@@ -6,25 +6,47 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
+import argparse
 
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
-    models = [
-        "RWKV-P",
-        "RWKV",
-        "LSTM-short-secs-equalize_test_with_non_secs",
-        "GRU-P-short",
-        "FSRS-6-recency",
-        "MOVING-AVG",
-        "FSRS-5",
-        "FSRS-4.5",
-        "FSRSv4",
-        "DASH",
-        "ACT-R",
-        "HLR",
-        "Ebisu-v2",
-    ]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--same-day", action="store_true")
+    args = parser.parse_args()
+    if args.same_day:
+        models = [
+            "MOVING-AVG-short-secs",
+            "GRU-P-short-secs",
+            "DASH[MCM]-short-secs",
+            "DASH-short-secs",
+            "DASH[ACT-R]-short-secs",
+            "AVG-short-secs",
+            "FSRS-6-secs-recency",
+            "FSRS-6-secs",
+            "ACT-R-short-secs",
+            "FSRS-4.5-short-secs",
+            "FSRS-5-secs",
+            "FSRSv4-short-secs",
+            "GRU-short-secs",
+            "HLR-short-secs",
+        ]
+    else:
+        models = [
+            "RWKV-P",
+            "RWKV",
+            "LSTM-short-secs-equalize_test_with_non_secs",
+            "GRU-P-short",
+            "FSRS-6-recency",
+            "MOVING-AVG",
+            "FSRS-5",
+            "FSRS-4.5",
+            "FSRSv4",
+            "DASH",
+            "ACT-R",
+            "HLR",
+            "Ebisu-v2",
+        ]
     csv_name = f"{len(models)} models.csv"
 
     df = pd.DataFrame()
@@ -102,14 +124,15 @@ if __name__ == "__main__":
                     percentages[j, i] = j_i_up
 
     # small changes to labels
-    index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
-    index_v4 = models.index("FSRSv4")
-    index_Ebisu_v2 = models.index("Ebisu-v2")
-    index_FSRS_6_recency = models.index("FSRS-6-recency")
-    models[index_lstm] = "LSTM"
-    models[index_v4] = "FSRS v4"
-    models[index_Ebisu_v2] = "Ebisu v2"
-    models[index_FSRS_6_recency] = "FSRS-6\nrecency"
+    if not args.same_day:
+        index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
+        index_v4 = models.index("FSRSv4")
+        index_Ebisu_v2 = models.index("Ebisu-v2")
+        index_FSRS_6_recency = models.index("FSRS-6-recency")
+        models[index_lstm] = "LSTM"
+        models[index_v4] = "FSRS v4"
+        models[index_Ebisu_v2] = "Ebisu v2"
+        models[index_FSRS_6_recency] = "FSRS-6\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

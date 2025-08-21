@@ -138,7 +138,6 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | DASH[MCM]-short-secs | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
 | DASH-short-secs | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |
 | DASH[ACT-R]-short-secs | 5 | 0.3763±0.0045 | 0.1161±0.0014 | 0.5576±0.0030 | FIL, G, SR |
-| NN-17-short-secs | 39 | 0.4215±0.0041 | 0.1389±0.0018 | 0.5763±0.0026 | FIL, G, SR |
 | FSRS-6-secs-recency | 21 | 0.3853±0.0050 | 0.1018±0.0015 | 0.6810±0.0021 | FIL, G, SR |
 | FSRS-6-secs | 21 | 0.3873±0.0050 | 0.1048±0.0015 | 0.6790±0.0021 | FIL, G, SR |
 | AVG-short-secs | 0 | 0.3816±0.0048 | 0.1195±0.0017 | 0.5006±0.0024 | --- |
@@ -157,33 +156,9 @@ This table is based on 9,999 collections. To make the table easier to read, not 
 
 ![Superiority, 9999](./plots/Superiority-small-9999-collections.png)
 
+![Superiority, 10000](./plots/Superiority-small-10000-collections.png)
+
 Additionally, you can find the full table [here](./plots/Superiority-9999.png).
-
-### Statistical significance
-
-The figures below show effect sizes comparing the Log Loss between all pairs of algorithms using the Wilcoxon signed-rank test r-values:
-
-The colors indicate:
-
-- Red shades indicate the row algorithm performs worse than the column algorithm:
-  - Dark red: large effect (r > 0.5)
-  - Red: medium effect (0.5 ≥ r > 0.2) 
-  - Light red: small effect (r ≤ 0.2)
-
-- Green shades indicate the row algorithm performs better than the column algorithm:
-  - Dark green: large effect (r > 0.5)
-  - Green: medium effect (0.5 ≥ r > 0.2) 
-  - Light green: small effect (r ≤ 0.2)
-
-- Grey indicates that the p-value is greater than 0.01, meaning we cannot conclude which algorithm performs better.
-
-The Wilcoxon test considers both the sign and rank of differences between pairs, but it does not account for the varying number of reviews across collections. Therefore, while the test results are reliable for qualitative analysis, caution should be exercised when interpreting the specific magnitude of effects.
-
-To make the table easier to read, not all the algorithms are included.
-
-![Wilcoxon, 9999 collections](./plots/Wilcoxon-small-9999-collections.png)
-
-Additionally, you can find the full table [here](./plots/Wilcoxon-9999-collections.png).
 
 ## Default Parameters
 

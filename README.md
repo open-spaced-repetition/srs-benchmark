@@ -132,22 +132,27 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 ### With same-day reviews
 
-| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |
+Total number of users: 10,000.
+
+Total number of reviews for evaluation: 519,296,315.
+Same-day reviews are used for evaluation. Here the probability of recall is calculated for all reviews, hence, the number of reviews for evaluation is greater.
+
+| Model | Parameters | LogLoss | RMSE(bins) | AUC | Input features |
 | --- | --- | --- | --- | --- | --- |
-| MOVING-AVG-short-secs | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
-| GRU-P-short-secs | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |
-| DASH[MCM]-short-secs | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
-| DASH-short-secs | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |
-| DASH[ACT-R]-short-secs | 5 | 0.3763±0.0045 | 0.1161±0.0014 | 0.5576±0.0030 | FIL, G, SR |
-| FSRS-6-secs-recency | 21 | 0.3853±0.0050 | 0.1018±0.0015 | 0.6810±0.0021 | FIL, G, SR |
-| FSRS-6-secs | 21 | 0.3873±0.0050 | 0.1048±0.0015 | 0.6790±0.0021 | FIL, G, SR |
-| AVG-short-secs | 0 | 0.3816±0.0048 | 0.1195±0.0017 | 0.5006±0.0024 | --- |
-| ACT-R-short-secs | 5 | 0.3898±0.0049 | 0.1240±0.0017 | 0.5174±0.0028 | FIL, G, SR |
-| FSRS-4.5-short-secs | 17 | 0.3976±0.0051 | 0.1023±0.0013 | 0.7055±0.0020 | FIL, G, SR |
-| FSRSv4-short-secs | 17 | 0.4419±0.0060 | 0.1119±0.0014 | 0.6953±0.0021 | FIL, G, SR |
-| FSRS-5-secs | 19 | 0.4658±0.0070 | 0.1189±0.0017 | 0.6707±0.0022 | FIL, G, SR |
-| GRU-short-secs | 39 | 0.590±0.010 | 0.1846±0.0027 | 0.5984±0.0031 | FIL, G, SR |
-| HLR-short-secs | 3 | 0.705±0.014 | 0.1715±0.0024 | 0.6104±0.0028 | FIL, G, SR |
+| MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
+| GRU-P | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |
+| DASH[MCM] | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
+| DASH | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |
+| DASH[ACT-R] | 5 | 0.3763±0.0045 | 0.1161±0.0014 | 0.5576±0.0030 | FIL, G, SR |
+| FSRS-6-recency | 21 | 0.3853±0.0050 | 0.1018±0.0015 | 0.6810±0.0021 | FIL, G, SR |
+| FSRS-6 | 21 | 0.3873±0.0050 | 0.1048±0.0015 | 0.6790±0.0021 | FIL, G, SR |
+| AVG | 0 | 0.3816±0.0048 | 0.1195±0.0017 | 0.5006±0.0024 | --- |
+| ACT-R | 5 | 0.3898±0.0049 | 0.1240±0.0017 | 0.5174±0.0028 | FIL, SR |
+| FSRS-4.5 | 17 | 0.3976±0.0051 | 0.1023±0.0013 | 0.7055±0.0020 | FIL, G, SR |
+| FSRSv4 | 17 | 0.4419±0.0060 | 0.1119±0.0014 | 0.6953±0.0021 | FIL, G, SR |
+| FSRS-5 | 19 | 0.4658±0.0070 | 0.1189±0.0017 | 0.6707±0.0022 | FIL, G, SR |
+| GRU | 39 | 0.590±0.010 | 0.1846±0.0027 | 0.5984±0.0031 | FIL, G, SR |
+| HLR | 3 | 0.705±0.014 | 0.1715±0.0024 | 0.6104±0.0028 | FIL, G, SR |
 
 ### Superiority
 

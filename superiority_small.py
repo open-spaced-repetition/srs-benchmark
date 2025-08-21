@@ -133,6 +133,9 @@ if __name__ == "__main__":
         models[index_v4] = "FSRS v4"
         models[index_Ebisu_v2] = "Ebisu v2"
         models[index_FSRS_6_recency] = "FSRS-6\nrecency"
+    else:
+        for i, model in enumerate(models):
+            models[i] = model.replace("-secs", "").replace("-short", "")
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

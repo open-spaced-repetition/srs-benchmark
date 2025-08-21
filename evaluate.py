@@ -106,10 +106,11 @@ if __name__ == "__main__":
             ("RWKV-P", 2762884, ""),
             ("RWKV", 2762884, ""),
             ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL, G, SR, AT"),
-            ("GRU-P-short", 297, "IL, G, SR"),
+            ("MOVING-AVG", 0, "---"),
             ("FSRS-6-recency", 21, "IL, G, SR"),
             ("FSRS-rs", 21, "IL, G, SR"),
             ("FSRS-6", 21, "IL, G, SR"),
+            ("GRU-P-short", 297, "IL, G, SR"),
             ("FSRS-6-preset", 21, "IL, G, SR"),
             ("GRU-P", 297, "IL, G"),
             ("FSRS-6-binary", 17, "IL, G, SR"),
@@ -144,8 +145,8 @@ if __name__ == "__main__":
         if not args.secs
         else [
             (dev_mode_name, None, None),
-            ("GRU-P-short-secs", 297, "FIL, G, SR"),
             ("MOVING-AVG-short-secs", 0, "---"),
+            ("GRU-P-short-secs", 297, "FIL, G, SR"),
             ("DASH[MCM]-short-secs", 9, "FIL, G, SR"),
             ("DASH-short-secs", 9, "FIL, G, SR"),
             ("DASH[ACT-R]-short-secs", 5, "FIL, G, SR"),
@@ -214,7 +215,7 @@ if __name__ == "__main__":
                 # print(f"parameters: {np.std(parameters, axis=0).round(2).tolist()}\n")
 
     else:
-        for scale in ("reviews", "users"):
+        for scale in ("users", "reviews"):
             print(f"Weighted by number of {scale}\n")
             print("| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |")
             print("| --- | --- | --- | --- | --- | --- |")

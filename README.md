@@ -98,53 +98,14 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 **AT** = **a**nswer **t**ime (duration of the review), in milliseconds
 
-### Weighted by the number of reviews
-
-| Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
-| --- | --- | --- | --- | --- | --- |
-| **RWKV-P** | 2762884 [(0)](#param-note) | **0.2709±0.0074** | 0.01450±0.00037 | **0.8233±0.0040** | [Yes](#features-note) |
-| RWKV | 2762884 [(0)](#param-note) | 0.2991±0.0075 | 0.0341±0.0012 | 0.7699±0.0032 | [Yes](#features-note) |
-| LSTM | 8869 | 0.3115±0.0079 | 0.0354±0.0011 | 0.7332±0.0038 | FIL, G, SR, AT |
-| GRU-P-short | 297 | 0.3195±0.0080 | 0.0421±0.0013 | 0.7096±0.0047 | IL, G, SR|
-| FSRS-6 recency | 21 | 0.3197±0.0080 | 0.0435±0.0012 | 0.7088±0.0042 | IL, G, SR |
-| FSRS-rs | 21 | 0.3197±0.0080 | 0.0435±0.0012 | 0.7090±0.0042 | IL, G, SR |
-| FSRS-6 | 21 | 0.3214±0.0081 | 0.0462±0.0013 | 0.7060±0.0041 | IL, G, SR |
-| FSRS-6 preset | 21 | 0.3215±0.0080 | 0.0454±0.0013 | 0.7067±0.0041 | IL, G, SR |
-| GRU-P | 297 | 0.3251±0.0082 | 0.0433±0.0013 | 0.6991±0.0046 | IL, G |
-| FSRS-6 binary | 17 | 0.3256±0.0082 | 0.0484±0.0014 | 0.6866±0.0046 | IL, G, SR |
-| FSRS-5 | 19 | 0.3273±0.0082 | 0.0518±0.0016 | 0.7025±0.0041 | IL, G, SR |
-| FSRS-6 deck | 21 | 0.3277±0.0082 | 0.0509±0.0016 | 0.6974±0.0042 | IL, G, SR |
-| FSRS-4.5 | 17 | 0.3324±0.0084 | 0.0536±0.0016 | 0.6918±0.0041 | IL, G |
-| FSRS-6 pretrain | 4 | 0.3327±0.0079 | 0.0632±0.0017 | 0.6945±0.0040 | IL, G, SR |
-| FSRS v4 | 17 | 0.3378±0.0086 | 0.0582±0.0017 | 0.6891±0.0043 | IL, G |
-| FSRS-6 default param. | 0 | 0.3393±0.0082 | 0.0716±0.0020 | 0.6891±0.0041 | IL, G, SR |
-| DASH-short | 9 | 0.3395±0.0084 | 0.0660±0.0018 | 0.6355±0.0049 | IL, G, SR |
-| DASH | 9 | 0.3398±0.0083 | 0.0627±0.0016 | 0.6386±0.0047 | IL, G |
-| DASH[MCM] | 9 | 0.3399±0.0083 | 0.0644±0.0017 | 0.6398±0.0052 | IL, G |
-| DASH[ACT-R] | 5 | 0.3428±0.0084 | 0.0670±0.0019 | 0.6294±0.0049 | IL, G |
-| GRU | 39 | 0.3430±0.0086 | 0.0631±0.0017 | 0.6726±0.0039 | IL, G |
-| ACT-R | 5 | 0.3623±0.0092 | 0.0864±0.0024 | 0.5345±0.0054 | IL |
-| AVG | 0 | 0.3630±0.0091 | 0.0876±0.0026 | 0.5085±0.0049 | --- |
-| FSRS v3 | 13 | 0.3709±0.0099 | 0.0729±0.0022 | 0.6666±0.0045 | IL, G |
-| FSRS v2 | 14 | 0.377±0.010 | 0.0687±0.0022 | 0.6669±0.0048 | IL, G |
-| FSRS v1 | 7 | 0.397±0.011 | 0.0864±0.0025 | 0.6333±0.0046 | IL, G |
-| Anki-SM-2 trainable | 7 | 0.407±0.011 | 0.0941±0.0032 | 0.6169±0.0044 | IL, G |
-| HLR | 3 | 0.415±0.012 | 0.1052±0.0031 | 0.6333±0.0050 | IL, G |
-| HLR-short | 3 | 0.436±0.013 | 0.1160±0.0036 | 0.6149±0.0064 | IL, G, SR |
-| SM-2 trainable | 6 | 0.444±0.012 | 0.1193±0.0034 | 0.5994±0.0049 | IL, G |
-| Ebisu v2 | 0 | 0.457±0.012 | 0.1582±0.0039 | 0.5942±0.0050 | IL, G |
-| Anki-SM-2 | 0 | 0.490±0.015 | 0.1278±0.0036 | 0.5973±0.0054 | IL, G |
-| SM-2-short | 0 | 0.511±0.016 | 0.1278±0.0038 | 0.5929±0.0065 | IL, G, SR |
-| SM-2 | 0 | 0.547±0.017 | 0.1484±0.0042 | 0.6005±0.0051 | IL, G |
-| **RMSE-BINS-EXPLOIT** | 0 | 4.48±0.13 | **0.00623±0.00021** | 0.6380±0.0040 | IL, G |
-
-### Unweighted
+### Without same-day reviews
 
 | Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
 | **RWKV-P** | 2762884 | **0.2773±0.0036** | 0.02502±0.00038 | **0.8329±0.0017** | [Yes](#features-note) |
 | RWKV | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0020 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3332±0.0041 | 0.05378±0.00096 | 0.7329±0.0020 | FIL, G, SR, AT |
+| MOVING-AVG | 0 | 0.3369±0.0042 | 0.05915±0.00082 | 0.7001±0.0026 | --- |
 | FSRS-6 recency | 21 | 0.3439±0.0042 | 0.0629±0.0010 | 0.7075±0.0022 | IL, G, SR |
 | FSRS-rs | 21 | 0.3437±0.0042 | 0.0628±0.0010 | 0.7080±0.0022 | IL, G, SR |
 | FSRS-6 | 21 | 0.3456±0.0042 | 0.0653±0.0011 | 0.7051±0.0023 | IL, G, SR |
@@ -178,9 +139,28 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | SM-2 | 0 | 0.722±0.017 | 0.2031±0.0031 | 0.6026±0.0025 | IL, G |
 | **RMSE-BINS-EXPLOIT** | 0 | 4.608±0.067 | **0.01350±0.00027** | 0.6548±0.0022 | IL, G |
 
-Averages weighted by the number of reviews are more representative of "best case" performance when plenty of data is available. Since almost all algorithms perform better when there's a lot of data to learn from, weighting by n(reviews) biases the average towards lower values.
+### With same-day reviews
 
-Unweighted averages are more representative of "average case" performance. In reality, not every user will have hundreds of thousands of reviews, so the algorithm won't always be able to reach its full potential.
+| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |
+| --- | --- | --- | --- | --- | --- |
+| MOVING-AVG-short-secs | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
+| GRU-P-short-secs | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |
+| DASH[MCM]-short-secs | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
+| DASH-short-secs | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |
+| DASH[ACT-R]-short-secs | 5 | 0.3763±0.0045 | 0.1161±0.0014 | 0.5576±0.0030 | FIL, G, SR |
+| NN-17-short-secs | 39 | 0.4215±0.0041 | 0.1389±0.0018 | 0.5763±0.0026 | FIL, G, SR |
+| FSRS-6-secs-recency | 21 | 0.3853±0.0050 | 0.1018±0.0015 | 0.6810±0.0021 | FIL, G, SR |
+| FSRS-6-secs | 21 | 0.3873±0.0050 | 0.1048±0.0015 | 0.6790±0.0021 | FIL, G, SR |
+| AVG-short-secs | 0 | 0.3816±0.0048 | 0.1195±0.0017 | 0.5006±0.0024 | --- |
+| ACT-R-short-secs | 5 | 0.3898±0.0049 | 0.1240±0.0017 | 0.5174±0.0028 | FIL, G, SR |
+| FSRS-4.5-short-secs | 17 | 0.3976±0.0051 | 0.1023±0.0013 | 0.7055±0.0020 | FIL, G, SR |
+| FSRSv4-short-secs | 17 | 0.4419±0.0060 | 0.1119±0.0014 | 0.6953±0.0021 | FIL, G, SR |
+| FSRS-5-secs | 19 | 0.4658±0.0070 | 0.1189±0.0017 | 0.6707±0.0022 | FIL, G, SR |
+| GRU-short-secs | 39 | 0.590±0.010 | 0.1846±0.0027 | 0.5984±0.0031 | FIL, G, SR |
+| HLR-short-secs | 3 | 0.705±0.014 | 0.1715±0.0024 | 0.6104±0.0028 | FIL, G, SR |
+| Anki-short-secs | 7 | 0.794±0.018 | 0.1721±0.0028 | 0.5808±0.0030 | FIL, G, SR |
+| SM2-trainable-short-secs | 6 | 0.824±0.017 | 0.2017±0.0028 | 0.5641±0.0029 | FIL, G, SR |
+| SM2-short-secs | 0 | 0.910±0.021 | 0.1999±0.0029 | 0.5715±0.0029 | FIL, G, SR |
 
 ### Superiority
 

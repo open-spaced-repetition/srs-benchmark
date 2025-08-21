@@ -16,6 +16,7 @@ if __name__ == "__main__":
         "LSTM-short-secs-equalize_test_with_non_secs",
         "GRU-P-short",
         "FSRS-6-recency",
+        "MOVING-AVG",
         "FSRS-5",
         "FSRS-4.5",
         "FSRSv4",

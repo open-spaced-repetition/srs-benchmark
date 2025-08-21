@@ -68,6 +68,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
         - RWKV-P: predicts the result of a review at the time of the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. Just like GRU-P, it may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
 - Other:
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline. An algorithm that doesn't outperform AVG cannot be considered good.
+    - MOVING-AVG: unlike AVG, which uses the overall retention across all reviews as its prediction of probability of recall, MOVING-AVG outputs higher values if recent reviews were successful and lower values if recent reviews were lapses. By adjusting its predictions based on the outcome of recent reviews, it's trying to capture trends in retention instead of assuming that retention is always the same.
     - RMSE-BINS-EXPLOIT: an algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.
 
 For further information regarding the FSRS algorithm, please refer to the following wiki page: [The Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm).
@@ -150,15 +151,19 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 ### Superiority
 
-The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the image below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column).
+The metrics presented above can be difficult to interpret. In order to make it easier to understand how algorithms perform relative to each other, the images below shows the percentage of users for whom algorithm A (row) has a lower Log Loss than algorithm B (column).
+
+#### Without same-day reviews
 
 This table is based on 9,999 collections. To make the table easier to read, not all the algorithms are included.
 
 ![Superiority, 9999](./plots/Superiority-small-9999-collections.png)
 
-![Superiority, 10000](./plots/Superiority-small-10000-collections.png)
-
 Additionally, you can find the full table [here](./plots/Superiority-9999.png).
+
+#### With same-day reviews
+
+![Superiority, 10000](./plots/Superiority-small-10000-collections.png)
 
 ## Default Parameters
 

@@ -137,7 +137,7 @@ Total number of users: 10,000.
 Total number of reviews for evaluation: 519,296,315.
 Same-day reviews are used for evaluation. Here the probability of recall is calculated for all reviews, hence, the number of reviews for evaluation is greater.
 
-| Model | Parameters | LogLoss | RMSE(bins) | AUC | Input features |
+| Model | Parameters | LogLoss↓ | RMSE(bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
 | MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
 | GRU-P | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |
@@ -160,13 +160,15 @@ The metrics presented above can be difficult to interpret. In order to make it e
 
 #### Without same-day reviews
 
-This table is based on 9,999 collections. To make the table easier to read, not all the algorithms are included.
+This table is based on 9,999 users. To make the table easier to read, not all the algorithms are included.
 
 ![Superiority, 9999](./plots/Superiority-small-9999-collections.png)
 
 Additionally, you can find the full table [here](./plots/Superiority-9999.png).
 
 #### With same-day reviews
+
+This table is based on 10,000 users.
 
 ![Superiority, 10000](./plots/Superiority-small-10000-collections.png)
 

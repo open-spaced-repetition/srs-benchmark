@@ -43,7 +43,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
     - FSRS-5: the upgraded version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
     - FSRS-6: the latest version of FSRS. The formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
-        - FSRS-6 default param.: FSRS-6 with default parameters. The default parameters have been obtained by running FSRS-6 on all 10 thousand collections from the dataset and calculating the median of each parameter.
+        - FSRS-6 default param.: FSRS-6 with default parameters.
         - FSRS-6 pretrain: FSRS-6 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
         - FSRS-6 binary: FSRS-6 which treats `hard` and `easy` grades as `good`.
         - FSRS-6 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.
@@ -132,7 +132,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 ### With same-day reviews
 
-Total number of users: 10,000.
+Total number of collections (aka unique users): 10,000.
 
 Total number of reviews for evaluation: 519,296,315.
 Same-day reviews are used for evaluation. Here the probability of recall is calculated for all reviews, hence, the number of reviews for evaluation is greater.
@@ -160,7 +160,7 @@ The metrics presented above can be difficult to interpret. In order to make it e
 
 #### Without same-day reviews
 
-This table is based on 9,999 users. To make the table easier to read, not all the algorithms are included.
+This table is based on 9,999 collections. To make the table easier to read, not all the algorithms are included.
 
 ![Superiority, 9999](./plots/Superiority-small-9999-collections.png)
 
@@ -168,7 +168,7 @@ Additionally, you can find the full table [here](./plots/Superiority-9999.png).
 
 #### With same-day reviews
 
-This table is based on 10,000 users.
+This table is based on 10,000 collections.
 
 ![Superiority, 10000](./plots/Superiority-small-10000-collections.png)
 

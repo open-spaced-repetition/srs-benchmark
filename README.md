@@ -75,7 +75,7 @@ For further information regarding the FSRS algorithm, please refer to the follow
 
 ## Result
 
-Total number of users: 9,999.
+Total number of collections (each from one Anki user): 9,999.
 
 Total number of reviews for evaluation: 349,923,850.
 Same-day reviews are not used for evaluation, but some algorithms use them to refine their predictions of probability of recall for the next day. Some reviews are filtered out, for example, the revlog entries created by changing the due date manually or reviewing cards in a filtered deck with "Reschedule cards based on my answers in this deck" disabled. Finally, an outlier filter is applied. These are the reasons why the number of reviews used for evaluation is significantly lower than the figure of 727 million mentioned earlier. 
@@ -132,7 +132,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 ### With same-day reviews
 
-Total number of collections (aka unique users): 10,000.
+Total number of collections: 10,000.
 
 Total number of reviews for evaluation: 519,296,315.
 Same-day reviews are used for evaluation. Here the probability of recall is calculated for all reviews, hence, the number of reviews for evaluation is greater.

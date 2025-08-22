@@ -33,6 +33,7 @@ ModelName = Literal[
     # Other models
     "AVG",
     "RMSE-BINS-EXPLOIT",
+    "MOVING-AVG",
     "90%",
 ]
 

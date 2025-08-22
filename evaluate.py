@@ -106,10 +106,11 @@ if __name__ == "__main__":
             ("RWKV-P", 2762884, ""),
             ("RWKV", 2762884, ""),
             ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL, G, SR, AT"),
-            ("GRU-P-short", 297, "IL, G, SR"),
+            ("MOVING-AVG", 0, "---"),
             ("FSRS-6-recency", 21, "IL, G, SR"),
             ("FSRS-rs", 21, "IL, G, SR"),
             ("FSRS-6", 21, "IL, G, SR"),
+            ("GRU-P-short", 297, "IL, G, SR"),
             ("FSRS-6-preset", 21, "IL, G, SR"),
             ("GRU-P", 297, "IL, G"),
             ("FSRS-6-binary", 17, "IL, G, SR"),
@@ -125,7 +126,6 @@ if __name__ == "__main__":
             ("DASH[ACT-R]", 5, "IL, G"),
             ("FSRSv2", 14, "IL, G"),
             ("FSRSv3", 13, "IL, G"),
-            ("NN-17", 39, "IL, G"),
             ("FSRS-6-dry-run", 0, "IL, G, SR"),
             ("ACT-R", 5, "IL"),
             ("FSRSv1", 7, "IL, G"),
@@ -144,15 +144,23 @@ if __name__ == "__main__":
         if not args.secs
         else [
             (dev_mode_name, None, None),
-            ("GRU-P-secs", 297, "FIL, G, SR"),
-            ("DASH[MCM]-secs", 9, "FIL, G, SR"),
-            ("DASH-secs", 9, "FIL, G, SR"),
-            ("NN-17-secs", 39, "FIL, G, SR"),
-            ("FSRS-4.5-secs", 17, "FIL, G, SR"),
-            ("GRU-secs", 39, "FIL, G, SR"),
-            ("DASH[ACT-R]-secs", 5, "FIL, G, SR"),
-            ("ACT-R-secs", 5, "FIL, G, SR"),
-            ("AVG-secs", 0, "---"),
+            ("MOVING-AVG-short-secs", 0, "---"),
+            ("GRU-P-short-secs", 297, "FIL, G, SR"),
+            ("DASH[MCM]-short-secs", 9, "FIL, G, SR"),
+            ("DASH-short-secs", 9, "FIL, G, SR"),
+            ("DASH[ACT-R]-short-secs", 5, "FIL, G, SR"),
+            ("FSRS-6-secs-recency", 21, "FIL, G, SR"),
+            ("FSRS-6-secs", 21, "FIL, G, SR"),
+            ("AVG-short-secs", 0, "---"),
+            ("ACT-R-short-secs", 5, "FIL, SR"),
+            ("FSRS-4.5-short-secs", 17, "FIL, G, SR"),
+            ("FSRSv4-short-secs", 17, "FIL, G, SR"),
+            ("FSRS-5-secs", 19, "FIL, G, SR"),
+            ("GRU-short-secs", 39, "FIL, G, SR"),
+            ("HLR-short-secs", 3, "FIL, G, SR"),
+            ("Anki-short-secs", 7, "FIL, G, SR"),
+            ("SM2-trainable-short-secs", 6, "FIL, G, SR"),
+            ("SM2-short-secs", 0, "FIL, G, SR"),
         ]
     )
     if args.fast:
@@ -205,7 +213,7 @@ if __name__ == "__main__":
                 # print(f"parameters: {np.std(parameters, axis=0).round(2).tolist()}\n")
 
     else:
-        for scale in ("reviews", "users"):
+        for scale in ("users", "reviews"):
             print(f"Weighted by number of {scale}\n")
             print("| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |")
             print("| --- | --- | --- | --- | --- | --- |")

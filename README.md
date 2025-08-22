@@ -137,7 +137,7 @@ Total number of users: 10,000.
 Total number of reviews for evaluation: 519,296,315.
 Same-day reviews are used for evaluation. Here the probability of recall is calculated for all reviews, hence, the number of reviews for evaluation is greater.
 
-| Model | Parameters | LogLoss↓ | RMSE(bins)↓ | AUC↑ | Input features |
+| Model | Parameters | Log Loss↓ | RMSE(bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
 | MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
 | GRU-P | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |

@@ -171,3 +171,12 @@ def get_bin(row):
     )
     i = round(1.99 * np.power(1.89, np.floor(np.log(row["i"]) / np.log(1.89))), 0)
     return (lapse, delta_t, i)
+
+
+def save_evaluation_file(user_id, df, config):
+    if config.save_evaluation_file:
+        df.to_csv(
+            f"evaluation/{config.get_evaluation_file_name()}/{user_id}.tsv",
+            sep="\t",
+            index=False,
+        )

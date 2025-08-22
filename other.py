@@ -23,7 +23,7 @@ from script import sort_jsonl
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser, Config
-from utils import catch_exceptions, get_bin, rmse_matrix
+from utils import catch_exceptions, get_bin, rmse_matrix, save_evaluation_file
 from data_loader import UserDataLoader
 from models.rmse_bins_exploit import RMSEBinsExploit
 from models.sm2 import sm2
@@ -259,8 +259,9 @@ def process_untrainable(
         p.extend(testset["p"].tolist())
         y.extend(testset["y"].tolist())
         save_tmp.append(testset)
-    save_tmp = pd.concat(save_tmp)
-    stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
+    save_tmp_df = pd.concat(save_tmp)
+    save_evaluation_file(user_id, save_tmp_df, config)
+    stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
     return stats, raw
 
 
@@ -314,6 +315,7 @@ def rmse_bins_exploit(
 
     save_tmp_df = pd.concat(save_tmp)
     save_tmp_df["p"] = p
+    save_evaluation_file(user_id, save_tmp_df, config)
     stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
     return stats, raw
 
@@ -349,6 +351,7 @@ def moving_avg(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict
 
     save_tmp_df = pd.concat(save_tmp)
     save_tmp_df["p"] = p
+    save_evaluation_file(user_id, save_tmp_df, config)
     stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
     return stats, raw
 
@@ -474,12 +477,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
 
     save_tmp_df = pd.concat(save_tmp)
     del save_tmp_df["tensor"]
-    if config.save_evaluation_file:
-        save_tmp_df.to_csv(
-            f"evaluation/{config.get_evaluation_file_name()}/{user_id}.tsv",
-            sep="\t",
-            index=False,
-        )
+    save_evaluation_file(user_id, save_tmp_df, config)
 
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, w_list

@@ -162,6 +162,7 @@ if __name__ == "__main__":
             ("Anki-short-secs", 7, "FIL, G, SR"),
             ("SM2-trainable-short-secs", 6, "FIL, G, SR"),
             ("SM2-short-secs", 0, "FIL, G, SR"),
+            ("RMSE-BINS-EXPLOIT-short-secs", 0, "FIL, G, SR"),
         ]
     )
     if args.fast:

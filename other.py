@@ -16,6 +16,8 @@ from sklearn.metrics import roc_auc_score, root_mean_squared_error, log_loss  # 
 from tqdm.auto import tqdm  # type: ignore
 from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 import warnings
+from models.fsrs_v6 import FSRS6
+from models.fsrs_v6_one_step import FSRS_one_step
 from models.model_factory import create_model
 from models.trainable import TrainableModel
 from reptile_trainer import get_inner_opt, finetune
@@ -356,6 +358,76 @@ def moving_avg(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict
     return stats, raw
 
 
+def fsrs_one_step(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+    w_list = []
+    testsets = []
+    tscv = TimeSeriesSplit(n_splits=config.n_splits)
+    for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
+        if not config.train_equals_test:
+            train_set = dataset.iloc[train_index]
+            test_set = dataset.iloc[test_index]
+            if config.equalize_test_with_non_secs:
+                # Ignores the train_index and test_index
+                train_set = dataset[dataset[f"{split_i}_train"]]
+                test_set = dataset[dataset[f"{split_i}_test"]]
+                train_index, test_index = (
+                    None,
+                    None,
+                )  # train_index and test_index no longer have the same meaning as before
+        else:
+            train_set = dataset.copy()
+            test_set = dataset[
+                dataset["review_th"] >= dataset.iloc[test_index]["review_th"].min()
+            ].copy()
+        if config.no_test_same_day:
+            test_set = test_set[test_set["elapsed_days"] > 0].copy()
+        if config.no_train_same_day:
+            train_set = train_set[train_set["elapsed_days"] > 0].copy()
+
+        n_epoch = 5
+
+        fsrs = FSRS_one_step(config)
+        fsrs.pretrain(train_set)
+        for _ in range(n_epoch):
+            for index in train_set.index:
+                sample = train_set.loc[index]
+                inputs = sample["inputs"]
+                delta_t, y = sample["delta_t"].item(), sample["y"].item()
+                if delta_t == 0:
+                    continue
+                fsrs.forward(inputs)
+                fsrs.backward(delta_t, y)
+        w_list.append({"0": fsrs.w})
+        testsets.append(test_set)
+
+    p = []
+    y = []
+    save_tmp = []
+
+    for i, (w, testset) in enumerate(zip(w_list, testsets)):
+        tmp_testset = testset.copy()
+        my_collection = Collection(FSRS6(config, w["0"]))
+        retentions, stabilities, difficulties = my_collection.batch_predict(tmp_testset)
+        tmp_testset.loc[:, "p"] = retentions
+        if stabilities:
+            tmp_testset.loc[:, "s"] = stabilities
+        if difficulties:
+            tmp_testset.loc[:, "d"] = difficulties
+        p.extend(retentions)
+        y.extend(tmp_testset.loc[:, "y"].tolist())
+        save_tmp.append(tmp_testset)
+
+    save_tmp_df = pd.concat(save_tmp)
+    del save_tmp_df["tensor"]
+    save_evaluation_file(user_id, save_tmp_df, config)
+
+    stats, raw = evaluate(
+        y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, w_list
+    )
+
+    return stats, raw
+
+
 @catch_exceptions
 def process(user_id: int) -> tuple[dict, Optional[dict]]:
     """Main processing function for all models."""
@@ -374,6 +446,8 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
         return rmse_bins_exploit(user_id, dataset)
     if config.model_name == "MOVING-AVG":
         return moving_avg(user_id, dataset)
+    if config.model_name == "FSRS-6-one-step":
+        return fsrs_one_step(user_id, dataset)
 
     # Process trainable models
     w_list = []

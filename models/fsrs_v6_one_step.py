@@ -118,46 +118,41 @@ class FSRS_one_step(BaseModel):
         """
         p = -self.w[20]
         factor = math.pow(0.9, 1 / p) - 1
-        if self.last_s is None:
-            R = math.pow(1 + factor * delta_t / self.new_s, p)
+        new_r = self.forgetting_curve(delta_t, self.new_s)
+        dL_dR = (new_r - y) / (new_r * (new_r - 1))
 
-            if R > 1e-6 and R < 1.0 - 1e-6:
-                grad_s = (p * factor * delta_t * (y - R)) / (
-                    self.new_s * (self.new_s + delta_t * factor) * (1 - R)
-                )
-                self.w[self.last_rating - 1] -= self.lr * grad_s * 5
+        # --- START: ADDED GRADIENT CALCULATION FOR w[20] ---
+        # This gradient depends on the state BEFORE the review (last_s, delta_t)
+        if new_r > 1e-6 and new_r < 1.0 - 1e-6:
+            # Using a more stable, manually derived formula for dL/dp
+            log_r = math.log(new_r)
+            log_0_9 = math.log(0.9)
+
+            # d(logR)/dp
+            d_log_r_dp = log_r / p - (delta_t * (factor + 1) * log_0_9) / (
+                p * (self.new_s + delta_t * factor)
+            )
+
+            # dL/dp = (dL/dR) * (dR/dp) = (R-y)/(R(1-R)) * (R * d(logR)/dp)
+            grad_p = dL_dR * new_r * d_log_r_dp
+
+            self.w[20] -= self.lr * grad_p
+        # --- END: ADDED GRADIENT CALCULATION FOR w[20] ---
+
+        dR_ds = (
+            new_r
+            * p
+            * factor
+            * delta_t
+            / (self.new_s * (factor * delta_t + self.new_s))
+        )
+        grad_s = dL_dR * dR_ds
+        if self.last_s is None:
+            if new_r > 1e-6 and new_r < 1.0 - 1e-6:
+                self.w[self.last_rating - 1] -= self.lr * grad_s
         else:
             if p == 0:
                 return
-
-            # --- START: ADDED GRADIENT CALCULATION FOR w[20] ---
-            # This gradient depends on the state BEFORE the review (last_s, delta_t)
-            new_r = self.forgetting_curve(delta_t, self.new_s)
-            if new_r > 1e-6 and new_r < 1.0 - 1e-6:
-                # Using a more stable, manually derived formula for dL/dp
-                log_r = math.log(new_r)
-                f = factor + 1  # This is 0.9**(1/p)
-                log_0_9 = math.log(0.9)
-
-                # d(logR)/dp
-                d_log_r_dp = log_r / p - (f * delta_t * log_0_9) / (
-                    p * (self.new_s + delta_t * factor)
-                )
-
-                # dL/dp = (dL/dR) * (dR/dp) = (R-y)/(R(1-R)) * (R * d(logR)/dp)
-                grad_p = (new_r - y) / (1 - new_r) * d_log_r_dp
-
-                # Chain rule: dL/dw[20] = dL/dp * dp/dw[20] = grad_p * -1
-                # Update rule: w = w - lr * dL/dw  =>  w[20] = w[20] - lr * (-grad_p)
-                self.w[20] += self.lr * grad_p
-            # --- END: ADDED GRADIENT CALCULATION FOR w[20] ---
-
-            # Gradient of Loss w.r.t. current stability (dL/dS_new)
-            grad_s = 0
-            if new_r > 1e-6 and new_r < 1.0 - 1e-6:
-                grad_s = (p * factor * delta_t * (y - new_r)) / (
-                    self.new_s * (self.new_s + delta_t * factor) * (1 - new_r)
-                )
 
             # --- Update weights based on the path taken ---
             if delta_t < 1:  # Short-term path

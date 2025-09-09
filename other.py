@@ -384,7 +384,6 @@ def fsrs_one_step(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[d
         if config.no_train_same_day:
             train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
-
         fsrs = FSRS_one_step(config)
         fsrs.pretrain(train_set)
         for index in train_set.index:

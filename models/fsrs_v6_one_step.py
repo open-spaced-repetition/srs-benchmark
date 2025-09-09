@@ -119,7 +119,6 @@ class FSRS_one_step(BaseModel):
         p = -self.w[20]
         factor = math.pow(0.9, 1 / p) - 1
         if self.last_s is None:
-
             R = math.pow(1 + factor * delta_t / self.new_s, p)
 
             if R > 1e-6 and R < 1.0 - 1e-6:

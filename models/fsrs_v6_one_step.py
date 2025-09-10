@@ -18,7 +18,7 @@ class FSRS_one_step(BaseModel):
 
     def __init__(self, config: Config, w: List[float] = init_w):
         super().__init__(config)
-        self.w = w
+        self.w = w.copy()
         self.lr = 1e-4
 
     def forgetting_curve(self, t: float, s: float) -> float:
@@ -33,12 +33,12 @@ class FSRS_one_step(BaseModel):
     def init_difficulty(self, rating: int) -> float:
         return max(1, min(10, self.w[4] - math.exp(self.w[5] * (rating - 1)) + 1))
 
-    def next_difficulty(self, d: float, rating: int) -> float:
+    def next_difficulty(self, last_d: float, rating: int) -> float:
         # From PyTorch code:
         init_d_4 = self.w[4] - math.exp(self.w[5] * (4 - 1)) + 1
         delta_d = -self.w[6] * (rating - 3)
-        linear_damping = delta_d * (10 - d) / 9
-        d_intermediate = d + linear_damping
+        linear_damping = delta_d * (10 - last_d) / 9
+        d_intermediate = last_d + linear_damping
         # Mean reversion
         new_d = self.w[7] * init_d_4 + (1 - self.w[7]) * d_intermediate
         return max(1, min(10, new_d))
@@ -53,30 +53,31 @@ class FSRS_one_step(BaseModel):
         return max(S_MIN, new_s)
 
     def stability_after_success(
-        self, s: float, d: float, r: float, rating: int
+        self, last_s: float, last_d: float, last_r: float, rating: int
     ) -> float:
         hard_penalty = self.w[15] if rating == 2 else 1.0
         easy_bonus = self.w[16] if rating == 4 else 1.0
-        new_s = s * (
+        new_s = last_s * (
             1
             + math.exp(self.w[8])
-            * (11 - d)
-            * math.pow(s, -self.w[9])
-            * (math.exp((1 - r) * self.w[10]) - 1)
+            * (11 - last_d)
+            * math.pow(last_s, -self.w[9])
+            * (math.exp((1 - last_r) * self.w[10]) - 1)
             * hard_penalty
             * easy_bonus
         )
         return max(S_MIN, new_s)
 
-    def stability_after_failure(self, s: float, d: float, r: float) -> float:
-        s_main = (
+    def stability_after_failure(
+        self, last_s: float, last_d: float, last_r: float
+    ) -> float:
+        new_s = (
             self.w[11]
-            * math.pow(d, -self.w[12])
-            * (math.pow(s + 1, self.w[13]) - 1)
-            * math.exp((1 - r) * self.w[14])
+            * math.pow(last_d, -self.w[12])
+            * (math.pow(last_s + 1, self.w[13]) - 1)
+            * math.exp((1 - last_r) * self.w[14])
         )
-        s_min_penalty = s / math.exp(self.w[17] * self.w[18])
-        return max(S_MIN, min(s_main, s_min_penalty))
+        return max(S_MIN, new_s)
 
     def step(self, delta_t, rating, last_s, last_d):
         if last_s is None:
@@ -116,143 +117,88 @@ class FSRS_one_step(BaseModel):
         :param delta_t: Time elapsed in days.
         :param y: Actual outcome (0 for fail, 1 for success).
         """
-        p = -self.w[20]
-        factor = math.pow(0.9, 1 / p) - 1
-        new_r = self.forgetting_curve(delta_t, self.new_s)
-        dL_dR = (new_r - y) / (new_r * (new_r - 1))
+        self.grad = [0.0] * len(self.w)
+        if self.new_s <= S_MIN:
+            return
 
-        # --- START: ADDED GRADIENT CALCULATION FOR w[20] ---
-        # This gradient depends on the state BEFORE the review (last_s, delta_t)
-        if new_r > 1e-6 and new_r < 1.0 - 1e-6:
-            # Using a more stable, manually derived formula for dL/dp
-            log_r = math.log(new_r)
-            log_0_9 = math.log(0.9)
+        r = self.forgetting_curve(delta_t, self.new_s)
+        r = min(max(r, 1e-9), 1.0 - 1e-9)
+        dL_dr = (r - y) / (r * (1 - r))
 
-            # d(logR)/dp
-            d_log_r_dp = log_r / p - (delta_t * (factor + 1) * log_0_9) / (
-                p * (self.new_s + delta_t * factor)
-            )
-
-            # dL/dp = (dL/dR) * (dR/dp) = (R-y)/(R(1-R)) * (R * d(logR)/dp)
-            grad_p = dL_dR * new_r * d_log_r_dp
-
-            self.w[20] -= self.lr * grad_p
-        # --- END: ADDED GRADIENT CALCULATION FOR w[20] ---
-
-        dR_ds = (
-            new_r
-            * p
-            * factor
-            * delta_t
-            / (self.new_s * (factor * delta_t + self.new_s))
+        s = self.new_s
+        decay = -self.w[20]
+        factor = 0.9 ** (1 / decay) - 1
+        dr_ds = (
+            decay
+            * math.pow(1 + factor * delta_t / s, decay - 1)
+            * (-factor * delta_t / (s**2))
         )
-        grad_s = dL_dR * dR_ds
+        C = dL_dr * dr_ds
+
         if self.last_s is None:
-            if new_r > 1e-6 and new_r < 1.0 - 1e-6:
-                self.w[self.last_rating - 1] -= self.lr * grad_s
+            rating = self.last_rating
+            if self.w[rating - 1] > S_MIN:
+                self.grad[rating - 1] = C
         else:
-            if p == 0:
-                return
+            last_r = self.forgetting_curve(self.last_delta_t, self.last_s)
+            s = self.last_s
+            d = self.last_d
+            rating = self.last_rating
+            if rating == 1:
+                term1 = math.pow(d, -self.w[12])
+                term3 = math.exp((1 - last_r) * self.w[14])
+                self.grad[11] = C * (self.new_s / self.w[11])
+                self.grad[12] = C * (-self.new_s * math.log(d))
+                self.grad[13] = C * (
+                    self.w[11]
+                    * term1
+                    * math.pow(s + 1, self.w[13])
+                    * math.log(s + 1)
+                    * term3
+                )
+                self.grad[14] = C * (self.new_s * (1 - last_r))
+            else:
+                hard_penalty = self.w[15] if rating == 2 else 1.0
+                easy_bonus = self.w[16] if rating == 4 else 1.0
+                term_exp_w10 = math.exp((1 - last_r) * self.w[10])
+                term_s_pow_w9 = math.pow(s, -self.w[9])
+                common_factor = (
+                    s
+                    * math.exp(self.w[8])
+                    * (11 - d)
+                    * term_s_pow_w9
+                    * (term_exp_w10 - 1)
+                )
+                self.grad[8] = C * common_factor * hard_penalty * easy_bonus
+                self.grad[9] = (
+                    C * common_factor * (-math.log(s)) * hard_penalty * easy_bonus
+                )
+                self.grad[10] = (
+                    C
+                    * s
+                    * math.exp(self.w[8])
+                    * (11 - d)
+                    * term_s_pow_w9
+                    * (term_exp_w10 * (1 - last_r))
+                    * hard_penalty
+                    * easy_bonus
+                )
+                if rating == 2:
+                    self.grad[15] = C * (common_factor * easy_bonus)
+                if rating == 4:
+                    self.grad[16] = C * (common_factor * hard_penalty)
 
-            # --- Update weights based on the path taken ---
-            if delta_t < 1:  # Short-term path
-                if self.last_s > 0:
-                    g17 = self.last_s * (self.last_rating - 3 + self.w[18])
-                    g18 = self.last_s * self.w[17]
-                    g19 = -self.last_s * math.log(self.last_s)
-                    self.w[17] -= self.lr * grad_s * g17
-                    self.w[18] -= self.lr * grad_s * g18
-                    self.w[19] -= self.lr * grad_s * g19
-            else:  # Long-term path
-                last_r = self.forgetting_curve(self.last_delta_t, self.last_s)
-                ds_new_d_last_d = 0.0  # This will connect S to D gradients
-
-                if self.last_rating > 1:  # Success
-                    ds_new_d_last_d = (
-                        -(self.last_s ** (1 - self.w[9]))
-                        * (self.w[15] if self.last_rating == 2 else 1.0)
-                        * (self.w[16] if self.last_rating == 4 else 1.0)
-                        * math.exp(self.w[8])
-                        * (math.exp((1 - last_r) * self.w[10]) - 1)
-                    )
-                    g8 = ds_new_d_last_d * (11 - self.last_d)
-                    g9 = g8 * math.log(self.last_s) if self.last_s > 0 else 0
-                    g10 = (
-                        self.last_s
-                        * math.exp(self.w[8])
-                        * (11 - self.last_d)
-                        * math.pow(self.last_s, -self.w[9])
-                        * (1 - last_r)
-                        * math.exp((1 - last_r) * self.w[10])
-                        * (self.w[15] if self.last_rating == 2 else 1.0)
-                        * (self.w[16] if self.last_rating == 4 else 1.0)
-                    )
-                    self.w[8] -= self.lr * grad_s * g8
-                    self.w[9] -= self.lr * grad_s * g9
-                    self.w[10] -= self.lr * grad_s * g10
-                    if self.last_rating == 2 and self.w[15] > 0:
-                        self.w[15] -= (
-                            self.lr * grad_s * (self.new_s - self.last_s) / self.w[15]
-                        )
-                    if self.last_rating == 4 and self.w[16] > 0:
-                        self.w[16] -= (
-                            self.lr * grad_s * (self.new_s - self.last_s) / self.w[16]
-                        )
-                else:  # Failure
-                    s_main = (
-                        self.w[11]
-                        * math.pow(self.last_d, -self.w[12])
-                        * (math.pow(self.last_s + 1, self.w[13]) - 1)
-                        * math.exp((1 - last_r) * self.w[14])
-                    )
-                    s_min_penalty = self.last_s / math.exp(self.w[17] * self.w[18])
-
-                    if s_main < s_min_penalty:
-                        ds_new_d_last_d = (
-                            -s_main * self.w[12] / self.last_d if self.last_d > 0 else 0
-                        )
-                        g11 = s_main / self.w[11] if self.w[11] != 0 else 0
-                        g12 = -s_main * math.log(self.last_d) if self.last_d > 0 else 0
-                        g13 = (
-                            self.w[11]
-                            * math.pow(self.last_d, -self.w[12])
-                            * math.pow(self.last_s + 1, self.w[13])
-                            * math.log(self.last_s + 1)
-                            * math.exp((1 - last_r) * self.w[14])
-                            if self.last_s >= 0
-                            else 0
-                        )
-                        g14 = s_main * (1 - last_r)
-                        self.w[11] -= self.lr * grad_s * g11
-                        self.w[12] -= self.lr * grad_s * g12
-                        self.w[13] -= self.lr * grad_s * g13
-                        self.w[14] -= self.lr * grad_s * g14
-                    else:
-                        g17 = -s_min_penalty * self.w[18]
-                        g18 = -s_min_penalty * self.w[17]
-                        self.w[17] -= self.lr * grad_s * g17
-                        self.w[18] -= self.lr * grad_s * g18
-
-                # Update difficulty weights via chain rule
-                if ds_new_d_last_d != 0:
-                    grad_d_w4 = self.w[7]
-                    grad_d_w5 = -3 * self.w[7] * math.exp(3 * self.w[5])
-                    grad_d_w6 = (
-                        -(self.last_d - 10)
-                        * (self.last_rating - 3)
-                        * (self.w[7] - 1)
-                        / 9
-                    )
-                    init_d_4 = self.w[4] - (math.exp(self.w[5] * 3) - 1)
-                    delta_d_term = (
-                        -self.w[6] * (self.last_rating - 3) * (self.last_d - 10) / 9
-                    )
-                    grad_d_w7 = init_d_4 - (self.last_d + delta_d_term)
-
-                    self.w[4] -= self.lr * grad_s * ds_new_d_last_d * grad_d_w4
-                    self.w[5] -= self.lr * grad_s * ds_new_d_last_d * grad_d_w5
-                    self.w[6] -= self.lr * grad_s * ds_new_d_last_d * grad_d_w6
-                    self.w[7] -= self.lr * grad_s * ds_new_d_last_d * grad_d_w7
+        t = delta_t
+        s = self.new_s
+        log_term = math.log(1 + factor * t / s)
+        d_factor_d_decay = math.pow(0.9, 1 / decay) * math.log(0.9) * (-1 / decay**2)
+        dr_d_decay = r * (
+            log_term + decay * (t / s) * d_factor_d_decay / (1 + factor * t / s)
+        )
+        dr_dw20 = -dr_d_decay
+        self.grad[20] = dL_dr * dr_dw20
+        for i in range(len(self.w)):
+            self.w[i] -= self.lr * self.grad[i]
 
         self.clamp_weights()
 
@@ -275,9 +221,6 @@ class FSRS_one_step(BaseModel):
         self.w[14] = max(0, min(self.w[14], 4))
         self.w[15] = max(0, min(self.w[15], 1))
         self.w[16] = max(1, min(self.w[16], 6))
-        self.w[17] = max(0, min(self.w[17], 2))
-        self.w[18] = max(0, min(self.w[18], 2))
-        self.w[19] = max(0.01, min(self.w[19], 0.8))
         self.w[20] = max(0.1, min(self.w[20], 0.8))
 
     def pretrain(self, train_set: pd.DataFrame) -> None:

@@ -386,15 +386,14 @@ def fsrs_one_step(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[d
 
         fsrs = FSRS_one_step(config)
         fsrs.pretrain(train_set)
-        for _ in range(5):
-            for index in train_set.index:
-                sample = train_set.loc[index]
-                inputs = sample["inputs"]
-                delta_t, y = sample["delta_t"].item(), sample["y"].item()
-                if delta_t == 0:
-                    continue
-                fsrs.forward(inputs)
-                fsrs.backward(delta_t, y)
+        for index in train_set.index:
+            sample = train_set.loc[index]
+            delta_t, y = sample["delta_t"].item(), sample["y"].item()
+            if delta_t < 1:
+                continue
+            inputs = sample["inputs"]
+            fsrs.forward(inputs)
+            fsrs.backward(delta_t, y)
         w_list.append({"0": fsrs.w})
         testsets.append(test_set)
 

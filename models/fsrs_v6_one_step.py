@@ -34,12 +34,10 @@ class FSRS_one_step(BaseModel):
         return max(1, min(10, self.w[4] - math.exp(self.w[5] * (rating - 1)) + 1))
 
     def next_difficulty(self, last_d: float, rating: int) -> float:
-        # From PyTorch code:
         init_d_4 = self.w[4] - math.exp(self.w[5] * (4 - 1)) + 1
         delta_d = -self.w[6] * (rating - 3)
         linear_damping = delta_d * (10 - last_d) / 9
         d_intermediate = last_d + linear_damping
-        # Mean reversion
         new_d = self.w[7] * init_d_4 + (1 - self.w[7]) * d_intermediate
         return max(1, min(10, new_d))
 
@@ -136,8 +134,7 @@ class FSRS_one_step(BaseModel):
         rating = self.last_rating
 
         if self.last_s is None:
-            if self.w[rating - 1] > S_MIN:
-                self.grad[rating - 1] = C
+            self.grad[rating - 1] = C * 100
         else:
             last_r = self.forgetting_curve(self.last_delta_t, self.last_s)
             s = self.last_s
@@ -221,6 +218,7 @@ class FSRS_one_step(BaseModel):
         )
         dr_dw20 = -dr_d_decay
         self.grad[20] = dL_dr * dr_dw20
+
         for i in range(len(self.w)):
             self.w[i] -= self.lr * self.grad[i]
 

@@ -82,20 +82,19 @@ class FSRS_one_step(BaseModel):
     def step(self, delta_t, rating, last_s, last_d):
         if last_s is None:
             return self.init_stability(rating), self.init_difficulty(rating)
-        elif delta_t == 0:
+        elif delta_t < 1:
             return self.stability_short_term(last_s, rating), self.next_difficulty(
                 last_d, rating
             )
         else:
+            new_d = self.next_difficulty(last_d, rating)
             r = self.forgetting_curve(delta_t, last_s)
             if rating == 1:
-                return self.stability_after_failure(
-                    last_s, last_d, r
-                ), self.next_difficulty(last_d, rating)
+                new_s = self.stability_after_failure(last_s, new_d, r)
             else:
-                return self.stability_after_success(
-                    last_s, last_d, r, rating
-                ), self.next_difficulty(last_d, rating)
+                new_s = self.stability_after_success(last_s, new_d, r, rating)
+
+            return new_s, new_d
 
     def forward(self, inputs):
         last_s = None
@@ -134,16 +133,15 @@ class FSRS_one_step(BaseModel):
             * (-factor * delta_t / (s**2))
         )
         C = dL_dr * dr_ds
+        rating = self.last_rating
 
         if self.last_s is None:
-            rating = self.last_rating
             if self.w[rating - 1] > S_MIN:
                 self.grad[rating - 1] = C
         else:
             last_r = self.forgetting_curve(self.last_delta_t, self.last_s)
             s = self.last_s
-            d = self.last_d
-            rating = self.last_rating
+            d = self.new_d
             if rating == 1:
                 term1 = math.pow(d, -self.w[12])
                 term3 = math.exp((1 - last_r) * self.w[14])
@@ -157,9 +155,19 @@ class FSRS_one_step(BaseModel):
                     * term3
                 )
                 self.grad[14] = C * (self.new_s * (1 - last_r))
+                ds_new_d_new = self.new_s * (-self.w[12] / d)
             else:
                 hard_penalty = self.w[15] if rating == 2 else 1.0
                 easy_bonus = self.w[16] if rating == 4 else 1.0
+                ds_new_d_new = (
+                    s
+                    * math.exp(self.w[8])
+                    * (-1)
+                    * math.pow(s, -self.w[9])
+                    * (math.exp((1 - last_r) * self.w[10]) - 1)
+                    * hard_penalty
+                    * easy_bonus
+                )
                 term_exp_w10 = math.exp((1 - last_r) * self.w[10])
                 term_s_pow_w9 = math.pow(s, -self.w[9])
                 common_factor = (
@@ -187,6 +195,22 @@ class FSRS_one_step(BaseModel):
                     self.grad[15] = C * (common_factor * easy_bonus)
                 if rating == 4:
                     self.grad[16] = C * (common_factor * hard_penalty)
+
+            last_d = self.last_d
+            init_d_4 = self.w[4] - math.exp(self.w[5] * (4 - 1)) + 1
+            d_intermediate = last_d + (-self.w[6] * (rating - 3) * (10 - last_d) / 9)
+
+            d_newd_dw4 = self.w[7]
+            self.grad[4] = C * ds_new_d_new * d_newd_dw4
+
+            d_newd_dw5 = self.w[7] * (-math.exp(self.w[5] * 3) * 3)
+            self.grad[5] = C * ds_new_d_new * d_newd_dw5
+
+            d_newd_dw6 = (1 - self.w[7]) * (-(rating - 3) * (10 - last_d) / 9)
+            self.grad[6] = C * ds_new_d_new * d_newd_dw6
+
+            d_newd_dw7 = init_d_4 - d_intermediate
+            self.grad[7] = C * ds_new_d_new * d_newd_dw7
 
         t = delta_t
         s = self.new_s

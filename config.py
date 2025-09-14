@@ -33,6 +33,7 @@ ModelName = Literal[
     "DASH[ACT-R]",
     # Other models
     "AVG",
+    "CONST",
     "RMSE-BINS-EXPLOIT",
     "MOVING-AVG",
     "90%",

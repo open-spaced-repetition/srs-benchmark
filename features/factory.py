@@ -50,6 +50,7 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
     "Ebisu-v2": EbisuFeatureEngineer,
     # Simple models that only need basic features
     "AVG": AVGFeatureEngineer,
+    "CONST": AVGFeatureEngineer,
     "MOVING-AVG": AVGFeatureEngineer,
     "RMSE-BINS-EXPLOIT": RMSEBinsExploitFeatureEngineer,
 }

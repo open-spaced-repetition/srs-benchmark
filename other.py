@@ -290,6 +290,7 @@ def baseline(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]
     stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
     return stats, raw
 
+
 def constant(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
     constant_p_recall = 0.9999  # 99.99% probability of recall
 
@@ -313,6 +314,7 @@ def constant(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]
     save_tmp = pd.concat(save_tmp)
     stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
     return stats, raw
+
 
 def rmse_bins_exploit(
     user_id: int, dataset: pd.DataFrame

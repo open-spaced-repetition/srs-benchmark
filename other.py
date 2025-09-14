@@ -290,6 +290,29 @@ def baseline(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]
     stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
     return stats, raw
 
+def constant(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict]]:
+    constant_p_recall = 0.9999  # 99.99% probability of recall
+
+    testsets = []
+    avg_ps = []
+    tscv = TimeSeriesSplit(n_splits=config.n_splits)
+    for train_index, test_index in tscv.split(dataset):
+        test_set = dataset.iloc[test_index].copy()
+        testsets.append(test_set)
+        avg_ps.append(constant_p_recall)
+
+    p = []
+    y = []
+    save_tmp = []
+
+    for avg_p, testset in zip(avg_ps, testsets):
+        testset["p"] = avg_p
+        p.extend([avg_p] * testset.shape[0])
+        y.extend(testset["y"].tolist())
+        save_tmp.append(testset)
+    save_tmp = pd.concat(save_tmp)
+    stats, raw = evaluate(y, p, save_tmp, config.model_name, user_id)
+    return stats, raw
 
 def rmse_bins_exploit(
     user_id: int, dataset: pd.DataFrame
@@ -439,6 +462,8 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
         return process_untrainable(user_id, dataset)
     if config.model_name == "AVG":
         return baseline(user_id, dataset)
+    if config.model_name == "CONST":
+        return constant(user_id, dataset)
     if config.model_name == "RMSE-BINS-EXPLOIT":
         return rmse_bins_exploit(user_id, dataset)
     if config.model_name == "MOVING-AVG":

@@ -26,4 +26,4 @@ class Ebisu:
         return model
 
     def predict(self, model, delta_t):
-        return ebisu.predictRecall(model, tnow=delta_t)
+        return ebisu.predictRecall(model, tnow=max(delta_t, 0.001), exact=True)

@@ -13,6 +13,7 @@ from models.trainable import TrainableModel
 import wandb
 import time
 from itertools import chain
+from features import create_features
 
 BATCH_SIZE = 16384
 BATCH_SIZE_EXP = 1.0
@@ -512,16 +513,17 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
     inner_opt.load_state_dict(inner_opt_state)
 
 
-def main():
-    from features import create_features
-    from models import Transformer, LSTM
+def process_user(user_id):
+    print("Process user:", user_id)
+    dataset = pd.read_parquet(DATA_PATH / "revlogs" / f"{user_id=}")
+    dataset = create_features(dataset, config=config)
+    dataset["user_id"] = user_id
+    print("Done:", user_id)
+    return user_id, dataset
 
-    def process_user(user_id):
-        print("Process user:", user_id)
-        dataset = pd.read_parquet(DATA_PATH / "revlogs" / f"{user_id=}")
-        dataset = create_features(dataset, config=config)
-        print("Done:", user_id)
-        return user_id, dataset
+
+def main():
+    from models import Transformer, LSTM
 
     if MODEL_NAME == "Transformer":
         model = Transformer(config)
@@ -551,14 +553,11 @@ def main():
     test_users = list(range(5000 - num_test_users, 5000))
     all_users = train_users + test_users
 
-    def worker(user_id):
-        return process_user(user_id)
-
     time_start = time.time()
     if PROCESSES > 1:
         print(f"Processes: {PROCESSES} is only used for getting the data.")
     with Pool(processes=PROCESSES) as pool:
-        results = pool.map(worker, all_users)
+        results = pool.map(process_user, all_users)
 
     for user, result in results:
         df_dict[user] = result

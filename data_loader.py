@@ -27,7 +27,6 @@ class UserDataLoader:
         df_revlogs = pd.read_parquet(
             self.data_path / "revlogs" / f"{user_id=}",
         )
-        df_revlogs.drop(columns=["user_id"], inplace=True)
 
         # Create initial features
         dataset = create_features(df_revlogs, config=self.config)

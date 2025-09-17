@@ -210,7 +210,7 @@ class FSRS4(FSRS3):
         w2 = 0.54
 
         if len(rating_stability) == 0:
-            raise Exception("Not enough data for pretraining!")
+            initial_stabilities = list(r_s0_default.values())
         elif len(rating_stability) == 1:
             rating = list(rating_stability.keys())[0]
             factor = rating_stability[rating] / r_s0_default[str(rating)]

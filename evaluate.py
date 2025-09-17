@@ -144,6 +144,7 @@ if __name__ == "__main__":
         if not args.secs
         else [
             (dev_mode_name, None, None),
+            ("LSTM-short-secs", 8869, "FIL, G, SR, AT"),
             ("MOVING-AVG-short-secs", 0, "---"),
             ("GRU-P-short-secs", 297, "FIL, G, SR"),
             ("DASH[MCM]-short-secs", 9, "FIL, G, SR"),
@@ -157,7 +158,6 @@ if __name__ == "__main__":
             ("FSRSv4-short-secs", 17, "FIL, G, SR"),
             ("FSRS-5-secs", 19, "FIL, G, SR"),
             ("GRU-short-secs", 39, "FIL, G, SR"),
-            ("Ebisu-v2", 0, "FIL, G, SR"),
             ("HLR-short-secs", 3, "FIL, G, SR"),
             ("Anki-short-secs", 7, "FIL, G, SR"),
             ("SM2-trainable-short-secs", 6, "FIL, G, SR"),

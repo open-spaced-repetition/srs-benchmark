@@ -153,6 +153,7 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | FSRSv4 | 17 | 0.4848±0.0077 | 0.1159±0.0017 | 0.6663±0.0024 | FIL, G, SR |
 | GRU | 39 | 0.590±0.010 | 0.1846±0.0027 | 0.5984±0.0031 | FIL, G, SR |
 | HLR | 3 | 0.705±0.014 | 0.1715±0.0024 | 0.6104±0.0028 | FIL, G, SR |
+| Ebisu v2 | 0 | 0.772±0.017 | 0.1846±0.0026 | 0.5947±0.0031 | FIL, G, SR |
 
 ### Superiority
 

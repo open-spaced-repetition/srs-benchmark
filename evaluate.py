@@ -157,11 +157,11 @@ if __name__ == "__main__":
             ("FSRSv4-short-secs", 17, "FIL, G, SR"),
             ("FSRS-5-secs", 19, "FIL, G, SR"),
             ("GRU-short-secs", 39, "FIL, G, SR"),
-            ("Ebisu-v2", 0, "FIL, G, SR"),
             ("HLR-short-secs", 3, "FIL, G, SR"),
             ("Anki-short-secs", 7, "FIL, G, SR"),
             ("SM2-trainable-short-secs", 6, "FIL, G, SR"),
             ("SM2-short-secs", 0, "FIL, G, SR"),
+            ("Ebisu-v2-short-secs", 0, "FIL, G, SR"),
             ("RMSE-BINS-EXPLOIT-short-secs", 0, "FIL, G, SR"),
         ]
     )

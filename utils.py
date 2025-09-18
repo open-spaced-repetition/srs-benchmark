@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import root_mean_squared_error  # type: ignore
 import traceback
+from sklearn.metrics import root_mean_squared_error  # type: ignore
 from functools import wraps
 from itertools import accumulate
+from config import Config
 
 
 def catch_exceptions(func):
@@ -173,7 +174,7 @@ def get_bin(row):
     return (lapse, delta_t, i)
 
 
-def save_evaluation_file(user_id, df, config):
+def save_evaluation_file(user_id, df, config: Config):
     if config.save_evaluation_file:
         df.to_csv(
             f"evaluation/{config.get_evaluation_file_name()}/{user_id}.tsv",

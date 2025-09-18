@@ -31,6 +31,7 @@ if __name__ == "__main__":
             "FSRSv4-short-secs",
             "GRU-short-secs",
             "HLR-short-secs",
+            "Ebisu-v2-short-secs",
         ]
     else:
         models = [

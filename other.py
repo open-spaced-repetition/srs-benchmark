@@ -263,7 +263,7 @@ def process_untrainable(
         save_tmp.append(testset)
     save_tmp_df = pd.concat(save_tmp)
     save_evaluation_file(user_id, save_tmp_df, config)
-    stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
+    stats, raw = evaluate(y, p, save_tmp_df, config.get_evaluation_file_name(), user_id)
     return stats, raw
 
 
@@ -354,7 +354,7 @@ def moving_avg(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[dict
     save_tmp_df = pd.concat(save_tmp)
     save_tmp_df["p"] = p
     save_evaluation_file(user_id, save_tmp_df, config)
-    stats, raw = evaluate(y, p, save_tmp_df, config.model_name, user_id)
+    stats, raw = evaluate(y, p, save_tmp_df, config.get_evaluation_file_name(), user_id)
     return stats, raw
 
 

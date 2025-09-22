@@ -44,7 +44,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS-5: the upgraded version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
     - FSRS-6: the latest version of FSRS. The formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
         - FSRS-6 default param.: FSRS-6 with default parameters.
-        - FSRS-6 pretrain: FSRS-6 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
+        - FSRS-6 S0: FSRS-6 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
         - FSRS-6 binary: FSRS-6 which treats `hard` and `easy` grades as `good`.
         - FSRS-6 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.
         - FSRS-6 deck: different parameters are used for each deck.
@@ -109,7 +109,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-6 preset | 21 | 0.3462±0.0042 | 0.0650±0.0010 | 0.7052±0.0023 | IL, G, SR |
 | FSRS-6 binary | 17 | 0.3509±0.0043 | 0.0676±0.0011 | 0.6848±0.0025 | IL, G, SR |
 | GRU-P | 297 | 0.3521±0.0043 | 0.0633±0.0011 | 0.6868±0.0025 | IL, G |
-| FSRS-6 pretrain | 4 | 0.3548±0.0042 | 0.0790±0.0012 | 0.6999±0.0022 | IL, G, SR |
+| FSRS-6 S0 | 4 | 0.3548±0.0042 | 0.0790±0.0012 | 0.6999±0.0022 | IL, G, SR |
 | FSRS-6 deck | 21 | 0.3549±0.0043 | 0.0733±0.0013 | 0.6988±0.0023 | IL, G, SR |
 | FSRS-5 | 19 | 0.3560±0.0045 | 0.0741±0.0013 | 0.7011±0.0023 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.3624±0.0046 | 0.0764±0.0013 | 0.6893±0.0023 | IL, G |

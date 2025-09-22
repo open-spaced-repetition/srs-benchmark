@@ -152,6 +152,7 @@ if __name__ == "__main__":
             ("DASH[ACT-R]-short-secs", 5, "FIL, G, SR"),
             ("FSRS-6-secs-recency", 21, "FIL, G, SR"),
             ("FSRS-6-secs", 21, "FIL, G, SR"),
+            ("FSRS-6-secs-preset", 21, "FIL, G, SR"),
             ("AVG-short-secs", 0, "---"),
             ("ACT-R-short-secs", 5, "FIL, SR"),
             ("FSRS-4.5-short-secs", 17, "FIL, G, SR"),

@@ -245,7 +245,7 @@ class FSRS_one_step(BaseModel):
         self.w[16] = max(1, min(self.w[16], 6))
         self.w[20] = max(0.1, min(self.w[20], 0.8))
 
-    def pretrain(self, train_set: pd.DataFrame) -> None:
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
             .groupby(by=["first_rating", "delta_t"], group_keys=False)
@@ -321,7 +321,7 @@ class FSRS_one_step(BaseModel):
         w2 = 0.54
 
         if len(rating_stability) == 0:
-            raise Exception("Not enough data for pretraining!")
+            raise ValueError("Not enough data for parameters initialization!")
         elif len(rating_stability) == 1:
             rating = list(rating_stability.keys())[0]
             factor = rating_stability[rating] / r_s0_default[str(rating)]

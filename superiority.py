@@ -23,7 +23,7 @@ if __name__ == "__main__":
         "FSRS-6-binary",
         "FSRS-6-deck",
         "GRU-P",
-        "FSRS-6-pretrain",
+        "FSRS-6-S0",
         "FSRS-5",
         "FSRS-6-dry-run",
         "FSRS-4.5",
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     # small changes to labels
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
     index_6_dry_run = models.index("FSRS-6-dry-run")
-    index_6_pretrain = models.index("FSRS-6-pretrain")
+    index_6_S0 = models.index("FSRS-6-S0")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_v2 = models.index("FSRSv2")
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_lstm] = "LSTM"
     models[index_6_dry_run] = "FSRS-6\ndef. param."
-    models[index_6_pretrain] = "FSRS-6\npretrain"
+    models[index_6_S0] = "FSRS-6 S0"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
     models[index_v2] = "FSRS v2"

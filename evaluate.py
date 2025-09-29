@@ -118,7 +118,7 @@ if __name__ == "__main__":
             ("FSRS-6-deck", 21, "IL, G, SR"),
             ("FSRS-4.5", 17, "IL, G"),
             ("FSRSv4", 17, "IL, G"),
-            ("FSRS-6-pretrain", 4, "IL, G, SR"),
+            ("FSRS-6-S0", 4, "IL, G, SR"),
             ("DASH", 9, "IL, G"),
             ("DASH[MCM]", 9, "IL, G"),
             ("GRU", 39, "IL, G"),

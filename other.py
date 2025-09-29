@@ -72,7 +72,7 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.model = model.to(device=config.device)
-        self.model.pretrain(train_set)
+        self.model.initialize_parameters(train_set)
 
         # Setup optimizer
         self.optimizer = self.model.get_optimizer(lr=self.model.lr, wd=self.model.wd)
@@ -385,7 +385,7 @@ def fsrs_one_step(user_id: int, dataset: pd.DataFrame) -> tuple[dict, Optional[d
             train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
         fsrs = FSRS_one_step(config)
-        fsrs.pretrain(train_set)
+        fsrs.initialize_parameters(train_set)
         for index in train_set.index:
             sample = train_set.loc[index]
             delta_t, y = sample["delta_t"].item(), sample["y"].item()

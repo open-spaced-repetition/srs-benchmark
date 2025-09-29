@@ -134,7 +134,7 @@ class FSRS4(FSRS3):
             )
         )
 
-    def pretrain(self, train_set: pd.DataFrame) -> None:
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
             .groupby(by=["first_rating", "delta_t"], group_keys=False)

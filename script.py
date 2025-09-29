@@ -290,7 +290,9 @@ def process(user_id):
                     )
                 else:
                     optimizer.define_model()
-                    _ = optimizer.initialize_parameters(dataset=train_partition, verbose=verbose)
+                    _ = optimizer.initialize_parameters(
+                        dataset=train_partition, verbose=verbose
+                    )
                     if ONLY_S0:
                         partition_weights[partition] = optimizer.init_w
                     else:

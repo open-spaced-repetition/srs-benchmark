@@ -321,7 +321,7 @@ class FSRS_one_step(BaseModel):
         w2 = 0.54
 
         if len(rating_stability) == 0:
-            raise Exception("Not enough data for parameters initialization!")
+            raise ValueError("Not enough data for parameters initialization!")
         elif len(rating_stability) == 1:
             rating = list(rating_stability.keys())[0]
             factor = rating_stability[rating] / r_s0_default[str(rating)]

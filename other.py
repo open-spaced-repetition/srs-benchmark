@@ -509,7 +509,10 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                         test_set=None,
                         batch_size=config.batch_size,
                     )
-                    partition_weights[partition] = trainer.train()
+                    if config.only_S0:
+                        partition_weights[partition] = trainer.model.state_dict()
+                    else:
+                        partition_weights[partition] = trainer.train()
             except Exception as e:
                 if str(e).endswith("inadequate."):
                     if config.verbose_inadequate_data:

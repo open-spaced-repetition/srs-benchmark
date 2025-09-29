@@ -20,7 +20,7 @@ args, _ = parser.parse_known_args()
 
 DEV_MODE = args.dev
 DRY_RUN = args.dry
-ONLY_PRETRAIN = args.pretrain
+ONLY_S0 = args.S0
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
 BINARY = args.binary
@@ -82,8 +82,8 @@ else:
     path = "FSRS-6"
     if DRY_RUN:
         path += "-dry-run"
-    if ONLY_PRETRAIN:
-        path += "-pretrain"
+    if ONLY_S0:
+        path += "-S0"
     if SECS_IVL:
         path += "-secs"
 if RECENCY:
@@ -290,8 +290,8 @@ def process(user_id):
                     )
                 else:
                     optimizer.define_model()
-                    _ = optimizer.pretrain(dataset=train_partition, verbose=verbose)
-                    if ONLY_PRETRAIN:
+                    _ = optimizer.initialize_parameters(dataset=train_partition, verbose=verbose)
+                    if ONLY_S0:
                         partition_weights[partition] = optimizer.init_w
                     else:
                         trainer = Trainer(

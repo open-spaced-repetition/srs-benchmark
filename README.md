@@ -231,7 +231,7 @@ python script.py --dry
 FSRS-6 with only the first 4 parameters optimized:
 
 ```bash
-python script.py --pretrain
+python script.py --S0
 ```
 
 FSRS-rs:

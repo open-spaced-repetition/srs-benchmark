@@ -33,9 +33,9 @@ class TrainableModel(Protocol):
         """
         ...
 
-    def pretrain(self, train_set: pd.DataFrame) -> None:
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         """
-        Pretrain the model on the given training dataset.
+        Initialize the model parameters on the given training dataset.
 
         Args:
             train_set: Training dataset as pandas DataFrame

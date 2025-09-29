@@ -113,7 +113,7 @@ def create_parser():
 
     # script.py only
     parser.add_argument(
-        "--pretrain", action="store_true", help="FSRS-5 with only pretraining"
+        "--S0", action="store_true", help="FSRS-5/FSRS-6 with only S0 initialization"
     )
     parser.add_argument(
         "--binary", action="store_true", help="FSRS-5 with binary ratings"

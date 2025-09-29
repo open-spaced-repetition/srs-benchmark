@@ -1,6 +1,0 @@
-pandas
-matplotlib
-scikit-learn
-fsrs-optimizer
-huggingface_hub
-wandb

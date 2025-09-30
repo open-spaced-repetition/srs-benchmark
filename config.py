@@ -59,6 +59,12 @@ def create_parser():
     parser.add_argument(
         "--dry", action="store_true", help="evaluate default parameters"
     )
+    parser.add_argument(
+        "--S0", action="store_true", help="FSRS-5/FSRS-6 with only S0 initialization"
+    )
+    parser.add_argument(
+        "--two_buttons", action="store_true", help="treat Hard and Easy as Good"
+    )
 
     # download revlogs from huggingface
     parser.add_argument(
@@ -70,10 +76,6 @@ def create_parser():
     # short-term memory research
     parser.add_argument(
         "--secs", action="store_true", help="use elapsed_seconds as interval"
-    )
-
-    parser.add_argument(
-        "--two_buttons", action="store_true", help="treat Hard and Easy as Good"
     )
 
     parser.add_argument(
@@ -112,12 +114,6 @@ def create_parser():
     )
 
     # script.py only
-    parser.add_argument(
-        "--S0", action="store_true", help="FSRS-5/FSRS-6 with only S0 initialization"
-    )
-    parser.add_argument(
-        "--binary", action="store_true", help="FSRS-5 with binary ratings"
-    )
     parser.add_argument("--rust", action="store_true", help="FSRS-rs")
     parser.add_argument(
         "--disable_short_term", action="store_true", help="disable short-term memory"
@@ -167,6 +163,7 @@ class Config:
         self.no_train_same_day: bool = args.no_train_same_day
         self.equalize_test_with_non_secs: bool = args.equalize_test_with_non_secs
         self.two_buttons: bool = args.two_buttons
+        self.only_S0: bool = args.S0
         self.save_evaluation_file: bool = args.file
         self.generate_plots: bool = args.plot
         self.save_weights: bool = args.weights
@@ -227,6 +224,11 @@ class Config:
         _file_name_parts: list[str] = [self.model_name]
         if self.dry_run:
             _file_name_parts.append("-dry-run")
+        if self.only_S0:
+            _file_name_parts.append("-S0")
+        if self.two_buttons:
+            # Suffix is '-binary' for backward compatibility with existing analysis scripts.
+            _file_name_parts.append("-binary")
         if self.initial_short_term_setting:
             _file_name_parts.append("-short")
         if self.use_secs_intervals:

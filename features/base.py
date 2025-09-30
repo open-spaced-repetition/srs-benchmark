@@ -216,7 +216,7 @@ class BaseFeatureEngineer(ABC):
         # Recalculate review sequence number
         df["i"] = (
             df.groupby("card_id")
-            .apply(lambda x: (x["elapsed_days"] > 0).cumsum())
+            .apply(lambda x: (x["elapsed_days"] > 0).cumsum(), include_groups=False)
             .reset_index(level=0, drop=True)
             + 1
         )

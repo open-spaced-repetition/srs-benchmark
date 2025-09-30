@@ -23,7 +23,7 @@ DRY_RUN = args.dry
 ONLY_S0 = args.S0
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
-BINARY = args.binary
+TWO_BUTTONS = args.two_buttons
 PARTITIONS = args.partitions
 RECENCY = args.recency
 RUST = args.rust
@@ -90,7 +90,7 @@ if RECENCY:
     path += "-recency"
 if NO_TEST_SAME_DAY:
     path += "-no_test_same_day"
-if BINARY:
+if TWO_BUTTONS:
     path += "-binary"
 if PARTITIONS != "none":
     path += f"-{PARTITIONS}"
@@ -171,9 +171,9 @@ def create_time_series(df):
     df.sort_values(by=["card_id", "review_th"], inplace=True)
     df["i"] = df.groupby("card_id").cumcount() + 1
     df.drop(df[df["i"] > max_seq_len * 2].index, inplace=True)
-    card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
-    if BINARY:
+    if TWO_BUTTONS:
         df.loc[:, "rating"] = df.loc[:, "rating"].map({1: 1, 2: 3, 3: 3, 4: 3})
+    card_id_to_first_rating = df.groupby("card_id")["rating"].first().to_dict()
     if "delta_t" not in df.columns:
         if SECS_IVL and "elapsed_seconds" in df.columns:
             df["delta_t"] = df["elapsed_seconds"] / 86400
@@ -225,8 +225,6 @@ def create_time_series(df):
         df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
             remove_non_continuous_rows
         )
-    if BINARY:
-        df["first_rating"] = df["first_rating"].map(lambda x: "1" if x == 1 else "3")
     return df[df["elapsed_days"] > 0].sort_values(by=["review_th"])
 
 

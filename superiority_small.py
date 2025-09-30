@@ -126,18 +126,21 @@ if __name__ == "__main__":
                     percentages[j, i] = j_i_up
 
     # small changes to labels
-    if not args.same_day:
-        index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
-        index_v4 = models.index("FSRSv4")
-        index_Ebisu_v2 = models.index("Ebisu-v2")
-        index_FSRS_6_recency = models.index("FSRS-6-recency")
-        models[index_lstm] = "LSTM"
-        models[index_v4] = "FSRS v4"
-        models[index_Ebisu_v2] = "Ebisu v2"
-        models[index_FSRS_6_recency] = "FSRS-6\nrecency"
-    else:
-        for i, model in enumerate(models):
-            models[i] = model.replace("-secs", "").replace("-short", "")
+    for i, model in enumerate(models):
+        models[i] = (
+            model.replace("-secs", "")
+            .replace("-short", "")
+            .replace("-equalize_test_with_non_secs", "")
+        )
+
+    index_lstm = models.index("LSTM")
+    index_v4 = models.index("FSRSv4")
+    index_Ebisu_v2 = models.index("Ebisu-v2")
+    index_FSRS_6_recency = models.index("FSRS-6-recency")
+    models[index_lstm] = "LSTM"
+    models[index_v4] = "FSRS v4"
+    models[index_Ebisu_v2] = "Ebisu v2"
+    models[index_FSRS_6_recency] = "FSRS-6\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

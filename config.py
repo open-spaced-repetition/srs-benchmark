@@ -227,6 +227,7 @@ class Config:
         if self.only_S0:
             _file_name_parts.append("-S0")
         if self.two_buttons:
+            # Suffix is '-binary' for backward compatibility with existing analysis scripts.
             _file_name_parts.append("-binary")
         if self.initial_short_term_setting:
             _file_name_parts.append("-short")

@@ -160,6 +160,7 @@ if __name__ == "__main__":
             ("FSRS-4.5-short-secs", 17, "FIL, G, SR"),
             ("FSRSv4-short-secs", 17, "FIL, G, SR"),
             ("FSRS-5-secs", 19, "FIL, G, SR"),
+            ("FSRS-6-dry-run-secs", 0, "FIL, G, SR"),
             ("GRU-short-secs", 39, "FIL, G, SR"),
             ("FSRSv3-short-secs", 13, "FIL, G, SR"),
             ("FSRSv2-short-secs", 14, "FIL, G, SR"),

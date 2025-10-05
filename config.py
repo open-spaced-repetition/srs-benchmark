@@ -57,7 +57,9 @@ def create_parser():
         "--recency", action="store_true", help="enable recency weighting"
     )
     parser.add_argument(
-        "--less_same_day_weighting", action="store_true", help="enable less same day weighting"
+        "--less_same_day_weighting",
+        action="store_true",
+        help="enable less same day weighting",
     )
     parser.add_argument(
         "--dry", action="store_true", help="evaluate default parameters"

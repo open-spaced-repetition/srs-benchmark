@@ -481,9 +481,14 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     assert (
                         train_partition["review_th"].max() < test_set["review_th"].min()
                     )
+                train_partition["weights"] = 1
                 if config.use_recency_weighting:
                     x = np.linspace(0, 1, len(train_partition))
-                    train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
+                    train_partition["weights"] *= 0.25 + 0.75 * np.power(x, 3)
+                if config.less_same_day_weighting:
+                    train_partition["weights"] *= np.where(
+                        train_partition["elapsed_days"] > 0, 1, 0.1
+                    )
 
                 model = create_model(config)
                 if config.dry_run:

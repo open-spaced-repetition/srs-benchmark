@@ -57,6 +57,9 @@ def create_parser():
         "--recency", action="store_true", help="enable recency weighting"
     )
     parser.add_argument(
+        "--less_same_day_weighting", action="store_true", help="enable less same day weighting"
+    )
+    parser.add_argument(
         "--dry", action="store_true", help="evaluate default parameters"
     )
     parser.add_argument(
@@ -172,6 +175,7 @@ class Config:
         self.num_processes: int = args.processes
         self.data_path: Path = Path(args.data)
         self.use_recency_weighting: bool = args.recency
+        self.less_same_day_weighting: bool = args.less_same_day_weighting
         self.train_equals_test: bool = args.train_equals_test
 
         # Training/data parameters from parser (with defaults)

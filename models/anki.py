@@ -49,7 +49,7 @@ class Anki(BaseModel):
             rating == 2,
             torch.max(elapsed * self.w[4], ivl * self.w[4] / 2),
             torch.where(
-                rating == 4,
+                rating == 3,
                 torch.max(elapsed * ease, ivl),
                 torch.max(elapsed * ease, ivl) * (self.w[3] - (self.w[3] - 1) / 2),
             ),
@@ -60,7 +60,7 @@ class Anki(BaseModel):
             rating == 2,
             ivl * self.w[4],
             torch.where(
-                rating == 4,
+                rating == 3,
                 (ivl + days_late / 2) * ease,
                 (ivl + days_late) * ease * self.w[3],
             ),

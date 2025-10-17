@@ -19,7 +19,7 @@ parser = create_parser()
 args, _ = parser.parse_known_args()
 
 DEV_MODE = args.dev
-DEFAULT = args.default
+USE_DEFAULT_PARAMS = args.default
 ONLY_S0 = args.S0
 SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
@@ -80,7 +80,7 @@ if RUST:
 
 else:
     path = "FSRS-6"
-    if DEFAULT:
+    if USE_DEFAULT_PARAMS:
         path += "-default"
     if ONLY_S0:
         path += "-S0"
@@ -277,7 +277,7 @@ def process(user_id):
                 if RECENCY:
                     x = np.linspace(0, 1, len(train_partition))
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
-                if DEFAULT:
+                if USE_DEFAULT_PARAMS:
                     optimizer.define_model()
                     partition_weights[partition] = optimizer.init_w
                     continue

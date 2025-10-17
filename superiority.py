@@ -25,7 +25,7 @@ if __name__ == "__main__":
         "GRU-P",
         "FSRS-6-S0",
         "FSRS-5",
-        "FSRS-6-dry-run",
+        "FSRS-6-default",
         "FSRS-4.5",
         "FSRSv4",
         "DASH-short",
@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
     # small changes to labels
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
-    index_6_dry_run = models.index("FSRS-6-dry-run")
+    index_6_default = models.index("FSRS-6-default")
     index_6_S0 = models.index("FSRS-6-S0")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     index_v1 = models.index("FSRSv1")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_lstm] = "LSTM"
-    models[index_6_dry_run] = "FSRS-6\ndef. param."
+    models[index_6_default] = "FSRS-6\ndef. param."
     models[index_6_S0] = "FSRS-6 S0"
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"

@@ -57,7 +57,7 @@ def create_parser():
         "--recency", action="store_true", help="enable recency weighting"
     )
     parser.add_argument(
-        "--dry", action="store_true", help="evaluate default parameters"
+        "--default", action="store_true", help="evaluate default parameters"
     )
     parser.add_argument(
         "--S0", action="store_true", help="FSRS-5/FSRS-6 with only S0 initialization"
@@ -156,7 +156,7 @@ class Config:
 
         # Basic arguments from parser
         self.dev_mode: bool = args.dev
-        self.dry_run: bool = args.dry
+        self.default_params: bool = args.default
         self.model_name: ModelName = args.algo
         self.use_secs_intervals: bool = args.secs
         self.no_test_same_day: bool = args.no_test_same_day
@@ -222,8 +222,8 @@ class Config:
 
         # Derived file names
         _file_name_parts: list[str] = [self.model_name]
-        if self.dry_run:
-            _file_name_parts.append("-dry-run")
+        if self.default_params:
+            _file_name_parts.append("-default")
         if self.only_S0:
             _file_name_parts.append("-S0")
         if self.two_buttons:

@@ -228,7 +228,7 @@ python script.py
 FSRS-6 with default parameters:
 
 ```bash
-python script.py --dry
+python script.py --default
 ```
 
 FSRS-6 with only the first 4 parameters optimized:

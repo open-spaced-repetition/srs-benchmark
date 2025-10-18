@@ -486,7 +486,7 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
 
                 model = create_model(config)
-                if config.dry_run:
+                if config.default_params:
                     partition_weights[partition] = model.state_dict()
                     continue
 

@@ -202,7 +202,6 @@ if __name__ == "__main__":
             print(f"Total number of reviews: {sum(sizes)}")
             for scale, size in (
                 ("reviews", np.array(sizes)),
-                ("log(reviews)", np.log(sizes)),
                 ("users", np.ones_like(sizes)),
             ):
                 print(f"Weighted average by {scale}:")

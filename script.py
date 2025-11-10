@@ -156,7 +156,9 @@ def convert_to_items(df):  # -> list[FSRSItem]
 
     result_list = sum(
         df.sort_values(by=["card_id", "review_th"])
-        .groupby("card_id")[["review_th", "t_history", "r_history", "delta_t", "rating"]]
+        .groupby("card_id")[
+            ["review_th", "t_history", "r_history", "delta_t", "rating"]
+        ]
         .apply(accumulate)
         .tolist(),
         [],

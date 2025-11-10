@@ -156,7 +156,7 @@ def convert_to_items(df):  # -> list[FSRSItem]
 
     result_list = sum(
         df.sort_values(by=["card_id", "review_th"])
-        .groupby("card_id")
+        .groupby("card_id")[["review_th", "t_history", "r_history", "delta_t", "rating"]]
         .apply(accumulate)
         .tolist(),
         [],
@@ -392,7 +392,7 @@ if __name__ == "__main__":
         sort_jsonl(raw_file)
 
     for user_id in dataset.partitioning.dictionaries[0]:
-        if user_id.as_py() in processed_user:
+        if user_id.as_py() in processed_user or user_id.as_py() > 10000:
             continue
         unprocessed_users.append(user_id.as_py())
 

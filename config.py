@@ -253,7 +253,7 @@ class Config:
 
         # Stability (S) parameters
         _s_min_base = 0.0001 if self.use_secs_intervals else 0.01
-        if self.model_name == "FSRS-6":
+        if self.model_name.startswith("FSRS-6"):
             self.s_min: float = 0.001 if not self.use_secs_intervals else _s_min_base
         else:
             self.s_min = _s_min_base

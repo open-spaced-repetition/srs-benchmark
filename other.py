@@ -642,9 +642,13 @@ if __name__ == "__main__":
         sort_jsonl(raw_file)
 
     for user_id in dataset.partitioning.dictionaries[0]:
-        if user_id.as_py() in processed_user:
+        user_id_value = user_id.as_py()
+        # Add the filter here
+        if config.max_user_id is not None and user_id_value > config.max_user_id:
             continue
-        unprocessed_users.append(user_id.as_py())
+        if user_id_value in processed_user:
+            continue
+        unprocessed_users.append(user_id_value)
 
     unprocessed_users.sort()
 

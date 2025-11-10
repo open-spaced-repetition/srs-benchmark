@@ -47,6 +47,14 @@ def create_parser():
     )
     parser.add_argument("--dev", action="store_true", help="for local development")
 
+    # Add this line:
+    parser.add_argument(
+        "--max-user-id",
+        type=int,
+        default=None,
+        help="maximum user ID to process (exclusive)"
+    )
+
     parser.add_argument(
         "--partitions",
         default="none",
@@ -158,6 +166,7 @@ class Config:
         self.dev_mode: bool = args.dev
         self.default_params: bool = args.default
         self.model_name: ModelName = args.algo
+        self.max_user_id: Optional[int] = args.max_user_id
         self.use_secs_intervals: bool = args.secs
         self.no_test_same_day: bool = args.no_test_same_day
         self.no_train_same_day: bool = args.no_train_same_day

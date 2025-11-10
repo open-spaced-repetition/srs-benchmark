@@ -295,3 +295,8 @@ Instead of using a 5-way split, train the algorithm and evaluate it on the same 
 ```bash
 python other.py --algo FSRS-6 --train_equals_test
 ```
+
+> You can limit the number of users with the --max-user-id parameter. Only users from 1 to max-user-id included will be considered.
+```bash
+python other.py --max-user-id 20
+```

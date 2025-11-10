@@ -52,7 +52,7 @@ def create_parser():
         "--max-user-id",
         type=int,
         default=None,
-        help="maximum user ID to process (exclusive)"
+        help="maximum user ID to process (inclusive)"
     )
 
     parser.add_argument(

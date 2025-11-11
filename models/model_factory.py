@@ -34,6 +34,9 @@ MODEL_REGISTRY: dict[ModelName, Type[TrainableModel]] = {
 # - "Ebisu-v2"
 # - "AVG"
 # - "RMSE-BINS-EXPLOIT"
+# - "MOVING-AVG"
+# - "FSRS-rs" (Rust-based implementation with special handling)
+# - "FSRS-6-one-step"
 
 
 def create_model(

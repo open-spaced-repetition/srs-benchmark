@@ -51,6 +51,7 @@ def confidence_interval(values, sizes):
         confidence_level=0.99,
         axis=0,
         method="BCa",
+        random_state=42,
     )
     low = list(CI_99_bootstrap.confidence_interval)[0]
     high = list(CI_99_bootstrap.confidence_interval)[1]

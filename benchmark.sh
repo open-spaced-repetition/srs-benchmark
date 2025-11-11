@@ -1,3 +1,4 @@
+#!/bin/bash
 python script.py --rust
 python other.py --algo FSRS-6
 python other.py --algo FSRS-6 --default

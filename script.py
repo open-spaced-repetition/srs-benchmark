@@ -33,6 +33,7 @@ RAW = args.raw
 PROCESSES = args.processes
 DATA_PATH = Path(args.data)
 DISABLE_SHORT_TERM = args.disable_short_term
+MAX_USER_ID = args.max_user_id
 
 torch.set_num_threads(1)
 # torch.set_num_interop_threads(1)
@@ -156,7 +157,9 @@ def convert_to_items(df):  # -> list[FSRSItem]
 
     result_list = sum(
         df.sort_values(by=["card_id", "review_th"])
-        .groupby("card_id")
+        .groupby("card_id")[
+            ["review_th", "t_history", "r_history", "delta_t", "rating"]
+        ]
         .apply(accumulate)
         .tolist(),
         [],
@@ -392,6 +395,8 @@ if __name__ == "__main__":
         sort_jsonl(raw_file)
 
     for user_id in dataset.partitioning.dictionaries[0]:
+        if MAX_USER_ID is not None and user_id.as_py() > MAX_USER_ID:
+            continue
         if user_id.as_py() in processed_user:
             continue
         unprocessed_users.append(user_id.as_py())

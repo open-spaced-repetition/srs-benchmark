@@ -156,6 +156,7 @@ if __name__ == "__main__":
             ("FSRS-6-binary-secs", 17, "FIL, G, SR"),
             ("FSRS-6-secs-preset", 21, "FIL, G, SR"),
             ("FSRS-6-S0-secs", 4, "FIL, G, SR"),
+            ("FSRS-6-secs-deck", 21, "FIL, G, SR"),
             ("ACT-R-short-secs", 5, "FIL, SR"),
             ("FSRS-4.5-short-secs", 17, "FIL, G, SR"),
             ("FSRSv4-short-secs", 17, "FIL, G, SR"),

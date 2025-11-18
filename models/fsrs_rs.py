@@ -48,7 +48,7 @@ def convert_to_items(df: pd.DataFrame, config: Config):
             )
         return items
 
-    result_list = sum(
+    result_list: list[FSRSItem] = sum(
         df.sort_values(by=["card_id", "review_th"])
         .groupby("card_id")[
             ["review_th", "t_history", "r_history", "delta_t", "rating"]

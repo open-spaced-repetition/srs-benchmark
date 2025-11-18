@@ -1,5 +1,5 @@
 #!/bin/bash
-python script.py --rust
+python other.py --algo FSRS-rs --processes 1
 python other.py --algo FSRS-6
 python other.py --algo FSRS-6 --default
 python other.py --algo FSRS-6 --S0

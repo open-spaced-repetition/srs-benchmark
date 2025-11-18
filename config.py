@@ -13,6 +13,7 @@ ModelName = Literal[
     "FSRS-5",
     "FSRS-6",
     "FSRS-6-one-step",
+    "FSRS-rs",
     # Neural networks
     "RNN",
     "GRU",
@@ -121,10 +122,15 @@ def create_parser():
         "--weights", action="store_true", help="save neural network weights"
     )
 
-    # script.py only
-    parser.add_argument("--rust", action="store_true", help="FSRS-rs")
+    # script.py only (deprecated - use --algo FSRS-rs instead)
+    parser.add_argument("--rust", action="store_true", help="FSRS-rs (deprecated)")
     parser.add_argument(
         "--disable_short_term", action="store_true", help="disable short-term memory"
+    )
+    parser.add_argument(
+        "--fsrs_rs_no_outlier",
+        action="store_true",
+        help="Set FSRS_NO_OUTLIER environment variable for FSRS-rs",
     )
     parser.add_argument(
         "--train_equals_test",
@@ -190,7 +196,10 @@ class Config:
 
         # Handle `include_short_term` based on model name and initial arg
         self.initial_short_term_setting: bool = args.short
-        if self.model_name.startswith("FSRS-5") or self.model_name.startswith("FSRS-6"):
+        if any(
+            self.model_name.startswith(prefix)
+            for prefix in ("FSRS-5", "FSRS-6", "FSRS-rs")
+        ):
             self.include_short_term = True
         else:
             self.include_short_term = self.initial_short_term_setting

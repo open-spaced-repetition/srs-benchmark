@@ -1,10 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import traceback
+import torch
+from torch import Tensor
 from sklearn.metrics import root_mean_squared_error  # type: ignore
 from functools import wraps
 from itertools import accumulate
+from typing import TYPE_CHECKING
 from config import Config
+
+if TYPE_CHECKING:
+    from models.trainable import TrainableModel
 
 
 def catch_exceptions(func):
@@ -181,3 +187,168 @@ def save_evaluation_file(user_id, df, config: Config):
             sep="\t",
             index=False,
         )
+
+
+def batch_process_wrapper(
+    model: "TrainableModel", batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
+) -> dict[str, Tensor]:
+    """
+    Wrapper function for batch processing of model predictions.
+
+    Args:
+        model: Trainable model instance
+        batch: Tuple of (sequences, delta_ts, labels, seq_lens, weights)
+
+    Returns:
+        Dictionary containing model outputs including labels and weights
+    """
+    sequences, delta_ts, labels, seq_lens, weights = batch
+    real_batch_size = seq_lens.shape[0]
+    result = {"labels": labels, "weights": weights}
+    outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
+    result.update(outputs)
+    return result
+
+
+class Collection:
+    """Collection class for batch prediction with trainable models."""
+
+    def __init__(self, model: "TrainableModel", config: Config) -> None:
+        """
+        Initialize collection with a model.
+
+        Args:
+            model: Trainable model instance
+            config: Configuration object
+        """
+        self.model = model.to(device=config.device)
+        self.model.eval()
+        self.config = config
+
+    def batch_predict(self, dataset):
+        """
+        Perform batch prediction on dataset.
+
+        Args:
+            dataset: DataFrame containing review data
+
+        Returns:
+            Tuple of (retentions, stabilities, difficulties)
+        """
+        try:
+            from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
+        except ImportError:
+            raise ImportError(
+                "fsrs_optimizer is required for batch prediction. "
+                "Please install it to use Collection.batch_predict()"
+            )
+
+        batch_dataset = BatchDataset(
+            dataset, batch_size=8192, sort_by_length=False, device=self.config.device
+        )
+        batch_loader = BatchLoader(batch_dataset, shuffle=False)
+        retentions = []
+        stabilities = []
+        difficulties = []
+        with torch.no_grad():
+            for batch in batch_loader:
+                result = batch_process_wrapper(self.model, batch)
+                retentions.extend(result["retentions"].cpu().tolist())
+                if "stabilities" in result:
+                    stabilities.extend(result["stabilities"].cpu().tolist())
+                if "difficulties" in result:
+                    difficulties.extend(result["difficulties"].cpu().tolist())
+
+        return retentions, stabilities, difficulties
+
+
+def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
+    """
+    Evaluate model predictions and generate statistics.
+
+    Args:
+        y: True labels
+        p: Predicted probabilities
+        df: DataFrame with predictions
+        file_name: Name for output files
+        user_id: User ID
+        config: Configuration object
+        w_list: Optional list of model weights
+
+    Returns:
+        tuple: (stats dict, raw predictions dict or None)
+    """
+    import math
+    import torch
+    from pathlib import Path
+    from sklearn.metrics import roc_auc_score, log_loss
+    from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
+
+    if config.generate_plots:
+        try:
+            from fsrs_optimizer import plot_brier, Optimizer  # type: ignore
+            import matplotlib.pyplot as plt
+
+            fig = plt.figure()
+            plot_brier(p, y, ax=fig.add_subplot(111))
+            fig.savefig(f"evaluation/{file_name}/calibration-retention-{user_id}.png")
+            fig = plt.figure()
+            optimizer = Optimizer()
+            if "s" in df.columns:
+                df["stability"] = df["s"]
+                optimizer.calibration_helper(
+                    df[["stability", "p", "y"]].copy(),
+                    "stability",
+                    lambda x: math.pow(1.2, math.floor(math.log(x, 1.2))),
+                    True,
+                    fig.add_subplot(111),
+                )
+                fig.savefig(
+                    f"evaluation/{file_name}/calibration-stability-{user_id}.png"
+                )
+        except ImportError:
+            pass  # Skip plotting if fsrs_optimizer is not available
+
+    p_calibrated = lowess(
+        y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
+    )
+    ici = np.mean(np.abs(p_calibrated - p))
+    rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
+    logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
+    rmse_bins = rmse_matrix(df)
+    try:
+        auc = round(roc_auc_score(y_true=y, y_score=p), 6)
+    except Exception:
+        auc = None
+    stats = {
+        "metrics": {
+            "RMSE": round(rmse_raw, 6),
+            "LogLoss": round(logloss, 6),
+            "RMSE(bins)": round(rmse_bins, 6),
+            "ICI": round(ici, 6),
+            "AUC": auc,
+        },
+        "user": int(user_id),
+        "size": len(y),
+    }
+    if (
+        w_list
+        and isinstance(w_list[0], dict)
+        and all(isinstance(w, list) for w in w_list[0].values())
+    ):
+        stats["parameters"] = {
+            int(partition): list(map(lambda x: round(x, 6), w))
+            for partition, w in w_list[-1].items()
+        }
+    elif config.save_weights and w_list:
+        Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
+        torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
+    if config.save_raw_output:
+        raw = {
+            "user": int(user_id),
+            "p": list(map(lambda x: round(x, 4), p)),
+            "y": list(map(int, y)),
+        }
+    else:
+        raw = None
+    return stats, raw

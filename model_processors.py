@@ -257,9 +257,6 @@ def fsrs_one_step(
     user_id: int, dataset: pd.DataFrame, config: Config
 ) -> tuple[dict, Optional[dict]]:
     """Process FSRS-6-one-step model."""
-    # Import Collection locally to avoid circular import
-    from other import Collection
-
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)

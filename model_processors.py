@@ -52,7 +52,9 @@ def process_untrainable(
         save_tmp.append(testset)
     save_tmp_df = pd.concat(save_tmp)
     save_evaluation_file(user_id, save_tmp_df, config)
-    stats, raw = evaluate(y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config)
+    stats, raw = evaluate(
+        y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config
+    )
     return stats, raw
 
 
@@ -149,7 +151,9 @@ def moving_avg(
     save_tmp_df = pd.concat(save_tmp)
     save_tmp_df["p"] = p
     save_evaluation_file(user_id, save_tmp_df, config)
-    stats, raw = evaluate(y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config)
+    stats, raw = evaluate(
+        y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config
+    )
     return stats, raw
 
 
@@ -160,9 +164,9 @@ def process_fsrs_rs(
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
-    
+
     fsrs_rs = FSRSRsBackend(config)
-    
+
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         if not config.train_equals_test:
             train_set = dataset.iloc[train_index]
@@ -187,7 +191,7 @@ def process_fsrs_rs(
 
         testsets.append(test_set)
         partition_weights = {}
-        
+
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
@@ -214,7 +218,7 @@ def process_fsrs_rs(
                     raise e
                 # Use default parameters on error
                 partition_weights[partition] = FSRS6.init_w
-        
+
         w_list.append(partition_weights)
 
         if config.train_equals_test:
@@ -230,7 +234,7 @@ def process_fsrs_rs(
             weights = w.get(partition, None)
             if weights is None:
                 weights = FSRS6.init_w
-            
+
             p_partition, y_partition, partition_testset_pred = fsrs_rs.predict(
                 partition_testset, weights
             )
@@ -255,7 +259,7 @@ def fsrs_one_step(
     """Process FSRS-6-one-step model."""
     # Import Collection locally to avoid circular import
     from other import Collection
-    
+
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
@@ -320,4 +324,3 @@ def fsrs_one_step(
     )
 
     return stats, raw
-

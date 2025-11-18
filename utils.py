@@ -194,11 +194,11 @@ def batch_process_wrapper(
 ) -> dict[str, Tensor]:
     """
     Wrapper function for batch processing of model predictions.
-    
+
     Args:
         model: Trainable model instance
         batch: Tuple of (sequences, delta_ts, labels, seq_lens, weights)
-        
+
     Returns:
         Dictionary containing model outputs including labels and weights
     """
@@ -212,11 +212,11 @@ def batch_process_wrapper(
 
 class Collection:
     """Collection class for batch prediction with trainable models."""
-    
+
     def __init__(self, model: "TrainableModel", config: Config) -> None:
         """
         Initialize collection with a model.
-        
+
         Args:
             model: Trainable model instance
             config: Configuration object
@@ -228,10 +228,10 @@ class Collection:
     def batch_predict(self, dataset):
         """
         Perform batch prediction on dataset.
-        
+
         Args:
             dataset: DataFrame containing review data
-            
+
         Returns:
             Tuple of (retentions, stabilities, difficulties)
         """
@@ -242,7 +242,7 @@ class Collection:
                 "fsrs_optimizer is required for batch prediction. "
                 "Please install it to use Collection.batch_predict()"
             )
-            
+
         batch_dataset = BatchDataset(
             dataset, batch_size=8192, sort_by_length=False, device=self.config.device
         )
@@ -265,7 +265,7 @@ class Collection:
 def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     """
     Evaluate model predictions and generate statistics.
-    
+
     Args:
         y: True labels
         p: Predicted probabilities
@@ -274,7 +274,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
         user_id: User ID
         config: Configuration object
         w_list: Optional list of model weights
-        
+
     Returns:
         tuple: (stats dict, raw predictions dict or None)
     """
@@ -283,12 +283,12 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     from pathlib import Path
     from sklearn.metrics import roc_auc_score, log_loss
     from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
-    
+
     if config.generate_plots:
         try:
             from fsrs_optimizer import plot_brier, Optimizer  # type: ignore
             import matplotlib.pyplot as plt
-            
+
             fig = plt.figure()
             plot_brier(p, y, ax=fig.add_subplot(111))
             fig.savefig(f"evaluation/{file_name}/calibration-retention-{user_id}.png")
@@ -303,10 +303,12 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
                     True,
                     fig.add_subplot(111),
                 )
-                fig.savefig(f"evaluation/{file_name}/calibration-stability-{user_id}.png")
+                fig.savefig(
+                    f"evaluation/{file_name}/calibration-stability-{user_id}.png"
+                )
         except ImportError:
             pass  # Skip plotting if fsrs_optimizer is not available
-            
+
     p_calibrated = lowess(
         y, p, it=0, delta=0.01 * (max(p) - min(p)), return_sorted=False
     )

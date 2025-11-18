@@ -93,7 +93,9 @@ class FSRSRsBackend:
             List[float]: Trained FSRS parameters (weights)
         """
         train_set_items = convert_to_items(train_set, self.config)
-        weights = list(map(lambda x: round(x, 4), self.backend.benchmark(train_set_items)))
+        weights = list(
+            map(lambda x: round(x, 4), self.backend.benchmark(train_set_items))
+        )
         return weights
 
     def predict(
@@ -113,7 +115,7 @@ class FSRSRsBackend:
 
         my_collection = Collection(weights)
         testset_copy = testset.copy()
-        
+
         testset_copy["stability"], testset_copy["difficulty"] = (
             my_collection.batch_predict(testset_copy)
         )
@@ -122,9 +124,8 @@ class FSRSRsBackend:
             testset_copy["stability"],
             -weights[20],
         )
-        
+
         p = testset_copy["p"].tolist()
         y = testset_copy["y"].tolist()
-        
-        return p, y, testset_copy
 
+        return p, y, testset_copy

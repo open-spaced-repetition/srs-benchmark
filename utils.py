@@ -316,6 +316,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(df)
+    mbe = np.mean(np.array(p) - np.array(y))
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
     except Exception:
@@ -327,6 +328,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
             "RMSE(bins)": round(rmse_bins, 6),
             "ICI": round(ici, 6),
             "AUC": auc,
+            "MBE": round(mbe, 6),
         },
         "user": int(user_id),
         "size": len(y),

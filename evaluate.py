@@ -202,17 +202,27 @@ if __name__ == "__main__":
                 continue
             print(f"Total number of users: {len(sizes)}")
             print(f"Total number of reviews: {sum(sizes)}")
-            for scale, size in (
+            for scale, size_base in (
                 ("reviews", np.array(sizes)),
                 ("users", np.ones_like(sizes)),
             ):
                 print(f"Weighted average by {scale}:")
-                for metric in ("LogLoss", "RMSE(bins)", "AUC"):
-                    metrics = np.array([item[metric] for item in m])
+                for metric in ("LogLoss", "RMSE(bins)", "AUC", "MBE"):
+                    metrics_list = [item.get(metric) for item in m]
+                    if all(v is None for v in metrics_list):
+                        print(f"{model} {metric} (mean±std): N/A")
+                        continue
+                    metrics = np.array(
+                        [v if v is not None else np.nan for v in metrics_list]
+                    )
+                    size = size_base.copy()
                     size = size[~np.isnan(metrics.astype(float))]
                     metrics = metrics[~np.isnan(metrics.astype(float))]
-                    wmean, wstd = weighted_avg_and_std(metrics, size)
-                    print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
+                    if len(metrics) == 0:
+                        print(f"{model} {metric} (mean±std): N/A")
+                    else:
+                        wmean, wstd = weighted_avg_and_std(metrics, size)
+                        print(f"{model} {metric} (mean±std): {wmean:.4f}±{wstd:.4f}")
                 print()
 
             # print(f"LogLoss 99%: {round(np.percentile(np.array([item['LogLoss'] for item in m]), 99), 4)}")
@@ -226,8 +236,10 @@ if __name__ == "__main__":
     else:
         for scale in ("users", "reviews"):
             print(f"Weighted by number of {scale}\n")
-            print("| Model | #Params | LogLoss | RMSE(bins) | AUC | Input features |")
-            print("| --- | --- | --- | --- | --- | --- |")
+            print(
+                "| Model | #Params | LogLoss | RMSE(bins) | AUC | MBE | Input features |"
+            )
+            print("| --- | --- | --- | --- | --- | --- | --- |")
             for model, n_param, input_features in models:
                 m = []
                 parameters = []
@@ -247,14 +259,26 @@ if __name__ == "__main__":
                 if len(sizes) == 0:
                     continue
 
-                size = np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
+                size_base = (
+                    np.array(sizes) if scale == "reviews" else np.ones_like(sizes)
+                )
                 result = f"| {model} | {n_param} |"
-                for metric in ("LogLoss", "RMSE(bins)", "AUC"):
-                    metrics = np.array([item[metric] for item in m])
+                for metric in ("LogLoss", "RMSE(bins)", "AUC", "MBE"):
+                    metrics_list = [item.get(metric) for item in m]
+                    if all(v is None for v in metrics_list):
+                        result += " N/A |"
+                        continue
+                    metrics = np.array(
+                        [v if v is not None else np.nan for v in metrics_list]
+                    )
+                    size = size_base.copy()
                     size = size[~np.isnan(metrics.astype(float))]
                     metrics = metrics[~np.isnan(metrics.astype(float))]
-                    wmean, wstd = weighted_avg_and_std(metrics, size)
-                    CI = confidence_interval(metrics, size)
-                    rounded_mean, rounded_CI = sigdig(wmean, CI)
-                    result += f" {rounded_mean}±{rounded_CI} |"
+                    if len(metrics) == 0:
+                        result += " N/A |"
+                    else:
+                        wmean, wstd = weighted_avg_and_std(metrics, size)
+                        CI = confidence_interval(metrics, size)
+                        rounded_mean, rounded_CI = sigdig(wmean, CI)
+                        result += f" {rounded_mean}±{rounded_CI} |"
                 print(result + f" {input_features} |")

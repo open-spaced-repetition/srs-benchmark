@@ -215,9 +215,9 @@ if __name__ == "__main__":
                     metrics = np.array(
                         [v if v is not None else np.nan for v in metrics_list]
                     )
-                    size = size_base.copy()
-                    size = size[~np.isnan(metrics.astype(float))]
-                    metrics = metrics[~np.isnan(metrics.astype(float))]
+                    valid_mask = ~np.isnan(metrics)
+                    metrics = metrics[valid_mask]
+                    size = size_base[valid_mask]
                     if len(metrics) == 0:
                         print(f"{model} {metric} (mean±std): N/A")
                     else:

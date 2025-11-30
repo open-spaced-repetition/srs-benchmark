@@ -58,7 +58,9 @@ def plot_metric_distribution(
 
     # Calculate statistics
     sorter = np.argsort(filtered_values)
-    weighted_quantiles = (np.cumsum(filtered_sizes[sorter]) - 0.5 * filtered_sizes[sorter]) / np.sum(filtered_sizes)
+    weighted_quantiles = (
+        np.cumsum(filtered_sizes[sorter]) - 0.5 * filtered_sizes[sorter]
+    ) / np.sum(filtered_sizes)
     median = np.interp(0.5, weighted_quantiles, filtered_values[sorter])
     median = np.median(filtered_values)
 

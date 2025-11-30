@@ -57,12 +57,12 @@ def plot_metric_distribution(
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Calculate statistics
+    mean = np.average(filtered_values, weights=filtered_sizes)
     sorter = np.argsort(filtered_values)
     weighted_quantiles = (
         np.cumsum(filtered_sizes[sorter]) - 0.5 * filtered_sizes[sorter]
     ) / np.sum(filtered_sizes)
     median = np.interp(0.5, weighted_quantiles, filtered_values[sorter])
-    median = np.median(filtered_values)
 
     # Calculate weighted standard deviation
     if len(filtered_values) > 1 and np.sum(filtered_sizes) > 0:

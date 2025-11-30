@@ -14,7 +14,7 @@ from pathlib import Path
 def plot_metric_distribution(
     model_name: str,
     metric_name: str,
-    values: list[float],
+    values: list[float | None],
     sizes: list[int] | None = None,
     output_dir: Path | None = None,
     xlim: tuple[float, float] | None = None,
@@ -163,7 +163,7 @@ def plot_metric_distribution(
 
 def collect_model_data(
     result_file: Path, metrics: list[str]
-) -> tuple[str, dict[str, list[float]], list[int]]:
+) -> tuple[str, dict[str, list[float | None]], list[int]]:
     """
     Collect metric data from a result file.
 
@@ -171,8 +171,8 @@ def collect_model_data(
         Tuple of (model_name, values_dict, sizes)
     """
     model_name = result_file.stem
-    values_dict = {metric: [] for metric in metrics}
-    sizes = []
+    values_dict: dict[str, list[float | None]] = {metric: [] for metric in metrics}
+    sizes: list[int] = []
 
     try:
         with open(result_file, "r") as f:
@@ -197,7 +197,7 @@ def collect_model_data(
 
 
 def calculate_metric_ranges(
-    all_model_data: dict[str, dict[str, list[float]]], metrics: list[str]
+    all_model_data: dict[str, dict[str, list[float | None]]], metrics: list[str]
 ) -> dict[str, tuple[float, float] | None]:
     """
     Calculate the global min and max for each metric across all models.
@@ -205,7 +205,7 @@ def calculate_metric_ranges(
     Returns:
         Dictionary mapping metric names to (min, max) tuples
     """
-    ranges = {}
+    ranges: dict[str, tuple[float, float] | None] = {}
     for metric in metrics:
         all_values = []
         for model_name, values_dict in all_model_data.items():
@@ -231,7 +231,7 @@ def calculate_metric_ranges(
 
 def process_model(
     model_name: str,
-    values_dict: dict[str, list[float]],
+    values_dict: dict[str, list[float | None]],
     sizes: list[int],
     metrics: list[str],
     use_weights: bool,
@@ -336,8 +336,8 @@ def main():
 
     # First pass: collect all data to calculate global ranges
     print("Collecting data from all models...")
-    all_model_data = {}
-    all_model_sizes = {}
+    all_model_data: dict[str, dict[str, list[float | None]]] = {}
+    all_model_sizes: dict[str, list[int]] = {}
     for result_file in result_files:
         try:
             model_name, values_dict, sizes = collect_model_data(

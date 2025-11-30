@@ -37,6 +37,10 @@ def catch_exceptions(func):
     return wrapper
 
 
+def mean_bias_error(y, p):
+    return np.mean(np.array(p) - np.array(y))
+
+
 def rmse_matrix(df):
     tmp = df.copy()
 
@@ -316,7 +320,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(df)
-    mbe = np.mean(np.array(p) - np.array(y))
+    mbe = mean_bias_error(y, p)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
     except Exception:

@@ -13,7 +13,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import pyarrow.parquet as pq  # type: ignore
 import torch
 from config import create_parser
-from utils import catch_exceptions, cum_concat
+from utils import catch_exceptions, cum_concat, mean_bias_error
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -335,7 +335,7 @@ def process(user_id):
     rmse_raw = root_mean_squared_error(y_true=y, y_pred=p)
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(evaluation)
-    mbe = np.mean(np.array(p) - np.array(y))
+    mbe = mean_bias_error(y, p)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
     except Exception:

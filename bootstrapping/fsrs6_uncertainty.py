@@ -3,12 +3,13 @@ import os
 import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq  # type: ignore
 import matplotlib.pyplot as plt  # type: ignore
+from scipy.signal import find_peaks  # type: ignore
 
 # Add parent directory to path to import from project root
 script_dir = Path(__file__).parent
@@ -111,7 +112,7 @@ def fit_fsrs6_parameters_for_user(
 
         # Initialize FSRS-6 model parameters for this dataset
         optimizer.define_model()
-        _ = optimizer.initialize_parameters(dataset=dataset, verbose=False)
+        # _ = optimizer.initialize_parameters(dataset=dataset, verbose=False)
 
         # Optionally skip training and only use S0 initialization
         if config.only_S0:
@@ -497,6 +498,250 @@ def calculate_interval_from_stability(
     return np.maximum(intervals, 0.0)  # Ensure non-negative
 
 
+def detect_peaks_in_distribution(
+    normalized_diff: np.ndarray,
+    n_bins: int = 100,
+    min_height: Optional[float] = None,
+    min_distance: Optional[int] = None,
+) -> List[float]:
+    """
+    Automatically detect peaks in the normalized difference distribution.
+
+    Args:
+        normalized_diff: Normalized differences array
+        n_bins: Number of bins for histogram
+        min_height: Minimum height for a peak (as fraction of max count)
+        min_distance: Minimum distance between peaks (in bins)
+
+    Returns:
+        List of detected peak values
+    """
+    # Create histogram
+    counts, bin_edges = np.histogram(normalized_diff, bins=n_bins)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    # Set default parameters if not provided
+    if min_height is None:
+        min_height = np.max(counts) * 0.1  # At least 10% of max count
+    if min_distance is None:
+        min_distance = max(1, n_bins // 20)  # At least 5% of bins apart
+
+    # Find peaks
+    peaks, properties = find_peaks(
+        counts,
+        height=min_height,
+        distance=min_distance,
+    )
+
+    # Get peak values (bin centers)
+    peak_values = [float(bin_centers[p]) for p in peaks]
+
+    return peak_values
+
+
+def analyze_peak_data_points(
+    test_set: pd.DataFrame,
+    normalized_diff: np.ndarray,
+    jiggle_interval_mean: np.ndarray,
+    jiggle_interval_std: np.ndarray,
+    standard_intervals: np.ndarray,
+    peak_values: List[float],
+    tolerance: float,
+    output_dir: Path,
+    user_id: int,
+) -> None:
+    """
+    Analyze characteristics of data points at specific peak values in the normalized difference distribution.
+
+    Args:
+        test_set: Test dataset
+        normalized_diff: Normalized differences array
+        jiggle_interval_mean: Mean jiggle intervals
+        jiggle_interval_std: Std of jiggle intervals
+        standard_intervals: Standard FSRS intervals
+        peak_values: List of peak values to analyze (if empty, will auto-detect)
+        tolerance: Tolerance for matching peak values
+        output_dir: Directory to save analysis results
+        user_id: User ID
+    """
+    analysis_results = []
+
+    # Track which data points have been assigned to avoid double counting
+    assigned_mask = np.zeros(len(test_set), dtype=bool)
+
+    for peak_val in peak_values:
+        # Find data points near the peak value that haven't been assigned yet
+        mask = (np.abs(normalized_diff - peak_val) < tolerance) & (~assigned_mask)
+        peak_indices = np.where(mask)[0]
+
+        if len(peak_indices) == 0:
+            print(
+                f"  No unassigned data points found near peak value {peak_val} (tolerance={tolerance})"
+            )
+            continue
+
+        # Mark these points as assigned
+        assigned_mask[peak_indices] = True
+
+        peak_data = test_set.iloc[peak_indices].copy()
+        peak_data["normalized_diff"] = normalized_diff[peak_indices]
+        peak_data["jiggle_interval_mean"] = jiggle_interval_mean[peak_indices]
+        peak_data["jiggle_interval_std"] = jiggle_interval_std[peak_indices]
+        peak_data["standard_interval"] = standard_intervals[peak_indices]
+
+        # Analyze common characteristics
+        analysis: Dict[str, Any] = {
+            "peak_value": peak_val,
+            "n_points": len(peak_indices),
+            "fraction": len(peak_indices) / len(test_set),
+        }
+
+        # Analyze r_history patterns
+        if "r_history" in peak_data.columns:
+            r_history_counts = peak_data["r_history"].value_counts().head(10)
+            analysis["top_r_history"] = {
+                str(k): int(v) for k, v in r_history_counts.items()
+            }
+
+        # Analyze t_history patterns
+        if "t_history" in peak_data.columns:
+            t_history_counts = peak_data["t_history"].value_counts().head(10)
+            analysis["top_t_history"] = {
+                str(k): int(v) for k, v in t_history_counts.items()
+            }
+
+        # Analyze rating distribution
+        if "rating" in peak_data.columns:
+            rating_counts = peak_data["rating"].value_counts()
+            analysis["rating_distribution"] = {
+                int(k): int(v) for k, v in rating_counts.items()
+            }
+
+        # Analyze review number (i)
+        if "i" in peak_data.columns:
+            i_stats = {
+                "mean": float(peak_data["i"].mean()),
+                "median": float(peak_data["i"].median()),
+                "std": float(peak_data["i"].std()),
+                "min": int(peak_data["i"].min()),
+                "max": int(peak_data["i"].max()),
+            }
+            analysis["review_number_stats"] = i_stats
+
+        # Analyze delta_t
+        if "delta_t" in peak_data.columns:
+            delta_t_stats = {
+                "mean": float(peak_data["delta_t"].mean()),
+                "median": float(peak_data["delta_t"].median()),
+                "std": float(peak_data["delta_t"].std()),
+                "min": float(peak_data["delta_t"].min()),
+                "max": float(peak_data["delta_t"].max()),
+            }
+            analysis["delta_t_stats"] = delta_t_stats
+
+        # Analyze interval statistics
+        analysis["interval_stats"] = {
+            "jiggle_mean_mean": float(peak_data["jiggle_interval_mean"].mean()),
+            "jiggle_mean_std": float(peak_data["jiggle_interval_mean"].std()),
+            "jiggle_std_mean": float(peak_data["jiggle_interval_std"].mean()),
+            "standard_mean": float(peak_data["standard_interval"].mean()),
+            "standard_std": float(peak_data["standard_interval"].std()),
+        }
+
+        # Analyze first_rating if available
+        if "first_rating" in peak_data.columns:
+            first_rating_counts = peak_data["first_rating"].value_counts()
+            analysis["first_rating_distribution"] = {
+                str(k): int(v) for k, v in first_rating_counts.items()
+            }
+
+        analysis_results.append(analysis)
+
+        # Save detailed data for this peak
+        output_dir.mkdir(parents=True, exist_ok=True)
+        peak_file = output_dir / f"{user_id}_peak_{peak_val:.2f}_data.tsv"
+        # Select relevant columns for output
+        output_cols = [
+            "normalized_diff",
+            "jiggle_interval_mean",
+            "jiggle_interval_std",
+            "standard_interval",
+        ]
+        if "r_history" in peak_data.columns:
+            output_cols.append("r_history")
+        if "t_history" in peak_data.columns:
+            output_cols.append("t_history")
+        if "rating" in peak_data.columns:
+            output_cols.append("rating")
+        if "i" in peak_data.columns:
+            output_cols.append("i")
+        if "delta_t" in peak_data.columns:
+            output_cols.append("delta_t")
+        if "first_rating" in peak_data.columns:
+            output_cols.append("first_rating")
+
+        available_cols = [col for col in output_cols if col in peak_data.columns]
+        peak_data[available_cols].to_csv(peak_file, sep="\t", index=False)
+        print(
+            f"  Saved peak {peak_val:.2f} data: {peak_file} ({len(peak_indices)} points)"
+        )
+
+    # Calculate coverage statistics
+    total_assigned = np.sum(assigned_mask)
+    total_points = len(test_set)
+    coverage = total_assigned / total_points if total_points > 0 else 0.0
+
+    # Save summary analysis
+    if analysis_results:
+        summary_file = output_dir / f"{user_id}_peak_analysis.json"
+        summary_data = {
+            "coverage": coverage,
+            "total_points": total_points,
+            "assigned_points": int(total_assigned),
+            "unassigned_points": int(total_points - total_assigned),
+            "peaks": analysis_results,
+        }
+        with open(summary_file, "w", encoding="utf-8") as f:
+            json.dump(summary_data, f, indent=2, ensure_ascii=False)
+        print(f"  Saved peak analysis summary: {summary_file}")
+
+        # Print summary to console
+        print(f"\n  Peak Analysis Summary for User {user_id}:")
+        print(
+            f"  Coverage: {coverage*100:.2f}% ({total_assigned}/{total_points} points assigned to peaks)"
+        )
+        print(
+            f"  Unassigned: {(1-coverage)*100:.2f}% ({total_points - total_assigned} points)"
+        )
+        for result in analysis_results:
+            print(f"\n  Peak at {result['peak_value']:.2f}:")
+            print(
+                f"    Number of points: {result['n_points']} ({result['fraction']*100:.2f}% of test set)"
+            )
+            if "top_r_history" in result:
+                print(f"    Top r_history patterns:")
+                for pattern, count in list(result["top_r_history"].items())[:5]:
+                    print(f"      '{pattern}': {count}")
+            if "top_t_history" in result:
+                print(f"    Top t_history patterns:")
+                for pattern, count in list(result["top_t_history"].items())[:5]:
+                    print(f"      '{pattern}': {count}")
+            if "review_number_stats" in result:
+                stats = result["review_number_stats"]
+                print(
+                    f"    Review number (i): mean={stats['mean']:.2f}, median={stats['median']:.1f}, range=[{stats['min']}, {stats['max']}]"
+                )
+            if "interval_stats" in result:
+                stats = result["interval_stats"]
+                print(
+                    f"    Jiggle interval mean: {stats['jiggle_mean_mean']:.2f} ± {stats['jiggle_mean_std']:.2f}"
+                )
+                print(
+                    f"    Standard interval: {stats['standard_mean']:.2f} ± {stats['standard_std']:.2f}"
+                )
+                print(f"    Jiggle std (uncertainty): {stats['jiggle_std_mean']:.2f}")
+
+
 def compare_jiggle_vs_standard(
     user_dataset,
     n_jiggles: int,
@@ -568,7 +813,7 @@ def compare_jiggle_vs_standard(
     # 2. Train standard FSRS on train_set (same as jiggle)
     optimizer = Optimizer(float_delta_t=config.use_secs_intervals)
     optimizer.define_model()
-    _ = optimizer.initialize_parameters(dataset=train_set, verbose=False)
+    # _ = optimizer.initialize_parameters(dataset=train_set, verbose=False)
 
     if config.only_S0:
         standard_params = list(map(float, optimizer.init_w))
@@ -614,6 +859,29 @@ def compare_jiggle_vs_standard(
     # Avoid division by zero
     sigma_safe = np.where(jiggle_interval_std > 1e-10, jiggle_interval_std, 1e-10)
     normalized_diff = (jiggle_interval_mean - standard_intervals) / sigma_safe
+
+    # 4.5. Automatically detect and analyze peak data points
+    detected_peaks = detect_peaks_in_distribution(normalized_diff)
+    if len(detected_peaks) > 0:
+        print(
+            f"  Detected {len(detected_peaks)} peaks: {[f'{p:.3f}' for p in detected_peaks]}"
+        )
+        # Analyze top peaks (limit to top 5 to avoid too many analyses)
+        # Sort by absolute value to prioritize significant peaks
+        peaks_to_analyze = sorted(detected_peaks, key=lambda x: abs(x), reverse=True)[
+            :5
+        ]
+        analyze_peak_data_points(
+            test_set=test_set,
+            normalized_diff=normalized_diff,
+            jiggle_interval_mean=jiggle_interval_mean,
+            jiggle_interval_std=jiggle_interval_std,
+            standard_intervals=standard_intervals,
+            peak_values=peaks_to_analyze,
+            tolerance=0.05,
+            output_dir=output_dir,
+            user_id=user_id,
+        )
 
     # 5. Create visualization
     fig, axes = plt.subplots(2, 1, figsize=(12, 10))

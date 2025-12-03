@@ -1,0 +1,610 @@
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
+
+# Add parent directory to path to import from project root
+script_dir = Path(__file__).parent
+project_root = script_dir.parent
+sys.path.insert(0, str(project_root))
+
+from config import Config, create_parser
+from data_loader import UserDataLoader
+
+
+def compute_mean_std(
+    samples: List[List[float]],
+) -> Tuple[List[float], List[float]]:
+    """
+    Compute mean and sample standard deviation for each parameter dimension.
+
+    Args:
+        samples: List of parameter sets, each containing 21 floats.
+
+    Returns:
+        Tuple of (mean_list, std_list), each containing 21 floats.
+    """
+    arr = np.array(samples, dtype=np.float64)
+    mean = np.mean(arr, axis=0)
+    # Use ddof=1 for an unbiased estimate of the variance
+    std = np.std(arr, axis=0, ddof=1) if arr.shape[0] > 1 else np.zeros_like(mean)
+
+    # Round to 6 decimal places as required
+    mean_rounded = np.round(mean, 6)
+    std_rounded = np.round(std, 6)
+
+    return mean_rounded.tolist(), std_rounded.tolist()
+
+
+def ensure_fsrs_optimizer_on_path(config: Config) -> None:
+    """
+    Ensure that the fsrs_optimizer module is importable by adjusting sys.path if needed.
+    """
+    if config.dev_mode:
+        # Path is relative to project root, so resolve from project root
+        script_dir = Path(__file__).parent
+        project_root = script_dir.parent
+        fsrs_path = (project_root / config.fsrs_optimizer_module_path).resolve()
+        if str(fsrs_path) not in sys.path:
+            sys.path.insert(0, str(fsrs_path))
+
+
+def fit_fsrs6_parameters_for_user(
+    user_dataset,
+    n_jiggles: int,
+    config: Config,
+) -> List[List[float]]:
+    """
+    Run N_JIGGLES Monte Carlo trainings for a single user's dataset.
+
+    Each training uses the same data but different binomial jiggle weights.
+    """
+    # Lazy import after sys.path has potentially been updated
+    from fsrs_optimizer import Optimizer, Trainer  # type: ignore
+
+    optimizer = Optimizer(float_delta_t=config.use_secs_intervals)
+
+    # Make sure elapsed_days exists if we want to filter same-day rows
+    if config.no_train_same_day and "elapsed_days" not in user_dataset.columns:
+        raise ValueError("Column 'elapsed_days' is required but missing from dataset.")
+
+    all_parameter_sets: List[List[float]] = []
+
+    for _ in range(n_jiggles):
+        dataset = user_dataset.copy()
+
+        if config.no_train_same_day:
+            dataset = dataset[dataset["elapsed_days"] > 0].copy()
+
+        if len(dataset) == 0:
+            # Not enough data after filtering; skip this jiggle
+            continue
+
+        # Binomial jiggle weights: 0 or 2, as described in the spec
+        weights = (
+            np.random.binomial(n=1, p=0.5, size=len(dataset)).astype("float32") * 2.0
+        )
+
+        # Ensure at least one non-zero weight so that training is meaningful
+        if np.all(weights == 0):
+            # Force a single sample to have non-zero weight
+            weights[np.random.randint(0, len(weights))] = 2.0
+
+        dataset["weights"] = weights
+
+        # Initialize FSRS-6 model parameters for this dataset
+        optimizer.define_model()
+        _ = optimizer.initialize_parameters(dataset=dataset, verbose=False)
+
+        # Optionally skip training and only use S0 initialization
+        if config.only_S0:
+            params = list(map(float, optimizer.init_w))
+            all_parameter_sets.append(params)
+            continue
+
+        # Train FSRS-6 with the jiggle weights
+        trainer = Trainer(
+            dataset,
+            None,
+            optimizer.init_w,
+            n_epoch=5,
+            lr=4e-2,
+            gamma=1.0,
+            batch_size=config.batch_size,
+            max_seq_len=config.max_seq_len,
+            enable_short_term=config.include_short_term,
+        )
+        params = trainer.train(verbose=False)
+        all_parameter_sets.append(list(map(float, params)))
+
+    return all_parameter_sets
+
+
+def generate_predictions_for_user(
+    user_dataset,
+    param_samples: List[List[float]],
+    config: Config,
+    output_dir: Path,
+    user_id: int,
+) -> None:
+    """
+    For a given user dataset and a list of parameter samples, generate predictions.
+
+    For each review record, this will produce:
+      - n_jiggles columns of stability values
+      - n_jiggles columns of retrievability values
+    and save the result as a TSV file.
+    """
+    # Import prediction utilities from fsrs_optimizer
+    from fsrs_optimizer import Collection as FSRSCollection, power_forgetting_curve  # type: ignore
+
+    df = user_dataset.copy()
+
+    for idx, w in enumerate(param_samples):
+        collection = FSRSCollection(w)
+        stabilities, difficulties = collection.batch_predict(df)
+
+        # Convert to numpy arrays for consistent downstream processing
+        stabilities_arr = np.asarray(stabilities, dtype=np.float64)
+
+        # Retrievability (predicted recall probability) using the forgetting curve
+        p = power_forgetting_curve(
+            df["delta_t"].to_numpy(dtype=np.float64),
+            stabilities_arr,
+            -w[20],
+        )
+
+        df[f"stability_{idx}"] = stabilities_arr
+        df[f"retrievability_{idx}"] = p
+
+    # Remove tensor column which is not serializable to TSV
+    if "tensor" in df.columns:
+        del df["tensor"]
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{user_id}.tsv"
+    df.to_csv(output_path, sep="\t", index=False)
+
+
+def visualize_stability_distributions(
+    pred_file_path: Path,
+    user_id: int,
+    n_jiggles: int,
+    output_dir: Path,
+    top_n: int = 100,
+    combos_per_page: int = 10,
+) -> None:
+    """
+    Visualize stability distributions for top N (r_history, t_history) combinations.
+    Generates multiple plots, each showing a subset of combinations.
+
+    For each user, this function:
+      - Reads the prediction TSV file
+      - Groups by (r_history, t_history) combinations
+      - Selects top N combinations by frequency
+      - Visualizes the stability distribution for each combination
+      - Saves multiple plots (each with combos_per_page combinations) to output_dir
+    """
+    # Read the prediction file
+    df = pd.read_csv(pred_file_path, sep="\t")
+
+    # Check required columns
+    if "r_history" not in df.columns or "t_history" not in df.columns:
+        print(
+            f"Warning: User {user_id} missing r_history or t_history columns, skipping visualization."
+        )
+        return
+
+    # Collect all stability columns
+    stability_cols = [f"stability_{i}" for i in range(n_jiggles)]
+    missing_cols = [col for col in stability_cols if col not in df.columns]
+    if missing_cols:
+        print(
+            f"Warning: User {user_id} missing stability columns: {missing_cols}, skipping visualization."
+        )
+        return
+
+    # Group by (r_history, t_history) and count frequency
+    df["combo"] = df["r_history"].astype(str) + " | " + df["t_history"].astype(str)
+    combo_counts = df["combo"].value_counts().head(top_n)
+
+    if len(combo_counts) == 0:
+        print(
+            f"Warning: User {user_id} has no valid combinations, skipping visualization."
+        )
+        return
+
+    # Filter to top N combinations
+    top_combos = combo_counts.index.tolist()
+    df_filtered = df[df["combo"].isin(top_combos)].copy()
+
+    # Prepare data for plotting: collect all stability values for each combination
+    all_plot_data = []
+    all_combo_labels = []
+    for combo in top_combos:
+        combo_df = df_filtered[df_filtered["combo"] == combo].copy()
+        # Collect all stability values across all jiggles for this combination
+        stability_values = []
+        for col in stability_cols:
+            # Check if column exists and get values
+            if isinstance(combo_df, pd.DataFrame) and col in combo_df.columns:
+                col_values = combo_df[col]
+                # Ensure we have a Series for dropna()
+                if not isinstance(col_values, pd.Series):
+                    col_values = pd.Series(col_values)
+                valid_values = col_values.dropna()
+                stability_values.extend(valid_values.tolist())
+        if stability_values:
+            all_plot_data.append(stability_values)
+            # Create a readable label with frequency
+            freq = combo_counts[combo]
+            # Truncate long strings for readability
+            r_hist, t_hist = combo.split(" | ", 1)
+            if len(r_hist) > 30:
+                r_hist = r_hist[:27] + "..."
+            if len(t_hist) > 30:
+                t_hist = t_hist[:27] + "..."
+            all_combo_labels.append(f"{r_hist} | {t_hist}\n(freq={freq})")
+
+    if not all_plot_data:
+        print(
+            f"Warning: User {user_id} has no valid stability data, skipping visualization."
+        )
+        return
+
+    # Split into pages: each page has combos_per_page combinations
+    output_dir.mkdir(parents=True, exist_ok=True)
+    num_pages = (len(all_plot_data) + combos_per_page - 1) // combos_per_page
+
+    for page_idx in range(num_pages):
+        start_idx = page_idx * combos_per_page
+        end_idx = min(start_idx + combos_per_page, len(all_plot_data))
+
+        plot_data = all_plot_data[start_idx:end_idx]
+        combo_labels = all_combo_labels[start_idx:end_idx]
+
+        # Create the plot
+        fig_height = max(8.0, float(len(plot_data) * 0.5))
+        fig, ax = plt.subplots(figsize=(14, fig_height))
+
+        # Use box plot to show distribution
+        bp = ax.boxplot(
+            plot_data,
+            vert=True,
+            patch_artist=True,
+            showmeans=True,
+            meanline=True,
+        )
+
+        # Set labels after creating the boxplot
+        ax.set_xticklabels(combo_labels)
+
+        # Style the boxes
+        for patch in bp["boxes"]:
+            patch.set_facecolor("lightblue")
+            patch.set_alpha(0.7)
+
+        ax.set_ylabel("Stability", fontsize=12)
+        ax.set_xlabel(
+            "(r_history, t_history) Combination (Top 100 by frequency)", fontsize=12
+        )
+        ax.set_title(
+            f"User {user_id}: Stability Distribution by History Combination "
+            f"(Page {page_idx + 1}/{num_pages}, Combos {start_idx + 1}-{end_idx})\n"
+            f"(Each box shows {n_jiggles} jiggle samples)",
+            fontsize=14,
+            fontweight="bold",
+        )
+        ax.grid(True, alpha=0.3, axis="y")
+        ax.tick_params(axis="x", rotation=45, labelsize=8)
+
+        plt.tight_layout()
+
+        # Save the plot
+        output_path = output_dir / f"{user_id}_page_{page_idx + 1}.png"
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+        plt.close()
+
+        print(f"  Saved stability distribution plot: {output_path}")
+
+
+def visualize_parameter_distributions(
+    param_samples: List[List[float]],
+    user_id: int,
+    output_dir: Path,
+    params_per_page: int = 7,
+) -> None:
+    """
+    Visualize FSRS-6 parameter distributions for a user across all jiggle samples.
+
+    For each user, this function:
+      - Takes the list of parameter samples (n_jiggles x 21 parameters)
+      - Visualizes the distribution of each parameter across jiggle samples
+      - Saves multiple plots (each with params_per_page parameters) to output_dir
+    """
+    if not param_samples:
+        print(
+            f"Warning: User {user_id} has no parameter samples, skipping parameter visualization."
+        )
+        return
+
+    # Convert to numpy array for easier manipulation
+    param_array = np.array(param_samples, dtype=np.float64)
+    n_params = param_array.shape[1]  # Should be 21 for FSRS-6
+    n_jiggles = param_array.shape[0]
+
+    if n_params != 21:
+        print(
+            f"Warning: User {user_id} has {n_params} parameters (expected 21), skipping parameter visualization."
+        )
+        return
+
+    # Split into pages: each page has params_per_page parameters
+    output_dir.mkdir(parents=True, exist_ok=True)
+    num_pages = (n_params + params_per_page - 1) // params_per_page
+
+    for page_idx in range(num_pages):
+        start_param = page_idx * params_per_page
+        end_param = min(start_param + params_per_page, n_params)
+
+        num_params_this_page = end_param - start_param
+
+        # Create subplots: 2 columns, multiple rows
+        n_rows = (num_params_this_page + 1) // 2
+        fig, axes = plt.subplots(n_rows, 2, figsize=(14, 4 * n_rows))
+        if n_rows == 1:
+            axes = axes.reshape(1, -1)
+        axes = axes.flatten()
+
+        for local_idx, param_idx in enumerate(range(start_param, end_param)):
+            ax = axes[local_idx]
+            param_values = param_array[:, param_idx]
+
+            # Calculate statistics
+            mean_val = np.mean(param_values)
+            median_val = np.median(param_values)
+            std_val = np.std(param_values, ddof=1) if len(param_values) > 1 else 0.0
+
+            # Create histogram
+            counts, bins, patches = ax.hist(
+                param_values,
+                bins=min(30, max(10, n_jiggles // 5)),
+                alpha=0.7,
+                edgecolor="black",
+                linewidth=0.5,
+                color="steelblue",
+            )
+
+            # Add vertical lines for statistics
+            ax.axvline(
+                mean_val,
+                color="red",
+                linestyle="--",
+                linewidth=2,
+                label=f"Mean: {mean_val:.4f}",
+            )
+            ax.axvline(
+                median_val,
+                color="orange",
+                linestyle="--",
+                linewidth=2,
+                label=f"Median: {median_val:.4f}",
+            )
+            if std_val > 0:
+                ax.axvline(
+                    mean_val - std_val,
+                    color="gray",
+                    linestyle=":",
+                    linewidth=1.5,
+                    alpha=0.7,
+                    label=f"±1 Std: {std_val:.4f}",
+                )
+                ax.axvline(
+                    mean_val + std_val,
+                    color="gray",
+                    linestyle=":",
+                    linewidth=1.5,
+                    alpha=0.7,
+                )
+
+            # Add text box with statistics
+            stats_text = f"Mean: {mean_val:.4f}\nMedian: {median_val:.4f}\nStd: {std_val:.4f}\nN: {n_jiggles}"
+            ax.text(
+                0.02,
+                0.98,
+                stats_text,
+                transform=ax.transAxes,
+                fontsize=9,
+                verticalalignment="top",
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+            )
+
+            ax.set_xlabel("Parameter value", fontsize=10)
+            ax.set_ylabel("Frequency", fontsize=10)
+            ax.set_title(f"w[{param_idx}]", fontsize=11, fontweight="bold")
+            ax.legend(loc="best", fontsize=8)
+            ax.grid(True, alpha=0.3)
+
+        # Hide unused subplots
+        for idx in range(num_params_this_page, len(axes)):
+            axes[idx].set_visible(False)
+
+        fig.suptitle(
+            f"User {user_id}: FSRS-6 Parameter Distributions "
+            f"(Page {page_idx + 1}/{num_pages}, Parameters {start_param}-{end_param - 1})\n"
+            f"(Each histogram shows {n_jiggles} jiggle samples)",
+            fontsize=14,
+            fontweight="bold",
+        )
+
+        plt.tight_layout(rect=(0, 0, 1, 0.96))  # Leave space for suptitle
+
+        # Save the plot
+        output_path = output_dir / f"{user_id}_params_page_{page_idx + 1}.png"
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+        plt.close()
+
+        print(f"  Saved parameter distribution plot: {output_path}")
+
+
+def main() -> None:
+    """
+    Run statistical uncertainty analysis for FSRS-6 using Monte Carlo jiggle weights.
+
+    For each dataset (user), we:
+      - Load data via the existing UserDataLoader
+      - Train N_JIGGLES FSRS-6 models with different binomial jiggle weights
+      - Output all parameter sets per user as JSON lines
+    """
+    parser = create_parser()
+    parser.add_argument(
+        "--n_jiggles",
+        type=int,
+        default=100,
+        help="Number of Monte Carlo jiggle trainings per user.",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="bootstrapping/FSRS-6-uncertainty.jsonl",
+        help="Output JSONL file path for parameter samples.",
+    )
+    parser.add_argument(
+        "--pred_output_dir",
+        type=str,
+        default="bootstrapping/predictions",
+        help="Directory to save per-user prediction TSV files.",
+    )
+    parser.add_argument(
+        "--plot_output_dir",
+        type=str,
+        default="bootstrapping/plots/stability",
+        help="Directory to save stability distribution plots.",
+    )
+    parser.add_argument(
+        "--top_n_combos",
+        type=int,
+        default=100,
+        help="Number of top (r_history, t_history) combinations to visualize.",
+    )
+    parser.add_argument(
+        "--combos_per_page",
+        type=int,
+        default=10,
+        help="Number of combinations to show per plot page.",
+    )
+    parser.add_argument(
+        "--param_plot_output_dir",
+        type=str,
+        default="bootstrapping/plots/params",
+        help="Directory to save parameter distribution plots.",
+    )
+    parser.add_argument(
+        "--params_per_page",
+        type=int,
+        default=7,
+        help="Number of parameters to show per plot page (arranged in 2 columns).",
+    )
+    args, _ = parser.parse_known_args()
+
+    # Force algorithm to be FSRS-6 for this script
+    args.algo = "FSRS-6"
+
+    config = Config(args)
+    ensure_fsrs_optimizer_on_path(config)
+
+    n_jiggles: int = args.n_jiggles
+
+    # Resolve paths relative to project root
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
+
+    output_path = (project_root / args.output).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    pred_output_dir = (project_root / args.pred_output_dir).resolve()
+    plot_output_dir = (project_root / args.plot_output_dir).resolve()
+    param_plot_output_dir = (project_root / args.param_plot_output_dir).resolve()
+    top_n_combos: int = args.top_n_combos
+
+    data_loader = UserDataLoader(config)
+
+    # Discover available user IDs from the parquet partitioning
+    dataset = pq.ParquetDataset(config.data_path / "revlogs")
+    user_ids: List[int] = []
+    for user_id in dataset.partitioning.dictionaries[0]:
+        uid = int(user_id.as_py())
+        if config.max_user_id is not None and uid > config.max_user_id:
+            continue
+        user_ids.append(uid)
+
+    user_ids.sort()
+
+    with output_path.open("w", encoding="utf-8") as out_f:
+        for user_id in user_ids:
+            try:
+                user_dataset = data_loader.load_user_data(user_id)
+            except Exception:
+                # Skip users with insufficient or invalid data
+                continue
+
+            param_samples = fit_fsrs6_parameters_for_user(
+                user_dataset=user_dataset,
+                n_jiggles=n_jiggles,
+                config=config,
+            )
+
+            if not param_samples:
+                continue
+
+            # Compute per-user statistics
+            param_mean, param_std = compute_mean_std(param_samples)
+
+            # Save parameter samples and their statistics
+            record: Dict[str, Any] = {
+                "user": user_id,
+                "size": int(len(user_dataset)),
+                "n_jiggles": len(param_samples),
+                "parameters": param_samples,
+                "param_mean": param_mean,
+                "param_std": param_std,
+            }
+            out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+            # Generate and save per-review predictions for this user
+            generate_predictions_for_user(
+                user_dataset=user_dataset,
+                param_samples=param_samples,
+                config=config,
+                output_dir=pred_output_dir,
+                user_id=user_id,
+            )
+
+            # Visualize stability distributions for top N combinations
+            pred_file_path = pred_output_dir / f"{user_id}.tsv"
+            if pred_file_path.exists():
+                visualize_stability_distributions(
+                    pred_file_path=pred_file_path,
+                    user_id=user_id,
+                    n_jiggles=len(param_samples),
+                    output_dir=plot_output_dir,
+                    top_n=top_n_combos,
+                    combos_per_page=args.combos_per_page,
+                )
+
+            # Visualize parameter distributions
+            visualize_parameter_distributions(
+                param_samples=param_samples,
+                user_id=user_id,
+                output_dir=param_plot_output_dir,
+                params_per_page=args.params_per_page,
+            )
+
+
+if __name__ == "__main__":
+    main()

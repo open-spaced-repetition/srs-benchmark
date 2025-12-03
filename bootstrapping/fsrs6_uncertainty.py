@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -59,11 +60,18 @@ def fit_fsrs6_parameters_for_user(
     user_dataset,
     n_jiggles: int,
     config: Config,
+    seed: int = 42,
 ) -> List[List[float]]:
     """
     Run N_JIGGLES Monte Carlo trainings for a single user's dataset.
 
     Each training uses the same data but different binomial jiggle weights.
+
+    Args:
+        user_dataset: User's dataset
+        n_jiggles: Number of jiggle trainings
+        config: Configuration object
+        seed: Random seed for reproducibility (default: 42)
     """
     # Lazy import after sys.path has potentially been updated
     from fsrs_optimizer import Optimizer, Trainer  # type: ignore
@@ -76,7 +84,11 @@ def fit_fsrs6_parameters_for_user(
 
     all_parameter_sets: List[List[float]] = []
 
-    for _ in range(n_jiggles):
+    # Create a random number generator with the seed for this user
+    # Use a deterministic seed based on user_id and global seed for reproducibility
+    rng = np.random.default_rng(seed)
+
+    for jiggle_idx in range(n_jiggles):
         dataset = user_dataset.copy()
 
         if config.no_train_same_day:
@@ -87,14 +99,13 @@ def fit_fsrs6_parameters_for_user(
             continue
 
         # Binomial jiggle weights: 0 or 2, as described in the spec
-        weights = (
-            np.random.binomial(n=1, p=0.5, size=len(dataset)).astype("float32") * 2.0
-        )
+        # Use the RNG to ensure reproducibility
+        weights = rng.binomial(n=1, p=0.5, size=len(dataset)).astype("float32") * 2.0
 
         # Ensure at least one non-zero weight so that training is meaningful
         if np.all(weights == 0):
             # Force a single sample to have non-zero weight
-            weights[np.random.randint(0, len(weights))] = 2.0
+            weights[rng.integers(0, len(weights))] = 2.0
 
         dataset["weights"] = weights
 
@@ -519,10 +530,22 @@ def main() -> None:
         default=7,
         help="Number of parameters to show per plot page (arranged in 2 columns).",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility (default: 42).",
+    )
     args, _ = parser.parse_known_args()
 
     # Force algorithm to be FSRS-6 for this script
     args.algo = "FSRS-6"
+
+    # Set random seeds for reproducibility
+    seed = args.seed
+    np.random.seed(seed)
+    random.seed(seed)
+    # Note: torch.manual_seed would be set if using PyTorch, but we're using fsrs_optimizer here
 
     config = Config(args)
     ensure_fsrs_optimizer_on_path(config)
@@ -561,10 +584,14 @@ def main() -> None:
                 # Skip users with insufficient or invalid data
                 continue
 
+            # Use a deterministic seed for each user based on global seed and user_id
+            # This ensures reproducibility while allowing different users to have different jiggle patterns
+            user_seed = seed + user_id
             param_samples = fit_fsrs6_parameters_for_user(
                 user_dataset=user_dataset,
                 n_jiggles=n_jiggles,
                 config=config,
+                seed=user_seed,
             )
 
             if not param_samples:

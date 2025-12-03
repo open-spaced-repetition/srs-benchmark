@@ -472,6 +472,215 @@ def visualize_parameter_distributions(
         print(f"  Saved parameter distribution plot: {output_path}")
 
 
+def calculate_interval_from_stability(
+    stability: np.ndarray, target_retrievability: float, decay: float
+) -> np.ndarray:
+    """
+    Calculate interval time from stability and target retrievability.
+
+    FSRS forgetting curve: R(t) = (1 + factor * t / s)^decay
+    where factor = 0.9^(1/decay) - 1, decay = -w[20]
+
+    Solving for t: t = s * ((R^(1/decay)) - 1) / factor
+
+    Args:
+        stability: Array of stability values
+        target_retrievability: Target retrievability (typically 0.9)
+        decay: Decay parameter (-w[20])
+
+    Returns:
+        Array of interval times
+    """
+    factor = 0.9 ** (1.0 / decay) - 1.0
+    r_power = target_retrievability ** (1.0 / decay)
+    intervals = stability * (r_power - 1.0) / factor
+    return np.maximum(intervals, 0.0)  # Ensure non-negative
+
+
+def compare_jiggle_vs_standard(
+    user_dataset,
+    n_jiggles: int,
+    config: Config,
+    seed: int,
+    output_dir: Path,
+    user_id: int,
+) -> None:
+    """
+    Compare jiggle method vs standard FSRS fitting on test data.
+
+    Splits data into 2 roughly equal sets:
+    1. Training set (for both jiggle method and standard FSRS fitting)
+    2. Test set (for evaluation)
+
+    For each test data point, calculates:
+    (t_jiggle,mean - t_standard) / σ_t,jiggle
+
+    Args:
+        user_dataset: Full user dataset
+        n_jiggles: Number of jiggle trainings
+        config: Configuration object
+        seed: Random seed
+        output_dir: Directory to save plots
+        user_id: User ID
+    """
+    from fsrs_optimizer import Optimizer, Trainer, Collection as FSRSCollection, power_forgetting_curve  # type: ignore
+
+    # Split data into 2 roughly equal parts
+    n_total = len(user_dataset)
+    n_train = n_total // 2
+
+    # Sort by review_th to maintain temporal order
+    df_sorted = user_dataset.sort_values("review_th").reset_index(drop=True)
+
+    # Create splits
+    train_set = df_sorted.iloc[:n_train].copy()
+    test_set = df_sorted.iloc[n_train:].copy()
+
+    if len(test_set) == 0:
+        print(
+            f"Warning: User {user_id} has no test data after splitting, skipping comparison."
+        )
+        return
+
+    print(
+        f"User {user_id}: Split sizes - Train: {len(train_set)}, Test: {len(test_set)}"
+    )
+
+    # 1. Train jiggle method on train_set
+    jiggle_params = fit_fsrs6_parameters_for_user(
+        user_dataset=train_set,
+        n_jiggles=n_jiggles,
+        config=config,
+        seed=seed,
+    )
+
+    if not jiggle_params:
+        print(
+            f"Warning: User {user_id} failed to generate jiggle parameters, skipping comparison."
+        )
+        return
+
+    # 2. Train standard FSRS on train_set (same as jiggle)
+    optimizer = Optimizer(float_delta_t=config.use_secs_intervals)
+    optimizer.define_model()
+    _ = optimizer.initialize_parameters(dataset=train_set, verbose=False)
+
+    if config.only_S0:
+        standard_params = list(map(float, optimizer.init_w))
+    else:
+        trainer = Trainer(
+            train_set,
+            None,
+            optimizer.init_w,
+            n_epoch=5,
+            lr=4e-2,
+            gamma=1.0,
+            batch_size=config.batch_size,
+            max_seq_len=config.max_seq_len,
+            enable_short_term=config.include_short_term,
+        )
+        standard_params = list(map(float, trainer.train(verbose=False)))
+
+    # 3. Predict on test set with both methods
+    target_r = 0.9  # Target retrievability (90%)
+
+    # Jiggle predictions: get stability for each jiggle, then calculate intervals
+    jiggle_intervals = []
+    for w in jiggle_params:
+        collection = FSRSCollection(w)
+        stabilities, _ = collection.batch_predict(test_set)
+        stabilities_arr = np.asarray(stabilities, dtype=np.float64)
+        intervals = calculate_interval_from_stability(stabilities_arr, target_r, -w[20])
+        jiggle_intervals.append(intervals)
+
+    jiggle_intervals_arr = np.array(jiggle_intervals)  # Shape: (n_jiggles, n_test)
+    jiggle_interval_mean = np.mean(jiggle_intervals_arr, axis=0)
+    jiggle_interval_std = np.std(jiggle_intervals_arr, axis=0, ddof=1)
+
+    # Standard FSRS prediction
+    standard_collection = FSRSCollection(standard_params)
+    standard_stabilities, _ = standard_collection.batch_predict(test_set)
+    standard_stabilities_arr = np.asarray(standard_stabilities, dtype=np.float64)
+    standard_intervals = calculate_interval_from_stability(
+        standard_stabilities_arr, target_r, -standard_params[20]
+    )
+
+    # 4. Calculate normalized difference: (t_jiggle,mean - t_standard) / σ_t,jiggle
+    # Avoid division by zero
+    sigma_safe = np.where(jiggle_interval_std > 1e-10, jiggle_interval_std, 1e-10)
+    normalized_diff = (jiggle_interval_mean - standard_intervals) / sigma_safe
+
+    # 5. Create visualization
+    fig, axes = plt.subplots(2, 1, figsize=(12, 10))
+
+    # Plot 1: Normalized difference over test data points
+    ax1 = axes[0]
+    test_indices = np.arange(len(normalized_diff))
+    ax1.scatter(test_indices, normalized_diff, alpha=0.6, s=20)
+    ax1.axhline(y=0, color="red", linestyle="--", linewidth=1, label="Zero difference")
+    ax1.axhline(y=1, color="orange", linestyle=":", linewidth=1, alpha=0.7, label="±1σ")
+    ax1.axhline(y=-1, color="orange", linestyle=":", linewidth=1, alpha=0.7)
+    ax1.set_xlabel("Test Data Point Index", fontsize=12)
+    ax1.set_ylabel("(t_jiggle,mean - t_standard) / σ_t,jiggle", fontsize=12)
+    ax1.set_title(
+        f"User {user_id}: Normalized Interval Difference (Jiggle vs Standard FSRS)\n"
+        f"Target R={target_r}, Test set size={len(test_set)}",
+        fontsize=14,
+        fontweight="bold",
+    )
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Plot 2: Histogram of normalized differences
+    ax2 = axes[1]
+    ax2.hist(normalized_diff, bins=50, alpha=0.7, edgecolor="black", color="steelblue")
+    ax2.axvline(x=0, color="red", linestyle="--", linewidth=2, label="Zero difference")
+    ax2.axvline(
+        x=np.mean(normalized_diff),
+        color="orange",
+        linestyle="--",
+        linewidth=2,
+        label=f"Mean: {np.mean(normalized_diff):.3f}",
+    )
+    ax2.set_xlabel("(t_jiggle,mean - t_standard) / σ_t,jiggle", fontsize=12)
+    ax2.set_ylabel("Frequency", fontsize=12)
+    ax2.set_title(
+        "Distribution of Normalized Interval Differences",
+        fontsize=12,
+        fontweight="bold",
+    )
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    # Add statistics text
+    stats_text = (
+        f"Mean: {np.mean(normalized_diff):.4f}\n"
+        f"Std: {np.std(normalized_diff):.4f}\n"
+        f"Median: {np.median(normalized_diff):.4f}\n"
+        f"Min: {np.min(normalized_diff):.4f}\n"
+        f"Max: {np.max(normalized_diff):.4f}"
+    )
+    ax2.text(
+        0.02,
+        0.98,
+        stats_text,
+        transform=ax2.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+    )
+
+    plt.tight_layout()
+
+    # Save the plot
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{user_id}_jiggle_vs_standard.png"
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close()
+
+    print(f"  Saved jiggle vs standard comparison plot: {output_path}")
+
+
 def main() -> None:
     """
     Run statistical uncertainty analysis for FSRS-6 using Monte Carlo jiggle weights.
@@ -536,6 +745,23 @@ def main() -> None:
         default=42,
         help="Random seed for reproducibility (default: 42).",
     )
+    parser.add_argument(
+        "--compare_jiggle_vs_standard",
+        action="store_true",
+        help="Compare jiggle method vs standard FSRS fitting on split test data.",
+    )
+    parser.add_argument(
+        "--comparison_output_dir",
+        type=str,
+        default="bootstrapping/plots/comparison",
+        help="Directory to save jiggle vs standard comparison plots.",
+    )
+    parser.add_argument(
+        "--max_users_for_comparison",
+        type=int,
+        default=10,
+        help="Maximum number of users to run comparison on (default: 10).",
+    )
     args, _ = parser.parse_known_args()
 
     # Force algorithm to be FSRS-6 for this script
@@ -561,6 +787,7 @@ def main() -> None:
     pred_output_dir = (project_root / args.pred_output_dir).resolve()
     plot_output_dir = (project_root / args.plot_output_dir).resolve()
     param_plot_output_dir = (project_root / args.param_plot_output_dir).resolve()
+    comparison_output_dir = (project_root / args.comparison_output_dir).resolve()
     top_n_combos: int = args.top_n_combos
 
     data_loader = UserDataLoader(config)
@@ -639,6 +866,20 @@ def main() -> None:
                 output_dir=param_plot_output_dir,
                 params_per_page=args.params_per_page,
             )
+
+            # Compare jiggle vs standard FSRS if requested
+            if args.compare_jiggle_vs_standard:
+                # Only process first N users for comparison
+                user_index = user_ids.index(user_id)
+                if user_index < args.max_users_for_comparison:
+                    compare_jiggle_vs_standard(
+                        user_dataset=user_dataset,
+                        n_jiggles=n_jiggles,
+                        config=config,
+                        seed=user_seed,
+                        output_dir=comparison_output_dir,
+                        user_id=user_id,
+                    )
 
 
 if __name__ == "__main__":

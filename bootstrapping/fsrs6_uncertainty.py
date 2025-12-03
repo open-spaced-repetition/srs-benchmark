@@ -708,22 +708,22 @@ def analyze_peak_data_points(
         # Print summary to console
         print(f"\n  Peak Analysis Summary for User {user_id}:")
         print(
-            f"  Coverage: {coverage*100:.2f}% ({total_assigned}/{total_points} points assigned to peaks)"
+            f"  Coverage: {coverage * 100:.2f}% ({total_assigned}/{total_points} points assigned to peaks)"
         )
         print(
-            f"  Unassigned: {(1-coverage)*100:.2f}% ({total_points - total_assigned} points)"
+            f"  Unassigned: {(1 - coverage) * 100:.2f}% ({total_points - total_assigned} points)"
         )
         for result in analysis_results:
             print(f"\n  Peak at {result['peak_value']:.2f}:")
             print(
-                f"    Number of points: {result['n_points']} ({result['fraction']*100:.2f}% of test set)"
+                f"    Number of points: {result['n_points']} ({result['fraction'] * 100:.2f}% of test set)"
             )
             if "top_r_history" in result:
-                print(f"    Top r_history patterns:")
+                print("    Top r_history patterns:")
                 for pattern, count in list(result["top_r_history"].items())[:5]:
                     print(f"      '{pattern}': {count}")
             if "top_t_history" in result:
-                print(f"    Top t_history patterns:")
+                print("    Top t_history patterns:")
                 for pattern, count in list(result["top_t_history"].items())[:5]:
                     print(f"      '{pattern}': {count}")
             if "review_number_stats" in result:

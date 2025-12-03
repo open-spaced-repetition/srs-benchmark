@@ -523,7 +523,12 @@ def compare_jiggle_vs_standard(
         output_dir: Directory to save plots
         user_id: User ID
     """
-    from fsrs_optimizer import Optimizer, Trainer, Collection as FSRSCollection, power_forgetting_curve  # type: ignore
+    from fsrs_optimizer import (
+        Optimizer,
+        Trainer,
+        Collection as FSRSCollection,
+        power_forgetting_curve,
+    )  # type: ignore
 
     # Split data into 2 roughly equal parts
     n_total = len(user_dataset)

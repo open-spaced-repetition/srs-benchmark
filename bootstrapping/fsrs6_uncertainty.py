@@ -146,6 +146,9 @@ def generate_predictions_for_user(
 
     df = user_dataset.copy()
 
+    # Collect all new columns to avoid DataFrame fragmentation
+    new_columns = {}
+    
     for idx, w in enumerate(param_samples):
         collection = FSRSCollection(w)
         stabilities, difficulties = collection.batch_predict(df)
@@ -160,8 +163,13 @@ def generate_predictions_for_user(
             -w[20],
         )
 
-        df[f"stability_{idx}"] = stabilities_arr
-        df[f"retrievability_{idx}"] = p
+        new_columns[f"stability_{idx}"] = stabilities_arr
+        new_columns[f"retrievability_{idx}"] = p
+
+    # Add all new columns at once using pd.concat to avoid fragmentation
+    if new_columns:
+        new_df = pd.DataFrame(new_columns, index=df.index)
+        df = pd.concat([df, new_df], axis=1)
 
     # Remove tensor column which is not serializable to TSV
     if "tensor" in df.columns:

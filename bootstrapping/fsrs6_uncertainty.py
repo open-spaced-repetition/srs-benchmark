@@ -148,7 +148,7 @@ def generate_predictions_for_user(
 
     # Collect all new columns to avoid DataFrame fragmentation
     new_columns = {}
-    
+
     for idx, w in enumerate(param_samples):
         collection = FSRSCollection(w)
         stabilities, difficulties = collection.batch_predict(df)

@@ -19,6 +19,9 @@ sys.path.insert(0, str(project_root))
 from config import Config, create_parser
 from data_loader import UserDataLoader
 
+N_EPOCH = 5
+LR = 4e-2
+
 
 def compute_mean_std(
     samples: List[List[float]],
@@ -112,7 +115,7 @@ def fit_fsrs6_parameters_for_user(
 
         # Initialize FSRS-6 model parameters for this dataset
         optimizer.define_model()
-        # _ = optimizer.initialize_parameters(dataset=dataset, verbose=False)
+        _ = optimizer.initialize_parameters(dataset=dataset, verbose=False)
 
         # Optionally skip training and only use S0 initialization
         if config.only_S0:
@@ -125,8 +128,8 @@ def fit_fsrs6_parameters_for_user(
             dataset,
             None,
             optimizer.init_w,
-            n_epoch=5,
-            lr=4e-2,
+            n_epoch=N_EPOCH,
+            lr=LR,
             gamma=1.0,
             batch_size=config.batch_size,
             max_seq_len=config.max_seq_len,
@@ -813,7 +816,7 @@ def compare_jiggle_vs_standard(
     # 2. Train standard FSRS on train_set (same as jiggle)
     optimizer = Optimizer(float_delta_t=config.use_secs_intervals)
     optimizer.define_model()
-    # _ = optimizer.initialize_parameters(dataset=train_set, verbose=False)
+    _ = optimizer.initialize_parameters(dataset=train_set, verbose=False)
 
     if config.only_S0:
         standard_params = list(map(float, optimizer.init_w))
@@ -822,8 +825,8 @@ def compare_jiggle_vs_standard(
             train_set,
             None,
             optimizer.init_w,
-            n_epoch=5,
-            lr=4e-2,
+            n_epoch=N_EPOCH,
+            lr=LR,
             gamma=1.0,
             batch_size=config.batch_size,
             max_seq_len=config.max_seq_len,
@@ -834,14 +837,45 @@ def compare_jiggle_vs_standard(
     # 3. Predict on test set with both methods
     target_r = 0.9  # Target retrievability (90%)
 
-    # Jiggle predictions: get stability for each jiggle, then calculate intervals
+    # Check if test set has labels (y column)
+    has_labels = "y" in test_set.columns
+    if has_labels:
+        y_true = test_set["y"].to_numpy(dtype=np.float64)
+    else:
+        y_true = None
+        print(
+            f"  Warning: User {user_id} test set missing 'y' column, skipping log loss calculation."
+        )
+
+    # Jiggle predictions: get stability and retrievability for each jiggle, then calculate intervals
     jiggle_intervals = []
-    for w in jiggle_params:
+    jiggle_log_losses = []
+    for idx, w in enumerate(jiggle_params):
         collection = FSRSCollection(w)
         stabilities, _ = collection.batch_predict(test_set)
         stabilities_arr = np.asarray(stabilities, dtype=np.float64)
+
+        # Calculate retrievability (predicted recall probability)
+        retrievability = power_forgetting_curve(
+            test_set["delta_t"].to_numpy(dtype=np.float64),
+            stabilities_arr,
+            -w[20],
+        )
+
+        # Calculate interval from stability
         intervals = calculate_interval_from_stability(stabilities_arr, target_r, -w[20])
         jiggle_intervals.append(intervals)
+
+        # Calculate log loss if labels are available
+        if has_labels and y_true is not None:
+            from sklearn.metrics import log_loss  # type: ignore
+
+            try:
+                logloss = log_loss(y_true=y_true, y_pred=retrievability, labels=[0, 1])
+                jiggle_log_losses.append(float(logloss))
+            except Exception as e:
+                print(f"  Warning: Failed to calculate log loss for jiggle {idx}: {e}")
+                jiggle_log_losses.append(None)
 
     jiggle_intervals_arr = np.array(jiggle_intervals)  # Shape: (n_jiggles, n_test)
     jiggle_interval_mean = np.mean(jiggle_intervals_arr, axis=0)
@@ -855,10 +889,70 @@ def compare_jiggle_vs_standard(
         standard_stabilities_arr, target_r, -standard_params[20]
     )
 
+    # Calculate standard FSRS log loss if labels are available
+    standard_log_loss = None
+    if has_labels and y_true is not None:
+        from sklearn.metrics import log_loss  # type: ignore
+
+        standard_retrievability = power_forgetting_curve(
+            test_set["delta_t"].to_numpy(dtype=np.float64),
+            standard_stabilities_arr,
+            -standard_params[20],
+        )
+        try:
+            standard_log_loss = float(
+                log_loss(y_true=y_true, y_pred=standard_retrievability, labels=[0, 1])
+            )
+        except Exception as e:
+            print(f"  Warning: Failed to calculate standard FSRS log loss: {e}")
+
     # 4. Calculate normalized difference: (t_jiggle,mean - t_standard) / σ_t,jiggle
     # Avoid division by zero
     sigma_safe = np.where(jiggle_interval_std > 1e-10, jiggle_interval_std, 1e-10)
     normalized_diff = (jiggle_interval_mean - standard_intervals) / sigma_safe
+
+    # 4.1. Calculate and report log loss statistics
+    log_loss_stats = None
+    if jiggle_log_losses:
+        valid_log_losses = [ll for ll in jiggle_log_losses if ll is not None]
+        if valid_log_losses:
+            log_loss_mean = np.mean(valid_log_losses)
+            log_loss_std = (
+                np.std(valid_log_losses, ddof=1) if len(valid_log_losses) > 1 else 0.0
+            )
+            log_loss_min = np.min(valid_log_losses)
+            log_loss_max = np.max(valid_log_losses)
+            log_loss_median = np.median(valid_log_losses)
+
+            log_loss_stats = {
+                "jiggle": {
+                    "mean": float(log_loss_mean),
+                    "std": float(log_loss_std),
+                    "median": float(log_loss_median),
+                    "min": float(log_loss_min),
+                    "max": float(log_loss_max),
+                    "all_values": [float(ll) for ll in valid_log_losses],
+                },
+                "standard": (
+                    float(standard_log_loss) if standard_log_loss is not None else None
+                ),
+                "difference": (
+                    float(log_loss_mean - standard_log_loss)
+                    if standard_log_loss is not None
+                    else None
+                ),
+            }
+
+            print(
+                f"  Jiggle Log Loss: mean={log_loss_mean:.6f}, std={log_loss_std:.6f}, "
+                f"median={log_loss_median:.6f}, range=[{log_loss_min:.6f}, {log_loss_max:.6f}]"
+            )
+
+            if standard_log_loss is not None:
+                print(f"  Standard FSRS Log Loss: {standard_log_loss:.6f}")
+                print(
+                    f"  Difference (Jiggle mean - Standard): {log_loss_mean - standard_log_loss:.6f}"
+                )
 
     # 4.5. Automatically detect and analyze peak data points
     detected_peaks = detect_peaks_in_distribution(normalized_diff)
@@ -952,6 +1046,13 @@ def compare_jiggle_vs_standard(
     plt.close()
 
     print(f"  Saved jiggle vs standard comparison plot: {output_path}")
+
+    # Save log loss statistics to JSON file
+    if log_loss_stats is not None:
+        log_loss_file = output_dir / f"{user_id}_log_loss.json"
+        with open(log_loss_file, "w", encoding="utf-8") as f:
+            json.dump(log_loss_stats, f, indent=2, ensure_ascii=False)
+        print(f"  Saved log loss statistics: {log_loss_file}")
 
 
 def main() -> None:

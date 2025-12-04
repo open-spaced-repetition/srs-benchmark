@@ -21,6 +21,8 @@ from data_loader import UserDataLoader
 
 N_EPOCH = 5
 LR = 4e-2
+BATCH_SIZE = 512
+GAMMA = 0
 
 
 def compute_mean_std(
@@ -130,8 +132,8 @@ def fit_fsrs6_parameters_for_user(
             optimizer.init_w,
             n_epoch=N_EPOCH,
             lr=LR,
-            gamma=1.0,
-            batch_size=config.batch_size,
+            gamma=GAMMA,
+            batch_size=BATCH_SIZE,
             max_seq_len=config.max_seq_len,
             enable_short_term=config.include_short_term,
         )
@@ -827,8 +829,8 @@ def compare_jiggle_vs_standard(
             optimizer.init_w,
             n_epoch=N_EPOCH,
             lr=LR,
-            gamma=1.0,
-            batch_size=config.batch_size,
+            gamma=GAMMA,
+            batch_size=BATCH_SIZE,
             max_seq_len=config.max_seq_len,
             enable_short_term=config.include_short_term,
         )
@@ -849,6 +851,7 @@ def compare_jiggle_vs_standard(
 
     # Jiggle predictions: get stability and retrievability for each jiggle, then calculate intervals
     jiggle_intervals = []
+    jiggle_retrievabilities = []
     jiggle_log_losses = []
     for idx, w in enumerate(jiggle_params):
         collection = FSRSCollection(w)
@@ -861,6 +864,7 @@ def compare_jiggle_vs_standard(
             stabilities_arr,
             -w[20],
         )
+        jiggle_retrievabilities.append(retrievability)
 
         # Calculate interval from stability
         intervals = calculate_interval_from_stability(stabilities_arr, target_r, -w[20])
@@ -881,6 +885,12 @@ def compare_jiggle_vs_standard(
     jiggle_interval_mean = np.mean(jiggle_intervals_arr, axis=0)
     jiggle_interval_std = np.std(jiggle_intervals_arr, axis=0, ddof=1)
 
+    jiggle_retrievabilities_arr = np.array(
+        jiggle_retrievabilities
+    )  # Shape: (n_jiggles, n_test)
+    jiggle_retrievability_mean = np.mean(jiggle_retrievabilities_arr, axis=0)
+    jiggle_retrievability_std = np.std(jiggle_retrievabilities_arr, axis=0, ddof=1)
+
     # Standard FSRS prediction
     standard_collection = FSRSCollection(standard_params)
     standard_stabilities, _ = standard_collection.batch_predict(test_set)
@@ -888,17 +898,17 @@ def compare_jiggle_vs_standard(
     standard_intervals = calculate_interval_from_stability(
         standard_stabilities_arr, target_r, -standard_params[20]
     )
+    standard_retrievability = power_forgetting_curve(
+        test_set["delta_t"].to_numpy(dtype=np.float64),
+        standard_stabilities_arr,
+        -standard_params[20],
+    )
 
     # Calculate standard FSRS log loss if labels are available
     standard_log_loss = None
     if has_labels and y_true is not None:
         from sklearn.metrics import log_loss  # type: ignore
 
-        standard_retrievability = power_forgetting_curve(
-            test_set["delta_t"].to_numpy(dtype=np.float64),
-            standard_stabilities_arr,
-            -standard_params[20],
-        )
         try:
             standard_log_loss = float(
                 log_loss(y_true=y_true, y_pred=standard_retrievability, labels=[0, 1])
@@ -906,10 +916,18 @@ def compare_jiggle_vs_standard(
         except Exception as e:
             print(f"  Warning: Failed to calculate standard FSRS log loss: {e}")
 
-    # 4. Calculate normalized difference: (t_jiggle,mean - t_standard) / σ_t,jiggle
+    # 4. Calculate normalized difference for intervals: (t_jiggle,mean - t_standard) / σ_t,jiggle
     # Avoid division by zero
     sigma_safe = np.where(jiggle_interval_std > 1e-10, jiggle_interval_std, 1e-10)
-    normalized_diff = (jiggle_interval_mean - standard_intervals) / sigma_safe
+    normalized_interval_diff = (jiggle_interval_mean - standard_intervals) / sigma_safe
+
+    # 4.1. Calculate normalized difference for retrievability: (R_jiggle,mean - R_standard) / σ_R,jiggle
+    sigma_r_safe = np.where(
+        jiggle_retrievability_std > 1e-10, jiggle_retrievability_std, 1e-10
+    )
+    normalized_retrievability_diff = (
+        jiggle_retrievability_mean - standard_retrievability
+    ) / sigma_r_safe
 
     # 4.1. Calculate and report log loss statistics
     log_loss_stats = None
@@ -954,20 +972,20 @@ def compare_jiggle_vs_standard(
                     f"  Difference (Jiggle mean - Standard): {log_loss_mean - standard_log_loss:.6f}"
                 )
 
-    # 4.5. Automatically detect and analyze peak data points
-    detected_peaks = detect_peaks_in_distribution(normalized_diff)
-    if len(detected_peaks) > 0:
+    # 4.5. Automatically detect and analyze peak data points for intervals
+    detected_peaks_interval = detect_peaks_in_distribution(normalized_interval_diff)
+    if len(detected_peaks_interval) > 0:
         print(
-            f"  Detected {len(detected_peaks)} peaks: {[f'{p:.3f}' for p in detected_peaks]}"
+            f"  Detected {len(detected_peaks_interval)} peaks in interval differences: {[f'{p:.3f}' for p in detected_peaks_interval]}"
         )
         # Analyze top peaks (limit to top 5 to avoid too many analyses)
         # Sort by absolute value to prioritize significant peaks
-        peaks_to_analyze = sorted(detected_peaks, key=lambda x: abs(x), reverse=True)[
-            :5
-        ]
+        peaks_to_analyze = sorted(
+            detected_peaks_interval, key=lambda x: abs(x), reverse=True
+        )[:5]
         analyze_peak_data_points(
             test_set=test_set,
-            normalized_diff=normalized_diff,
+            normalized_diff=normalized_interval_diff,
             jiggle_interval_mean=jiggle_interval_mean,
             jiggle_interval_std=jiggle_interval_std,
             standard_intervals=standard_intervals,
@@ -977,13 +995,14 @@ def compare_jiggle_vs_standard(
             user_id=user_id,
         )
 
-    # 5. Create visualization
-    fig, axes = plt.subplots(2, 1, figsize=(12, 10))
+    # 5. Create visualization - 4 subplots: interval and retrievability comparisons
+    fig, axes = plt.subplots(4, 1, figsize=(14, 16))
 
-    # Plot 1: Normalized difference over test data points
+    test_indices = np.arange(len(normalized_interval_diff))
+
+    # Plot 1: Normalized interval difference over test data points
     ax1 = axes[0]
-    test_indices = np.arange(len(normalized_diff))
-    ax1.scatter(test_indices, normalized_diff, alpha=0.6, s=20)
+    ax1.scatter(test_indices, normalized_interval_diff, alpha=0.6, s=20)
     ax1.axhline(y=0, color="red", linestyle="--", linewidth=1, label="Zero difference")
     ax1.axhline(y=1, color="orange", linestyle=":", linewidth=1, alpha=0.7, label="±1σ")
     ax1.axhline(y=-1, color="orange", linestyle=":", linewidth=1, alpha=0.7)
@@ -998,16 +1017,22 @@ def compare_jiggle_vs_standard(
     ax1.legend()
     ax1.grid(True, alpha=0.3)
 
-    # Plot 2: Histogram of normalized differences
+    # Plot 2: Histogram of normalized interval differences
     ax2 = axes[1]
-    ax2.hist(normalized_diff, bins=50, alpha=0.7, edgecolor="black", color="steelblue")
+    ax2.hist(
+        normalized_interval_diff,
+        bins=50,
+        alpha=0.7,
+        edgecolor="black",
+        color="steelblue",
+    )
     ax2.axvline(x=0, color="red", linestyle="--", linewidth=2, label="Zero difference")
     ax2.axvline(
-        x=np.mean(normalized_diff),
+        x=np.mean(normalized_interval_diff),
         color="orange",
         linestyle="--",
         linewidth=2,
-        label=f"Mean: {np.mean(normalized_diff):.3f}",
+        label=f"Mean: {np.mean(normalized_interval_diff):.3f}",
     )
     ax2.set_xlabel("(t_jiggle,mean - t_standard) / σ_t,jiggle", fontsize=12)
     ax2.set_ylabel("Frequency", fontsize=12)
@@ -1019,22 +1044,87 @@ def compare_jiggle_vs_standard(
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
-    # Add statistics text
-    stats_text = (
-        f"Mean: {np.mean(normalized_diff):.4f}\n"
-        f"Std: {np.std(normalized_diff):.4f}\n"
-        f"Median: {np.median(normalized_diff):.4f}\n"
-        f"Min: {np.min(normalized_diff):.4f}\n"
-        f"Max: {np.max(normalized_diff):.4f}"
+    # Plot 3: Normalized retrievability difference over test data points
+    ax3 = axes[2]
+    ax3.scatter(
+        test_indices, normalized_retrievability_diff, alpha=0.6, s=20, color="green"
+    )
+    ax3.axhline(y=0, color="red", linestyle="--", linewidth=1, label="Zero difference")
+    ax3.axhline(y=1, color="orange", linestyle=":", linewidth=1, alpha=0.7, label="±1σ")
+    ax3.axhline(y=-1, color="orange", linestyle=":", linewidth=1, alpha=0.7)
+    ax3.set_xlabel("Test Data Point Index", fontsize=12)
+    ax3.set_ylabel("(R_jiggle,mean - R_standard) / σ_R,jiggle", fontsize=12)
+    ax3.set_title(
+        "Normalized Retrievability Difference (Jiggle vs Standard FSRS)",
+        fontsize=14,
+        fontweight="bold",
+    )
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+
+    # Plot 4: Histogram of normalized retrievability differences
+    ax4 = axes[3]
+    ax4.hist(
+        normalized_retrievability_diff,
+        bins=50,
+        alpha=0.7,
+        edgecolor="black",
+        color="lightgreen",
+    )
+    ax4.axvline(x=0, color="red", linestyle="--", linewidth=2, label="Zero difference")
+    ax4.axvline(
+        x=np.mean(normalized_retrievability_diff),
+        color="orange",
+        linestyle="--",
+        linewidth=2,
+        label=f"Mean: {np.mean(normalized_retrievability_diff):.3f}",
+    )
+    ax4.set_xlabel("(R_jiggle,mean - R_standard) / σ_R,jiggle", fontsize=12)
+    ax4.set_ylabel("Frequency", fontsize=12)
+    ax4.set_title(
+        "Distribution of Normalized Retrievability Differences",
+        fontsize=12,
+        fontweight="bold",
+    )
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+
+    # Add statistics text for intervals
+    stats_text_interval = (
+        f"Interval Stats:\n"
+        f"Mean: {np.mean(normalized_interval_diff):.4f}\n"
+        f"Std: {np.std(normalized_interval_diff):.4f}\n"
+        f"Median: {np.median(normalized_interval_diff):.4f}\n"
+        f"Min: {np.min(normalized_interval_diff):.4f}\n"
+        f"Max: {np.max(normalized_interval_diff):.4f}"
     )
     ax2.text(
         0.02,
         0.98,
-        stats_text,
+        stats_text_interval,
         transform=ax2.transAxes,
         fontsize=10,
         verticalalignment="top",
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+    )
+
+    # Add statistics text for retrievability
+    stats_text_retrievability = (
+        f"Retrievability Stats:\n"
+        f"Mean: {np.mean(normalized_retrievability_diff):.4f}\n"
+        f"Std: {np.std(normalized_retrievability_diff):.4f}\n"
+        f"Median: {np.median(normalized_retrievability_diff):.4f}\n"
+        f"Min: {np.min(normalized_retrievability_diff):.4f}\n"
+        f"Max: {np.max(normalized_retrievability_diff):.4f}"
+    )
+    ax4.text(
+        0.02,
+        0.98,
+        stats_text_retrievability,
+        transform=ax4.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="lightgreen", alpha=0.5),
     )
 
     plt.tight_layout()

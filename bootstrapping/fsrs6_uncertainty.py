@@ -71,11 +71,14 @@ def fit_fsrs6_parameters_for_user(
     """
     Run N_JIGGLES Monte Carlo trainings for a single user's dataset.
 
-    Each training uses the same data but different binomial jiggle weights.
+    Each training uses card-level bootstrap resampling:
+    - Sample J cards with replacement from all unique cards
+    - Construct a new dataset where each card's reviews appear as many times as the card was sampled
+    - Train FSRS-6 model on the resampled dataset
 
     Args:
-        user_dataset: User's dataset
-        n_jiggles: Number of jiggle trainings
+        user_dataset: User's dataset (must contain 'card_id' column)
+        n_jiggles: Number of bootstrap trainings
         config: Configuration object
         seed: Random seed for reproducibility (default: 42)
     """
@@ -88,32 +91,68 @@ def fit_fsrs6_parameters_for_user(
     if config.no_train_same_day and "elapsed_days" not in user_dataset.columns:
         raise ValueError("Column 'elapsed_days' is required but missing from dataset.")
 
+    # Make sure card_id exists for card-level bootstrap
+    if "card_id" not in user_dataset.columns:
+        raise ValueError(
+            "Column 'card_id' is required but missing from dataset for card-level bootstrap."
+        )
+
     all_parameter_sets: List[List[float]] = []
 
     # Create a random number generator with the seed for this user
     # Use a deterministic seed based on user_id and global seed for reproducibility
     rng = np.random.default_rng(seed)
 
+    # Apply filtering first to get the final dataset structure for all bootstrap samples
+    dataset_filtered = user_dataset.copy()
+    if config.no_train_same_day:
+        dataset_filtered = dataset_filtered[dataset_filtered["elapsed_days"] > 0].copy()
+
+    if len(dataset_filtered) == 0:
+        # Not enough data after filtering
+        return all_parameter_sets
+
+    # Get unique card IDs from filtered dataset for bootstrap sampling
+    unique_card_ids = dataset_filtered["card_id"].unique()
+    n_cards = len(unique_card_ids)
+
+    if n_cards == 0:
+        # No cards available
+        return all_parameter_sets
+
+    # Pre-group reviews by card_id for efficient lookup
+    card_groups = {
+        card_id: group for card_id, group in dataset_filtered.groupby("card_id")
+    }
+
     for jiggle_idx in range(n_jiggles):
-        dataset = user_dataset.copy()
+        # Card-level bootstrap: sample n_cards cards with replacement
+        # From {1, ..., J} sample J indices with replacement: j_1^(b), ..., j_J^(b)
+        bootstrap_card_indices = rng.choice(n_cards, size=n_cards, replace=True)
 
-        if config.no_train_same_day:
-            dataset = dataset[dataset["elapsed_days"] > 0].copy()
+        # Get the card IDs that were sampled (with replacement)
+        # D^(b) = {h_{j_1^(b)}, ..., h_{j_J^(b)}} where each h_j contains all reviews for card j
+        bootstrap_card_ids = unique_card_ids[bootstrap_card_indices]
 
-        if len(dataset) == 0:
-            # Not enough data after filtering; skip this jiggle
+        # Construct the bootstrap dataset by including each card's reviews as many times as it was sampled
+        # If a card was sampled k times, all its reviews will appear k times in the dataset
+        bootstrap_datasets = []
+        for card_id in bootstrap_card_ids:
+            # Get all review records for this card (using pre-grouped data)
+            if card_id in card_groups:
+                card_reviews = card_groups[card_id].copy()
+                bootstrap_datasets.append(card_reviews)
+
+        # Concatenate all card reviews to form the bootstrap dataset
+        if not bootstrap_datasets:
+            # No cards were sampled or all sampled cards have no reviews
             continue
 
-        # Binomial jiggle weights: 0 or 2, as described in the spec
-        # Use the RNG to ensure reproducibility
-        weights = rng.binomial(n=1, p=0.5, size=len(dataset)).astype("float32") * 2.0
+        dataset = pd.concat(bootstrap_datasets, ignore_index=True)
 
-        # Ensure at least one non-zero weight so that training is meaningful
-        if np.all(weights == 0):
-            # Force a single sample to have non-zero weight
-            weights[rng.integers(0, len(weights))] = 2.0
-
-        dataset["weights"] = weights
+        # Sort by review_th to maintain temporal order if needed
+        if "review_th" in dataset.columns:
+            dataset = dataset.sort_values("review_th").reset_index(drop=True)
 
         # Initialize FSRS-6 model parameters for this dataset
         optimizer.define_model()
@@ -125,7 +164,7 @@ def fit_fsrs6_parameters_for_user(
             all_parameter_sets.append(params)
             continue
 
-        # Train FSRS-6 with the jiggle weights
+        # Train FSRS-6 on the bootstrap resampled dataset
         trainer = Trainer(
             dataset,
             None,
@@ -1147,11 +1186,11 @@ def compare_jiggle_vs_standard(
 
 def main() -> None:
     """
-    Run statistical uncertainty analysis for FSRS-6 using Monte Carlo jiggle weights.
+    Run statistical uncertainty analysis for FSRS-6 using card-level bootstrap resampling.
 
     For each dataset (user), we:
       - Load data via the existing UserDataLoader
-      - Train N_JIGGLES FSRS-6 models with different binomial jiggle weights
+      - Train N_JIGGLES FSRS-6 models with card-level bootstrap resampling
       - Output all parameter sets per user as JSON lines
     """
     parser = create_parser()
@@ -1159,7 +1198,7 @@ def main() -> None:
         "--n_jiggles",
         type=int,
         default=100,
-        help="Number of Monte Carlo jiggle trainings per user.",
+        help="Number of Monte Carlo bootstrap resamplings per user (card-level bootstrap).",
     )
     parser.add_argument(
         "--output",

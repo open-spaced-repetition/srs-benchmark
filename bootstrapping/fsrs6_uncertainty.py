@@ -1066,14 +1066,14 @@ def collect_and_visualize_z_scores(
         # Shapiro-Wilk test (works best for 3-5000 samples)
         if len(z_scores) <= 5000:
             stat_shapiro, p_shapiro = shapiro(z_scores)
-            print(f"\n  Normality Test Results:")
+            print("\n  Normality Test Results:")
             print(
                 f"  Shapiro-Wilk test: statistic={stat_shapiro:.6f}, p-value={p_shapiro:.6f}"
             )
             if p_shapiro > 0.05:
-                print(f"    ✓ Distribution appears normal (p > 0.05)")
+                print("    ✓ Distribution appears normal (p > 0.05)")
             else:
-                print(f"    ✗ Distribution does not appear normal (p ≤ 0.05)")
+                print("    ✗ Distribution does not appear normal (p ≤ 0.05)")
 
         # D'Agostino's normality test (works for any sample size)
         stat_dagostino, p_dagostino = normaltest(z_scores)
@@ -1081,9 +1081,9 @@ def collect_and_visualize_z_scores(
             f"  D'Agostino test: statistic={stat_dagostino:.6f}, p-value={p_dagostino:.6f}"
         )
         if p_dagostino > 0.05:
-            print(f"    ✓ Distribution appears normal (p > 0.05)")
+            print("    ✓ Distribution appears normal (p > 0.05)")
         else:
-            print(f"    ✗ Distribution does not appear normal (p ≤ 0.05)")
+            print("    ✗ Distribution does not appear normal (p ≤ 0.05)")
 
     # Save z-scores to JSON file
     z_score_file = output_dir / "z_scores.json"

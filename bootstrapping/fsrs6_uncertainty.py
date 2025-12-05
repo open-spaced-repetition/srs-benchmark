@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq  # type: ignore
 import matplotlib.pyplot as plt  # type: ignore
-from scipy.signal import find_peaks  # type: ignore
+from scipy.signal import find_peaks
+from tqdm.auto import tqdm  # type: ignore
 
 # Add parent directory to path to import from project root
 script_dir = Path(__file__).parent
@@ -786,6 +787,329 @@ def analyze_peak_data_points(
                 print(f"    Jiggle std (uncertainty): {stats['jiggle_std_mean']:.2f}")
 
 
+def calculate_initial_good_review_interval(
+    params: List[float], target_retrievability: float = 0.9
+) -> float:
+    """
+    Calculate the interval time for an initial good review (rating=3) using FSRS parameters.
+
+    An initial good review means:
+    - First review of a card
+    - Rating = 3 (Good)
+    - No previous history
+
+    Args:
+        params: FSRS-6 parameter weights (21 parameters)
+        target_retrievability: Target retrievability (default: 0.9)
+
+    Returns:
+        Interval time in days
+    """
+
+    # For an initial review with rating=3, the initial stability is w[2] (0-indexed, rating-1)
+    # w[0] = rating 1, w[1] = rating 2, w[2] = rating 3, w[3] = rating 4
+    S_MIN = 0.001
+    initial_stability = max(S_MIN, params[2])
+
+    # Now calculate interval from initial stability
+    decay = -params[20]
+    interval = calculate_interval_from_stability(
+        np.array([initial_stability]), target_retrievability, decay
+    )[0]
+
+    return float(interval)
+
+
+def validate_jiggle_method_gaussianness(
+    user_dataset,
+    n_jiggles: int,
+    config: Config,
+    seed: int,
+    output_dir: Path,
+    user_id: int,
+    min_data_size: int = 1000,
+) -> Optional[float]:
+    """
+    Validate jiggle method by calculating z-score for initial good review interval.
+
+    For a single user, this function:
+    - Fits jiggle parameters on a small subset of data
+    - Fits standard FSRS parameters on full dataset
+    - Calculates interval for initial good review (rating=3)
+    - Returns z-score: (t_jiggle_mean - t_standard) / t_jiggle_std
+
+    Args:
+        user_dataset: Full user dataset
+        n_jiggles: Number of bootstrap trainings
+        config: Configuration object
+        seed: Random seed
+        output_dir: Directory to save results
+        user_id: User ID
+        min_data_size: Minimum data size required (default: 1000)
+
+    Returns:
+        Z-score if successful, None otherwise
+    """
+    if len(user_dataset) < min_data_size:
+        return None
+
+    # Fit jiggle parameters on subset
+    jiggle_params = fit_fsrs6_parameters_for_user(
+        user_dataset=user_dataset,
+        n_jiggles=n_jiggles,
+        config=config,
+        seed=seed,
+    )
+
+    if not jiggle_params or len(jiggle_params) == 0:
+        return None
+
+    # Fit standard FSRS on full dataset
+    from fsrs_optimizer import Optimizer, Trainer  # type: ignore
+
+    optimizer = Optimizer(float_delta_t=config.use_secs_intervals)
+    optimizer.define_model()
+    _ = optimizer.initialize_parameters(dataset=user_dataset, verbose=False)
+
+    if config.only_S0:
+        standard_params = list(map(float, optimizer.init_w))
+    else:
+        trainer = Trainer(
+            user_dataset,
+            None,
+            optimizer.init_w,
+            n_epoch=N_EPOCH,
+            lr=LR,
+            gamma=GAMMA,
+            batch_size=BATCH_SIZE,
+            max_seq_len=config.max_seq_len,
+            enable_short_term=config.include_short_term,
+        )
+        standard_params = list(map(float, trainer.train(verbose=False)))
+
+    # Calculate intervals for initial good review
+    target_r = 0.9
+    jiggle_intervals = [
+        calculate_initial_good_review_interval(params, target_r)
+        for params in jiggle_params
+    ]
+
+    t_jiggle_mean = np.mean(jiggle_intervals)
+    t_jiggle_std = (
+        np.std(jiggle_intervals, ddof=1) if len(jiggle_intervals) > 1 else 0.0
+    )
+    t_standard = calculate_initial_good_review_interval(standard_params, target_r)
+
+    # Calculate z-score: (t_jiggle_mean - t_standard) / t_jiggle_std
+    if t_jiggle_std == 0:
+        return None
+
+    z_score = (t_jiggle_mean - t_standard) / t_jiggle_std
+
+    return float(z_score)
+
+
+def collect_and_visualize_z_scores(
+    data_loader: UserDataLoader,
+    user_ids: List[int],
+    n_jiggles: int,
+    config: Config,
+    seed: int,
+    output_dir: Path,
+    max_z_scores: int = 1000,
+    min_data_size: int = 1000,
+) -> None:
+    """
+    Collect z-scores from multiple users and visualize the distribution.
+
+    This function validates the jiggle method by checking if z-scores follow
+    a Gaussian distribution, which would indicate the bootstrap method is working correctly.
+
+    Args:
+        data_loader: UserDataLoader instance
+        user_ids: List of user IDs to process
+        n_jiggles: Number of bootstrap trainings
+        config: Configuration object
+        seed: Random seed
+        output_dir: Directory to save visualization
+        max_z_scores: Maximum number of z-scores to collect (default: 1000)
+        min_data_size: Minimum data size per user (default: 1000)
+    """
+    z_scores = []
+    z_scores_with_users = []  # List of (user_id, z_score) tuples
+
+    print(f"\nCollecting z-scores for Gaussian validation (max {max_z_scores})...")
+
+    for user_id in tqdm(user_ids):
+        if len(z_scores) >= max_z_scores:
+            print(f"  Collected {len(z_scores)} z-scores, stopping collection.")
+            break
+
+        try:
+            user_dataset = data_loader.load_user_data(user_id)
+        except Exception:
+            continue
+
+        user_seed = seed + user_id
+        z_score = validate_jiggle_method_gaussianness(
+            user_dataset=user_dataset,
+            n_jiggles=n_jiggles,
+            config=config,
+            seed=user_seed,
+            output_dir=output_dir,
+            user_id=user_id,
+            min_data_size=min_data_size,
+        )
+
+        if z_score is not None:
+            print(f"  User {user_id} z-score: {z_score:.6f}")
+            z_scores.append(z_score)
+            z_scores_with_users.append((user_id, z_score))
+            if len(z_scores) % 100 == 0:
+                print(f"  Collected {len(z_scores)} z-scores...")
+
+    if len(z_scores) == 0:
+        print("  Warning: No z-scores were collected. Cannot create validation plot.")
+        return
+
+    print(f"  Total z-scores collected: {len(z_scores)}")
+
+    # Print users with z-score < -5
+    extreme_users = [(uid, z) for uid, z in z_scores_with_users if z < -5]
+    if extreme_users:
+        print(f"\n  Users with z-score < -5: {len(extreme_users)} users")
+        extreme_users_sorted = sorted(
+            extreme_users, key=lambda x: x[1]
+        )  # Sort by z-score (most negative first)
+        for user_id, z_score in extreme_users_sorted:
+            print(f"    User {user_id}: z-score = {z_score:.6f}")
+    else:
+        print("\n  No users with z-score < -5 found.")
+
+    # Visualize z-score distribution
+    output_dir.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(2, 1, figsize=(12, 10))
+
+    # Plot 1: Histogram of z-scores
+    ax1 = axes[0]
+    n_bins = min(50, max(20, len(z_scores) // 20))
+    counts, bins, patches = ax1.hist(
+        z_scores, bins=n_bins, alpha=0.7, edgecolor="black", color="steelblue"
+    )
+
+    # Add normal distribution overlay
+    from scipy.stats import norm, probplot, skew, kurtosis  # type: ignore
+
+    mu = np.mean(z_scores)
+    sigma = np.std(z_scores, ddof=1)
+    x = np.linspace(np.min(z_scores), np.max(z_scores), 100)
+    y = norm.pdf(x, mu, sigma) * len(z_scores) * (bins[1] - bins[0])
+    ax1.plot(x, y, "r--", linewidth=2, label=f"Normal(μ={mu:.4f}, σ={sigma:.4f})")
+
+    # Add vertical line at mean
+    ax1.axvline(x=mu, color="red", linestyle="--", linewidth=2, label=f"Mean: {mu:.4f}")
+    ax1.axvline(
+        x=0, color="orange", linestyle=":", linewidth=1.5, alpha=0.7, label="Zero"
+    )
+
+    ax1.set_xlabel("Z-Score: (t_jiggle_mean - t_standard) / t_jiggle_std", fontsize=12)
+    ax1.set_ylabel("Frequency", fontsize=12)
+    ax1.set_title(
+        f"Distribution of Z-Scores for Initial Good Review Interval\n"
+        f"(N={len(z_scores)} users, {n_jiggles} jiggles per user)",
+        fontsize=14,
+        fontweight="bold",
+    )
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Add statistics text
+    stats_text = (
+        f"Statistics:\n"
+        f"Mean: {mu:.6f}\n"
+        f"Std: {sigma:.6f}\n"
+        f"Median: {np.median(z_scores):.6f}\n"
+        f"Min: {np.min(z_scores):.6f}\n"
+        f"Max: {np.max(z_scores):.6f}\n"
+        f"Skewness: {skew(z_scores):.4f}\n"
+        f"Kurtosis: {kurtosis(z_scores):.4f}"
+    )
+    ax1.text(
+        0.02,
+        0.98,
+        stats_text,
+        transform=ax1.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+    )
+
+    # Plot 2: Q-Q plot to check normality
+    ax2 = axes[1]
+    probplot(z_scores, dist="norm", plot=ax2)
+    ax2.set_title("Q-Q Plot (Normal Distribution)", fontsize=12, fontweight="bold")
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    # Save the plot
+    output_path = output_dir / "z_score_gaussian_validation.png"
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close()
+
+    print(f"  Saved z-score validation plot: {output_path}")
+
+    # Perform normality test
+    from scipy.stats import shapiro, normaltest  # type: ignore
+
+    if len(z_scores) >= 3:
+        # Shapiro-Wilk test (works best for 3-5000 samples)
+        if len(z_scores) <= 5000:
+            stat_shapiro, p_shapiro = shapiro(z_scores)
+            print(f"\n  Normality Test Results:")
+            print(
+                f"  Shapiro-Wilk test: statistic={stat_shapiro:.6f}, p-value={p_shapiro:.6f}"
+            )
+            if p_shapiro > 0.05:
+                print(f"    ✓ Distribution appears normal (p > 0.05)")
+            else:
+                print(f"    ✗ Distribution does not appear normal (p ≤ 0.05)")
+
+        # D'Agostino's normality test (works for any sample size)
+        stat_dagostino, p_dagostino = normaltest(z_scores)
+        print(
+            f"  D'Agostino test: statistic={stat_dagostino:.6f}, p-value={p_dagostino:.6f}"
+        )
+        if p_dagostino > 0.05:
+            print(f"    ✓ Distribution appears normal (p > 0.05)")
+        else:
+            print(f"    ✗ Distribution does not appear normal (p ≤ 0.05)")
+
+    # Save z-scores to JSON file
+    z_score_file = output_dir / "z_scores.json"
+    z_score_data = {
+        "n_samples": len(z_scores),
+        "n_jiggles": n_jiggles,
+        "mean": float(mu),
+        "std": float(sigma),
+        "median": float(np.median(z_scores)),
+        "min": float(np.min(z_scores)),
+        "max": float(np.max(z_scores)),
+        "z_scores": [float(z) for z in z_scores],
+        "user_z_scores": [
+            {"user_id": int(uid), "z_score": float(z)} for uid, z in z_scores_with_users
+        ],
+        "extreme_users_z_less_than_minus5": [
+            {"user_id": int(uid), "z_score": float(z)}
+            for uid, z in z_scores_with_users
+            if z < -5
+        ],
+    }
+    with open(z_score_file, "w", encoding="utf-8") as f:
+        json.dump(z_score_data, f, indent=2, ensure_ascii=False)
+    print(f"  Saved z-scores data: {z_score_file}")
+
+
 def compare_jiggle_vs_standard(
     user_dataset,
     n_jiggles: int,
@@ -1265,6 +1589,29 @@ def main() -> None:
         default=10,
         help="Maximum number of users to run comparison on (default: 10).",
     )
+    parser.add_argument(
+        "--validation_output_dir",
+        type=str,
+        default="bootstrapping/plots/validation",
+        help="Directory to save z-score validation plots.",
+    )
+    parser.add_argument(
+        "--max_z_scores",
+        type=int,
+        default=1000,
+        help="Maximum number of z-scores to collect for validation (default: 1000).",
+    )
+    parser.add_argument(
+        "--min_data_size_for_validation",
+        type=int,
+        default=1000,
+        help="Minimum data size per user for validation (default: 1000).",
+    )
+    parser.add_argument(
+        "--validation_only",
+        action="store_true",
+        help="Only run validation (skip parameter fitting, predictions, and other visualizations).",
+    )
     args, _ = parser.parse_known_args()
 
     # Force algorithm to be FSRS-6 for this script
@@ -1305,6 +1652,21 @@ def main() -> None:
         user_ids.append(uid)
 
     user_ids.sort()
+
+    # If validation_only mode, skip all other processing and go directly to validation
+    if args.validation_only:
+        validation_output_dir = (project_root / args.validation_output_dir).resolve()
+        collect_and_visualize_z_scores(
+            data_loader=data_loader,
+            user_ids=user_ids,
+            n_jiggles=n_jiggles,
+            config=config,
+            seed=seed,
+            output_dir=validation_output_dir,
+            max_z_scores=args.max_z_scores,
+            min_data_size=args.min_data_size_for_validation,
+        )
+        return
 
     with output_path.open("w", encoding="utf-8") as out_f:
         for user_id in user_ids:

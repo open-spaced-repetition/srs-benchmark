@@ -787,16 +787,11 @@ def analyze_peak_data_points(
                 print(f"    Jiggle std (uncertainty): {stats['jiggle_std_mean']:.2f}")
 
 
-def calculate_initial_good_review_interval(
-    params: List[float], target_retrievability: float = 0.9
+def calculate_initial_review_interval(
+    params: List[float], rating: int, target_retrievability: float = 0.9
 ) -> float:
     """
-    Calculate the interval time for an initial good review (rating=3) using FSRS parameters.
-
-    An initial good review means:
-    - First review of a card
-    - Rating = 3 (Good)
-    - No previous history
+    Calculate the interval time for an initial review using FSRS parameters.
 
     Args:
         params: FSRS-6 parameter weights (21 parameters)
@@ -809,7 +804,7 @@ def calculate_initial_good_review_interval(
     # For an initial review with rating=3, the initial stability is w[2] (0-indexed, rating-1)
     # w[0] = rating 1, w[1] = rating 2, w[2] = rating 3, w[3] = rating 4
     S_MIN = 0.001
-    initial_stability = max(S_MIN, params[2])
+    initial_stability = max(S_MIN, params[rating - 1])
 
     # Now calculate interval from initial stability
     decay = -params[20]
@@ -889,8 +884,9 @@ def validate_jiggle_method_gaussianness(
 
     # Calculate intervals for initial good review
     target_r = 0.9
+    rating = 1
     jiggle_intervals = [
-        calculate_initial_good_review_interval(params, target_r)
+        calculate_initial_review_interval(params, rating, target_r)
         for params in jiggle_params
     ]
 
@@ -898,7 +894,7 @@ def validate_jiggle_method_gaussianness(
     t_jiggle_std = (
         np.std(jiggle_intervals, ddof=1) if len(jiggle_intervals) > 1 else 0.0
     )
-    t_standard = calculate_initial_good_review_interval(standard_params, target_r)
+    t_standard = calculate_initial_review_interval(standard_params, rating, target_r)
 
     # Calculate z-score: (t_jiggle_mean - t_standard) / t_jiggle_std
     if t_jiggle_std == 0:

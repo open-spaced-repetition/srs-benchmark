@@ -884,7 +884,7 @@ def validate_jiggle_method_gaussianness(
 
     # Calculate intervals for initial good review
     target_r = 0.9
-    rating = 1
+    rating = 3
     jiggle_intervals = [
         calculate_initial_review_interval(params, rating, target_r)
         for params in jiggle_params
@@ -1011,7 +1011,7 @@ def collect_and_visualize_z_scores(
     ax1.set_xlabel("Z-Score: (t_jiggle_mean - t_standard) / t_jiggle_std", fontsize=12)
     ax1.set_ylabel("Frequency", fontsize=12)
     ax1.set_title(
-        f"Distribution of Z-Scores for Initial Good Review Interval\n"
+        f"Distribution of Z-Scores for Initial Review Interval\n"
         f"(N={len(z_scores)} users, {n_jiggles} jiggles per user)",
         fontsize=14,
         fontweight="bold",

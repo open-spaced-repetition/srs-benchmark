@@ -42,7 +42,8 @@ class RNNProcess:
     ):
         self.rnn = SrsRWKVRnn(config).to(device)
         if path is not None:
-            self.rnn.load_state_dict(torch.load(path, weights_only=True))
+            state_dict = torch.load(path, map_location=device, weights_only=True)
+            self.rnn.load_state_dict(state_dict)
             print(f"Loaded: {path}")
         else:
             print("Did not load weights.")

@@ -35,7 +35,14 @@ def process(user_id):
             return
 
     df = pd.read_parquet(rwkv_config.DATA_PATH / "revlogs" / f"{user_id=}")
-    df = create_features(df.copy(), config=config)
+    try:
+        df = create_features(df.copy(), config=config)
+    except ValueError as err:
+        # Some users can lose every row during outlier/non-continuity filtering; skip those users.
+        if "No data after handling outliers" in str(err):
+            print(f"Skipping {user_id}: {err}")
+            return
+        raise
     if len(df) == 0:  # that one user
         return
 

@@ -589,7 +589,7 @@ if __name__ == "__main__":
         if not torch.cuda.is_available():
             raise RuntimeError(
                 "DEVICE is set to CUDA, but this PyTorch build lacks CUDA support. "
-                "Install a CUDA-enabled build or set DEVICE to 'cpu'/'mps'."
+                "Install a CUDA-enabled build or set DEVICE to 'cpu'."
             )
     else:
         print(

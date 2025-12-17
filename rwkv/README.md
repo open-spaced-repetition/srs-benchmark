@@ -1,4 +1,4 @@
-For fast performance, a device that supports CUDA is required. The code in this directory has been tested on a 3090 RTX on Windows.
+For fast performance, a device that supports CUDA is required. The code in this directory has been tested on a 3090 RTX on Windows. Training can fall back to CPU, but expect it to be dramatically slower.
 
 RWKV can still be run on non-CUDA devices for individual users. See the section [Run on a single user](#run-on-a-single-user).
 
@@ -27,6 +27,8 @@ To switch between the two phases, refer to the config file. RWKV was trained on 
 ```bash
 python -m rwkv.train_rwkv --config rwkv/train_rwkv_config.toml
 ```
+### Training without CUDA (experimental)
+You can run the trainer on CPU-only machines, but it is dramatically slower than CUDA. Edit `rwkv/train_rwkv_config.toml` and set `DEVICE = "cpu"` before launching the command above.
 ## Evaluation
 ### Fast evaluation with CUDA
 ```bash

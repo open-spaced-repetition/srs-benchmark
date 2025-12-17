@@ -179,6 +179,13 @@ def get_grad_norm(model):
     return total_norm
 
 
+def _clear_device_cache(device):
+    """Clear CUDA cache only when CUDA is actually available."""
+    device_type = device.type if isinstance(device, torch.device) else str(device)
+    if device_type == "cuda" and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def evaluate_on_user(user_id, batch, model: SrsRWKV):
     model.eval()
     with torch.no_grad():
@@ -198,7 +205,7 @@ def evaluate_on_user(user_id, batch, model: SrsRWKV):
 
 
 def validate(model, data_fetcher, all_db_keys, users, device):
-    torch.cuda.empty_cache()
+    _clear_device_cache(device)
     tot_ahead_loss = 0
     tot_ahead_raw_loss = 0
     tot_ahead_n = 0
@@ -447,7 +454,7 @@ def main_loop(config, task_queue, batch_queue):
                 break
 
             if step < config.STEP_OFFSET + 1000:
-                torch.cuda.empty_cache()
+                _clear_device_cache(config.DEVICE)
 
             validate_iter = (
                 step == 50 or (group_i + 1) % 500 == 0 or step == total_steps
@@ -578,5 +585,14 @@ def main(config):
 
 if __name__ == "__main__":
     config = parse_toml()
-    assert config.DEVICE.type == "cuda", "Only cuda is supported for training."
+    if config.DEVICE.type == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "DEVICE is set to CUDA, but this PyTorch build lacks CUDA support. "
+                "Install a CUDA-enabled build or set DEVICE to 'cpu'/'mps'."
+            )
+    else:
+        print(
+            f"Running on {config.DEVICE}. Training without CUDA is supported but will be significantly slower."
+        )
     main(config)

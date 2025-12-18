@@ -9,6 +9,8 @@ dependencies = [
     "huggingface_hub",
     "wandb",
     "torch",
+    "lmdb",
+    "tomli",
 ]
 
 [build-system]

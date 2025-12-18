@@ -195,6 +195,7 @@ def add_segment_features(df, equalize_review_ths=[]):
 def get_rwkv_data(data_path, user_id, equalize_review_ths=[]):
     df = pd.read_parquet(data_path / "revlogs" / f"{user_id=}")
     df_len = len(df)
+    df["user_id"] = user_id
     df["review_th"] = range(1, df.shape[0] + 1)
     df_cards = pd.read_parquet(data_path / "cards", filters=[("user_id", "=", user_id)])
     df_cards.drop(columns=["user_id"], inplace=True)

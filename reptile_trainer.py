@@ -78,7 +78,12 @@ FILE_NAME = (
 MODEL_PATH = f"./pretrain/{FILE_NAME}_pretrain.pth"
 INNER_OPT_PATH = f"./pretrain/{FILE_NAME}_opt_pretrain.pth"
 DATA_PATH = Path(args.data)
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    DEVICE = torch.device("mps")
+else:
+    DEVICE = torch.device("cpu")
 MAX_SEQ_LEN: int = 64
 n_splits = 5
 
@@ -442,7 +447,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             param.grad = torch.zeros_like(param.data)
 
         task_id = outer_it % len(train_df_list)
-        user_id = train_df_list[task_id]["user_id"].iloc[0]
+        user_id = train_df_list[task_id]["user_id"].iloc[0].item()
 
         # Register an optimizer for the learner's parameters
         learner = copy.deepcopy(model)
@@ -475,7 +480,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         if outer_it > 0 and outer_it % len(train_df_list) == 0:
             outer_lr = scheduler.get_last_lr()[0]
             print(
-                f"{outer_it}, outer lr: {outer_lr:.3f}, inner lr: {train_adapt_params['lr_middle_raw']:.3f}, exp average: {outer_loss_running:.3f}, inner loss avg: {(recent_losses_total / recent_losses_n):.3f}"
+                f"{outer_it}, outer lr: {outer_lr:.4f}, inner lr: {train_adapt_params['lr_middle_raw']:.4f}, exp average: {outer_loss_running:.4f}, inner loss avg: {(recent_losses_total / recent_losses_n):.4f}"
             )
             sorted_exp_loss_dict = {
                 k: round(v, 4) for k, v in sorted(exp_loss_dict.items())

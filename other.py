@@ -279,6 +279,10 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                     partition_weights[partition] = copy.deepcopy(
                         trained_model.state_dict()
                     )
+                    # Clean up trained model and optimizer
+                    del trained_model, inner_opt
+                    if config.device.type == "mps":
+                        torch.mps.empty_cache()
                 else:
                     trainer = Trainer(
                         model=model,

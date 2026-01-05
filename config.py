@@ -229,8 +229,8 @@ class Config:
             "Transformer",
         ]:
             self.device: torch.device = torch.device("cuda")
-        # elif torch.backends.mps.is_available(): # Support for MPS if uncommented in original
-        #     self.device = torch.device("mps")
+        elif torch.backends.mps.is_available() and self.model_name == "LSTM":
+            self.device = torch.device("mps")
         else:
             self.device = torch.device("cpu")
 

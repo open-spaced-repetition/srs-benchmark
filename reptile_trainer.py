@@ -239,12 +239,15 @@ def finetune_adapt(
         not meta_model_params.requires_grad
     )  # Do not update the meta model's parameters by accident
 
-    for _ in range(inner_steps):
+    inner_loss = None
+    for step in range(inner_steps):
+        batch_count = 0
         for batch in data:
             inner_opt.zero_grad()
-            inner_loss, inner_loss_scaled, _ = compute_data_loss(
+            batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
                 model, batch, batch_size_exp
             )
+            inner_loss = batch_inner_loss  # Keep reference to last loss
             reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
             assert reg_loss.requires_grad
             loss = inner_loss_scaled + reg_scale * reg_loss
@@ -252,8 +255,22 @@ def finetune_adapt(
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
             inner_opt.step()
 
+            # Clear memory for MPS backend after each batch
+            del loss, inner_loss_scaled, reg_loss, batch
+            batch_count += 1
+
+            # Periodic memory cleanup for MPS (every 10 batches)
+            if DEVICE.type == "mps" and batch_count % 10 == 0:
+                torch.mps.empty_cache()
+
         inner_scheduler.step()
 
+        # Additional memory cleanup after each epoch
+        if DEVICE.type == "mps":
+            torch.mps.empty_cache()
+
+    if inner_loss is None:
+        raise ValueError("No batches found in data loader")
     return inner_loss
 
 

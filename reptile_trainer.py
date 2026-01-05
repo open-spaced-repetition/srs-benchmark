@@ -216,7 +216,7 @@ def adapt_on_data(
         )
         inner_loss = batch_inner_loss
         inner_loss_vec = batch_inner_loss_vec
-        
+
         # Compute reg_loss with memory-efficient approach
         flattened_params = get_params_flattened(model)
         reg_loss = torch.sum((flattened_params - meta_model_params) ** 2)
@@ -225,7 +225,7 @@ def adapt_on_data(
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
         inner_opt.step()
         inner_scheduler.step()
-        
+
         # Clear memory for MPS backend
         del loss, inner_loss_scaled, reg_loss, flattened_params, batch
         if DEVICE.type == "mps" and i % 5 == 0:  # Periodic cleanup
@@ -329,7 +329,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
 
     # Get flattened params before deepcopy to avoid holding reference
     meta_model_params = get_params_flattened(model).detach()
-    
+
     learner = copy.deepcopy(model)
     inner_opt = get_inner_opt(learner.parameters())
 
@@ -369,12 +369,12 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         reg_scale=reg_scale,
         clip_norm=clip_norm,
     )
-    
+
     # Clean up intermediate objects
     del df_batchdataset, df_loader, inner_opt_state_copy, meta_model_params
     if DEVICE.type == "mps":
         torch.mps.empty_cache()
-    
+
     return learner
 
 
@@ -412,7 +412,7 @@ def evaluate(df_list, model, inner_opt_state, name, log):
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
                 test_loss += test_split_loss.item()
                 test_n += len(test_set)
-            
+
             # Clean up finetuned model after evaluation
             del finetuned_model
             if DEVICE.type == "mps":
@@ -522,7 +522,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
 
         outer_opt.step()
         scheduler.step()
-        
+
         # Clean up learner and intermediate variables
         del learner, inner_opt, meta_model_params
         if DEVICE.type == "mps" and outer_it % 100 == 0:  # Periodic cleanup

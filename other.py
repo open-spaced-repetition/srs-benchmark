@@ -40,6 +40,7 @@ from model_processors import (
 parser = create_parser()
 args, _ = parser.parse_known_args()
 config = Config(args)
+DATASET_DEVICE = torch.device("cpu") if config.device.type == "mps" else config.device
 
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
@@ -93,7 +94,7 @@ class Trainer:
             train_set.copy(),
             self.batch_size,
             max_seq_len=self.max_seq_len,
-            device=config.device,
+            device=DATASET_DEVICE,
         )
         self.train_data_loader = BatchLoader(self.train_set)
 
@@ -104,7 +105,7 @@ class Trainer:
                 test_set.copy(),
                 batch_size=self.batch_size,
                 max_seq_len=self.max_seq_len,
-                device=config.device,
+                device=DATASET_DEVICE,
             )
         )
         self.test_data_loader = (
@@ -274,7 +275,9 @@ def process(user_id: int) -> tuple[dict, Optional[dict]]:
                         path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
                     )
                     trained_model = finetune(
-                        train_partition, model, inner_opt.state_dict()
+                        train_partition,
+                        model,
+                        inner_opt.state_dict(),
                     )
                     partition_weights[partition] = copy.deepcopy(
                         trained_model.state_dict()

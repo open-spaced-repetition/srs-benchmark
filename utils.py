@@ -206,7 +206,18 @@ def batch_process_wrapper(
     Returns:
         Dictionary containing model outputs including labels and weights
     """
-    sequences, delta_ts, labels, seq_lens, weights = batch
+    device = (
+        model.config.device
+        if hasattr(model, "config") and hasattr(model.config, "device")
+        else next(model.parameters()).device
+    )
+    sequences, delta_ts, labels, seq_lens, weights = (
+        batch[0].to(device),
+        batch[1].to(device),
+        batch[2].to(device),
+        batch[3].to(device),
+        batch[4].to(device),
+    )
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
@@ -247,8 +258,13 @@ class Collection:
                 "Please install it to use Collection.batch_predict()"
             )
 
+        dataset_device = (
+            torch.device("cpu")
+            if self.config.device.type == "mps"
+            else self.config.device
+        )
         batch_dataset = BatchDataset(
-            dataset, batch_size=8192, sort_by_length=False, device=self.config.device
+            dataset, batch_size=8192, sort_by_length=False, device=dataset_device
         )
         batch_loader = BatchLoader(batch_dataset, shuffle=False)
         retentions = []

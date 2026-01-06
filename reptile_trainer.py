@@ -84,6 +84,7 @@ elif torch.backends.mps.is_available():
     DEVICE = torch.device("mps")
 else:
     DEVICE = torch.device("cpu")
+DATASET_DEVICE = torch.device("cpu") if DEVICE.type == "mps" else DEVICE
 MAX_SEQ_LEN: int = 64
 n_splits = 5
 
@@ -136,12 +137,30 @@ def print_grad_norm(model):
     print(torch.cat(grads).norm())
 
 
+def move_batch_to_device(
+    batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor], device: torch.device
+) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    sequences, delta_ts, labels, seq_lens, weights = batch
+    return (
+        sequences.to(device),
+        delta_ts.to(device),
+        labels.to(device),
+        seq_lens.to(device),
+        weights.to(device),
+    )
+
+
 def compute_data_loss(
     model: TrainableModel,
     batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor],
     batch_size_exp=1.0,
 ):
-    sequences, delta_ts, labels, seq_lens, weights = batch
+    device = (
+        model.config.device
+        if hasattr(model, "config") and hasattr(model.config, "device")
+        else next(model.parameters()).device
+    )
+    sequences, delta_ts, labels, seq_lens, weights = move_batch_to_device(batch, device)
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
@@ -161,7 +180,7 @@ def compute_df_loss(model, df):
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
-        device=DEVICE,
+        device=DATASET_DEVICE,
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
     total = 0.0
@@ -226,11 +245,6 @@ def adapt_on_data(
         inner_opt.step()
         inner_scheduler.step()
 
-        # Clear memory for MPS backend
-        del loss, inner_loss_scaled, reg_loss, flattened_params, batch
-        if DEVICE.type == "mps" and i % 5 == 0:  # Periodic cleanup
-            torch.mps.empty_cache()
-
     if inner_loss is None:
         raise ValueError("No batches processed in adapt_on_data")
     return inner_loss, inner_loss_vec.shape[0] if inner_loss_vec is not None else 0
@@ -268,20 +282,9 @@ def finetune_adapt(
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
             inner_opt.step()
-
-            # Clear memory for MPS backend after each batch
-            del loss, inner_loss_scaled, reg_loss, batch
             batch_count += 1
 
-            # Periodic memory cleanup for MPS (every 10 batches)
-            if DEVICE.type == "mps" and batch_count % 10 == 0:
-                torch.mps.empty_cache()
-
         inner_scheduler.step()
-
-        # Additional memory cleanup after each epoch
-        if DEVICE.type == "mps":
-            torch.mps.empty_cache()
 
     if inner_loss is None:
         raise ValueError("No batches found in data loader")
@@ -355,7 +358,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
-        device=DEVICE,
+        device=DATASET_DEVICE,
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
     _ = finetune_adapt(
@@ -369,16 +372,16 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         reg_scale=reg_scale,
         clip_norm=clip_norm,
     )
-
-    # Clean up intermediate objects
-    del df_batchdataset, df_loader, inner_opt_state_copy, meta_model_params
-    if DEVICE.type == "mps":
-        torch.mps.empty_cache()
-
     return learner
 
 
-def evaluate(df_list, model, inner_opt_state, name, log):
+def evaluate(
+    df_list,
+    model,
+    inner_opt_state,
+    name,
+    log,
+):
     all_test_loss = 0
     all_test_n = 0
     output_str = "{"
@@ -413,11 +416,6 @@ def evaluate(df_list, model, inner_opt_state, name, log):
                 test_loss += test_split_loss.item()
                 test_n += len(test_set)
 
-            # Clean up finetuned model after evaluation
-            del finetuned_model
-            if DEVICE.type == "mps":
-                torch.mps.empty_cache()
-
         avg_test_loss = test_loss / test_n
         output_str += f"{user_id}: {avg_test_loss:.3f}, "
         all_test_loss += test_loss
@@ -439,7 +437,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             df.copy().sample(frac=1, random_state=2030),
             BATCH_SIZE,
             max_seq_len=MAX_SEQ_LEN,
-            device=DEVICE,
+            device=DATASET_DEVICE,
         )
         task_batchloaders.append(BatchLoader(task_dataset, shuffle=True))
 
@@ -523,11 +521,6 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         outer_opt.step()
         scheduler.step()
 
-        # Clean up learner and intermediate variables
-        del learner, inner_opt, meta_model_params
-        if DEVICE.type == "mps" and outer_it % 100 == 0:  # Periodic cleanup
-            torch.mps.empty_cache()
-
         wandb_log = {}
         if outer_it > 0 and outer_it % len(train_df_list) == 0:
             outer_lr = scheduler.get_last_lr()[0]
@@ -556,7 +549,13 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
                 name="train",
                 log=wandb_log,
             )
-            evaluate(test_df_list, model, inner_opt_state, name="test", log=wandb_log)
+            evaluate(
+                test_df_list,
+                model,
+                inner_opt_state,
+                name="test",
+                log=wandb_log,
+            )
 
         if outer_it > 0 and outer_it % CHECKPOINT_STEPS == 0:
             torch.save(model.state_dict(), MODEL_PATH)

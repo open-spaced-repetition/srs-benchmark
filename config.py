@@ -308,9 +308,7 @@ class Config:
 
         Delta interval is always included, duration is optional, and rating is appended last.
         """
-        features: List[str] = [
-            "delta_t_secs" if self.use_secs_intervals else "delta_t"
-        ]
+        features: List[str] = ["delta_t_secs" if self.use_secs_intervals else "delta_t"]
         if self.lstm_use_duration:
             features.append("duration")
         features.append("rating")

@@ -59,14 +59,10 @@ class LSTMFeatureEngineer(BaseFeatureEngineer):
     def _create_lstm_tensors(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Create tensor features for LSTM model
-        Features include: [delta_t, duration, rating]
+        Features include: [delta_t, optional duration, rating]
         """
         # Define features to include in tensor
-        features = [
-            "delta_t_secs" if self.config.use_secs_intervals else "delta_t",
-            "duration",
-            "rating",
-        ]
+        features = self.config.get_lstm_tensor_feature_names()
 
         def get_history(group):
             # Create tensor for each row

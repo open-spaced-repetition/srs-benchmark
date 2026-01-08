@@ -78,6 +78,7 @@ FILE_NAME = (
     + ("-secs" if SECS_IVL else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
+    + ("-no_duration" if (MODEL_NAME == "LSTM" and args.no_lstm_duration) else "")
 )
 MODEL_PATH = f"./pretrain/{FILE_NAME}_pretrain.pth"
 INNER_OPT_PATH = f"./pretrain/{FILE_NAME}_opt_pretrain.pth"
@@ -165,12 +166,9 @@ def compute_df_loss(model, df):
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
+        device=DEVICE,
     )
-    base_loader = BatchLoader(df_batchdataset, shuffle=False)
-    df_loader = DevicePrefetchLoader(
-        base_loader,
-        target_device=DEVICE,
-    )
+    df_loader = BatchLoader(df_batchdataset, shuffle=False)
     total = 0.0
     for batch in df_loader:
         _, evaluate_loss_scaled, _ = compute_data_loss(model, batch)
@@ -213,11 +211,7 @@ def adapt_on_data(
 
     inner_loss = None
     inner_loss_vec = None
-    device_loader = DevicePrefetchLoader(
-        data,
-        target_device=DEVICE,
-    )
-    for i, batch in enumerate(device_loader):
+    for i, batch in enumerate(data):
         if i >= inner_steps:
             break
 
@@ -432,6 +426,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             df.copy().sample(frac=1, random_state=2030),
             BATCH_SIZE,
             max_seq_len=MAX_SEQ_LEN,
+            device=DEVICE,
         )
         task_batchloaders.append(
             BatchLoader(
@@ -621,11 +616,11 @@ def main():
     print(f"Loaded data in {(time.time() - time_start):.3f} seconds.")
 
     # Initialize the mean/std norm for the model
-    features = ["delta_t_secs" if SECS_IVL else "delta_t", "duration", "rating"]
+    tensor_features = config.get_lstm_tensor_feature_names()
     means = []
     stds = []
-    for feature_i, feature in enumerate(features):
-        if feature in ("rating"):
+    for feature_i, feature in enumerate(tensor_features):
+        if feature == "rating":
             continue
 
         all_series = []
@@ -635,7 +630,10 @@ def main():
             series = np.array(
                 list(
                     chain.from_iterable(
-                        map(lambda row: row[:, feature_i].tolist(), tensors)
+                        map(
+                            lambda row, idx=feature_i: row[:, idx].tolist(),
+                            tensors,
+                        )
                     )
                 )
             )

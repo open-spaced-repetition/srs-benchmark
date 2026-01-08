@@ -86,6 +86,11 @@ def create_parser():
     parser.add_argument(
         "--secs", action="store_true", help="use elapsed_seconds as interval"
     )
+    parser.add_argument(
+        "--no_lstm_duration",
+        action="store_true",
+        help="disable duration feature when training LSTM",
+    )
 
     parser.add_argument(
         "--no_test_same_day",
@@ -174,6 +179,7 @@ class Config:
         self.model_name: ModelName = args.algo
         self.max_user_id: Optional[int] = args.max_user_id
         self.use_secs_intervals: bool = args.secs
+        self.lstm_use_duration: bool = not args.no_lstm_duration
         self.no_test_same_day: bool = args.no_test_same_day
         self.no_train_same_day: bool = args.no_train_same_day
         self.equalize_test_with_non_secs: bool = args.equalize_test_with_non_secs
@@ -251,6 +257,8 @@ class Config:
             _file_name_parts.append("-short")
         if self.use_secs_intervals:
             _file_name_parts.append("-secs")
+        if self.model_name == "LSTM" and not self.lstm_use_duration:
+            _file_name_parts.append("-no_duration")
         if self.use_recency_weighting:
             _file_name_parts.append("-recency")
         if self.no_test_same_day:
@@ -293,6 +301,20 @@ class Config:
     def get_optimizer_file_name(self) -> str:
         """Returns the base name for optimizer state files."""
         return self.base_file_name + self.optimizer_name_suffix
+
+    def get_lstm_tensor_feature_names(self) -> List[str]:
+        """
+        Returns the ordered feature names used to build LSTM tensors.
+
+        Delta interval is always included, duration is optional, and rating is appended last.
+        """
+        features: List[str] = [
+            "delta_t_secs" if self.use_secs_intervals else "delta_t"
+        ]
+        if self.lstm_use_duration:
+            features.append("duration")
+        features.append("rating")
+        return features
 
     def __repr__(self) -> str:
         """Provides a string representation of the configuration."""

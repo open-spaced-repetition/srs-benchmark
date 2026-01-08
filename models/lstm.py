@@ -53,7 +53,9 @@ class LSTM(BaseModel):
         self.register_buffer(
             "input_std", torch.tensor(1.0) if input_std is None else input_std
         )
-        self.n_input = 6
+        self.use_duration_feature = config.lstm_use_duration
+        num_main_inputs = 1 + (1 if self.use_duration_feature else 0)
+        self.n_input = num_main_inputs + 4  # rating is expanded to 4 dims
         self.n_hidden = 20
         self.n_curves = 3
 
@@ -135,10 +137,17 @@ class LSTM(BaseModel):
         self.register_buffer("input_std", std_i)
 
     def forward(self, x_lni, hx=None):
-        x_delay, x_duration, x_rating = x_lni.split(1, dim=-1)
-        x_delay = torch.log(1e-5 + x_delay)
-        x_duration = torch.log(torch.clamp(x_duration, min=100, max=60000))
-        x_main = torch.cat([x_delay, x_duration], dim=-1)
+        x_rating = x_lni[..., -1:]
+        x_features = x_lni[..., :-1]
+
+        x_delay = torch.log(1e-5 + x_features[..., :1])
+        if self.use_duration_feature:
+            x_duration = torch.log(
+                torch.clamp(x_features[..., 1:2], min=100, max=60000)
+            )
+            x_main = torch.cat([x_delay, x_duration], dim=-1)
+        else:
+            x_main = x_delay
 
         x_main = (x_main - self.input_mean) / self.input_std
 

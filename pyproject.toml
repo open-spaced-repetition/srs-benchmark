@@ -5,12 +5,13 @@ dependencies = [
     "pandas",
     "matplotlib",
     "scikit-learn",
-    "fsrs-optimizer>=6.2.0",
+    "fsrs-optimizer>=6.4.0",
     "huggingface_hub",
     "wandb",
     "torch",
     "lmdb",
     "tomli",
+    "scipy==1.16.2",
 ]
 
 [build-system]

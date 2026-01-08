@@ -5,7 +5,11 @@ import torch.nn as nn
 from torch import Tensor
 from pathlib import Path
 from config import create_parser, Config
-from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
+from fsrs_optimizer import (  # type: ignore
+    BatchDataset,
+    BatchLoader,
+    DevicePrefetchLoader,
+)
 from multiprocessing import Pool  # type: ignore
 import copy
 import numpy as np
@@ -14,7 +18,6 @@ import wandb
 import time
 from itertools import chain
 from features import create_features
-
 BATCH_SIZE = 16384
 BATCH_SIZE_EXP = 1.0
 
@@ -84,10 +87,8 @@ elif torch.backends.mps.is_available():
     DEVICE = torch.device("mps")
 else:
     DEVICE = torch.device("cpu")
-DATASET_DEVICE = torch.device("cpu") if DEVICE.type == "mps" else DEVICE
 MAX_SEQ_LEN: int = 64
 n_splits = 5
-
 
 class PiecewiseLinearScheduler:
     def __init__(self, optimizer, lr_start, lr_middle, lr_end, n_warmup, n_total):
@@ -137,30 +138,12 @@ def print_grad_norm(model):
     print(torch.cat(grads).norm())
 
 
-def move_batch_to_device(
-    batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor], device: torch.device
-) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-    sequences, delta_ts, labels, seq_lens, weights = batch
-    return (
-        sequences.to(device),
-        delta_ts.to(device),
-        labels.to(device),
-        seq_lens.to(device),
-        weights.to(device),
-    )
-
-
 def compute_data_loss(
     model: TrainableModel,
     batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor],
     batch_size_exp=1.0,
 ):
-    device = (
-        model.config.device
-        if hasattr(model, "config") and hasattr(model.config, "device")
-        else next(model.parameters()).device
-    )
-    sequences, delta_ts, labels, seq_lens, weights = move_batch_to_device(batch, device)
+    sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
@@ -180,9 +163,12 @@ def compute_df_loss(model, df):
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
-        device=DATASET_DEVICE,
     )
-    df_loader = BatchLoader(df_batchdataset, shuffle=False)
+    base_loader = BatchLoader(df_batchdataset, shuffle=False)
+    df_loader = DevicePrefetchLoader(
+        base_loader,
+        target_device=DEVICE,
+    )
     total = 0.0
     for batch in df_loader:
         _, evaluate_loss_scaled, _ = compute_data_loss(model, batch)
@@ -225,7 +211,11 @@ def adapt_on_data(
 
     inner_loss = None
     inner_loss_vec = None
-    for i, batch in enumerate(data):
+    device_loader = DevicePrefetchLoader(
+        data,
+        target_device=DEVICE,
+    )
+    for i, batch in enumerate(device_loader):
         if i >= inner_steps:
             break
 
@@ -268,9 +258,13 @@ def finetune_adapt(
     )  # Do not update the meta model's parameters by accident
 
     inner_loss = None
+    device_loader = DevicePrefetchLoader(
+        data,
+        target_device=DEVICE,
+    )
     for step in range(inner_steps):
         batch_count = 0
-        for batch in data:
+        for batch in device_loader:
             inner_opt.zero_grad()
             batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
                 model, batch, batch_size_exp
@@ -358,7 +352,6 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
-        device=DATASET_DEVICE,
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
     _ = finetune_adapt(
@@ -437,9 +430,13 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             df.copy().sample(frac=1, random_state=2030),
             BATCH_SIZE,
             max_seq_len=MAX_SEQ_LEN,
-            device=DATASET_DEVICE,
         )
-        task_batchloaders.append(BatchLoader(task_dataset, shuffle=True))
+        task_batchloaders.append(
+            BatchLoader(
+                task_dataset,
+                shuffle=True,
+            )
+        )
 
     outer_opt = torch.optim.AdamW(
         model.parameters(),
@@ -491,7 +488,6 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
 
         task_id = outer_it % len(train_df_list)
         user_id = train_df_list[task_id]["user_id"].iloc[0].item()
-
         # Register an optimizer for the learner's parameters
         learner = copy.deepcopy(model)
         inner_opt = get_inner_opt(learner.parameters())

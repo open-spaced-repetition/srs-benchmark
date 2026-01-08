@@ -18,6 +18,7 @@ import wandb
 import time
 from itertools import chain
 from features import create_features
+
 BATCH_SIZE = 16384
 BATCH_SIZE_EXP = 1.0
 
@@ -89,6 +90,7 @@ else:
     DEVICE = torch.device("cpu")
 MAX_SEQ_LEN: int = 64
 n_splits = 5
+
 
 class PiecewiseLinearScheduler:
     def __init__(self, optimizer, lr_start, lr_middle, lr_end, n_warmup, n_total):

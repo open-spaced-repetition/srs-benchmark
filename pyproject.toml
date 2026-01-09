@@ -1,17 +1,20 @@
 [project]
 name = "fsrs-optimizer-project"
 version = "0.1.0"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "pandas",
     "matplotlib",
     "scikit-learn",
     "fsrs-optimizer>=6.4.0",
+    "statsmodels>=0.14.6",
+    "pyarrow>=15",
     "huggingface_hub",
     "wandb",
     "torch",
     "lmdb",
     "tomli",
-    "scipy==1.16.2",
+    "scipy==1.16.3",
 ]
 
 [build-system]

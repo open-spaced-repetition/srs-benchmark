@@ -21,10 +21,10 @@ from rwkv.utils import load_tensor, save_tensor  # type: ignore
 FETCH_AHEAD = 20
 
 
-def get_benchmark_info(db_path, db_size, user_id):
+def get_benchmark_info(db_path, db_size, user_id, key_prefix: str = ""):
     equalize_env = lmdb.open(db_path, db_size)
-    key_review_ths = f"{user_id}_review_ths"
-    key_rmse_bins = f"{user_id}_rmse_bins"
+    key_review_ths = f"{key_prefix}{user_id}_review_ths"
+    key_rmse_bins = f"{key_prefix}{user_id}_rmse_bins"
     with equalize_env.begin(write=False) as txn:
         if txn.get(key_review_ths.encode()) is not None:
             return (
@@ -149,6 +149,7 @@ def run(
     imm_path_raw,
 ):
     data_fetcher = DataFetcher(task_queue=task_queue, out_queue=batch_queue)
+    label_filter_key_prefix = getattr(config, "LABEL_FILTER_KEY_PREFIX", "")
 
     master_model = SrsRWKV(anki_rwkv_config=DEFAULT_ANKI_RWKV_CONFIG).to(config.DEVICE)
     model = (
@@ -174,7 +175,10 @@ def run(
             batches = all_db_keys[user_id]
             print("User:", user_id, "key:", batches)
             equalize_review_ths, rmse_bins = get_benchmark_info(
-                config.LABEL_FILTER_LMDB_PATH, config.LABEL_FILTER_LMDB_SIZE, user_id
+                config.LABEL_FILTER_LMDB_PATH,
+                config.LABEL_FILTER_LMDB_SIZE,
+                user_id,
+                key_prefix=label_filter_key_prefix,
             )
             rmse_bins_dict = {
                 equalize_review_ths[i]: rmse_bins[i]

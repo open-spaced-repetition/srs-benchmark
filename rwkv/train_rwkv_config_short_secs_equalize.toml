@@ -1,3 +1,6 @@
+# Train RWKV while optimizing only on the same benchmark keyset used for
+# same-day (short-term) evaluation (generated with LABEL_FILTER_KEY_PREFIX="short_secs_").
+
 # Start and end indices of the users used for training
 TRAIN_USERS_START = 5000
 TRAIN_USERS_END = 10000
@@ -5,12 +8,10 @@ TRAIN_USERS_END = 10000
 VALIDATE_USERS_START = 1
 VALIDATE_USERS_END = 100
 
-TRAIN_DATASET_LMDB_PATH = "train_db"
+TRAIN_DATASET_LMDB_PATH = "train_db_short_secs"
 TRAIN_DATASET_LMDB_SIZE = 205_000_000_000
-VALIDATE_DATASET_LMDB_PATH = "test_db"
+VALIDATE_DATASET_LMDB_PATH = "test_db_short_secs"
 VALIDATE_DATASET_LMDB_SIZE = 195_000_000_000
-LABEL_FILTER_LMDB_PATH = "label_filter_db"
-LABEL_FILTER_LMDB_SIZE = 7_000_000_000
 
 # Number of CPU processes for preprocessing the dataset
 NUM_FETCH_PROCESSES = 10
@@ -18,8 +19,8 @@ NUM_FETCH_PROCESSES = 10
 # The maximum global length of a batch
 MAX_TRAIN_GLOBAL_LEN = 66000
 
-# Loss mode: "all" (default) or "equalize" (only labels marked by label_is_equalize in the preprocessed LMDB).
-# LOSS_MODE = "all"
+# Use only label_is_equalize positions for the optimized loss.
+LOSS_MODE = "equalize"
 
 # Available modes are "WS" and "D" for the corresponding phases of the WSD learning rate scheduler.
 TRAIN_MODE = "WS"
@@ -35,7 +36,8 @@ LOAD_MODEL = false
 LOAD_MODEL_FOLDER = "pretrain/rwkv"
 LOAD_MODEL_NAME = "RWKV_trained_on_5000_10000"
 SAVE_MODEL_FOLDER = "pretrain/rwkv/train"
-SAVE_MODEL_PREFIX = "rwkv_test"
+SAVE_MODEL_PREFIX = "rwkv_short_secs_equalize"
+
 # Device to train on. Use "cuda" for NVIDIA GPUs, or "cpu" for CPU-only setups (much slower).
 DEVICE = "cuda"
 DTYPE = "bfloat16"

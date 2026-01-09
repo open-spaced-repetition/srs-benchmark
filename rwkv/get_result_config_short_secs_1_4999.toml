@@ -1,0 +1,26 @@
+# Same-day (short-term) evaluation: run with the model trained on users 5000-10000,
+# and evaluate on users 1-4999.
+
+# Output file names (both halves should write to the same files; the second run appends and then sorts).
+FILE_AHEAD = "RWKV-short-secs"
+FILE_IMM = "RWKV-P-short-secs"
+
+MODEL_PATH = "pretrain/RWKV_trained_on_5000_10000.pth"
+DEVICE = "cuda"
+DTYPE = "bfloat16"
+
+DATASET_LMDB_PATH = "test_db"
+DATASET_LMDB_SIZE = 195_000_000_000
+
+LABEL_FILTER_LMDB_PATH = "label_filter_db"
+LABEL_FILTER_LMDB_SIZE = 12_000_000_000
+LABEL_FILTER_KEY_PREFIX = "short_secs_"
+
+RAW = false
+RAW_DB_PATH = "raw/result_db"
+RAW_DB_SIZE = 3_000_000_000
+
+USER_START = 1
+USER_END = 4999
+
+NUM_FETCH_PROCESSES = 10

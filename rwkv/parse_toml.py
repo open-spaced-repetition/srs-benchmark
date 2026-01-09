@@ -1,6 +1,9 @@
 import argparse
 from pathlib import Path
-import tomli
+try:
+    import tomllib as _toml  # Python 3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as _toml  # type: ignore
 from argparse import Namespace
 
 import torch
@@ -11,7 +14,7 @@ def parse_toml():
     parser.add_argument("--config", required=True, help="Location of the toml file")
     args, _ = parser.parse_known_args()
     with open(args.config, "rb") as f:
-        args = tomli.load(f)
+        args = _toml.load(f)
         if "DTYPE" in args:
             if args["DTYPE"] == "bfloat16":
                 args["DTYPE"] = torch.bfloat16

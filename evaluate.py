@@ -145,6 +145,8 @@ if __name__ == "__main__":
         if not args.secs
         else [
             (dev_mode_name, None, None),
+            ("RWKV-P-short-secs", 2762884, "FIL, G, SR, AT"),
+            ("RWKV-short-secs", 2762884, "FIL, G, SR, AT"),
             ("LSTM-short-secs", 8869, "FIL, G, SR, AT"),
             ("MOVING-AVG-short-secs", 0, "---"),
             ("GRU-P-short-secs", 297, "FIL, G, SR"),

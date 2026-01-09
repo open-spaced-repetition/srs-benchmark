@@ -577,6 +577,7 @@ def job(config, user_id, max_size, done, writer_queue, progress_queue):
     LABEL_FILTER_DATASET = lmdb.open(
         config.LABEL_FILTER_LMDB_PATH, map_size=config.LABEL_FILTER_LMDB_SIZE
     )
+    label_filter_key_prefix = getattr(config, "LABEL_FILTER_KEY_PREFIX", "")
     with LABEL_FILTER_DATASET.begin(write=False) as txn:
 
         def load_tensor(txn, key, device):
@@ -584,7 +585,9 @@ def job(config, user_id, max_size, done, writer_queue, progress_queue):
             buffer = BytesIO(tensor_bytes)
             return torch.load(buffer, weights_only=True, map_location=device)
 
-        equalize_review_ths = load_tensor(txn, f"{user_id}_review_ths", "cpu").tolist()
+        equalize_review_ths = load_tensor(
+            txn, f"{label_filter_key_prefix}{user_id}_review_ths", "cpu"
+        ).tolist()
     LABEL_FILTER_DATASET.close()
 
     df = get_rwkv_data(

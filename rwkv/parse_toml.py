@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+
 try:
     import tomllib as _toml  # Python 3.11+
 except ModuleNotFoundError:  # pragma: no cover

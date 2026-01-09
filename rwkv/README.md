@@ -28,14 +28,6 @@ To switch between the two phases, refer to the config file. RWKV was trained on 
 python -m rwkv.train_rwkv --config rwkv/train_rwkv_config.toml
 ```
 
-### Same-day (short-term) training experiment
-RWKV's default training loss already uses all labeled targets (including those with next-review `elapsed_days == 0`). If you want the *optimized* loss to exactly match the same-day evaluation keyset, generate the short-secs benchmark keys first, then preprocess into a separate LMDB, and finally train with `LOSS_MODE = "equalize"`:
-```bash
-python -m rwkv.find_equalize_test_reviews --config rwkv/find_equalize_test_reviews_config_short_secs.toml --secs --short
-python -m rwkv.data_processing --config rwkv/data_processing_config_train_short_secs.toml
-python -m rwkv.data_processing --config rwkv/data_processing_config_test_short_secs.toml
-python -m rwkv.train_rwkv --config rwkv/train_rwkv_config_short_secs_equalize.toml
-```
 ### Training without CUDA (experimental)
 You can run the trainer on CPU-only machines, but it is dramatically slower than CUDA. Edit `rwkv/train_rwkv_config.toml` and set `DEVICE = "cpu"` before launching the command above.
 ## Evaluation

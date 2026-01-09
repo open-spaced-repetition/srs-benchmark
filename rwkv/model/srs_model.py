@@ -265,7 +265,6 @@ class SrsRWKV(ModuleType):
         batch_num_data: int,
         batch_labels: torch.Tensor,
         batch_label_review_th: torch.Tensor,
-        loss_mode: str = "all",
     ):
         out_ahead_logits, out_w, out_w_log_p, out_p_logits = self.forward_batch(
             batch_start,
@@ -335,39 +334,25 @@ class SrsRWKV(ModuleType):
         p_binary_loss = torch.nn.functional.binary_cross_entropy(
             out_p_binary, label_y, reduction="none"
         )
-
-        if loss_mode not in ("all", "equalize"):
-            raise ValueError(f"Invalid loss_mode: {loss_mode}")
-        train_ahead_mask = ahead_mask if loss_mode == "all" else ahead_equalize_mask
-        train_immediate_mask = (
-            immediate_mask if loss_mode == "all" else immediate_equalize_mask
-        )
-
-        ahead_avg = (curve_loss * train_ahead_mask).sum() / (
-            1e-8 + train_ahead_mask.sum()
-        )
+        ahead_avg = (curve_loss * ahead_mask).sum() / (1e-8 + ahead_mask.sum())
         AHEAD_SCALE = 0.5
-        ahead_raw_avg = (curve_raw_loss * train_ahead_mask).sum() / (
-            1e-8 + train_ahead_mask.sum()
-        )
+        ahead_raw_avg = (curve_raw_loss * ahead_mask).sum() / (1e-8 + ahead_mask.sum())
         AHEAD_RAW_SCALE = 0.5
-        immediate_avg = (p_loss * train_immediate_mask).sum() / (
-            1e-8 + train_immediate_mask.sum()
-        )
-        w_avg = (w_loss * train_ahead_mask).sum() / (1e-8 + train_ahead_mask.sum())
+        immediate_avg = (p_loss * immediate_mask).sum() / (1e-8 + immediate_mask.sum())
+        w_avg = (w_loss * ahead_mask).sum() / (1e-8 + ahead_mask.sum())
         W_LOSS_SCALE = 1e-5
         ahead_logits_mag_loss = torch.sqrt(
             1e-16 + out_ahead_logits.square().mean(dim=-1)
         )
-        ahead_logits_mag_avg = (ahead_logits_mag_loss * train_ahead_mask).sum() / (
-            1e-8 + train_ahead_mask.sum()
+        ahead_logits_mag_avg = (ahead_logits_mag_loss * ahead_mask).sum() / (
+            1e-8 + ahead_mask.sum()
         )
         AHEAD_LOGITS_MAG_LOSS_SCALE = 1e-4
         ahead_logits_diff_loss = torch.sqrt(
             1e-16 + out_ahead_logits.diff().square().mean(dim=-1)
         )
-        ahead_logits_diff_avg = (ahead_logits_diff_loss * train_ahead_mask).sum() / (
-            1e-8 + train_ahead_mask.sum()
+        ahead_logits_diff_avg = (ahead_logits_diff_loss * ahead_mask).sum() / (
+            1e-8 + ahead_mask.sum()
         )
         AHEAD_LOGITS_DIFF_LOSS_SCALE = 1e-3
         loss_avg = (
@@ -424,7 +409,7 @@ class SrsRWKV(ModuleType):
             has_label=has_label.detach(),
         )
 
-    def get_loss(self, batch: PreparedBatch, loss_mode: str = "all"):
+    def get_loss(self, batch: PreparedBatch):
         return self._get_loss(
             batch.start,
             batch.sub_gather,
@@ -434,7 +419,6 @@ class SrsRWKV(ModuleType):
             batch.num_data,
             batch.labels,
             batch.label_review_th,
-            loss_mode=loss_mode,
         )
 
     def copy_downcast_(self, master_model, dtype):

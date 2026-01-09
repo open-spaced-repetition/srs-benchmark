@@ -186,10 +186,10 @@ def _clear_device_cache(device):
         torch.cuda.empty_cache()
 
 
-def evaluate_on_user(user_id, batch, model: SrsRWKV, loss_mode: str):
+def evaluate_on_user(user_id, batch, model: SrsRWKV):
     model.eval()
     with torch.no_grad():
-        stats = model.get_loss(batch, loss_mode=loss_mode)
+        stats = model.get_loss(batch)
         if stats is None:
             raise Exception("Stats is none.")
         print(
@@ -204,7 +204,7 @@ def evaluate_on_user(user_id, batch, model: SrsRWKV, loss_mode: str):
     )
 
 
-def validate(model, data_fetcher, all_db_keys, users, device, loss_mode: str):
+def validate(model, data_fetcher, all_db_keys, users, device):
     _clear_device_cache(device)
     tot_ahead_loss = 0
     tot_ahead_raw_loss = 0
@@ -235,7 +235,7 @@ def validate(model, data_fetcher, all_db_keys, users, device, loss_mode: str):
                 user_ahead_raw_loss,
                 user_imm_loss,
                 user_imm_n,
-            ) = evaluate_on_user(user_id, batch, model, loss_mode=loss_mode)
+            ) = evaluate_on_user(user_id, batch, model)
             assert user_ahead_n == user_imm_n
             tot_ahead_loss += user_ahead_loss
             tot_ahead_raw_loss += user_ahead_raw_loss
@@ -478,9 +478,7 @@ def main_loop(config, task_queue, batch_queue):
             model.copy_downcast_(master_model, dtype=config.DTYPE)
             model.train()
             try:
-                stats = model.get_loss(
-                    prepared_batch, loss_mode=getattr(config, "LOSS_MODE", "all")
-                )
+                stats = model.get_loss(prepared_batch)
                 if stats is None:
                     raise Exception("Stats is none.")
 
@@ -538,12 +536,7 @@ def main_loop(config, task_queue, batch_queue):
                 group_start = time.time()
                 model.copy_downcast_(master_model, dtype=config.DTYPE)
                 validation_out = validate(
-                    model,
-                    data_fetcher,
-                    all_db_keys,
-                    VALIDATION_USERS,
-                    config.DEVICE,
-                    loss_mode=getattr(config, "LOSS_MODE", "all"),
+                    model, data_fetcher, all_db_keys, VALIDATION_USERS, config.DEVICE
                 )
                 if validation_out is not None:
                     log["validation_ahead_loss"], log["validation_imm_loss"] = (

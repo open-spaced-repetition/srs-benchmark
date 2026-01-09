@@ -339,15 +339,7 @@ class RNNProcess:
 
 
 @torch.inference_mode()
-def run(
-    data_path,
-    model_path,
-    label_db_path,
-    label_db_size,
-    user_id,
-    verbose,
-    label_filter_key_prefix: str = "",
-):
+def run(data_path, model_path, label_db_path, label_db_size, user_id, verbose):
     """Runs the rnn version of rwkv to explicitly show information flow. Written to guard against possible data leakage.
     The outputs will not exactly match with the parallel version. Reasons:
     - hard to match rng
@@ -366,7 +358,7 @@ def run(
     df["review_th"] = range(1, df.shape[0] + 1)
 
     equalize_review_ths, rmse_bins = get_benchmark_info(
-        label_db_path, label_db_size, user_id, key_prefix=label_filter_key_prefix
+        label_db_path, label_db_size, user_id
     )
     rmse_bins_dict = {
         equalize_review_ths[i]: rmse_bins[i] for i in range(len(equalize_review_ths))
@@ -447,5 +439,4 @@ if __name__ == "__main__":
         label_db_size=config.LABEL_FILTER_LMDB_SIZE,
         user_id=config.USER,
         verbose=config.VERBOSE,
-        label_filter_key_prefix=getattr(config, "LABEL_FILTER_KEY_PREFIX", ""),
     )

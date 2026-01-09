@@ -16,8 +16,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.same_day:
         models = [
-            "RWKV-P-short-secs",
-            "RWKV-short-secs",
             "LSTM-short-secs",
             "MOVING-AVG-short-secs",
             "GRU-P-short-secs",

@@ -16,7 +16,6 @@ rwkv_config = parse_toml()
 lmdb_env = lmdb.open(
     rwkv_config.LABEL_FILTER_LMDB_PATH, map_size=rwkv_config.LABEL_FILTER_LMDB_SIZE
 )
-LABEL_FILTER_KEY_PREFIX = getattr(rwkv_config, "LABEL_FILTER_KEY_PREFIX", "")
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -25,8 +24,8 @@ config.model_name = "FSRS-5"
 
 
 def process(user_id):
-    key_review_ths = f"{LABEL_FILTER_KEY_PREFIX}{user_id}_review_ths"
-    key_rmse_bins = f"{LABEL_FILTER_KEY_PREFIX}{user_id}_rmse_bins"
+    key_review_ths = f"{user_id}_review_ths"
+    key_rmse_bins = f"{user_id}_rmse_bins"
     with lmdb_env.begin(write=False) as txn:
         if (
             txn.get(key_review_ths.encode()) is not None

@@ -18,9 +18,6 @@ NUM_FETCH_PROCESSES = 10
 # The maximum global length of a batch
 MAX_TRAIN_GLOBAL_LEN = 66000
 
-# Loss mode: "all" (default) or "equalize" (only labels marked by label_is_equalize in the preprocessed LMDB).
-# LOSS_MODE = "all"
-
 # Available modes are "WS" and "D" for the corresponding phases of the WSD learning rate scheduler.
 TRAIN_MODE = "WS"
 # Set a step offset, useful for resuming WANDB runs

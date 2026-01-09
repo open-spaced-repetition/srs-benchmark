@@ -22,7 +22,6 @@ args, _ = parser.parse_known_args()
 config = Config(args)
 config.model_name = rwkv_config.ALGO
 config.use_secs_intervals = bool(rwkv_config.SECS)
-config.equalize_test_with_non_secs = bool(rwkv_config.EQUALIZE_TEST_WITH_NON_SECS)
 
 
 def process(user_id):

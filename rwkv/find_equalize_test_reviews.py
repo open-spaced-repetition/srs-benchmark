@@ -20,7 +20,9 @@ lmdb_env = lmdb.open(
 parser = create_parser()
 args, _ = parser.parse_known_args()
 config = Config(args)
-config.model_name = "FSRS-5"
+config.model_name = rwkv_config.ALGO
+config.use_secs_intervals = bool(rwkv_config.SECS)
+config.equalize_test_with_non_secs = bool(rwkv_config.EQUALIZE_TEST_WITH_NON_SECS)
 
 
 def process(user_id):
@@ -62,8 +64,8 @@ def process(user_id):
     tscv = TimeSeriesSplit(n_splits=5)
     test_label_review_th = []
     test_label_rmse_bins = []
-    for _, (_, non_secs_test_index) in enumerate(tscv.split(df)):
-        for i in non_secs_test_index:
+    for _, (_, test_index) in enumerate(tscv.split(df)):
+        for i in test_index:
             row = df.iloc[i]
             review_th = row["review_th"]
             test_label_review_th.append(review_th)

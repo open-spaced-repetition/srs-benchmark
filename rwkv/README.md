@@ -13,6 +13,7 @@ Create a helper db, used to precompute bins for the RMSE (bins) metric and to fi
 ```bash
 python -m rwkv.find_equalize_test_reviews --config rwkv/find_equalize_test_reviews_config.toml
 ```
+The feature-engineering settings that define the aligned test reviews (e.g. `ALGO`, `SECS`) live in `rwkv/find_equalize_test_reviews_config.toml`.
 
 Preprocess the 10k dataset. With the default configuration, this will require ~400 GB of available storage.
 ```bash

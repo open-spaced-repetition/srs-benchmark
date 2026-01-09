@@ -5,6 +5,7 @@ LABEL_FILTER_LMDB_SIZE = 7_000_000_000
 # Feature-engineering settings used to decide which reviews are part of the benchmark.
 # These mirror CLI flags in `config.py` and control how `create_features()` filters/splits data.
 ALGO = "FSRS-6"
+SHORT = true
 SECS = true
 
 USER_START = 1

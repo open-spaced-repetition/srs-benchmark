@@ -21,6 +21,7 @@ parser = create_parser()
 args, _ = parser.parse_known_args()
 config = Config(args)
 config.model_name = rwkv_config.ALGO
+config.include_short_term = bool(rwkv_config.SHORT)
 config.use_secs_intervals = bool(rwkv_config.SECS)
 
 
@@ -78,7 +79,7 @@ def process(user_id):
         save_tensor(txn, key_review_ths, review_ths_tensor)
         save_tensor(txn, key_rmse_bins, rmse_bins_tensor)
 
-    print("Done:", user_id)
+    print("Done:", user_id, "Size:", len(test_label_review_th))
 
 
 def set_low_priority():

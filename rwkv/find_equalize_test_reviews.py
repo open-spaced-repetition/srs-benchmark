@@ -20,7 +20,9 @@ lmdb_env = lmdb.open(
 parser = create_parser()
 args, _ = parser.parse_known_args()
 config = Config(args)
-config.model_name = "FSRS-5"
+config.model_name = rwkv_config.ALGO
+config.include_short_term = bool(rwkv_config.SHORT)
+config.use_secs_intervals = bool(rwkv_config.SECS)
 
 
 def process(user_id):
@@ -62,8 +64,8 @@ def process(user_id):
     tscv = TimeSeriesSplit(n_splits=5)
     test_label_review_th = []
     test_label_rmse_bins = []
-    for _, (_, non_secs_test_index) in enumerate(tscv.split(df)):
-        for i in non_secs_test_index:
+    for _, (_, test_index) in enumerate(tscv.split(df)):
+        for i in test_index:
             row = df.iloc[i]
             review_th = row["review_th"]
             test_label_review_th.append(review_th)
@@ -77,7 +79,7 @@ def process(user_id):
         save_tensor(txn, key_review_ths, review_ths_tensor)
         save_tensor(txn, key_rmse_bins, rmse_bins_tensor)
 
-    print("Done:", user_id)
+    print("Done:", user_id, "Size:", len(test_label_review_th))
 
 
 def set_low_priority():

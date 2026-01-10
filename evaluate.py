@@ -104,8 +104,8 @@ if __name__ == "__main__":
     models = (
         [
             (dev_mode_name, None, None),
-            ("RWKV-P", 2762884, ""),
-            ("RWKV", 2762884, ""),
+            ("RWKV-P", 2762884, "[Yes](#features-note)"),
+            ("RWKV", 2762884, "[Yes](#features-note)"),
             ("LSTM-short-secs-equalize_test_with_non_secs", 8869, "FIL, G, SR, AT"),
             ("MOVING-AVG", 0, "---"),
             ("FSRS-6-recency", 21, "IL, G, SR"),
@@ -145,6 +145,8 @@ if __name__ == "__main__":
         if not args.secs
         else [
             (dev_mode_name, None, None),
+            ("RWKV-P-short-secs", 2762884, "[Yes](#features-note)"),
+            ("RWKV-short-secs", 2762884, "[Yes](#features-note)"),
             ("LSTM-short-secs", 8869, "FIL, G, SR, AT"),
             ("MOVING-AVG-short-secs", 0, "---"),
             ("GRU-P-short-secs", 297, "FIL, G, SR"),

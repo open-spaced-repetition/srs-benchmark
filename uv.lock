@@ -131,6 +131,19 @@ wheels = [
 ]
 
 [[package]]
+name = "ebisu"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d0/86/1a161505d438204bf3c40139bb772a01f486e234aa2197c5ae3f85e04341/ebisu-2.2.0.tar.gz", hash = "sha256:dccd333a6821e7e3ae40acfb8caa731a4467322307d500594bf942c61fa977ca", size = 40050, upload-time = "2024-09-01T18:02:07.004Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/af/5b/5a5ce3cee9d6a549abca7bc71b182e6e69ab0c6cb0682c026289080c7e49/ebisu-2.2.0-py3-none-any.whl", hash = "sha256:ee333ed0de20595f2bb68dba83b07778158db3d63ad3a68c2ba370c72b6644a9", size = 8800, upload-time = "2024-09-01T18:02:05.578Z" },
+]
+
+[[package]]
 name = "filelock"
 version = "3.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -189,6 +202,7 @@ name = "fsrs-optimizer-project"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "ebisu" },
     { name = "fsrs-optimizer" },
     { name = "huggingface-hub" },
     { name = "lmdb" },
@@ -205,6 +219,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ebisu", specifier = ">=2.2.0" },
     { name = "fsrs-optimizer", specifier = ">=6.4.0" },
     { name = "huggingface-hub" },
     { name = "lmdb" },

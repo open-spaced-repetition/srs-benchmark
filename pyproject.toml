@@ -15,6 +15,7 @@ dependencies = [
     "lmdb",
     "tomli",
     "scipy>=1.16.3",
+    "ebisu>=2.2.0",
 ]
 
 [build-system]

@@ -1,9 +1,11 @@
+import os
 import pandas as pd
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 import torch
 import torch.nn as nn
 from torch import Tensor
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from config import create_parser, Config
 from fsrs_optimizer import (  # type: ignore
     BatchDataset,
@@ -604,9 +606,17 @@ def main():
 
     time_start = time.time()
     if PROCESSES > 1:
-        print(f"Processes: {PROCESSES} is only used for getting the data.")
-    with Pool(processes=PROCESSES) as pool:
-        results = pool.map(process_user, all_users)
+        loader_label = "threads" if os.name == "nt" else "processes"
+        print(
+            f"{loader_label.capitalize()}: {PROCESSES} worker(s) only used for getting the data."
+        )
+
+    if os.name == "nt":
+        with ThreadPoolExecutor(max_workers=PROCESSES) as executor:
+            results = list(executor.map(process_user, all_users))
+    else:
+        with Pool(processes=PROCESSES) as pool:
+            results = pool.map(process_user, all_users)
 
     for user, result in results:
         df_dict[user] = result

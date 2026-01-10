@@ -71,7 +71,7 @@ def get_stats(
         auc = round(roc_auc_score(y_true=gather_y, y_score=gather_pred), 6)
     except Exception:
         auc = None
-    if np.isnan(auc):
+    if auc is not None and np.isnan(auc):
         auc = None
 
     rows = []

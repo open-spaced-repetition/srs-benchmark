@@ -561,11 +561,6 @@ def create_sample(
 
 
 def job(config, user_id, max_size, done, writer_queue, progress_queue):
-    if user_id == 4371:
-        print("Skipping user 4371. This user has no reviews in the 10k dataset.")
-        progress_queue.put(1)
-        return
-
     if done:
         print(f"User already done: {user_id}")
         progress_queue.put(1)

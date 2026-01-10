@@ -16,6 +16,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.same_day:
         models = [
+            "RWKV-P-short-secs",
+            "RWKV-short-secs",
             "LSTM-short-secs",
             "MOVING-AVG-short-secs",
             "GRU-P-short-secs",
@@ -197,7 +199,7 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=15,
+                    fontsize=13,
                 )
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=15, rotation=45)

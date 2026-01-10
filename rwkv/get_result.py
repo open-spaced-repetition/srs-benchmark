@@ -282,8 +282,6 @@ def sort_jsonl(file):
 
 def main(config):
     target_users = list(range(config.USER_START, config.USER_END + 1))
-    if 4371 in target_users:
-        target_users.remove(4371)  # this user has no reviews
 
     Path("result").mkdir(parents=True, exist_ok=True)
     Path("raw").mkdir(parents=True, exist_ok=True)

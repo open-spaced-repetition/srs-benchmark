@@ -1,6 +1,6 @@
 # Output file names
-FILE_AHEAD = "RWKV_1_4999"
-FILE_IMM = "RWKV-P_1_4999"
+FILE_AHEAD = "RWKV-short-secs"
+FILE_IMM = "RWKV-P-short-secs"
 
 MODEL_PATH = "pretrain/RWKV_trained_on_5000_10000.pth"
 DEVICE = "cuda"

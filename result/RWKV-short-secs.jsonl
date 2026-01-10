@@ -4368,6 +4368,7 @@
 {"metrics": {"RMSE": 0.355049, "LogLoss": 0.403904, "RMSE(bins)": 0.08753, "AUC": 0.749771}, "user": 4368, "size": 9530}
 {"metrics": {"RMSE": 0.139588, "LogLoss": 0.084102, "RMSE(bins)": 0.040776, "AUC": 0.83977}, "user": 4369, "size": 51125}
 {"metrics": {"RMSE": 0.44888, "LogLoss": 0.587296, "RMSE(bins)": 0.095244, "AUC": 0.751062}, "user": 4370, "size": 6795}
+{"metrics": {"RMSE": 0.009362, "LogLoss": 0.007856, "RMSE(bins)": 0.008547, "AUC": null}, "user": 4371, "size": 15}
 {"metrics": {"RMSE": 0.344326, "LogLoss": 0.38003, "RMSE(bins)": 0.053065, "AUC": 0.784484}, "user": 4372, "size": 19840}
 {"metrics": {"RMSE": 0.297479, "LogLoss": 0.301112, "RMSE(bins)": 0.042441, "AUC": 0.77692}, "user": 4373, "size": 52080}
 {"metrics": {"RMSE": 0.404538, "LogLoss": 0.494927, "RMSE(bins)": 0.058452, "AUC": 0.827125}, "user": 4374, "size": 23115}

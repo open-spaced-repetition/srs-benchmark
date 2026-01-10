@@ -139,8 +139,8 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 
 | Model | Parameters | Log Loss↓ | RMSE(bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **RWKV-P** | 2762884 | **0.2660±0.0036** | 0.03212±0.00045 | **0.8450±0.0017** | FIL, G, SR, AT |
-| RWKV | 2762884 | 0.2975±0.0037 | 0.05438±0.00081 | 0.7964±0.0017 | FIL, G, SR, AT |
+| **RWKV-P** | 2762884 | **0.2660±0.0036** | 0.03212±0.00045 | **0.8450±0.0017** | [Yes](#features-note) |
+| RWKV | 2762884 | 0.2975±0.0037 | 0.05438±0.00081 | 0.7964±0.0017 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3140±0.0038 | 0.05200±0.00077 | 0.7622±0.0018 | FIL, G, SR, AT |
 | MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
 | DASH[MCM] | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |

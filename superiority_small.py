@@ -21,17 +21,12 @@ if __name__ == "__main__":
             "LSTM-short-secs",
             "MOVING-AVG-short-secs",
             "GRU-P-short-secs",
-            "DASH[MCM]-short-secs",
             "DASH-short-secs",
-            "DASH[ACT-R]-short-secs",
             "FSRS-6-secs-recency",
-            "FSRS-6-secs",
-            "AVG-short-secs",
             "ACT-R-short-secs",
             "FSRS-4.5-short-secs",
             "FSRS-5-secs",
             "FSRSv4-short-secs",
-            "GRU-short-secs",
             "HLR-short-secs",
             "Ebisu-v2-short-secs",
         ]
@@ -199,7 +194,7 @@ if __name__ == "__main__":
                     ha="center",
                     va="center",
                     color="white",
-                    fontsize=13,
+                    fontsize=15,
                 )
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=15, rotation=45)

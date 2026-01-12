@@ -52,6 +52,7 @@ class Snapshot:
 @dataclass
 class ModelPlotBundle:
     name: str
+    display_name: str
     model: object
     config: Config
     snapshots: list[Snapshot]
@@ -649,9 +650,9 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
     if not bundles:
         raise RuntimeError("No card snapshots available to plot.")
 
-    title_suffix = ", ".join(bundle.name for bundle in bundles)
     plt.figure(figsize=(10, 5))
-    plt.title(f"{args.title} [{title_suffix}]")
+    user_display = f"user {args.user_id}" if args.user_id is not None else "all users"
+    plt.title(f"{args.title} [{user_display}]")
     plt.xlabel("Absolute time since first review")
     plt.ylabel("Retention probability")
     plt.ylim(0.0, 1.05)
@@ -683,7 +684,8 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
 
     for bundle in bundles:
         label_used = False
-        color = color_map.setdefault(bundle.name, next(color_cycle))
+        display_name = bundle.display_name
+        color = color_map.setdefault(display_name, next(color_cycle))
         for idx, snap in enumerate(bundle.snapshots):
             start = snap.time
             end = (
@@ -703,7 +705,7 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
                 for elapsed in xs_local
             ]
             xs = [start + x for x in xs_local]
-            label = bundle.name if not label_used else None
+            label = display_name if not label_used else None
             (line,) = plt.plot(xs, ys, label=label, color=color)
             if not label_used and label is not None:
                 label_used = True
@@ -820,7 +822,11 @@ def prepare_model_bundle(
         model_name, args, model, config, elapses, durations, ratings
     )
     return ModelPlotBundle(
-        name=model_name, model=model, config=config, snapshots=snapshots
+        name=model_name,
+        display_name=final_base_name,
+        model=model,
+        config=config,
+        snapshots=snapshots,
     )
 
 

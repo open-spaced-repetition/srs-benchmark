@@ -1,0 +1,586 @@
+from __future__ import annotations
+
+import argparse
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Sequence, Tuple
+
+import matplotlib.pyplot as plt
+import torch
+
+from config import load_config
+from models.fsrs_v6 import FSRS6
+from models.fsrs_v6_one_step import FSRS_one_step
+from models.lstm import LSTM
+from models.model_factory import create_model
+
+
+SUPPORTED_MODELS = (
+    "FSRSv1",
+    "FSRSv2",
+    "FSRSv3",
+    "FSRSv4",
+    "FSRS-4.5",
+    "FSRS-5",
+    "FSRS-6",
+    "FSRS-6-one-step",
+    "LSTM",
+)
+STATE_DICT_MODELS = {"LSTM"}
+
+
+@dataclass
+class Snapshot:
+    time: float
+    rating: int
+    elapsed: float
+    state: object
+
+
+@dataclass
+class WeightLocation:
+    path: Path
+    base_name: str
+
+
+FLAG_TOKEN_MAP: dict[str, list[str]] = {
+    "default": ["--default"],
+    "S0": ["--S0"],
+    "binary": ["--two_buttons"],
+    "short": ["--short"],
+    "secs": ["--secs"],
+    "no_duration": ["--no_lstm_duration"],
+    "recency": ["--recency"],
+    "no_test_same_day": ["--no_test_same_day"],
+    "no_train_same_day": ["--no_train_same_day"],
+    "equalize_test_with_non_secs": ["--equalize_test_with_non_secs"],
+    "train_equals_test": ["--train_equals_test"],
+    "deck": ["--partitions", "deck"],
+    "preset": ["--partitions", "preset"],
+    "dev": ["--dev"],
+}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Visualize forgetting curves for FSRS-family models or the LSTM benchmark "
+            "model given a manual review history."
+        )
+    )
+    parser.add_argument(
+        "--model",
+        choices=SUPPORTED_MODELS,
+        default="FSRS-6",
+        help="Model to visualize.",
+    )
+    parser.add_argument(
+        "--ratings",
+        nargs="+",
+        type=int,
+        required=True,
+        help="Sequence of review ratings (1-4). The first rating is treated as the initial learning review.",
+    )
+    parser.add_argument(
+        "--elapses",
+        nargs="+",
+        type=float,
+        required=True,
+        help="Elapsed time between reviews, in the same units used to train the model. The first value must be 0.",
+    )
+    parser.add_argument(
+        "--durations",
+        nargs="+",
+        type=float,
+        help="Optional review durations (milliseconds). Only used when --model LSTM and duration features are enabled.",
+    )
+    parser.add_argument(
+        "--default-duration",
+        type=float,
+        default=1000.0,
+        help="Fallback duration (ms) when --model LSTM expects durations but none are provided.",
+    )
+    parser.add_argument(
+        "--result-file",
+        type=Path,
+        help="Path to the JSONL result file containing learned parameters (defaults to result/<model>.jsonl).",
+    )
+    parser.add_argument(
+        "--user-id",
+        type=int,
+        help="User ID whose parameters should be loaded from the result file.",
+    )
+    parser.add_argument(
+        "--partition",
+        default="0",
+        help="Partition key inside the result JSON line when parameters are stored per partition.",
+    )
+    parser.add_argument(
+        "--weights-file",
+        type=Path,
+        help="Path to a saved state_dict (e.g., weights/LSTM-*/<user>.pth). Required when no --result-file is provided for LSTM.",
+    )
+    parser.add_argument(
+        "--secs",
+        action="store_true",
+        help="Configure the model to use elapsed seconds instead of days.",
+    )
+    parser.add_argument(
+        "--short",
+        action="store_true",
+        help="Enable --short behavior when building the Config (matches training flags).",
+    )
+    parser.add_argument(
+        "--two-buttons",
+        action="store_true",
+        help="Use binary ratings when constructing the Config.",
+    )
+    parser.add_argument(
+        "--no_lstm_duration",
+        action="store_true",
+        help="Disable the LSTM duration feature to match checkpoints trained without durations.",
+    )
+    parser.add_argument(
+        "--max-days",
+        type=float,
+        default=120.0,
+        help="Future horizon to continue the last forgetting curve.",
+    )
+    parser.add_argument(
+        "--num-points",
+        type=int,
+        default=200,
+        help="Samples per curve segment.",
+    )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default="Predicted Forgetting Curve",
+        help="Plot title.",
+    )
+    return parser.parse_args()
+
+
+def collect_user_config_flags(args: argparse.Namespace) -> list[str]:
+    flags: list[str] = []
+    if args.secs:
+        flags.append("--secs")
+    if args.short:
+        flags.append("--short")
+    if args.two_buttons:
+        flags.append("--two_buttons")
+    if args.no_lstm_duration:
+        flags.append("--no_lstm_duration")
+    return flags
+
+
+def compute_base_name(args: argparse.Namespace) -> str:
+    parts: list[str] = [args.model]
+    if args.two_buttons:
+        parts.append("-binary")
+    if args.short:
+        parts.append("-short")
+    if args.secs:
+        parts.append("-secs")
+    if args.model == "LSTM" and args.no_lstm_duration:
+        parts.append("-no_duration")
+    return "".join(parts)
+
+
+def infer_base_name_from_weights_path(
+    path: Path, fallback: str, model_name: str
+) -> str:
+    parent_name = path.resolve().parent.name
+    if parent_name.startswith(model_name):
+        return parent_name
+    return fallback
+
+
+def resolve_weights_path(
+    preferred_base_name: str, model_name: str, user_id: int | None
+) -> WeightLocation | None:
+    if user_id is None:
+        return None
+    base_dir = Path("weights")
+    if not base_dir.exists():
+        return None
+    preferred_dir = base_dir / preferred_base_name
+    candidate = preferred_dir / f"{user_id}.pth"
+    if candidate.exists():
+        return WeightLocation(candidate, preferred_base_name)
+    else:
+        raise ValueError(f"{candidate} not found")
+
+
+def flags_from_base_name(model_name: str, base_name: str) -> list[str]:
+    if not base_name.startswith(model_name):
+        return []
+    suffix = base_name[len(model_name) :]
+    tokens = [token for token in suffix.split("-") if token]
+    flags: list[str] = []
+    for token in tokens:
+        mapped = FLAG_TOKEN_MAP.get(token)
+        if mapped:
+            flags.extend(mapped)
+    return flags
+
+
+def load_parameters_from_result(
+    path: Path, user_id: int, partition_key: str
+) -> List[float]:
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            record = json.loads(line)
+            if record.get("user") != user_id:
+                continue
+            params = record.get("parameters")
+            if params is None:
+                raise ValueError(
+                    f"Entry for user {user_id} in {path} does not contain parameters."
+                )
+            if isinstance(params, dict):
+                key = partition_key
+                if key not in params:
+                    available = ", ".join(map(str, params.keys()))
+                    raise ValueError(
+                        f"Partition '{key}' not found. Available keys: {available}"
+                    )
+                return [float(x) for x in params[key]]
+            if isinstance(params, list):
+                return [float(x) for x in params]
+            raise TypeError(f"Unsupported parameter format in {path}: {type(params)}")
+    raise ValueError(f"User {user_id} not found in {path}")
+
+
+def load_state_dict(path: Path) -> dict:
+    load_kwargs = {"map_location": "cpu"}
+    try:
+        state = torch.load(path, weights_only=False, **load_kwargs)
+    except TypeError:
+        # Older PyTorch versions don't support weights_only
+        state = torch.load(path, **load_kwargs)
+    if not isinstance(state, dict):
+        for key in ("state_dict", "model_state_dict", "model"):
+            sub = getattr(state, key, None)
+            if sub is None and isinstance(state, dict):
+                sub = state.get(key)
+            if isinstance(sub, dict):
+                state = sub
+                break
+        else:
+            raise TypeError(f"Unsupported checkpoint format in {path}: {type(state)}")
+    return state
+
+
+def build_config(args: argparse.Namespace, extra_flags: Sequence[str] | None = None):
+    cli_args = ["--algo", args.model]
+    cli_args.extend(collect_user_config_flags(args))
+    if extra_flags:
+        cli_args.extend(extra_flags)
+    return load_config(custom_args_list=cli_args)
+
+
+def instantiate_model(args: argparse.Namespace, config, model_params: object | None):
+    if args.model == "FSRS-6-one-step":
+        if model_params is None:
+            raise ValueError("FSRS-6-one-step requires parameters from a result file.")
+        if not isinstance(model_params, list):
+            raise TypeError(
+                "FSRS-6-one-step expects a parameter list loaded from the result file."
+            )
+        model = FSRS_one_step(config, w=model_params)
+        model.eval()
+        return model
+    model = create_model(config, model_params)
+    model.eval()
+    return model
+
+
+def validate_inputs(
+    args: argparse.Namespace,
+) -> Tuple[List[int], List[float], List[float]]:
+    ratings = list(args.ratings)
+    elapses = list(args.elapses)
+    if len(ratings) != len(elapses):
+        raise ValueError("ratings and elapses must have the same length.")
+    if not ratings:
+        raise ValueError("Provide at least one rating.")
+    if abs(elapses[0]) > 1e-6:
+        raise ValueError("The first elapsed value must be zero.")
+    durations: List[float] = []
+    if args.durations:
+        if len(args.durations) != len(ratings):
+            raise ValueError("durations must have the same length as ratings.")
+        durations = list(args.durations)
+    return ratings, elapses, durations
+
+
+def build_sequence_tensor(
+    args: argparse.Namespace,
+    config,
+    elapses: Sequence[float],
+    durations: Sequence[float],
+    ratings: Sequence[int],
+) -> torch.Tensor | list[tuple[float, int]]:
+    if args.model == "FSRS-6-one-step":
+        return [(float(delta), int(rating)) for delta, rating in zip(elapses, ratings)]
+
+    if args.model == "LSTM":
+        if config.lstm_use_duration:
+            if not durations:
+                durations = [args.default_duration] * len(ratings)
+            features = [
+                [float(delta), float(duration), float(rating)]
+                for delta, duration, rating in zip(elapses, durations, ratings)
+            ]
+        else:
+            features = [
+                [float(delta), float(rating)] for delta, rating in zip(elapses, ratings)
+            ]
+    else:
+        features = [
+            [float(delta), float(rating)] for delta, rating in zip(elapses, ratings)
+        ]
+
+    tensor = torch.tensor(features, dtype=torch.float32, device=config.device)
+    return tensor.unsqueeze(1)
+
+
+def build_snapshots(
+    args: argparse.Namespace,
+    model,
+    config,
+    elapses: Sequence[float],
+    durations: Sequence[float],
+    ratings: Sequence[int],
+) -> List[Snapshot]:
+    sequence = build_sequence_tensor(args, config, elapses, durations, ratings)
+    states: List[object] = []
+
+    if args.model == "FSRS-6-one-step":
+        outputs = model.forward(sequence)
+        states = [float(state[0]) for state in outputs]
+    elif args.model == "LSTM":
+        with torch.no_grad():
+            w_lnh, s_lnh, d_lnh = model.forward(sequence)  # type: ignore[arg-type]
+        for idx in range(len(ratings)):
+            w = w_lnh[idx, 0].detach().cpu()
+            s = s_lnh[idx, 0].detach().cpu()
+            d = d_lnh[idx, 0].detach().cpu()
+            states.append((w, s, d))
+    else:
+        with torch.no_grad():
+            outputs = model.forward(sequence)  # type: ignore[arg-type]
+        if isinstance(outputs, tuple):
+            state_tensor = outputs[0]
+        else:
+            state_tensor = outputs
+        state_tensor = state_tensor[:, 0, :].detach().cpu()
+        states = state_tensor[:, 0].tolist()
+
+    snapshots: List[Snapshot] = []
+    current_time = 0.0
+    for idx, (rating, delta, state) in enumerate(zip(ratings, elapses, states)):
+        if idx > 0:
+            current_time += float(delta)
+        snapshots.append(
+            Snapshot(
+                time=current_time,
+                rating=int(rating),
+                elapsed=float(delta),
+                state=state,
+            )
+        )
+    return snapshots
+
+
+def predict_retention(model, config, state: object, elapsed: float) -> float:
+    if isinstance(model, LSTM):
+        w, s, d = state  # type: ignore[misc]
+        t = torch.full(
+            (w.shape[0],), float(elapsed), dtype=torch.float32, device=config.device
+        )
+        value = model.forgetting_curve(
+            t, w.to(config.device), s.to(config.device), d.to(config.device)
+        )
+        return float(value.item())
+
+    if isinstance(model, FSRS_one_step):
+        return float(model.forgetting_curve(float(elapsed), float(state)))
+
+    if isinstance(model, FSRS6):
+        t_tensor = torch.tensor([elapsed], dtype=torch.float32, device=config.device)
+        s_tensor = torch.tensor([state], dtype=torch.float32, device=config.device)
+        decay = -float(model.w[20].detach().cpu().item())
+        value = model.forgetting_curve(t_tensor, s_tensor, decay)
+    else:
+        t_tensor = torch.tensor([elapsed], dtype=torch.float32, device=config.device)
+        s_tensor = torch.tensor([state], dtype=torch.float32, device=config.device)
+        value = model.forgetting_curve(t_tensor, s_tensor)
+
+    if isinstance(value, torch.Tensor):
+        return float(value.item())
+    return float(value)
+
+
+def plot_snapshots(
+    args: argparse.Namespace,
+    model,
+    config,
+    snapshots: Sequence[Snapshot],
+) -> None:
+    if not snapshots:
+        raise RuntimeError("No card snapshots available to plot.")
+
+    plt.figure(figsize=(10, 5))
+    plt.title(f"{args.title} [{args.model}]")
+    plt.xlabel("Absolute time since first review")
+    plt.ylabel("Retention probability")
+    plt.ylim(0.0, 1.05)
+    plt.grid(True, alpha=0.25)
+
+    for idx, snap in enumerate(snapshots):
+        start = snap.time
+        end = (
+            snapshots[idx + 1].time
+            if idx + 1 < len(snapshots)
+            else start + args.max_days
+        )
+        duration = max(0.0, end - start)
+        if duration <= 0.0:
+            continue
+        xs_local = [
+            duration * i / max(1, (args.num_points - 1)) for i in range(args.num_points)
+        ]
+        ys = [
+            predict_retention(model, config, snap.state, elapsed)
+            for elapsed in xs_local
+        ]
+        xs = [start + x for x in xs_local]
+        label = "Future curve" if idx == len(snapshots) - 1 else None
+        plt.plot(xs, ys, label=label)
+
+    review_times = [snap.time for snap in snapshots]
+
+    for snap in snapshots:
+        plt.axvline(snap.time, color="tab:gray", linestyle="--", alpha=0.25)
+        annot = f"r={snap.rating}, Δ={snap.elapsed:.2f}"
+        plt.annotate(
+            annot,
+            (snap.time, 1.0),
+            textcoords="offset points",
+            xytext=(5, 5),
+            fontsize=8,
+            rotation=30,
+            color="tab:red",
+        )
+
+    plt.scatter(
+        review_times,
+        [1.0] * len(review_times),
+        c="tab:red",
+        marker="x",
+        label="Review event",
+    )
+    if len(snapshots) > 1:
+        plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+def main() -> None:
+    args = parse_args()
+    ratings, elapses, durations = validate_inputs(args)
+    user_base_name = compute_base_name(args)
+    result_path: Path | None = args.result_file
+    result_base_name: str | None = None
+    if result_path is not None:
+        if not result_path.exists():
+            raise FileNotFoundError(f"{result_path} does not exist.")
+        result_base_name = result_path.stem
+    else:
+        candidate = Path("result") / f"{user_base_name}.jsonl"
+        if candidate.exists():
+            result_path = candidate
+            result_base_name = user_base_name
+
+    weight_info: WeightLocation | None = None
+    if args.weights_file:
+        if not args.weights_file.exists():
+            raise FileNotFoundError(f"{args.weights_file} does not exist.")
+        inferred = infer_base_name_from_weights_path(
+            args.weights_file, user_base_name, args.model
+        )
+        weight_info = WeightLocation(args.weights_file, inferred)
+    elif args.model in STATE_DICT_MODELS:
+        weight_info = resolve_weights_path(user_base_name, args.model, args.user_id)
+
+    source_type: str | None = None
+    source_base_name: str | None = None
+    selected_path: Path | None = None
+
+    if args.weights_file and weight_info:
+        source_type = "weights"
+        source_base_name = weight_info.base_name
+        selected_path = weight_info.path
+    elif args.result_file and result_path:
+        source_type = "result"
+        source_base_name = result_base_name or user_base_name
+        selected_path = result_path
+    elif result_path:
+        source_type = "result"
+        source_base_name = result_base_name or user_base_name
+        selected_path = result_path
+    elif weight_info:
+        source_type = "weights"
+        source_base_name = weight_info.base_name
+        selected_path = weight_info.path
+    else:
+        raise ValueError(
+            "Unable to locate parameters. Provide --result-file/--user-id or --weights-file."
+        )
+
+    model_params: object | None = None
+    final_base_name = source_base_name or user_base_name
+    final_source_type = source_type
+    if final_source_type == "weights":
+        if selected_path is None:
+            raise ValueError("Weights path was not resolved.")
+        if args.model not in STATE_DICT_MODELS:
+            raise ValueError("--weights-file is only supported for neural models.")
+        model_params = load_state_dict(selected_path)
+    elif final_source_type == "result":
+        if selected_path is None:
+            raise ValueError("Result path was not resolved.")
+        if args.user_id is None:
+            raise ValueError("--user-id is required when loading from a result file.")
+        try:
+            model_params = load_parameters_from_result(
+                selected_path, args.user_id, str(args.partition)
+            )
+        except ValueError as exc:
+            missing_params = "does not contain parameters" in str(exc)
+            if missing_params and weight_info and weight_info.path.exists():
+                final_source_type = "weights"
+                final_base_name = weight_info.base_name
+                selected_path = weight_info.path
+                if args.model not in STATE_DICT_MODELS:
+                    raise ValueError(
+                        "Fallback weights loading is only supported for neural models."
+                    )
+                model_params = load_state_dict(selected_path)
+            else:
+                raise
+    else:
+        raise RuntimeError("Unknown parameter source.")
+
+    extra_flags = flags_from_base_name(args.model, final_base_name)
+    config = build_config(args, extra_flags=extra_flags)
+    model = instantiate_model(args, config, model_params)
+    snapshots = build_snapshots(args, model, config, elapses, durations, ratings)
+    plot_snapshots(args, model, config, snapshots)
+
+
+if __name__ == "__main__":
+    main()

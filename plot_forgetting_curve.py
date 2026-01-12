@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 
 from config import load_config
+from models.act_r import ACT_R
+from models.dash import DASH
 from models.fsrs_v6 import FSRS6
 from models.fsrs_v6_one_step import FSRS_one_step
+from models.hlr import HLR
 from models.lstm import LSTM
 from models.model_factory import create_model
 
@@ -25,6 +30,11 @@ SUPPORTED_MODELS = (
     "FSRS-5",
     "FSRS-6",
     "FSRS-6-one-step",
+    "SM2-trainable",
+    "Anki",
+    "HLR",
+    "ACT-R",
+    "DASH",
     "LSTM",
 )
 STATE_DICT_MODELS = {"LSTM"}
@@ -39,9 +49,63 @@ class Snapshot:
 
 
 @dataclass
+class ModelPlotBundle:
+    name: str
+    model: object
+    config: Config
+    snapshots: list[Snapshot]
+
+
+@dataclass
 class WeightLocation:
     path: Path
     base_name: str
+
+
+def is_dash_model(model_name: str) -> bool:
+    return model_name.startswith("DASH")
+
+
+def compute_dash_features(
+    rating_history: Sequence[int],
+    interval_history: Sequence[float],
+    enable_decay: bool = False,
+) -> List[float]:
+    if not rating_history:
+        return [0.0] * 8
+    if len(interval_history) != len(rating_history):
+        raise ValueError(
+            f"DASH feature length mismatch: {len(interval_history)} intervals vs {len(rating_history)} ratings."
+        )
+    r_binary = np.array(rating_history, dtype=np.float64) > 1
+    intervals = np.array(interval_history, dtype=np.float64)
+    cumulative_times = np.cumsum(intervals[::-1])[::-1]
+    tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426], dtype=np.float64)
+    time_windows = np.array([1.0, 7.0, 30.0, np.inf], dtype=np.float64)
+    features = np.zeros(8, dtype=np.float64)
+    for idx, window in enumerate(time_windows):
+        if enable_decay:
+            decay = np.exp(-cumulative_times / tau_w[idx])
+        else:
+            decay = np.ones_like(cumulative_times)
+        mask = cumulative_times <= window
+        if not np.any(mask):
+            continue
+        decay_masked = decay[mask]
+        features[idx * 2] = float(np.sum(decay_masked))
+        features[idx * 2 + 1] = float(np.sum(r_binary[mask] * decay_masked))
+    return features.tolist()
+
+
+def compute_hlr_features(success_count: int, failure_count: int) -> torch.Tensor:
+    features = torch.tensor(
+        [
+            math.sqrt(float(success_count)),
+            math.sqrt(float(failure_count)),
+        ],
+        dtype=torch.float32,
+    )
+    return features
 
 
 FLAG_TOKEN_MAP: dict[str, list[str]] = {
@@ -73,7 +137,13 @@ def parse_args() -> argparse.Namespace:
         "--model",
         choices=SUPPORTED_MODELS,
         default="FSRS-6",
-        help="Model to visualize.",
+        help="Primary model to visualize when --models is not provided.",
+    )
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        choices=SUPPORTED_MODELS,
+        help="Optional list of models to plot simultaneously (overrides --model).",
     )
     parser.add_argument(
         "--ratings",
@@ -175,15 +245,15 @@ def collect_user_config_flags(args: argparse.Namespace) -> list[str]:
     return flags
 
 
-def compute_base_name(args: argparse.Namespace) -> str:
-    parts: list[str] = [args.model]
+def compute_base_name(model_name: str, args: argparse.Namespace) -> str:
+    parts: list[str] = [model_name]
     if args.two_buttons:
         parts.append("-binary")
     if args.short:
         parts.append("-short")
     if args.secs:
         parts.append("-secs")
-    if args.model == "LSTM" and args.no_lstm_duration:
+    if model_name == "LSTM" and args.no_lstm_duration:
         parts.append("-no_duration")
     return "".join(parts)
 
@@ -273,16 +343,18 @@ def load_state_dict(path: Path) -> dict:
     return state
 
 
-def build_config(args: argparse.Namespace, extra_flags: Sequence[str] | None = None):
-    cli_args = ["--algo", args.model]
+def build_config(
+    model_name: str, args: argparse.Namespace, extra_flags: Sequence[str] | None = None
+):
+    cli_args = ["--algo", model_name]
     cli_args.extend(collect_user_config_flags(args))
     if extra_flags:
         cli_args.extend(extra_flags)
     return load_config(custom_args_list=cli_args)
 
 
-def instantiate_model(args: argparse.Namespace, config, model_params: object | None):
-    if args.model == "FSRS-6-one-step":
+def instantiate_model(model_name: str, config, model_params: object | None):
+    if model_name == "FSRS-6-one-step":
         if model_params is None:
             raise ValueError("FSRS-6-one-step requires parameters from a result file.")
         if not isinstance(model_params, list):
@@ -317,16 +389,17 @@ def validate_inputs(
 
 
 def build_sequence_tensor(
+    model_name: str,
     args: argparse.Namespace,
     config,
     elapses: Sequence[float],
     durations: Sequence[float],
     ratings: Sequence[int],
 ) -> torch.Tensor | list[tuple[float, int]]:
-    if args.model == "FSRS-6-one-step":
+    if model_name == "FSRS-6-one-step":
         return [(float(delta), int(rating)) for delta, rating in zip(elapses, ratings)]
 
-    if args.model == "LSTM":
+    if model_name == "LSTM":
         if config.lstm_use_duration:
             if not durations:
                 durations = [args.default_duration] * len(ratings)
@@ -348,6 +421,7 @@ def build_sequence_tensor(
 
 
 def build_snapshots(
+    model_name: str,
     args: argparse.Namespace,
     model,
     config,
@@ -355,13 +429,21 @@ def build_snapshots(
     durations: Sequence[float],
     ratings: Sequence[int],
 ) -> List[Snapshot]:
-    sequence = build_sequence_tensor(args, config, elapses, durations, ratings)
+    if is_dash_model(model_name):
+        return build_dash_snapshots(model_name, ratings, elapses)
+    if model_name == "HLR":
+        return build_hlr_snapshots(model, config, ratings, elapses)
+    if model_name == "ACT-R":
+        return build_actr_snapshots(ratings, elapses)
+    sequence = build_sequence_tensor(
+        model_name, args, config, elapses, durations, ratings
+    )
     states: List[object] = []
 
-    if args.model == "FSRS-6-one-step":
+    if model_name == "FSRS-6-one-step":
         outputs = model.forward(sequence)
         states = [float(state[0]) for state in outputs]
-    elif args.model == "LSTM":
+    elif model_name == "LSTM":
         with torch.no_grad():
             w_lnh, s_lnh, d_lnh = model.forward(sequence)  # type: ignore[arg-type]
         for idx in range(len(ratings)):
@@ -395,6 +477,102 @@ def build_snapshots(
     return snapshots
 
 
+def build_dash_snapshots(
+    model_name: str,
+    ratings: Sequence[int],
+    elapses: Sequence[float],
+) -> List[Snapshot]:
+    enable_decay = "MCM" in model_name
+    snapshots: List[Snapshot] = []
+    current_time = 0.0
+    history_ratings: List[int] = []
+    history_elapses: List[float] = []
+    for idx, (rating, delta) in enumerate(zip(ratings, elapses)):
+        delta = float(delta)
+        if idx == 0:
+            current_time = 0.0
+            history_elapses.append(0.0)
+        else:
+            current_time += delta
+            history_elapses.append(delta)
+        history_ratings.append(int(rating))
+        state = {
+            "type": "dash",
+            "ratings": history_ratings.copy(),
+            "elapses": history_elapses.copy(),
+            "enable_decay": enable_decay,
+        }
+        snapshots.append(
+            Snapshot(
+                time=current_time,
+                rating=int(rating),
+                elapsed=delta,
+                state=state,
+            )
+        )
+    return snapshots
+
+
+def build_hlr_snapshots(
+    model: HLR,
+    config,
+    ratings: Sequence[int],
+    elapses: Sequence[float],
+) -> List[Snapshot]:
+    successes = 0
+    failures = 0
+    snapshots: List[Snapshot] = []
+    current_time = 0.0
+    for idx, (rating, delta) in enumerate(zip(ratings, elapses)):
+        delta = float(delta)
+        if idx == 0:
+            current_time = 0.0
+        else:
+            current_time += delta
+        feature_tensor = compute_hlr_features(successes, failures).to(config.device)
+        with torch.no_grad():
+            stability_tensor = model.forward(feature_tensor.view(1, -1))
+        stability = float(stability_tensor.squeeze().detach().cpu().item())
+        snapshots.append(
+            Snapshot(
+                time=current_time,
+                rating=int(rating),
+                elapsed=delta,
+                state=stability,
+            )
+        )
+        if rating > 1:
+            successes += 1
+        else:
+            failures += 1
+    return snapshots
+
+
+def build_actr_snapshots(
+    ratings: Sequence[int],
+    elapses: Sequence[float],
+) -> List[Snapshot]:
+    snapshots: List[Snapshot] = []
+    abs_times: List[float] = []
+    current_time = 0.0
+    for idx, (rating, delta) in enumerate(zip(ratings, elapses)):
+        delta = float(delta)
+        if idx == 0:
+            current_time = 0.0
+        else:
+            current_time += delta
+        abs_times.append(current_time)
+        snapshots.append(
+            Snapshot(
+                time=current_time,
+                rating=int(rating),
+                elapsed=delta,
+                state={"type": "actr", "times": abs_times.copy()},
+            )
+        )
+    return snapshots
+
+
 def predict_retention(model, config, state: object, elapsed: float) -> float:
     if isinstance(model, LSTM):
         w, s, d = state  # type: ignore[misc]
@@ -414,6 +592,41 @@ def predict_retention(model, config, state: object, elapsed: float) -> float:
         s_tensor = torch.tensor([state], dtype=torch.float32, device=config.device)
         decay = -float(model.w[20].detach().cpu().item())
         value = model.forgetting_curve(t_tensor, s_tensor, decay)
+        return float(value.item()) if isinstance(value, torch.Tensor) else float(value)
+
+    if isinstance(model, ACT_R):
+        if not isinstance(state, dict) or state.get("type") != "actr":
+            raise ValueError("Invalid ACT-R state for prediction.")
+        times: List[float] = state.get("times", [])
+        if not times:
+            times = [0.0]
+        last_time = times[-1]
+        future_time = last_time + float(elapsed)
+        sp = torch.tensor(
+            times + [future_time], dtype=torch.float32, device=config.device
+        ).view(-1, 1, 1)
+        with torch.no_grad():
+            outputs = model.forward(sp)
+        return float(outputs[-1, 0, 0].item())
+
+    if isinstance(model, DASH):
+        if not isinstance(state, dict) or state.get("type") != "dash":
+            raise ValueError("Invalid DASH state for prediction.")
+        ratings_hist: List[int] = state["ratings"]
+        elapses_hist: List[float] = state["elapses"]
+        enable_decay = bool(state.get("enable_decay", False))
+        interval_history = elapses_hist[1:].copy()
+        interval_history.append(float(elapsed))
+        features = compute_dash_features(
+            ratings_hist, interval_history, enable_decay=enable_decay
+        )
+        tensor = torch.tensor(features, dtype=torch.float32, device=config.device).view(
+            1, 1, -1
+        )
+        with torch.no_grad():
+            outputs = model.forward(tensor)
+        return float(outputs[0, 0].item())
+
     else:
         t_tensor = torch.tensor([elapsed], dtype=torch.float32, device=config.device)
         s_tensor = torch.tensor([state], dtype=torch.float32, device=config.device)
@@ -424,46 +637,48 @@ def predict_retention(model, config, state: object, elapsed: float) -> float:
     return float(value)
 
 
-def plot_snapshots(
-    args: argparse.Namespace,
-    model,
-    config,
-    snapshots: Sequence[Snapshot],
-) -> None:
-    if not snapshots:
+def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundle]):
+    if not bundles:
         raise RuntimeError("No card snapshots available to plot.")
 
+    title_suffix = ", ".join(bundle.name for bundle in bundles)
     plt.figure(figsize=(10, 5))
-    plt.title(f"{args.title} [{args.model}]")
+    plt.title(f"{args.title} [{title_suffix}]")
     plt.xlabel("Absolute time since first review")
     plt.ylabel("Retention probability")
     plt.ylim(0.0, 1.05)
     plt.grid(True, alpha=0.25)
 
-    for idx, snap in enumerate(snapshots):
-        start = snap.time
-        end = (
-            snapshots[idx + 1].time
-            if idx + 1 < len(snapshots)
-            else start + args.max_days
-        )
-        duration = max(0.0, end - start)
-        if duration <= 0.0:
-            continue
-        xs_local = [
-            duration * i / max(1, (args.num_points - 1)) for i in range(args.num_points)
-        ]
-        ys = [
-            predict_retention(model, config, snap.state, elapsed)
-            for elapsed in xs_local
-        ]
-        xs = [start + x for x in xs_local]
-        label = "Future curve" if idx == len(snapshots) - 1 else None
-        plt.plot(xs, ys, label=label)
+    reference_snapshots = bundles[0].snapshots
+    review_times = [snap.time for snap in reference_snapshots]
 
-    review_times = [snap.time for snap in snapshots]
+    for bundle in bundles:
+        label_used = False
+        for idx, snap in enumerate(bundle.snapshots):
+            start = snap.time
+            end = (
+                bundle.snapshots[idx + 1].time
+                if idx + 1 < len(bundle.snapshots)
+                else start + args.max_days
+            )
+            duration = max(0.0, end - start)
+            if duration <= 0.0:
+                continue
+            xs_local = [
+                duration * i / max(1, (args.num_points - 1))
+                for i in range(args.num_points)
+            ]
+            ys = [
+                predict_retention(bundle.model, bundle.config, snap.state, elapsed)
+                for elapsed in xs_local
+            ]
+            xs = [start + x for x in xs_local]
+            label = bundle.name if not label_used else None
+            (line,) = plt.plot(xs, ys, label=label)
+            if not label_used and label is not None:
+                label_used = True
 
-    for snap in snapshots:
+    for snap in reference_snapshots:
         plt.axvline(snap.time, color="tab:gray", linestyle="--", alpha=0.25)
         annot = f"r={snap.rating}, Δ={snap.elapsed:.2f}"
         plt.annotate(
@@ -483,16 +698,20 @@ def plot_snapshots(
         marker="x",
         label="Review event",
     )
-    if len(snapshots) > 1:
+    if len(reference_snapshots) > 1 or len(bundles) > 1:
         plt.legend()
     plt.tight_layout()
     plt.show()
 
 
-def main() -> None:
-    args = parse_args()
-    ratings, elapses, durations = validate_inputs(args)
-    user_base_name = compute_base_name(args)
+def prepare_model_bundle(
+    model_name: str,
+    args: argparse.Namespace,
+    ratings: Sequence[int],
+    elapses: Sequence[float],
+    durations: Sequence[float],
+) -> ModelPlotBundle:
+    base_name = compute_base_name(model_name, args)
     result_path: Path | None = args.result_file
     result_base_name: str | None = None
     if result_path is not None:
@@ -500,21 +719,23 @@ def main() -> None:
             raise FileNotFoundError(f"{result_path} does not exist.")
         result_base_name = result_path.stem
     else:
-        candidate = Path("result") / f"{user_base_name}.jsonl"
+        candidate = Path("result") / f"{base_name}.jsonl"
         if candidate.exists():
             result_path = candidate
-            result_base_name = user_base_name
+            result_base_name = base_name
 
     weight_info: WeightLocation | None = None
     if args.weights_file:
+        if model_name not in STATE_DICT_MODELS:
+            raise ValueError("--weights-file is only supported for neural models.")
         if not args.weights_file.exists():
             raise FileNotFoundError(f"{args.weights_file} does not exist.")
         inferred = infer_base_name_from_weights_path(
-            args.weights_file, user_base_name, args.model
+            args.weights_file, base_name, model_name
         )
         weight_info = WeightLocation(args.weights_file, inferred)
-    elif args.model in STATE_DICT_MODELS:
-        weight_info = resolve_weights_path(user_base_name, args.model, args.user_id)
+    elif model_name in STATE_DICT_MODELS:
+        weight_info = resolve_weights_path(base_name, model_name, args.user_id)
 
     source_type: str | None = None
     source_base_name: str | None = None
@@ -524,13 +745,9 @@ def main() -> None:
         source_type = "weights"
         source_base_name = weight_info.base_name
         selected_path = weight_info.path
-    elif args.result_file and result_path:
+    elif result_path is not None:
         source_type = "result"
-        source_base_name = result_base_name or user_base_name
-        selected_path = result_path
-    elif result_path:
-        source_type = "result"
-        source_base_name = result_base_name or user_base_name
+        source_base_name = result_base_name or base_name
         selected_path = result_path
     elif weight_info:
         source_type = "weights"
@@ -538,19 +755,16 @@ def main() -> None:
         selected_path = weight_info.path
     else:
         raise ValueError(
-            "Unable to locate parameters. Provide --result-file/--user-id or --weights-file."
+            f"Unable to locate parameters for {model_name}. Provide --result-file/--user-id or --weights-file."
         )
 
     model_params: object | None = None
-    final_base_name = source_base_name or user_base_name
-    final_source_type = source_type
-    if final_source_type == "weights":
+    final_base_name = source_base_name or base_name
+    if source_type == "weights":
         if selected_path is None:
             raise ValueError("Weights path was not resolved.")
-        if args.model not in STATE_DICT_MODELS:
-            raise ValueError("--weights-file is only supported for neural models.")
         model_params = load_state_dict(selected_path)
-    elif final_source_type == "result":
+    elif source_type == "result":
         if selected_path is None:
             raise ValueError("Result path was not resolved.")
         if args.user_id is None:
@@ -562,24 +776,42 @@ def main() -> None:
         except ValueError as exc:
             missing_params = "does not contain parameters" in str(exc)
             if missing_params and weight_info and weight_info.path.exists():
-                final_source_type = "weights"
+                model_params = load_state_dict(weight_info.path)
                 final_base_name = weight_info.base_name
-                selected_path = weight_info.path
-                if args.model not in STATE_DICT_MODELS:
-                    raise ValueError(
-                        "Fallback weights loading is only supported for neural models."
-                    )
-                model_params = load_state_dict(selected_path)
             else:
                 raise
     else:
         raise RuntimeError("Unknown parameter source.")
 
-    extra_flags = flags_from_base_name(args.model, final_base_name)
-    config = build_config(args, extra_flags=extra_flags)
-    model = instantiate_model(args, config, model_params)
-    snapshots = build_snapshots(args, model, config, elapses, durations, ratings)
-    plot_snapshots(args, model, config, snapshots)
+    extra_flags = flags_from_base_name(model_name, final_base_name)
+    config = build_config(model_name, args, extra_flags=extra_flags)
+    model = instantiate_model(model_name, config, model_params)
+    snapshots = build_snapshots(
+        model_name, args, model, config, elapses, durations, ratings
+    )
+    return ModelPlotBundle(
+        name=model_name, model=model, config=config, snapshots=snapshots
+    )
+
+
+def main() -> None:
+    args = parse_args()
+    ratings, elapses, durations = validate_inputs(args)
+    model_names = args.models if args.models else [args.model]
+    if len(model_names) > 1:
+        if args.result_file:
+            raise ValueError(
+                "Remove --result-file when plotting multiple models; files are discovered per model."
+            )
+        if args.weights_file:
+            raise ValueError(
+                "Remove --weights-file when plotting multiple models. Provide per-model weights by running separately."
+            )
+    bundles = [
+        prepare_model_bundle(model_name, args, ratings, elapses, durations)
+        for model_name in model_names
+    ]
+    plot_model_curves(args, bundles)
 
 
 if __name__ == "__main__":

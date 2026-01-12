@@ -280,8 +280,15 @@ def resolve_weights_path(
     candidate = preferred_dir / f"{user_id}.pth"
     if candidate.exists():
         return WeightLocation(candidate, preferred_base_name)
-    else:
-        raise ValueError(f"{candidate} not found")
+    for sub_dir in sorted(base_dir.iterdir()):
+        if not sub_dir.is_dir():
+            continue
+        if not sub_dir.name.startswith(model_name):
+            continue
+        fallback_candidate = sub_dir / f"{user_id}.pth"
+        if fallback_candidate.exists():
+            return WeightLocation(fallback_candidate, sub_dir.name)
+    return None
 
 
 def flags_from_base_name(model_name: str, base_name: str) -> list[str]:
@@ -703,21 +710,21 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
 
     for snap in reference_snapshots:
         plt.axvline(snap.time, color="tab:gray", linestyle="--", alpha=0.25)
-        annot = f"r={snap.rating}, Δ={snap.elapsed:.2f}"
+        annot = f"r={snap.rating}, Δ={snap.elapsed:.0f}"
         plt.annotate(
             annot,
             (snap.time, 1.0),
             textcoords="offset points",
-            xytext=(5, 5),
-            fontsize=8,
-            rotation=30,
-            color="tab:red",
+            xytext=(5, 15),
+            fontsize=10,
+            rotation=45,
+            color="black",
         )
 
     plt.scatter(
         review_times,
         [1.0] * len(review_times),
-        c="tab:red",
+        c="black",
         marker="x",
         label="Review event",
     )

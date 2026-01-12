@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import math
 from dataclasses import dataclass
@@ -652,8 +653,30 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
     reference_snapshots = bundles[0].snapshots
     review_times = [snap.time for snap in reference_snapshots]
 
+    prop_cycle = plt.rcParams.get("axes.prop_cycle")
+    if prop_cycle is not None:
+        base_colors = prop_cycle.by_key().get("color", [])
+    else:
+        base_colors = []
+    if not base_colors:
+        base_colors = [
+            "tab:blue",
+            "tab:orange",
+            "tab:green",
+            "tab:red",
+            "tab:purple",
+            "tab:brown",
+            "tab:pink",
+            "tab:gray",
+            "tab:olive",
+            "tab:cyan",
+        ]
+    color_cycle = itertools.cycle(base_colors)
+    color_map: dict[str, str] = {}
+
     for bundle in bundles:
         label_used = False
+        color = color_map.setdefault(bundle.name, next(color_cycle))
         for idx, snap in enumerate(bundle.snapshots):
             start = snap.time
             end = (
@@ -674,7 +697,7 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
             ]
             xs = [start + x for x in xs_local]
             label = bundle.name if not label_used else None
-            (line,) = plt.plot(xs, ys, label=label)
+            (line,) = plt.plot(xs, ys, label=label, color=color)
             if not label_used and label is not None:
                 label_used = True
 

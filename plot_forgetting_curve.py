@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from config import load_config
+from config import Config, load_config
 from models.act_r import ACT_R
 from models.dash import DASH
 from models.fsrs_v6 import FSRS6

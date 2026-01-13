@@ -137,15 +137,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        choices=SUPPORTED_MODELS,
         default="FSRS-6",
-        help="Primary model to visualize when --models is not provided.",
+        help="Final base name (e.g., FSRS-6-short) to visualize when --models is not provided.",
     )
     parser.add_argument(
         "--models",
         nargs="+",
-        choices=SUPPORTED_MODELS,
-        help="Optional list of models to plot simultaneously (overrides --model).",
+        help="Optional list of final base names to plot simultaneously (overrides --model).",
     )
     parser.add_argument(
         "--ratings",
@@ -174,11 +172,6 @@ def parse_args() -> argparse.Namespace:
         help="Fallback duration (ms) when --model LSTM expects durations but none are provided.",
     )
     parser.add_argument(
-        "--result-file",
-        type=Path,
-        help="Path to the JSONL result file containing learned parameters (defaults to result/<model>.jsonl).",
-    )
-    parser.add_argument(
         "--user-id",
         type=int,
         help="User ID whose parameters should be loaded from the result file.",
@@ -187,31 +180,6 @@ def parse_args() -> argparse.Namespace:
         "--partition",
         default="0",
         help="Partition key inside the result JSON line when parameters are stored per partition.",
-    )
-    parser.add_argument(
-        "--weights-file",
-        type=Path,
-        help="Path to a saved state_dict (e.g., weights/LSTM-*/<user>.pth). Required when no --result-file is provided for LSTM.",
-    )
-    parser.add_argument(
-        "--secs",
-        action="store_true",
-        help="Configure the model to use elapsed seconds instead of days.",
-    )
-    parser.add_argument(
-        "--short",
-        action="store_true",
-        help="Enable --short behavior when building the Config (matches training flags).",
-    )
-    parser.add_argument(
-        "--two-buttons",
-        action="store_true",
-        help="Use binary ratings when constructing the Config.",
-    )
-    parser.add_argument(
-        "--no_lstm_duration",
-        action="store_true",
-        help="Disable the LSTM duration feature to match checkpoints trained without durations.",
     )
     parser.add_argument(
         "--max-days",
@@ -234,30 +202,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def collect_user_config_flags(args: argparse.Namespace) -> list[str]:
-    flags: list[str] = []
-    if args.secs:
-        flags.append("--secs")
-    if args.short:
-        flags.append("--short")
-    if args.two_buttons:
-        flags.append("--two_buttons")
-    if args.no_lstm_duration:
-        flags.append("--no_lstm_duration")
-    return flags
-
-
-def compute_base_name(model_name: str, args: argparse.Namespace) -> str:
-    parts: list[str] = [model_name]
-    if args.two_buttons:
-        parts.append("-binary")
-    if args.short:
-        parts.append("-short")
-    if args.secs:
-        parts.append("-secs")
-    if model_name == "LSTM" and args.no_lstm_duration:
-        parts.append("-no_duration")
-    return "".join(parts)
+def split_base_name(base_name: str) -> tuple[str, str]:
+    normalized = base_name.strip()
+    for candidate in sorted(SUPPORTED_MODELS, key=len, reverse=True):
+        if normalized.startswith(candidate):
+            suffix = normalized[len(candidate) :]
+            return candidate, suffix
+    raise ValueError(
+        f"Unable to determine model name for '{base_name}'. Expected one of {SUPPORTED_MODELS} prefixes."
+    )
 
 
 def infer_base_name_from_weights_path(
@@ -352,11 +305,8 @@ def load_state_dict(path: Path) -> dict:
     return state
 
 
-def build_config(
-    model_name: str, args: argparse.Namespace, extra_flags: Sequence[str] | None = None
-):
+def build_config(model_name: str, extra_flags: Sequence[str] | None = None):
     cli_args = ["--algo", model_name]
-    cli_args.extend(collect_user_config_flags(args))
     if extra_flags:
         cli_args.extend(extra_flags)
     return load_config(custom_args_list=cli_args)
@@ -737,47 +687,27 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
 
 
 def prepare_model_bundle(
-    model_name: str,
+    base_name: str,
     args: argparse.Namespace,
     ratings: Sequence[int],
     elapses: Sequence[float],
     durations: Sequence[float],
 ) -> ModelPlotBundle:
-    base_name = compute_base_name(model_name, args)
-    result_path: Path | None = args.result_file
-    result_base_name: str | None = None
-    if result_path is not None:
-        if not result_path.exists():
-            raise FileNotFoundError(f"{result_path} does not exist.")
-        result_base_name = result_path.stem
-    else:
-        candidate = Path("result") / f"{base_name}.jsonl"
-        if candidate.exists():
-            result_path = candidate
-            result_base_name = base_name
+    base_name = base_name.strip()
+    model_name, _ = split_base_name(base_name)
+    candidate = Path("result") / f"{base_name}.jsonl"
+    result_path = candidate if candidate.exists() else None
+    result_base_name: str | None = base_name if result_path else None
 
     weight_info: WeightLocation | None = None
-    if args.weights_file:
-        if model_name not in STATE_DICT_MODELS:
-            raise ValueError("--weights-file is only supported for neural models.")
-        if not args.weights_file.exists():
-            raise FileNotFoundError(f"{args.weights_file} does not exist.")
-        inferred = infer_base_name_from_weights_path(
-            args.weights_file, base_name, model_name
-        )
-        weight_info = WeightLocation(args.weights_file, inferred)
-    elif model_name in STATE_DICT_MODELS:
+    if model_name in STATE_DICT_MODELS:
         weight_info = resolve_weights_path(base_name, model_name, args.user_id)
 
     source_type: str | None = None
     source_base_name: str | None = None
     selected_path: Path | None = None
 
-    if args.weights_file and weight_info:
-        source_type = "weights"
-        source_base_name = weight_info.base_name
-        selected_path = weight_info.path
-    elif result_path is not None:
+    if result_path is not None:
         source_type = "result"
         source_base_name = result_base_name or base_name
         selected_path = result_path
@@ -787,7 +717,7 @@ def prepare_model_bundle(
         selected_path = weight_info.path
     else:
         raise ValueError(
-            f"Unable to locate parameters for {model_name}. Provide --result-file/--user-id or --weights-file."
+            f"Unable to locate parameters for {model_name}. Provide --user-id for neural models or ensure result/{base_name}.jsonl exists."
         )
 
     model_params: object | None = None
@@ -816,7 +746,7 @@ def prepare_model_bundle(
         raise RuntimeError("Unknown parameter source.")
 
     extra_flags = flags_from_base_name(model_name, final_base_name)
-    config = build_config(model_name, args, extra_flags=extra_flags)
+    config = build_config(model_name, extra_flags=extra_flags)
     model = instantiate_model(model_name, config, model_params)
     snapshots = build_snapshots(
         model_name, args, model, config, elapses, durations, ratings
@@ -834,15 +764,6 @@ def main() -> None:
     args = parse_args()
     ratings, elapses, durations = validate_inputs(args)
     model_names = args.models if args.models else [args.model]
-    if len(model_names) > 1:
-        if args.result_file:
-            raise ValueError(
-                "Remove --result-file when plotting multiple models; files are discovered per model."
-            )
-        if args.weights_file:
-            raise ValueError(
-                "Remove --weights-file when plotting multiple models. Provide per-model weights by running separately."
-            )
     bundles = [
         prepare_model_bundle(model_name, args, ratings, elapses, durations)
         for model_name in model_names

@@ -119,7 +119,7 @@ class LSTM(BaseModel):
         self.d_fc = nn.Linear(self.n_hidden, self.n_curves)
 
         if state_dict is not None:
-            self.load_state_dict(state_dict)
+            self.load_state_dict(state_dict[0])
         else:
             try:
                 self.load_state_dict(

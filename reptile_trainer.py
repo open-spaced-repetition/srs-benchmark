@@ -606,7 +606,7 @@ def main():
     def worker(user_id):
         return process_user(user_id)
 
-    time_start = time.time()    
+    time_start = time.time()
     if PROCESSES > 1:
         print(f"Processes: {PROCESSES} is only used for getting the data.")
     with Pool(processes=PROCESSES) as pool:

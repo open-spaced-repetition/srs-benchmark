@@ -150,7 +150,7 @@ create_feature_engineer(config)
 
 ### LSTM Model
 - Additional features: new card counts, review counts, daily statistics
-- Tensor format: `[delta_t, duration, rating]` history
+- Tensor format: `[delta_t, rating]` history by default; add `duration` with `--duration`
 
 ### DASH Models
 - **DASH**: Time window features without decay

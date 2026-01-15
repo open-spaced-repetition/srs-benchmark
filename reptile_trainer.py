@@ -79,7 +79,7 @@ FILE_NAME = (
     + ("-secs" if SECS_IVL else "")
     + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
     + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
-    + ("-no_duration" if (MODEL_NAME == "LSTM" and args.no_lstm_duration) else "")
+    + ("-duration" if (MODEL_NAME == "LSTM" and args.duration) else "")
 )
 MODEL_PATH = f"./pretrain/{FILE_NAME}_pretrain.pth"
 INNER_OPT_PATH = f"./pretrain/{FILE_NAME}_opt_pretrain.pth"

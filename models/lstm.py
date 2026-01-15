@@ -31,7 +31,7 @@ class LSTM(BaseModel):
     It uses:
     - same-day reviews as features
     - fractional intervals
-    - the duration of each review as an input feature
+    - optional duration of each review as an input feature (enable with --duration)
     - its own version of --recency
     For prediction, it uses 'elapsed_days' for input to the forgetting curve.
 

@@ -5,14 +5,13 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from config import create_parser, Config
 from fsrs_optimizer import (  # type: ignore
     BatchDataset,
     BatchLoader,
     DevicePrefetchLoader,
 )
-from multiprocessing import Pool  # type: ignore
+from multiprocess import Pool
 import copy
 import numpy as np
 from models.trainable import TrainableModel
@@ -604,19 +603,14 @@ def main():
     test_users = list(range(5000 - num_test_users, 5000))
     all_users = train_users + test_users
 
-    time_start = time.time()
-    if PROCESSES > 1:
-        loader_label = "threads" if os.name == "nt" else "processes"
-        print(
-            f"{loader_label.capitalize()}: {PROCESSES} worker(s) only used for getting the data."
-        )
+    def worker(user_id):
+        return process_user(user_id)
 
-    if os.name == "nt":
-        with ThreadPoolExecutor(max_workers=PROCESSES) as executor:
-            results = list(executor.map(process_user, all_users))
-    else:
-        with Pool(processes=PROCESSES) as pool:
-            results = pool.map(process_user, all_users)
+    time_start = time.time()    
+    if PROCESSES > 1:
+        print(f"Processes: {PROCESSES} is only used for getting the data.")
+    with Pool(processes=PROCESSES) as pool:
+        results = pool.map(worker, all_users)
 
     for user, result in results:
         df_dict[user] = result

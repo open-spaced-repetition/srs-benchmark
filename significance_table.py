@@ -70,18 +70,18 @@ if __name__ == "__main__":
         "RWKV",
         "LSTM-short-secs-equalize_test_with_non_secs",
         "GRU-P-short",
-        "FSRS-rs",
-        "FSRS-6-recency",
-        "FSRS-6",
+        "FSRS-rs-short",
+        "FSRS-6-short-recency",
+        "FSRS-6-short",
         "MOVING-AVG",
-        "FSRS-6-preset",
-        "FSRS-6-binary",
-        "FSRS-6-deck",
+        "FSRS-6-short-preset",
+        "FSRS-6-binary-short",
+        "FSRS-6-short-deck",
         "GRU-P",
-        "FSRS-5",
-        "FSRS-6-S0",
+        "FSRS-5-short",
+        "FSRS-6-S0-short",
         "FSRS-4.5",
-        "FSRS-6-default",
+        "FSRS-6-default-short",
         "FSRSv4",
         "DASH-short",
         "DASH",
@@ -190,6 +190,9 @@ if __name__ == "__main__":
                             color_ttest[i, j] = 4
 
     # small changes to labels
+    for idx, model_name in enumerate(models):
+        if model_name.startswith("FSRS"):
+            models[idx] = model_name.replace("-short", "")
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
     index_6_default = models.index("FSRS-6-default")
     index_6_S0 = models.index("FSRS-6-S0")

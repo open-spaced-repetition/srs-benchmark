@@ -118,24 +118,12 @@ def create_parser():
         "--plot", action="store_true", help="save evaluation plots to file"
     )
 
-    # other.py only
     parser.add_argument("--algo", default="FSRSv3", help="algorithm name")
     parser.add_argument(
         "--short", action="store_true", help="include short-term reviews"
     )
     parser.add_argument(
         "--weights", action="store_true", help="save neural network weights"
-    )
-
-    # script.py only (deprecated - use --algo FSRS-rs instead)
-    parser.add_argument("--rust", action="store_true", help="FSRS-rs (deprecated)")
-    parser.add_argument(
-        "--disable_short_term", action="store_true", help="disable short-term memory"
-    )
-    parser.add_argument(
-        "--fsrs_rs_no_outlier",
-        action="store_true",
-        help="Set FSRS_NO_OUTLIER environment variable for FSRS-rs",
     )
     parser.add_argument(
         "--train_equals_test",

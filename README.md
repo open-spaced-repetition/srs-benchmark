@@ -215,49 +215,37 @@ Dataset (tiny): https://github.com/open-spaced-repetition/fsrs-benchmark/issues/
 Dependencies:
 
 ```bash
-pip install -r requirements.txt
+uv sycn
 ```
+
+> uv is a tool that helps manage Python environments and dependencies. You can install it from https://docs.astral.sh/uv/.
 
 ### Commands
 
 FSRS-6:
 
 ```bash
-python script.py
+uv run python script.py --algo FSRS-6 --short
 ```
-
-> Please confirm that you have upgraded the `fsrs-optimizer` package to the latest version.
 
 FSRS-6 with default parameters:
 
 ```bash
-python script.py --default
+uv run python script.py --algo FSRS-6 --default --short
 ```
 
 FSRS-6 with only the first 4 parameters optimized:
 
 ```bash
-python script.py --S0
+uv run python script.py --algo FSRS-6 --S0 --short
 ```
 
 FSRS-rs:
 
-It requires `fsrs_rs_python` to be installed.
-
-```bash
-pip install fsrs_rs_python
-```
-
 Then run the following command:
 
 ```bash
-python script.py --rust
-```
-
-Dev algorithm in fsrs-optimizer:
-
-```bash
-python script.py --dev
+uv run python script.py --algo FSRS-rs --short
 ```
 
 > Please place the [fsrs-optimizer repository](https://github.com/open-spaced-repetition/fsrs-optimizer) in the same directory as this repository.
@@ -265,41 +253,41 @@ python script.py --dev
 Set the number of processes:
 
 ```bash
-python script.py --processes 4
+uv run python script.py --processes 4
 ```
 
 Save the raw predictions:
 
 ```bash
-python script.py --raw
+uv run python script.py --raw
 ```
 
 Save the detailed results:
 
 ```bash
-python script.py --file
+uv run python script.py --file
 ```
 
 Save the analyzing charts:
 
 ```bash
-python script.py --plot
+uv run python script.py --plot
 ```
 
 Benchmark FSRS-5/FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
-python other.py --algo FSRS-6
+uv run python script.py --algo FSRS-6
 ```
 
 > You can change `FSRS-6` to `FSRSv3`, `HLR`, `LSTM`, etc. to run the corresponding algorithm.
 
 Instead of using a 5-way split, train the algorithm and evaluate it on the same data. This can be useful to determine how much the algorithm is overfitting.
 ```bash
-python other.py --algo FSRS-6 --train_equals_test
+uv run python script.py --algo FSRS-6 --train_equals_test
 ```
 
 > You can limit the number of users with the --max-user-id parameter. Only users from 1 to max-user-id included will be considered.
 ```bash
-python other.py --max-user-id 20
+uv run python script.py --max-user-id 20
 ```

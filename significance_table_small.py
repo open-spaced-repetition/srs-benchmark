@@ -57,9 +57,9 @@ if __name__ == "__main__":
         "RWKV",
         "LSTM-short-secs-equalize_test_with_non_secs",
         "GRU-P-short",
-        "FSRS-6-recency",
+        "FSRS-6-short-recency",
         "MOVING-AVG",
-        "FSRS-5",
+        "FSRS-5-short",
         "FSRS-4.5",
         "FSRSv4",
         "DASH",
@@ -134,6 +134,9 @@ if __name__ == "__main__":
                             color_wilcox[i, j] = 4
 
     # small changes to labels
+    for idx, model_name in enumerate(models):
+        if model_name.startswith("FSRS"):
+            models[idx] = model_name.replace("-short", "")
     index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
     index_v4 = models.index("FSRSv4")
     index_Ebisu_v2 = models.index("Ebisu-v2")

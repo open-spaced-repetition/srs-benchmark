@@ -371,8 +371,10 @@ if __name__ == "__main__":
     print(f"Test Use Secs: {test_config.use_secs_intervals}")
     print(f"Test Dev Mode: {test_config.dev_mode}")
     print(f"Test S_MIN: {test_config.s_min}")  # Should be 1e-6
-    print(f"Test Initial Short Term: {test_config.include_short_term}")  # True
-    print(f"Test Effective Short Term: {test_config.include_short_term}")  # True
+    print(f"Test Short Term Enabled: {test_config.include_short_term}")  # True
+    print(
+        f"Test Eval File Has '-short': {'-short' in test_config.get_evaluation_file_name()}"
+    )  # True
 
     print("\n--- Testing FSRS-6 S_MIN logic ---")
     fsrs6_no_secs_config = load_config(custom_args_list=["--algo", "FSRS-6"])
@@ -381,20 +383,27 @@ if __name__ == "__main__":
     fsrs6_secs_config = load_config(custom_args_list=["--algo", "FSRS-6", "--secs"])
     print(f"FSRS-6 (with secs) S_MIN: {fsrs6_secs_config.s_min}")  # Expected: 1e-6
 
-    print("\n--- Testing effective_short_term logic ---")
+    print("\n--- Testing short-term flag propagation ---")
+    fsrs5_config_with_short_arg = load_config(
+        custom_args_list=["--algo", "FSRS-5", "--short"]
+    )
+    print(
+        f"FSRS-5 (with --short arg) Include Short: {fsrs5_config_with_short_arg.include_short_term}, Eval File: {fsrs5_config_with_short_arg.get_evaluation_file_name()}"
+    )  # E: True / '-short' present
+
     fsrs5_config_no_short_arg = load_config(custom_args_list=["--algo", "FSRS-5"])
     print(
-        f"FSRS-5 (no --short arg) Initial: {fsrs5_config_no_short_arg.include_short_term}, Effective: {fsrs5_config_no_short_arg.include_short_term}"
-    )  # E: True
+        f"FSRS-5 (no --short arg) Include Short: {fsrs5_config_no_short_arg.include_short_term}, Eval File: {fsrs5_config_no_short_arg.get_evaluation_file_name()}"
+    )  # E: False / '-short' absent
 
     fsrs4_config_with_short_arg = load_config(
         custom_args_list=["--algo", "FSRS-4.5", "--short"]
     )
     print(
-        f"FSRS-4.5 (with --short arg) Initial: {fsrs4_config_with_short_arg.include_short_term}, Effective: {fsrs4_config_with_short_arg.include_short_term}"
-    )  # E: True
+        f"FSRS-4.5 (with --short arg) Include Short: {fsrs4_config_with_short_arg.include_short_term}, Eval File: {fsrs4_config_with_short_arg.get_evaluation_file_name()}"
+    )  # E: True / '-short' present
 
     fsrs4_config_no_short_arg = load_config(custom_args_list=["--algo", "FSRS-4.5"])
     print(
-        f"FSRS-4.5 (no --short arg) Initial: {fsrs4_config_no_short_arg.include_short_term}, Effective: {fsrs4_config_no_short_arg.include_short_term}"
-    )  # E: False
+        f"FSRS-4.5 (no --short arg) Include Short: {fsrs4_config_no_short_arg.include_short_term}, Eval File: {fsrs4_config_no_short_arg.get_evaluation_file_name()}"
+    )  # E: False / '-short' absent

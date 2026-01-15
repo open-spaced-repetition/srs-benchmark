@@ -367,9 +367,9 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     return stats, raw
 
 def sort_jsonl(file):
-    data = list(map(lambda x: json.loads(x), open(file).readlines()))
+    data = list(map(lambda x: json.loads(x), open(file, encoding="utf-8").readlines()))
     data.sort(key=lambda x: x["user"])
-    with file.open("w", encoding="utf-8") as jsonl_file:
+    with file.open("w", encoding="utf-8", newline="\n") as jsonl_file:
         for json_data in data:
             jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
     return data

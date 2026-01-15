@@ -389,10 +389,10 @@ if __name__ == "__main__":
                     tqdm.write(error)
                 else:
                     stats, raw = result
-                    with open(result_file, "a") as f:
+                    with open(result_file, "a", encoding="utf-8", newline="\n") as f:
                         f.write(json.dumps(stats, ensure_ascii=False) + "\n")
                     if raw:
-                        with open(raw_file, "a") as f:
+                        with open(raw_file, "a", encoding="utf-8", newline="\n") as f:
                             f.write(json.dumps(raw, ensure_ascii=False) + "\n")
                     pbar.set_description(f"Processed {stats['user']}")
             except Exception as e:

@@ -199,7 +199,7 @@ class Config:
         self.n_splits: int = args.n_splits
         self.batch_size: int = args.batch_size
         self.max_seq_len: int = args.max_seq_len
-        self.include_short_term = self.include_short_term
+        self.include_short_term: bool = args.short
 
         # PyTorch threading settings
         self.torch_num_threads: int = args.torch_num_threads

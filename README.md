@@ -215,7 +215,7 @@ Dataset (tiny): https://github.com/open-spaced-repetition/fsrs-benchmark/issues/
 Dependencies:
 
 ```bash
-uv sycn
+uv sync
 ```
 
 > uv is a tool that helps manage Python environments and dependencies. You can install it from https://docs.astral.sh/uv/.

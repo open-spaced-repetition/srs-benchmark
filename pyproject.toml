@@ -17,6 +17,7 @@ dependencies = [
     "scipy>=1.16.3",
     "ebisu>=2.2.0",
     "multiprocess>=0.70.18",
+    "fsrs-rs-python>=0.8.2",
 ]
 
 [build-system]

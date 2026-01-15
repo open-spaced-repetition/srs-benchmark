@@ -354,7 +354,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
         }
     elif config.save_weights and w_list:
         Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
-        torch.save(w_list[-1], f"weights/{file_name}/{user_id}.pth")
+        torch.save(w_list[-1][0], f"weights/{file_name}/{user_id}.pth")
     if config.save_raw_output:
         raw = {
             "user": int(user_id),

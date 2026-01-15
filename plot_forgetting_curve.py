@@ -116,7 +116,7 @@ FLAG_TOKEN_MAP: dict[str, list[str]] = {
     "binary": ["--two_buttons"],
     "short": ["--short"],
     "secs": ["--secs"],
-    "no_duration": ["--no_lstm_duration"],
+    "duration": ["--duration"],
     "recency": ["--recency"],
     "no_test_same_day": ["--no_test_same_day"],
     "no_train_same_day": ["--no_train_same_day"],

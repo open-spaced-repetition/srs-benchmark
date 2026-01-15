@@ -18,7 +18,7 @@ if __name__ == "__main__":
         models = [
             "RWKV-P-short-secs",
             "RWKV-short-secs",
-            "LSTM-short-secs",
+            "LSTM-short-secs-duration",
             "MOVING-AVG-short-secs",
             "GRU-P-short-secs",
             "DASH-short-secs",
@@ -34,7 +34,7 @@ if __name__ == "__main__":
         models = [
             "RWKV-P",
             "RWKV",
-            "LSTM-short-secs-equalize_test_with_non_secs",
+            "LSTM-short-secs-duration-equalize_test_with_non_secs",
             "GRU-P-short",
             "FSRS-6-short-recency",
             "MOVING-AVG",
@@ -127,6 +127,7 @@ if __name__ == "__main__":
         models[i] = (
             model.replace("-secs", "")
             .replace("-short", "")
+            .replace("-duration", "")
             .replace("-equalize_test_with_non_secs", "")
         )
 

@@ -55,7 +55,7 @@ if __name__ == "__main__":
     models = [
         "RWKV-P",
         "RWKV",
-        "LSTM-short-secs-equalize_test_with_non_secs",
+        "LSTM-short-secs-duration-equalize_test_with_non_secs",
         "GRU-P-short",
         "FSRS-6-short-recency",
         "MOVING-AVG",
@@ -137,7 +137,7 @@ if __name__ == "__main__":
     for idx, model_name in enumerate(models):
         if model_name.startswith("FSRS"):
             models[idx] = model_name.replace("-short", "")
-    index_lstm = models.index("LSTM-short-secs-equalize_test_with_non_secs")
+    index_lstm = models.index("LSTM-short-secs-duration-equalize_test_with_non_secs")
     index_v4 = models.index("FSRSv4")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     index_FSRS_6_recency = models.index("FSRS-6-recency")

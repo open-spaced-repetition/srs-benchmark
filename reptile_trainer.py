@@ -67,20 +67,10 @@ args, _ = parser.parse_known_args()
 config = Config(args)
 
 MODEL_NAME = args.algo
-SHORT_TERM = args.short
 PROCESSES = args.processes
-SECS_IVL = args.secs
 NO_TEST_SAME_DAY = args.no_test_same_day
 EQUALIZE_TEST_WITH_NON_SECS = args.equalize_test_with_non_secs
-TWO_BUTTONS = args.two_buttons
-FILE_NAME = (
-    MODEL_NAME
-    + ("-short" if SHORT_TERM else "")
-    + ("-secs" if SECS_IVL else "")
-    + ("-no_test_same_day" if NO_TEST_SAME_DAY else "")
-    + ("-equalize_test_with_non_secs" if EQUALIZE_TEST_WITH_NON_SECS else "")
-    + ("-no_duration" if (MODEL_NAME == "LSTM" and args.no_lstm_duration) else "")
-)
+FILE_NAME = config.get_evaluation_file_name()
 MODEL_PATH = f"./pretrain/{FILE_NAME}_pretrain.pth"
 INNER_OPT_PATH = f"./pretrain/{FILE_NAME}_opt_pretrain.pth"
 DATA_PATH = Path(args.data)

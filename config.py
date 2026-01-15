@@ -87,9 +87,9 @@ def create_parser():
         "--secs", action="store_true", help="use elapsed_seconds as interval"
     )
     parser.add_argument(
-        "--no_lstm_duration",
+        "--duration",
         action="store_true",
-        help="disable duration feature when training LSTM",
+        help="enable duration feature when training LSTM",
     )
 
     parser.add_argument(
@@ -167,7 +167,7 @@ class Config:
         self.model_name: ModelName = args.algo
         self.max_user_id: Optional[int] = args.max_user_id
         self.use_secs_intervals: bool = args.secs
-        self.lstm_use_duration: bool = not args.no_lstm_duration
+        self.lstm_use_duration: bool = args.duration
         self.no_test_same_day: bool = args.no_test_same_day
         self.no_train_same_day: bool = args.no_train_same_day
         self.equalize_test_with_non_secs: bool = args.equalize_test_with_non_secs
@@ -236,8 +236,8 @@ class Config:
             _file_name_parts.append("-short")
         if self.use_secs_intervals:
             _file_name_parts.append("-secs")
-        if self.model_name == "LSTM" and not self.lstm_use_duration:
-            _file_name_parts.append("-no_duration")
+        if self.model_name == "LSTM" and self.lstm_use_duration:
+            _file_name_parts.append("-duration")
         if self.use_recency_weighting:
             _file_name_parts.append("-recency")
         if self.no_test_same_day:

@@ -1,16 +1,15 @@
 #!/bin/bash
-python other.py --algo FSRS-rs --processes 1
-python other.py --algo FSRS-6
-python other.py --algo FSRS-6 --default
-python other.py --algo FSRS-6 --S0
-python other.py --algo FSRS-6 --two_buttons
-python other.py --algo FSRS-6 --partitions preset
-python other.py --algo FSRS-6 --partitions deck
-python other.py --algo FSRS-6 --secs
-python other.py --algo FSRS-6 --default --secs
-python other.py --algo FSRS-6 --S0 --secs
-python other.py --algo FSRS-6 --two_buttons --secs
-python other.py --algo FSRS-6 --secs --recency
-python other.py --algo FSRS-6 --partitions preset --secs
-python other.py --algo FSRS-6 --partitions deck --secs
-python other.py --algo FSRS-6-one-step
+uv run python script.py --algo FSRS-rs --short
+uv run python script.py --algo FSRS-6 --short
+uv run python script.py --algo FSRS-6 --short --default
+uv run python script.py --algo FSRS-6 --short --S0
+uv run python script.py --algo FSRS-6 --short --two_buttons
+uv run python script.py --algo FSRS-6 --short --partitions preset
+uv run python script.py --algo FSRS-6 --short --partitions deck
+uv run python script.py --algo FSRS-6 --short --secs
+uv run python script.py --algo FSRS-6 --short --default --secs
+uv run python script.py --algo FSRS-6 --short --S0 --secs
+uv run python script.py --algo FSRS-6 --short --two_buttons --secs
+uv run python script.py --algo FSRS-6 --short --secs --recency
+uv run python script.py --algo FSRS-6 --short --partitions preset --secs
+uv run python script.py --algo FSRS-6-one-step --short

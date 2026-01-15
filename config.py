@@ -199,16 +199,7 @@ class Config:
         self.n_splits: int = args.n_splits
         self.batch_size: int = args.batch_size
         self.max_seq_len: int = args.max_seq_len
-
-        # Handle `include_short_term` based on model name and initial arg
-        self.initial_short_term_setting: bool = args.short
-        if any(
-            self.model_name.startswith(prefix)
-            for prefix in ("FSRS-5", "FSRS-6", "FSRS-rs")
-        ):
-            self.include_short_term = True
-        else:
-            self.include_short_term = self.initial_short_term_setting
+        self.include_short_term = self.include_short_term
 
         # PyTorch threading settings
         self.torch_num_threads: int = args.torch_num_threads
@@ -253,7 +244,7 @@ class Config:
         if self.two_buttons:
             # Suffix is '-binary' for backward compatibility with existing analysis scripts.
             _file_name_parts.append("-binary")
-        if self.initial_short_term_setting:
+        if self.include_short_term:
             _file_name_parts.append("-short")
         if self.use_secs_intervals:
             _file_name_parts.append("-secs")
@@ -380,7 +371,7 @@ if __name__ == "__main__":
     print(f"Test Use Secs: {test_config.use_secs_intervals}")
     print(f"Test Dev Mode: {test_config.dev_mode}")
     print(f"Test S_MIN: {test_config.s_min}")  # Should be 1e-6
-    print(f"Test Initial Short Term: {test_config.initial_short_term_setting}")  # True
+    print(f"Test Initial Short Term: {test_config.include_short_term}")  # True
     print(f"Test Effective Short Term: {test_config.include_short_term}")  # True
 
     print("\n--- Testing FSRS-6 S_MIN logic ---")
@@ -393,17 +384,17 @@ if __name__ == "__main__":
     print("\n--- Testing effective_short_term logic ---")
     fsrs5_config_no_short_arg = load_config(custom_args_list=["--algo", "FSRS-5"])
     print(
-        f"FSRS-5 (no --short arg) Initial: {fsrs5_config_no_short_arg.initial_short_term_setting}, Effective: {fsrs5_config_no_short_arg.include_short_term}"
+        f"FSRS-5 (no --short arg) Initial: {fsrs5_config_no_short_arg.include_short_term}, Effective: {fsrs5_config_no_short_arg.include_short_term}"
     )  # E: True
 
     fsrs4_config_with_short_arg = load_config(
         custom_args_list=["--algo", "FSRS-4.5", "--short"]
     )
     print(
-        f"FSRS-4.5 (with --short arg) Initial: {fsrs4_config_with_short_arg.initial_short_term_setting}, Effective: {fsrs4_config_with_short_arg.include_short_term}"
+        f"FSRS-4.5 (with --short arg) Initial: {fsrs4_config_with_short_arg.include_short_term}, Effective: {fsrs4_config_with_short_arg.include_short_term}"
     )  # E: True
 
     fsrs4_config_no_short_arg = load_config(custom_args_list=["--algo", "FSRS-4.5"])
     print(
-        f"FSRS-4.5 (no --short arg) Initial: {fsrs4_config_no_short_arg.initial_short_term_setting}, Effective: {fsrs4_config_no_short_arg.include_short_term}"
+        f"FSRS-4.5 (no --short arg) Initial: {fsrs4_config_no_short_arg.include_short_term}, Effective: {fsrs4_config_no_short_arg.include_short_term}"
     )  # E: False

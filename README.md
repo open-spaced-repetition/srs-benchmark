@@ -225,19 +225,19 @@ uv sync
 FSRS-6:
 
 ```bash
-uv run python script.py --algo FSRS-6 --short
+uv run script.py --algo FSRS-6 --short
 ```
 
 FSRS-6 with default parameters:
 
 ```bash
-uv run python script.py --algo FSRS-6 --default --short
+uv run script.py --algo FSRS-6 --default --short
 ```
 
 FSRS-6 with only the first 4 parameters optimized:
 
 ```bash
-uv run python script.py --algo FSRS-6 --S0 --short
+uv run script.py --algo FSRS-6 --S0 --short
 ```
 
 FSRS-rs:
@@ -245,7 +245,7 @@ FSRS-rs:
 Then run the following command:
 
 ```bash
-uv run python script.py --algo FSRS-rs --short
+uv run script.py --algo FSRS-rs --short
 ```
 
 > Please place the [fsrs-optimizer repository](https://github.com/open-spaced-repetition/fsrs-optimizer) in the same directory as this repository.
@@ -253,41 +253,41 @@ uv run python script.py --algo FSRS-rs --short
 Set the number of processes:
 
 ```bash
-uv run python script.py --processes 4
+uv run script.py --processes 4
 ```
 
 Save the raw predictions:
 
 ```bash
-uv run python script.py --raw
+uv run script.py --raw
 ```
 
 Save the detailed results:
 
 ```bash
-uv run python script.py --file
+uv run script.py --file
 ```
 
 Save the analyzing charts:
 
 ```bash
-uv run python script.py --plot
+uv run script.py --plot
 ```
 
 Benchmark FSRS-5/FSRSv4/FSRSv3/HLR/LSTM/SM2:
 
 ```bash
-uv run python script.py --algo FSRS-6
+uv run script.py --algo FSRS-6
 ```
 
 > You can change `FSRS-6` to `FSRSv3`, `HLR`, `LSTM`, etc. to run the corresponding algorithm.
 
 Instead of using a 5-way split, train the algorithm and evaluate it on the same data. This can be useful to determine how much the algorithm is overfitting.
 ```bash
-uv run python script.py --algo FSRS-6 --train_equals_test
+uv run script.py --algo FSRS-6 --train_equals_test
 ```
 
 > You can limit the number of users with the --max-user-id parameter. Only users from 1 to max-user-id included will be considered.
 ```bash
-uv run python script.py --max-user-id 20
+uv run script.py --max-user-id 20
 ```

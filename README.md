@@ -291,3 +291,35 @@ uv run script.py --algo FSRS-6 --train_equals_test
 ```bash
 uv run script.py --max-user-id 20
 ```
+
+### script.py options
+
+Run `uv run script.py --help` for the full list. Common options include:
+
+| Flag | Description | Default/Notes |
+| --- | --- | --- |
+| `--algo` | Algorithm name (e.g., `FSRS-6`, `GRU`, `LSTM`). | Default: `FSRSv3` |
+| `--short` | Include short-term (same-day) reviews. | Off |
+| `--secs` | Use `elapsed_seconds` as the interval instead of days. | Off |
+| `--duration` | Add review duration feature (LSTM only). | Off |
+| `--default` | Evaluate default parameters (no training). | Off |
+| `--S0` | FSRS-5/FSRS-6 with only S0 initialization. | Off |
+| `--two_buttons` | Treat Hard and Easy as Good. | Off |
+| `--recency` | Enable recency weighting during training. | Off |
+| `--partitions` | Partition training by `deck` or `preset`. | Default: `none` |
+| `--data` | Path to `revlogs/*.parquet`. | Default: `../anki-revlogs-10k` |
+| `--processes` | Number of worker processes. | Default: `8` |
+| `--max-user-id` | Maximum user ID to process (inclusive). | No limit |
+| `--n_splits` | Number of TimeSeriesSplit folds. | Default: `5` |
+| `--train_equals_test` | Train and test on the same data. | Off |
+| `--no_test_same_day` | Exclude elapsed_days=0 from the test set. | Off |
+| `--no_train_same_day` | Exclude elapsed_days=0 from the train set. | Off |
+| `--equalize_test_with_non_secs` | Test only on reviews included in non-secs tests. | Off |
+| `--batch_size` | Batch size for training models. | Default: `512` |
+| `--max_seq_len` | Max sequence length for batching inputs. | Default: `64` |
+| `--torch_num_threads` | PyTorch intra-op threads. | Default: `1` |
+| `--raw` | Save raw predictions to `raw/<name>.jsonl`. | Off |
+| `--file` | Save per-user evaluation TSVs to `evaluation/<name>/`. | Off |
+| `--plot` | Save evaluation plots to `evaluation/<name>/` (if available). | Off |
+| `--weights` | Save model weights to `weights/<name>/`. | Off |
+| `--dev` | Enable local dev import for `fsrs_optimizer`. | Off |

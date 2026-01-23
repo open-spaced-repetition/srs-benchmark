@@ -33,6 +33,7 @@ __all__ = [
     "FSRS4dot5",
     "FSRS5",
     "FSRS6",
+    "FSRS7",
     "FSRS_one_step",
     "FSRSRsBackend",
     "RNN",

@@ -22,7 +22,9 @@ class BaseModel(nn.Module):
         super().__init__()
         self.config = config
 
-    def get_optimizer(self, lr: float, wd: float, betas: tuple=(0.9, 0.999)) -> torch.optim.Optimizer:
+    def get_optimizer(
+        self, lr: float, wd: float, betas: tuple = (0.9, 0.999)
+    ) -> torch.optim.Optimizer:
         return torch.optim.Adam(self.parameters(), lr=lr, betas=betas)
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:

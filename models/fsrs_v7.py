@@ -69,43 +69,12 @@ class FSRS7(FSRS6):
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
-    init_w = [
-        0.0023,
-        1.7647,
-        3.7175,
-        12.162,  # Initial S
-        5.2595,
-        0.4694,
-        3.0984,  # Difficulty
-        0.9315,
-        0.2607,
-        1.4791,
-        0.1873,
-        0.0016,
-        0.7225,
-        0.0,
-        0.6864,
-        1.2075,  # Stability (long-term)
-        1.0916,
-        0.3196,
-        3.6801,
-        0.1121,
-        0.1142,
-        0.0598,
-        2.3272,
-        0.4398,
-        1.2,  # Stability (short-term)
-        2.5,
-        0.9998,  # Long-short term transition function
-        0.0388,
-        0.2869,
-        0.75,
-        0.9699,
-        0.3825,
-        0.4612,
-        0.7163,
-        0.3741,
-    ]
+    init_w = [0.0023, 1.7647, 3.7175, 12.162,  # Initial S
+              5.2595, 0.4694, 3.0984,  # Difficulty
+              0.9315, 0.2607, 1.4791, 0.1873, 0.0016, 0.7225, 0.0, 0.6864, 1.2075,  # Stability (long-term)
+              1.0916, 0.3196, 3.6801, 0.1121, 0.1142, 0.0598, 2.3272, 0.4398, 1.2,  # Stability (short-term)
+              2.5, 0.9998,  # Long-short term transition function
+              0.0388, 0.2869, 0.75, 0.9699, 0.3825, 0.4612, 0.7163, 0.3741]
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super().__init__(config)

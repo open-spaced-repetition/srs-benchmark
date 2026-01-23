@@ -69,8 +69,8 @@ class Trainer:
         self.model = model.to(device=config.device)
         self.model.initialize_parameters(train_set)
 
-        self.batch_size = getattr(self.model, 'batch_size', batch_size)
-        self.betas = getattr(self.model, 'betas', (0.9, 0.999))
+        self.batch_size = getattr(self.model, "batch_size", batch_size)
+        self.betas = getattr(self.model, "betas", (0.9, 0.999))
         self.max_seq_len = max_seq_len
         self.n_epoch = self.model.n_epoch
 
@@ -78,7 +78,9 @@ class Trainer:
         self.build_dataset(self.model.filter_training_data(train_set), test_set)
 
         # Setup optimizer
-        self.optimizer = self.model.get_optimizer(lr=self.model.lr, wd=self.model.wd, betas=self.betas)
+        self.optimizer = self.model.get_optimizer(
+            lr=self.model.lr, wd=self.model.wd, betas=self.betas
+        )
 
         # Setup scheduler
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(

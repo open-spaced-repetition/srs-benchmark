@@ -614,7 +614,8 @@ class FSRS7(FSRS6):
         # this was originally intended to be a loop that tries several different sets of forgetting curve parameters
         # but it didn't improve log loss, so I only kept the default ones
         initial_forgetting_curve_params = [
-            # forgetting curves params
+            # you can put multiple lists of forgetting curve params here to improve log loss
+            # but I wasn't able to find more lists of params to try that actually DO improve log loss
             self.init_w[-8:],
         ]
 

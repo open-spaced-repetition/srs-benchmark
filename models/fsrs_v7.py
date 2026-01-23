@@ -69,12 +69,43 @@ class FSRS7(FSRS6):
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
-    init_w = [0.0023, 1.7647, 3.7175, 12.162,  # Initial S
-              5.2595, 0.4694, 3.0984,  # Difficulty
-              0.9315, 0.2607, 1.4791, 0.1873, 0.0016, 0.7225, 0.0, 0.6864, 1.2075,  # Stability (long-term)
-              1.0916, 0.3196, 3.6801, 0.1121, 0.1142, 0.0598, 2.3272, 0.4398, 1.2,  # Stability (short-term)
-              2.5, 0.9998,  # Long-short term transition function
-              0.0388, 0.2869, 0.75, 0.9699, 0.3825, 0.4612, 0.7163, 0.3741]
+    init_w = [
+        0.0023,
+        1.7647,
+        3.7175,
+        12.162,  # Initial S
+        5.2595,
+        0.4694,
+        3.0984,  # Difficulty
+        0.9315,
+        0.2607,
+        1.4791,
+        0.1873,
+        0.0016,
+        0.7225,
+        0.0,
+        0.6864,
+        1.2075,  # Stability (long-term)
+        1.0916,
+        0.3196,
+        3.6801,
+        0.1121,
+        0.1142,
+        0.0598,
+        2.3272,
+        0.4398,
+        1.2,  # Stability (short-term)
+        2.5,
+        0.9998,  # Long-short term transition function
+        0.0388,
+        0.2869,
+        0.75,
+        0.9699,
+        0.3825,
+        0.4612,
+        0.7163,
+        0.3741,
+    ]
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super().__init__(config)
@@ -97,11 +128,18 @@ class FSRS7(FSRS6):
             torch.arange(real_batch_size, device=self.config.device),
         ].transpose(0, 1)
 
-        retentions = self.forgetting_curve(delta_ts, stabilities,
-                                      -self.w[-8], -self.w[-7],
-                                      self.w[-6], self.w[-5],
-                                      self.w[-4], self.w[-3],
-                                      self.w[-2], self.w[-1])
+        retentions = self.forgetting_curve(
+            delta_ts,
+            stabilities,
+            -self.w[-8],
+            -self.w[-7],
+            self.w[-6],
+            self.w[-5],
+            self.w[-4],
+            self.w[-3],
+            self.w[-2],
+            self.w[-1],
+        )
         retentions = retentions.clamp(0.0001, 0.9999)
         output = {
             "retentions": retentions,
@@ -110,11 +148,19 @@ class FSRS7(FSRS6):
         }
         return output
 
-    def forgetting_curve(self, t, s,
-                         decay1=-init_w[-8], decay2=-init_w[-7],
-                         base1=init_w[-6], base2=init_w[-5],
-                         base_weight1=init_w[-4], base_weight2=init_w[-3],
-                         swp1=init_w[-2], swp2=init_w[-1]):
+    def forgetting_curve(
+        self,
+        t,
+        s,
+        decay1=-init_w[-8],
+        decay2=-init_w[-7],
+        base1=init_w[-6],
+        base2=init_w[-5],
+        base_weight1=init_w[-4],
+        base_weight2=init_w[-3],
+        swp1=init_w[-2],
+        swp2=init_w[-1],
+    ):
         # decays must be passed into forgetting_curve with a minus sign
         factor1 = base1 ** (1 / decay1) - 1
         factor2 = base2 ** (1 / decay2) - 1
@@ -128,34 +174,42 @@ class FSRS7(FSRS6):
         denominator = weight1 + weight2
         return numerator / denominator
 
-    def stability_after_success_long_term(self, state: Tensor, r: Tensor, rating: Tensor) -> Tensor:  # type: ignore[override]
+    def stability_after_success_long_term(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> Tensor:  # type: ignore[override]
         hard_penalty = torch.where(rating == 2, self.w[14], 1)
         easy_bonus = torch.where(rating == 4, self.w[15], 1)
         pls = self.stability_after_failure_long_term(state, r)
-        SInc =  1 \
-                + torch.exp(self.w[7]) \
-                * (11 - state[:, 1]) \
-                * torch.pow(state[:, 0], -self.w[8]) \
-                * (torch.exp((1 - r) * self.w[9]) - 1) \
-                * hard_penalty \
-                * easy_bonus
+        SInc = (
+            1
+            + torch.exp(self.w[7])
+            * (11 - state[:, 1])
+            * torch.pow(state[:, 0], -self.w[8])
+            * (torch.exp((1 - r) * self.w[9]) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
 
         # Ensure that new S>=PLS
         new_s = state[:, 0] * SInc
         return torch.maximum(pls, new_s)
 
-    def stability_after_success_short_term(self, state: Tensor, r: Tensor, rating: Tensor) -> Tensor:  # type: ignore[override]
+    def stability_after_success_short_term(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> Tensor:  # type: ignore[override]
         hard_penalty = torch.where(rating == 2, self.w[23], 1)
         easy_bonus = torch.where(rating == 4, self.w[24], 1)
         pls = self.stability_after_failure_short_term(state, r)
         # -1.5 so that w[16] doesn't have to be negative
-        SInc =  1 \
-                + torch.exp(self.w[16] - 1.5) \
-                * (11 - state[:, 1]) \
-                * torch.pow(state[:, 0], -self.w[17]) \
-                * (torch.exp((1 - r) * self.w[18]) - 1) \
-                * hard_penalty\
-                * easy_bonus
+        SInc = (
+            1
+            + torch.exp(self.w[16] - 1.5)
+            * (11 - state[:, 1])
+            * torch.pow(state[:, 0], -self.w[17])
+            * (torch.exp((1 - r) * self.w[18]) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
 
         # Ensure that new S>=PLS
         new_s = state[:, 0] * SInc
@@ -164,20 +218,20 @@ class FSRS7(FSRS6):
     def stability_after_failure_long_term(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
         old_s = state[:, 0]
         new_s = (
-                self.w[10]
-                * torch.pow(state[:, 1], -self.w[11])
-                * (torch.pow(state[:, 0] + 1, self.w[12]) - 1)
-                * torch.exp((1 - r) * self.w[13])
+            self.w[10]
+            * torch.pow(state[:, 1], -self.w[11])
+            * (torch.pow(state[:, 0] + 1, self.w[12]) - 1)
+            * torch.exp((1 - r) * self.w[13])
         )
         return torch.minimum(old_s, new_s)
 
     def stability_after_failure_short_term(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
         old_s = state[:, 0]
         new_s = (
-                self.w[19]
-                * torch.pow(state[:, 1], -self.w[20])
-                * (torch.pow(state[:, 0] + 1, self.w[21]) - 1)
-                * torch.exp((1 - r) * self.w[22])
+            self.w[19]
+            * torch.pow(state[:, 1], -self.w[20])
+            * (torch.pow(state[:, 0] + 1, self.w[21]) - 1)
+            * torch.exp((1 - r) * self.w[22])
         )
         return torch.minimum(old_s, new_s)
 
@@ -211,7 +265,9 @@ class FSRS7(FSRS6):
         if isinstance(delta_t, pd.Series):
             intervals = delta_t.values
         else:
-            intervals = np.array([delta_t]) if not isinstance(delta_t, np.ndarray) else delta_t
+            intervals = (
+                np.array([delta_t]) if not isinstance(delta_t, np.ndarray) else delta_t
+            )
 
         # Define bin boundaries in days
         ten_minutes = 10 / (24 * 60)  # 0.006944...
@@ -224,21 +280,21 @@ class FSRS7(FSRS6):
         mask_short = intervals < two_hours
         binned[mask_short] = np.maximum(
             np.floor(intervals[mask_short] / ten_minutes) * ten_minutes,
-            ten_minutes  # Ensure minimum of 10 minutes
+            ten_minutes,  # Ensure minimum of 10 minutes
         )
 
         # 2-24 hours: 2-hour bins
         mask_medium = (intervals >= two_hours) & (intervals < one_day)
         binned[mask_medium] = np.maximum(
             np.floor(intervals[mask_medium] / two_hours) * two_hours,
-            two_hours  # Ensure minimum of 2 hours
+            two_hours,  # Ensure minimum of 2 hours
         )
 
         # > 24 hours: 1-day bins
         mask_long = intervals >= one_day
         binned[mask_long] = np.maximum(
             np.floor(intervals[mask_long]),
-            one_day  # Ensure minimum of 1 day
+            one_day,  # Ensure minimum of 1 day
         )
 
         return binned if len(binned) > 1 else binned[0]
@@ -309,7 +365,9 @@ class FSRS7(FSRS6):
             So if user has S0_Again=0.01 and S0_Good=10:
                 S0_Hard = 0.01 * (10/0.01)^0.78 = 0.01 * 1000^0.78 ≈ 2.3
             """
-            t = (log_anchor[target] - log_anchor[r_low]) / (log_anchor[r_high] - log_anchor[r_low])
+            t = (log_anchor[target] - log_anchor[r_low]) / (
+                log_anchor[r_high] - log_anchor[r_low]
+            )
             return log_S0[r_low] + t * (log_S0[r_high] - log_S0[r_low])
 
         def extrapolate(target, anchor):
@@ -367,7 +425,6 @@ class FSRS7(FSRS6):
         # CASE: TWO VALUES MISSING (2 known)
         # =========================================================================
         elif len(known) == 2:
-
             if known == [1, 2]:  # Known: Again, Hard | Missing: Good, Easy
                 # Both missing values are above the known range
                 # Extrapolate Good from Hard, then Easy from Good
@@ -430,7 +487,7 @@ class FSRS7(FSRS6):
 
         # Final monotonicity check
         values = list(result.values())
-        assert values == sorted(values), f'{values}'
+        assert values == sorted(values), f"{values}"
 
         return result
 
@@ -440,7 +497,9 @@ class FSRS7(FSRS6):
         # With FSRS-7 --secs should always be used
         if self.config.use_secs_intervals:
             train_set_copy = train_set.copy()
-            train_set_copy['delta_t_binned'] = self.bin_interval(train_set_copy['delta_t'])
+            train_set_copy["delta_t_binned"] = self.bin_interval(
+                train_set_copy["delta_t"]
+            )
             group_by_cols = ["first_rating", "delta_t_binned"]
         else:
             train_set_copy = train_set
@@ -465,7 +524,9 @@ class FSRS7(FSRS6):
 
             # For each rating, optimize initial stability using current forgetting curve params
             for first_rating in ("1", "2", "3", "4"):
-                group = S0_dataset_group[S0_dataset_group["first_rating"] == first_rating]
+                group = S0_dataset_group[
+                    S0_dataset_group["first_rating"] == first_rating
+                ]
                 if group.empty:
                     if self.config.verbose_inadequate_data:
                         tqdm.write(
@@ -477,18 +538,27 @@ class FSRS7(FSRS6):
                     delta_t = group["delta_t_binned"]
                 else:
                     delta_t = group["delta_t"]
-                recall = (group["y"]["mean"] * group["y"]["count"] + average_recall * 1) / (group["y"]["count"] + 1)
+                recall = (
+                    group["y"]["mean"] * group["y"]["count"] + average_recall * 1
+                ) / (group["y"]["count"] + 1)
                 count = group["y"]["count"]
 
                 init_s0 = r_s0_default[first_rating]
 
                 def loss(stability):
                     assert first_rating in ["1", "2", "3", "4"]
-                    y_pred = self.forgetting_curve(delta_t, stability,
-                                                   -decay1, -decay2,
-                                                   base1, base2,
-                                                   weight1, weight2,
-                                                   swp1, swp2)
+                    y_pred = self.forgetting_curve(
+                        delta_t,
+                        stability,
+                        -decay1,
+                        -decay2,
+                        base1,
+                        base2,
+                        weight1,
+                        weight2,
+                        swp1,
+                        swp2,
+                    )
                     y_pred = np.clip(y_pred, 0.0001, 0.9999)
                     logloss = sum(
                         -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
@@ -511,14 +581,32 @@ class FSRS7(FSRS6):
 
             # Apply stability ordering constraints
             for small_rating, big_rating in (
-                    (1, 2), (2, 3), (3, 4), (1, 3), (2, 4), (1, 4),
+                (1, 2),
+                (2, 3),
+                (3, 4),
+                (1, 3),
+                (2, 4),
+                (1, 4),
             ):
-                if small_rating in current_rating_stability and big_rating in current_rating_stability:
-                    if current_rating_stability[small_rating] > current_rating_stability[big_rating]:
-                        if current_rating_count[small_rating] > current_rating_count[big_rating]:
-                            current_rating_stability[big_rating] = current_rating_stability[small_rating]
+                if (
+                    small_rating in current_rating_stability
+                    and big_rating in current_rating_stability
+                ):
+                    if (
+                        current_rating_stability[small_rating]
+                        > current_rating_stability[big_rating]
+                    ):
+                        if (
+                            current_rating_count[small_rating]
+                            > current_rating_count[big_rating]
+                        ):
+                            current_rating_stability[big_rating] = (
+                                current_rating_stability[small_rating]
+                            )
                         else:
-                            current_rating_stability[small_rating] = current_rating_stability[big_rating]
+                            current_rating_stability[small_rating] = (
+                                current_rating_stability[big_rating]
+                            )
 
             return total_loss, current_rating_stability
 
@@ -542,7 +630,9 @@ class FSRS7(FSRS6):
         candidates.sort(key=lambda x: x[0])
 
         # Use the best combination found
-        best_total_loss, best_forgetting_curve_params, best_rating_stability = candidates[0]
+        best_total_loss, best_forgetting_curve_params, best_rating_stability = (
+            candidates[0]
+        )
 
         rating_stability = best_rating_stability
 
@@ -561,8 +651,10 @@ class FSRS7(FSRS6):
             initial_stabilities = list(map(lambda x: x * factor, r_s0_default.values()))
         elif len(rating_stability) in [2, 3]:
             filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
-            if any([np.isnan(x) for x in filled.values()]) or any([np.isinf(x) for x in filled.values()]):
-                raise Exception(f'NaN/inf in S0 interpolation')
+            if any([np.isnan(x) for x in filled.values()]) or any(
+                [np.isinf(x) for x in filled.values()]
+            ):
+                raise Exception("NaN/inf in S0 interpolation")
             initial_stabilities = [filled[r] for r in [1, 2, 3, 4]]
         elif len(rating_stability) == 4:
             initial_stabilities = [
@@ -606,44 +698,51 @@ class FSRS7(FSRS6):
             new_d = new_d.clamp(1, 10)
         else:
             success = X[:, 1] > 1
-            r = self.forgetting_curve(X[:, 0], state[:, 0],
-                                      -self.w[-8], -self.w[-7],
-                                      self.w[-6], self.w[-5],
-                                      self.w[-4], self.w[-3],
-                                      self.w[-2], self.w[-1])
+            r = self.forgetting_curve(
+                X[:, 0],
+                state[:, 0],
+                -self.w[-8],
+                -self.w[-7],
+                self.w[-6],
+                self.w[-5],
+                self.w[-4],
+                self.w[-3],
+                self.w[-2],
+                self.w[-1],
+            )
 
             if not torch.isfinite(r).all():
-                print('R contains NaN/Inf')
-                print(f'r={r}\n')
+                print("R contains NaN/Inf")
+                print(f"r={r}\n")
 
             new_s_long_term = torch.where(
-                    success,
-                    self.stability_after_success_long_term(state, r, X[:, 1]),
-                    self.stability_after_failure_long_term(state, r),
+                success,
+                self.stability_after_success_long_term(state, r, X[:, 1]),
+                self.stability_after_failure_long_term(state, r),
             )
             new_s_short_term = torch.where(
-                    success,
-                    self.stability_after_success_short_term(state, r, X[:, 1]),
-                    self.stability_after_failure_short_term(state, r),
+                success,
+                self.stability_after_success_short_term(state, r, X[:, 1]),
+                self.stability_after_failure_short_term(state, r),
             )
             # A number between 0 and 1 that represents how much of a non-same-day review this is
             # 1 = long-term
             # 0 = short-term (same-day)
-            coefficient = self.transition_function(X[:,0])
+            coefficient = self.transition_function(X[:, 0])
             new_s = coefficient * new_s_long_term + (1 - coefficient) * new_s_short_term
 
             if not torch.isfinite(new_s).all():
-                print('S contains NaN/Inf')
-                print(f's={state[:,0]}')
-                print(f'new_s={new_s}\n')
+                print("S contains NaN/Inf")
+                print(f"s={state[:, 0]}")
+                print(f"new_s={new_s}\n")
 
             new_d = self.next_d(state, X[:, 1])
             new_d = new_d.clamp(1, 10)
 
             if not torch.isfinite(new_d).all():
-                print('D contains NaN/Inf')
-                print(f'd={state[:,1]}')
-                print(f'new_d={new_d}\n')
+                print("D contains NaN/Inf")
+                print(f"d={state[:, 1]}")
+                print(f"new_d={new_d}\n")
 
         new_s = new_s.clamp(self.config.s_min, 36500)
         return torch.stack([new_s, new_d], dim=1)

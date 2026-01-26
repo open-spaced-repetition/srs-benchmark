@@ -20,13 +20,16 @@ class TrainableModel(Protocol):
     n_epoch: int
     config: Config
 
-    def get_optimizer(self, lr: float, wd: float) -> torch.optim.Optimizer:
+    def get_optimizer(
+        self, lr: float, wd: float, betas: tuple = (0.9, 0.999)
+    ) -> torch.optim.Optimizer:
         """
         Return an optimizer for training the model.
 
         Args:
             lr: Learning rate
             wd: Weight decay
+            betas: beta1 and beta2 parameters for Adam
 
         Returns:
             torch.optim.Optimizer: Configured optimizer

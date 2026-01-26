@@ -491,7 +491,7 @@ class FSRS7(FSRS6):
 
         return result
 
-    def pretrain(self, train_set: pd.DataFrame) -> None:
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         # start = time.perf_counter()
         # Create binned intervals if using --secs
         # With FSRS-7 --secs should always be used

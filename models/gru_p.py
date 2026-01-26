@@ -64,10 +64,6 @@ class GRU_P(BaseModel):
             ]
         }
 
-    def get_optimizer(
-        self, lr: float, wd: float = 1e-4, betas: tuple = (0.9, 0.999)
-    ):
+    def get_optimizer(self, lr: float, wd: float = 1e-4, betas: tuple = (0.9, 0.999)):
         """Return AdamW optimizer for GRU-P models"""
-        return torch.optim.AdamW(
-            self.parameters(), lr=lr, weight_decay=wd, betas=betas
-        )
+        return torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=wd, betas=betas)

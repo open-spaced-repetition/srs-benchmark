@@ -578,7 +578,9 @@ def main():
         inner_opt.load_state_dict(torch.load(INNER_OPT_PATH, weights_only=True))
         print("Loaded optimizer from storage:", INNER_OPT_PATH)
     except FileNotFoundError:
-        print("Optimizer file not found.")
+        print(
+            f"Optimizer file not found. It's common for the first time to pretrain {MODEL_NAME}."
+        )
 
     total_params = 0
     for param in model.parameters():

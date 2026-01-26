@@ -323,3 +323,11 @@ Run `uv run script.py --help` for the full list. Common options include:
 | `--plot` | Save evaluation plots to `evaluation/<name>/` (if available). | Off |
 | `--weights` | Save model weights to `weights/<name>/`. | Off |
 | `--dev` | Enable local dev import for `fsrs_optimizer`. | Off |
+
+## Pretrain
+
+To pretrain LSTM on multiple users, run:
+
+```bash
+uv run pretrain.py --algo LSTM
+```

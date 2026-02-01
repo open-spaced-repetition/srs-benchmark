@@ -309,6 +309,7 @@ Run `uv run script.py --help` for the full list. Common options include:
 | `--partitions` | Partition training by `deck` or `preset`. | Default: `none` |
 | `--data` | Path to `revlogs/*.parquet`. | Default: `../anki-revlogs-10k` |
 | `--processes` | Number of worker processes. | Default: `8` |
+| `--gpus` | CUDA device IDs to assign to workers (e.g., `0,1` or `all`). | Default: unset |
 | `--max-user-id` | Maximum user ID to process (inclusive). | No limit |
 | `--n_splits` | Number of TimeSeriesSplit folds. | Default: `5` |
 | `--train_equals_test` | Train and test on the same data. | Off |

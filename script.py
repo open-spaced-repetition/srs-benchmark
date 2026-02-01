@@ -198,10 +198,34 @@ class Trainer:
         return fig
 
 
+def _configure_process_device(device_id: Optional[int]) -> None:
+    if device_id is None:
+        return
+    if not torch.cuda.is_available():
+        return
+    if config.device.type != "cuda":
+        return
+    device_count = torch.cuda.device_count()
+    if device_id < 0 or device_id >= device_count:
+        raise ValueError(
+            f"Invalid CUDA device id {device_id}. Available range: 0..{device_count - 1}"
+        )
+    torch.cuda.set_device(device_id)
+    config.device = torch.device(f"cuda:{device_id}")
+    if config.model_name == "LSTM":
+        try:
+            import reptile_trainer
+
+            reptile_trainer.DEVICE = config.device
+        except Exception:
+            pass
+
+
 @catch_exceptions
-def process(user_id: int) -> tuple[dict, Optional[dict]]:
+def process(user_id: int, device_id: Optional[int] = None) -> tuple[dict, Optional[dict]]:
     """Main processing function for all models."""
     plt.close("all")
+    _configure_process_device(device_id)
 
     # Load data once for all models
     data_loader = UserDataLoader(config)
@@ -372,13 +396,32 @@ if __name__ == "__main__":
 
     unprocessed_users.sort()
 
+    cuda_device_ids = None
+    if config.cuda_device_ids:
+        if config.device.type != "cuda":
+            print("Warning: --gpus ignored because CUDA is not enabled for this model.")
+        else:
+            device_count = torch.cuda.device_count()
+            invalid = [i for i in config.cuda_device_ids if i >= device_count]
+            if invalid:
+                raise ValueError(
+                    "Invalid CUDA device IDs "
+                    f"{invalid}; available range is 0..{device_count - 1}"
+                )
+            cuda_device_ids = config.cuda_device_ids
+            if config.num_processes > len(cuda_device_ids):
+                print(
+                    "Warning: --processes exceeds --gpus; multiple workers will share GPUs."
+                )
+
     with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
         futures = [
             executor.submit(
                 process,
                 user_id,
+                cuda_device_ids[idx % len(cuda_device_ids)] if cuda_device_ids else None,
             )
-            for user_id in unprocessed_users
+            for idx, user_id in enumerate(unprocessed_users)
         ]
         for future in (
             pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)

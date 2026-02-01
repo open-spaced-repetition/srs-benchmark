@@ -1,4 +1,5 @@
 import argparse
+import re
 import torch
 from pathlib import Path
 from typing import List, Optional, Literal, get_args
@@ -45,6 +46,11 @@ def create_parser():
 
     parser.add_argument(
         "--processes", default=8, type=int, help="set the number of processes"
+    )
+    parser.add_argument(
+        "--gpus",
+        default=None,
+        help="comma/space-separated CUDA device IDs to use (e.g., '0,1' or 'all')",
     )
     parser.add_argument("--dev", action="store_true", help="for local development")
 
@@ -154,6 +160,33 @@ def create_parser():
     return parser
 
 
+def _parse_cuda_devices(raw: Optional[str]) -> Optional[List[int]]:
+    if raw is None:
+        return None
+    value = raw.strip()
+    if value == "":
+        return None
+    value_lower = value.lower()
+    if value_lower in {"all", "*"}:
+        if not torch.cuda.is_available():
+            return []
+        return list(range(torch.cuda.device_count()))
+
+    parts = [p for p in re.split(r"[,\s]+", value) if p]
+    device_ids: List[int] = []
+    for part in parts:
+        try:
+            device_id = int(part)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid CUDA device id '{part}'. Use comma/space-separated integers."
+            ) from exc
+        if device_id < 0:
+            raise ValueError("CUDA device IDs must be >= 0.")
+        device_ids.append(device_id)
+    return device_ids
+
+
 class Config:
     """Holds all application configurations derived from command-line arguments and defaults."""
 
@@ -182,6 +215,7 @@ class Config:
         self.data_path: Path = Path(args.data)
         self.use_recency_weighting: bool = args.recency
         self.train_equals_test: bool = args.train_equals_test
+        self.cuda_device_ids: Optional[List[int]] = _parse_cuda_devices(args.gpus)
 
         # Training/data parameters from parser (with defaults)
         self.n_splits: int = args.n_splits

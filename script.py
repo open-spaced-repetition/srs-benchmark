@@ -222,7 +222,9 @@ def _configure_process_device(device_id: Optional[int]) -> None:
 
 
 @catch_exceptions
-def process(user_id: int, device_id: Optional[int] = None) -> tuple[dict, Optional[dict]]:
+def process(
+    user_id: int, device_id: Optional[int] = None
+) -> tuple[dict, Optional[dict]]:
     """Main processing function for all models."""
     plt.close("all")
     _configure_process_device(device_id)
@@ -419,7 +421,9 @@ if __name__ == "__main__":
             executor.submit(
                 process,
                 user_id,
-                cuda_device_ids[idx % len(cuda_device_ids)] if cuda_device_ids else None,
+                cuda_device_ids[idx % len(cuda_device_ids)]
+                if cuda_device_ids
+                else None,
             )
             for idx, user_id in enumerate(unprocessed_users)
         ]

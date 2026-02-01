@@ -1,3 +1,4 @@
+import os
 import psutil
 from multiprocessing import Pool
 import torch
@@ -85,7 +86,11 @@ def process(user_id):
 def set_low_priority():
     try:
         p = psutil.Process()
-        p.nice(psutil.IDLE_PRIORITY_CLASS)
+        if hasattr(psutil, "IDLE_PRIORITY_CLASS"):
+            p.nice(psutil.IDLE_PRIORITY_CLASS)
+        else:
+            # POSIX: nice level 19 is the lowest priority
+            p.nice(19)
     except Exception as e:
         print(f"Failed to set priority: {e}")
 

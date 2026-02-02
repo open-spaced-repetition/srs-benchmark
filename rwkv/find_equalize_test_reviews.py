@@ -1,4 +1,3 @@
-import os
 import psutil
 from multiprocessing import Pool
 import torch
@@ -14,9 +13,7 @@ from rwkv.parse_toml import parse_toml
 from rwkv.utils import save_tensor
 
 rwkv_config = parse_toml()
-lmdb_env = lmdb.open(
-    rwkv_config.LABEL_FILTER_LMDB_PATH, map_size=rwkv_config.LABEL_FILTER_LMDB_SIZE
-)
+lmdb_env = None
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -26,7 +23,23 @@ config.include_short_term = bool(rwkv_config.SHORT)
 config.use_secs_intervals = bool(rwkv_config.SECS)
 
 
+def _open_lmdb_env():
+    max_readers = getattr(rwkv_config, "LMDB_MAX_READERS", None)
+    if max_readers is None:
+        processes = getattr(rwkv_config, "PROCESSES", 1)
+        max_readers = max(128, processes * 8)
+    return lmdb.open(
+        rwkv_config.LABEL_FILTER_LMDB_PATH,
+        map_size=rwkv_config.LABEL_FILTER_LMDB_SIZE,
+        max_readers=max_readers,
+    )
+
+
 def process(user_id):
+    global lmdb_env
+    if lmdb_env is None:
+        lmdb_env = _open_lmdb_env()
+
     key_review_ths = f"{user_id}_review_ths"
     key_rmse_bins = f"{user_id}_rmse_bins"
     with lmdb_env.begin(write=False) as txn:
@@ -95,10 +108,16 @@ def set_low_priority():
         print(f"Failed to set priority: {e}")
 
 
+def init_worker():
+    global lmdb_env
+    set_low_priority()
+    lmdb_env = _open_lmdb_env()
+
+
 def main():
     user_ids = list(range(rwkv_config.USER_START, rwkv_config.USER_END + 1))
 
-    with Pool(processes=rwkv_config.PROCESSES, initializer=set_low_priority) as pool:
+    with Pool(processes=rwkv_config.PROCESSES, initializer=init_worker) as pool:
         _ = list(tqdm(pool.imap(process, user_ids), total=len(user_ids)))
 
 

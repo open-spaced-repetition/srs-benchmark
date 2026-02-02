@@ -16,7 +16,6 @@ from config import Config, load_config
 from models.act_r import ACT_R
 from models.dash import DASH
 from models.fsrs_v6 import FSRS6
-from models.fsrs_v6_one_step import FSRS_one_step
 from models.hlr import HLR
 from models.lstm import LSTM
 from models.model_factory import create_model
@@ -30,7 +29,6 @@ SUPPORTED_MODELS = (
     "FSRS-4.5",
     "FSRS-5",
     "FSRS-6",
-    "FSRS-6-one-step",
     "SM2-trainable",
     "Anki",
     "HLR",
@@ -39,6 +37,7 @@ SUPPORTED_MODELS = (
     "LSTM",
 )
 STATE_DICT_MODELS = {"LSTM"}
+ModelParams = list[float] | dict[str, torch.Tensor] | float | None
 
 
 @dataclass
@@ -286,12 +285,7 @@ def load_parameters_from_result(
 
 
 def load_state_dict(path: Path) -> dict:
-    load_kwargs = {"map_location": "cpu"}
-    try:
-        state = torch.load(path, weights_only=False, **load_kwargs)
-    except TypeError:
-        # Older PyTorch versions don't support weights_only
-        state = torch.load(path, **load_kwargs)
+    state = torch.load(path, weights_only=False, map_location="cpu")
     if not isinstance(state, dict):
         for key in ("state_dict", "model_state_dict", "model"):
             sub = getattr(state, key, None)
@@ -312,17 +306,7 @@ def build_config(model_name: str, extra_flags: Sequence[str] | None = None):
     return load_config(custom_args_list=cli_args)
 
 
-def instantiate_model(model_name: str, config, model_params: object | None):
-    if model_name == "FSRS-6-one-step":
-        if model_params is None:
-            raise ValueError("FSRS-6-one-step requires parameters from a result file.")
-        if not isinstance(model_params, list):
-            raise TypeError(
-                "FSRS-6-one-step expects a parameter list loaded from the result file."
-            )
-        model = FSRS_one_step(config, w=model_params)
-        model.eval()
-        return model
+def instantiate_model(model_name: str, config, model_params: ModelParams):
     model = create_model(config, model_params)
     model.eval()
     return model
@@ -354,10 +338,7 @@ def build_sequence_tensor(
     elapses: Sequence[float],
     durations: Sequence[float],
     ratings: Sequence[int],
-) -> torch.Tensor | list[tuple[float, int]]:
-    if model_name == "FSRS-6-one-step":
-        return [(float(delta), int(rating)) for delta, rating in zip(elapses, ratings)]
-
+) -> torch.Tensor:
     if model_name == "LSTM":
         if config.lstm_use_duration:
             if not durations:
@@ -399,10 +380,7 @@ def build_snapshots(
     )
     states: List[object] = []
 
-    if model_name == "FSRS-6-one-step":
-        outputs = model.forward(sequence)
-        states = [float(state[0]) for state in outputs]
-    elif model_name == "LSTM":
+    if model_name == "LSTM":
         with torch.no_grad():
             w_lnh, s_lnh, d_lnh = model.forward(sequence)  # type: ignore[arg-type]
         for idx in range(len(ratings)):
@@ -542,9 +520,6 @@ def predict_retention(model, config, state: object, elapsed: float) -> float:
             t, w.to(config.device), s.to(config.device), d.to(config.device)
         )
         return float(value.item())
-
-    if isinstance(model, FSRS_one_step):
-        return float(model.forgetting_curve(float(elapsed), float(state)))
 
     if isinstance(model, FSRS6):
         t_tensor = torch.tensor([elapsed], dtype=torch.float32, device=config.device)
@@ -720,7 +695,7 @@ def prepare_model_bundle(
             f"Unable to locate parameters for {model_name}. Provide --user-id for neural models or ensure result/{base_name}.jsonl exists."
         )
 
-    model_params: object | None = None
+    model_params: ModelParams = None
     final_base_name = source_base_name or base_name
     if source_type == "weights":
         if selected_path is None:

@@ -300,7 +300,7 @@ wheels = [
 
 [[package]]
 name = "fsrs-optimizer"
-version = "6.4.0"
+version = "6.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -315,9 +315,9 @@ dependencies = [
     { name = "torch", version = "2.10.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/c5/aed3d7098505d8102887275dfd0c9ab7ae4a960ccaf0828a2944dac5e05d/fsrs_optimizer-6.4.0.tar.gz", hash = "sha256:f7341c2216aaf685f76f7f871878d2f04ed4a47c5c2c8336b31b7764021b85de", size = 37457, upload-time = "2026-01-08T07:04:24.212Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/db/97688f4b8bb0d15ee513f84e8fba433cf4baf575b80c148e9498aa5cb6bd/fsrs_optimizer-6.5.0.tar.gz", hash = "sha256:2afb0c10ad8abca5071bacc6a3888aeecf153f2a7348f0fe2767bec3ccfd5cd8", size = 37430, upload-time = "2026-02-02T06:18:39.682Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/70/5413d64e6a39a338ffcbfd617c58635e2368016063c145570e294fa5a8f6/fsrs_optimizer-6.4.0-py3-none-any.whl", hash = "sha256:aaaccb43ffc4ad28912bd305d72fdcedc9771e5baabb817adc79af5f424fe8bf", size = 38589, upload-time = "2026-01-08T07:04:22.9Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/37/740eeb688a0d4dee86fb8530785bc621e4e5b456fd52bc7b236faf62c576/fsrs_optimizer-6.5.0-py3-none-any.whl", hash = "sha256:245ea144584c3db2bbdfdccb3beebf29978a400aa01f8cd33bf947b6f7cff20c", size = 38587, upload-time = "2026-02-02T06:18:36.616Z" },
 ]
 
 [[package]]
@@ -1593,7 +1593,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "ebisu", specifier = ">=2.2.0" },
-    { name = "fsrs-optimizer", specifier = ">=6.4.0" },
+    { name = "fsrs-optimizer", specifier = ">=6.5.0" },
     { name = "fsrs-rs-python", specifier = ">=0.8.2" },
     { name = "huggingface-hub" },
     { name = "lmdb" },

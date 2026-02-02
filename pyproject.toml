@@ -6,7 +6,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "scikit-learn",
-    "fsrs-optimizer>=6.4.0",
+    "fsrs-optimizer>=6.5.0",
     "statsmodels>=0.14.6",
     "pyarrow>=15",
     "huggingface_hub",

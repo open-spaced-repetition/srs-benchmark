@@ -43,12 +43,8 @@ config = Config(args)
 
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
-import logging
 
-try:
-    from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
-except Exception as e:
-    logging.exception("Failed to import fsrs_optimizer: %s", e)
+from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(config.seed)
@@ -57,6 +53,8 @@ tqdm.pandas()
 
 class Trainer:
     optimizer: torch.optim.Optimizer
+    test_set: Optional[BatchDataset]
+    test_data_loader: Optional[BatchLoader]
 
     def __init__(
         self,
@@ -96,21 +94,20 @@ class Trainer:
         )
         self.train_data_loader = BatchLoader(self.train_set)
 
-        self.test_set = (
-            []
-            if test_set is None
-            else BatchDataset(
+        if test_set is None:
+            self.test_set = None
+            self.test_data_loader = None
+        else:
+            self.test_set = BatchDataset(
                 test_set.copy(),
                 batch_size=self.batch_size,
                 max_seq_len=self.max_seq_len,
             )
-        )
-        self.test_data_loader = (
-            [] if test_set is None else BatchLoader(self.test_set, shuffle=False)
-        )
+            self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
     def train(self):
         best_loss = np.inf
+        best_w = self.model.state_dict()  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
         for k in range(self.n_epoch):
@@ -151,7 +148,11 @@ class Trainer:
         with torch.no_grad():
             losses = []
             self.train_data_loader.shuffle = False
-            for data_loader in (self.train_data_loader, self.test_data_loader):
+            data_loaders = [self.train_data_loader]
+            if self.test_data_loader is not None:
+                data_loaders.append(self.test_data_loader)
+
+            for data_loader in data_loaders:
                 if len(data_loader) == 0:
                     losses.append(0)
                     continue
@@ -175,21 +176,24 @@ class Trainer:
                 losses.append(loss / total)
             self.train_data_loader.shuffle = True
             self.avg_train_losses.append(losses[0])
-            self.avg_eval_losses.append(losses[1])
+            self.avg_eval_losses.append(losses[1] if len(losses) > 1 else 0)
 
             w = self.model.state_dict()
 
-            weighted_loss = (
-                losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
-            ) / (len(self.train_set) + len(self.test_set))
+            if self.test_set is None:
+                weighted_loss = losses[0]
+            else:
+                weighted_loss = (
+                    losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
+                ) / (len(self.train_set) + len(self.test_set))
 
             return weighted_loss, w
 
     def plot(self):
         fig = plt.figure()
         ax = fig.gca()
-        self.avg_train_losses = [x.item() for x in self.avg_train_losses]
-        self.avg_eval_losses = [x.item() for x in self.avg_eval_losses]
+        self.avg_train_losses = [x for x in self.avg_train_losses]
+        self.avg_eval_losses = [x for x in self.avg_eval_losses]
         ax.plot(self.avg_train_losses, label="train")
         ax.plot(self.avg_eval_losses, label="test")
         ax.set_xlabel("epoch")
@@ -433,7 +437,7 @@ if __name__ == "__main__":
             try:
                 result, error = future.result()
                 if error:
-                    tqdm.write(error)
+                    tqdm.write(str(error))
                 else:
                     stats, raw = result
                     with open(result_file, "a", encoding="utf-8", newline="\n") as f:

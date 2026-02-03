@@ -1,0 +1,1 @@
+You can download the weights of LSTM here: [open-spaced-repetition/srs-benchmark-weights · Hugging Face](https://huggingface.co/open-spaced-repetition/srs-benchmark-weights)

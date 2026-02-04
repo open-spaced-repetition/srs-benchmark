@@ -69,12 +69,43 @@ class FSRS7(FSRS6):
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
-    init_w = [0.041, 2.4175, 4.1283, 11.9709,  # Initial S
-              5.6385, 0.4468, 3.262,  # Difficulty
-              2.3054, 0.1688, 1.3325, 0.3524, 0.0049, 0.7503, 0.0896, 0.6625, 1.15,  # Stability (long-term)
-              0.882, 0.3072, 3.5875, 0.303, 0.0107, 0.2279, 2.6413, 0.5594, 1.15,  # Stability (short-term)
-              2.5, 1.0,  # Long-short term transition function
-              0.0723, 0.1634, 0.5, 0.9555, 0.2245, 0.6232, 0.1362, 0.3862]
+    init_w = [
+        0.041,
+        2.4175,
+        4.1283,
+        11.9709,  # Initial S
+        5.6385,
+        0.4468,
+        3.262,  # Difficulty
+        2.3054,
+        0.1688,
+        1.3325,
+        0.3524,
+        0.0049,
+        0.7503,
+        0.0896,
+        0.6625,
+        1.15,  # Stability (long-term)
+        0.882,
+        0.3072,
+        3.5875,
+        0.303,
+        0.0107,
+        0.2279,
+        2.6413,
+        0.5594,
+        1.15,  # Stability (short-term)
+        2.5,
+        1.0,  # Long-short term transition function
+        0.0723,
+        0.1634,
+        0.5,
+        0.9555,
+        0.2245,
+        0.6232,
+        0.1362,
+        0.3862,
+    ]
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super().__init__(config)
@@ -137,8 +168,8 @@ class FSRS7(FSRS6):
         R1 = (1 + factor1 * t_over_s) ** decay1
         R2 = (1 + factor2 * t_over_s) ** decay2
         # S weight power 1 (swp1) with a minus sign
-        weight1 = base_weight1 * s ** -swp1
-        weight2 = base_weight2 * s ** swp2
+        weight1 = base_weight1 * s**-swp1
+        weight2 = base_weight2 * s**swp2
         numerator = weight1 * R1 + weight2 * R2
         denominator = weight1 + weight2
         return numerator / denominator
@@ -597,8 +628,7 @@ class FSRS7(FSRS6):
             [0.0508, 0.3743, 0.5863, 0.9448, 0.2974, 0.606, 0.1444, 0.3944],
             [0.0498, 0.3753, 0.6875, 0.9319, 0.3758, 0.4984, 0.2268, 0.4768],
             [0.0618, 0.1663, 0.5977, 0.9682, 0.3619, 0.5066, 0.2972, 0.5472],
-            [0.0656, 0.197, 0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096]
-
+            [0.0656, 0.197, 0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096],
         ]
 
         # Track all candidates with their losses

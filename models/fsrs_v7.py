@@ -69,43 +69,12 @@ class FSRS7(FSRS6):
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
-    init_w = [
-        0.041,
-        2.4175,
-        4.1283,
-        11.9709,  # Initial S
-        5.6385,
-        0.4468,
-        3.262,  # Difficulty
-        2.3054,
-        0.1688,
-        1.3325,
-        0.3524,
-        0.0049,
-        0.7503,
-        0.0896,
-        0.6625,
-        1.15,  # Stability (long-term)
-        0.882,
-        0.3072,
-        3.5875,
-        0.303,
-        0.0107,
-        0.2279,
-        2.6413,
-        0.5594,
-        1.15,  # Stability (short-term)
-        2.5,
-        1.0,  # Long-short term transition function
-        0.0723,
-        0.1634,
-        0.5,
-        0.9555,
-        0.2245,
-        0.6232,
-        0.1362,
-        0.3862,
-    ]
+    init_w = [0.041, 2.4175, 4.1283, 11.9709,  # Initial S
+              5.6385, 0.4468, 3.262,  # Difficulty
+              2.3054, 0.1688, 1.3325, 0.3524, 0.0049, 0.7503, 0.0896, 0.6625, 1.15,  # Stability (long-term)
+              0.882, 0.3072, 3.5875, 0.303, 0.0107, 0.2279, 2.6413, 0.5594, 1.15,  # Stability (short-term)
+              2.5, 1.0,  # Long-short term transition function
+              0.0723, 0.1634, 0.5, 0.9555, 0.2245, 0.6232, 0.1362, 0.3862]
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super().__init__(config)
@@ -149,17 +118,17 @@ class FSRS7(FSRS6):
         return output
 
     def forgetting_curve(
-        self,
-        t,
-        s,
-        decay1=-init_w[-8],
-        decay2=-init_w[-7],
-        base1=init_w[-6],
-        base2=init_w[-5],
-        base_weight1=init_w[-4],
-        base_weight2=init_w[-3],
-        swp1=init_w[-2],
-        swp2=init_w[-1],
+            self,
+            t,
+            s,
+            decay1=-init_w[-8],
+            decay2=-init_w[-7],
+            base1=init_w[-6],
+            base2=init_w[-5],
+            base_weight1=init_w[-4],
+            base_weight2=init_w[-3],
+            swp1=init_w[-2],
+            swp2=init_w[-1],
     ):
         # decays must be passed into forgetting_curve with a minus sign
         t_over_s = t / s
@@ -172,43 +141,78 @@ class FSRS7(FSRS6):
         R2 = power_law_retention(base2, decay2)
 
         # S weight power 1 should have a minus sign
-        weight1 = base_weight1 * s**-swp1
-        weight2 = base_weight2 * s**swp2
+        weight1 = base_weight1 * s ** -swp1
+        weight2 = base_weight2 * s ** swp2
 
         return (weight1 * R1 + weight2 * R2) / (weight1 + weight2)
 
-    def stability_after_success(
-        self, state: Tensor, r: Tensor, rating: Tensor, w_base: int
-    ) -> Tensor:
+    def stability_after_review(
+            self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> tuple[Tensor, Tensor]:
+        """
+        Calculate both long-term and short-term stability in one pass.
+        Returns (new_s_long_term, new_s_short_term)
+        """
         w = self.w
-        hard_penalty = torch.where(rating == 2, w[w_base + 7], 1)
-        easy_bonus = torch.where(rating == 4, w[w_base + 8], 1)
+        batch_size = state.shape[0]
 
-        pls = self.stability_after_failure(state, r, w_base)
-
-        SInc = (
-            1
-            + torch.exp(w[w_base] - 1.5)
-            * (11 - state[:, 1])
-            * torch.pow(state[:, 0], -w[w_base + 1])
-            * (torch.exp((1 - r) * w[w_base + 2]) - 1)
-            * hard_penalty
-            * easy_bonus
-        )
-
-        new_s = state[:, 0] * SInc
-        return torch.maximum(pls, new_s)
-
-    def stability_after_failure(self, state: Tensor, r: Tensor, w_base: int) -> Tensor:
-        w = self.w
         old_s = state[:, 0]
-        new_s = (
-            w[w_base + 3]
-            * torch.pow(state[:, 1], -w[w_base + 4])
-            * (torch.pow(state[:, 0] + 1, w[w_base + 5]) - 1)
-            * torch.exp((1 - r) * w[w_base + 6])
+        old_d = state[:, 1]
+        success = rating > 1
+
+        # Stack weights for both long-term (base=7) and short-term (base=16)
+        # Shape: [2] for each parameter
+        w_base = torch.tensor([7, 16], device=w.device)
+
+        w_sinc_base = w[w_base]  # w[7], w[16]
+        w_sinc_s_exp = w[w_base + 1]  # w[8], w[17]
+        w_sinc_r_mult = w[w_base + 2]  # w[9], w[18]
+        w_fail_mult = w[w_base + 3]  # w[10], w[19]
+        w_fail_d_exp = w[w_base + 4]  # w[11], w[20]
+        w_fail_s_exp = w[w_base + 5]  # w[12], w[21]
+        w_fail_r_mult = w[w_base + 6]  # w[13], w[22]
+        w_hard = w[w_base + 7]  # w[14], w[23]
+        w_easy = w[w_base + 8]  # w[15], w[24]
+
+        # Expand state to [batch_size, 2] for broadcasting with [2] weight vectors
+        # Result shapes: [batch_size, 2] where dim 1 is (long-term, short-term)
+
+        hard_penalty = torch.where(
+            rating.unsqueeze(1) == 2,
+            w_hard.unsqueeze(0),
+            torch.ones(batch_size, 2, device=w.device)
         )
-        return torch.minimum(old_s, new_s)
+        easy_bonus = torch.where(
+            rating.unsqueeze(1) == 4,
+            w_easy.unsqueeze(0),
+            torch.ones(batch_size, 2, device=w.device)
+        )
+
+        # Stability after failure: [batch_size, 2]
+        new_s_fail = (
+                w_fail_mult
+                * torch.pow(old_d.unsqueeze(1), -w_fail_d_exp)
+                * (torch.pow(old_s.unsqueeze(1) + 1, w_fail_s_exp) - 1)
+                * torch.exp((1 - r).unsqueeze(1) * w_fail_r_mult)
+        )
+        pls = torch.minimum(old_s.unsqueeze(1), new_s_fail)
+
+        # Stability increase after success: [batch_size, 2]
+        SInc = (
+                1
+                + torch.exp(w_sinc_base - 1.5)
+                * (11 - old_d).unsqueeze(1)
+                * torch.pow(old_s.unsqueeze(1), -w_sinc_s_exp)
+                * (torch.exp((1 - r).unsqueeze(1) * w_sinc_r_mult) - 1)
+                * hard_penalty
+                * easy_bonus
+        )
+        new_s_success = torch.maximum(pls, old_s.unsqueeze(1) * SInc)
+
+        # Select success or failure based on rating: [batch_size, 2]
+        new_s_both = torch.where(success.unsqueeze(1), new_s_success, pls)
+
+        return new_s_both[:, 0], new_s_both[:, 1]
 
     def transition_function(self, delta_t: Tensor) -> Tensor:
         return 1 - self.w[26] * torch.exp(-self.w[25] * delta_t)
@@ -602,7 +606,7 @@ class FSRS7(FSRS6):
             [0.0508, 0.3743, 0.5863, 0.9448, 0.2974, 0.606, 0.1444, 0.3944],
             [0.0498, 0.3753, 0.6875, 0.9319, 0.3758, 0.4984, 0.2268, 0.4768],
             [0.0618, 0.1663, 0.5977, 0.9682, 0.3619, 0.5066, 0.2972, 0.5472],
-            [0.0656, 0.197, 0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096],
+            [0.0656, 0.197, 0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096]
         ]
 
         # Track all candidates with their losses
@@ -702,16 +706,8 @@ class FSRS7(FSRS6):
                 print("R contains NaN/Inf")
                 print(f"r={r}\n")
 
-            new_s_long_term = torch.where(
-                success,
-                self.stability_after_success(state, r, X[:, 1], w_base=7),
-                self.stability_after_failure(state, r, w_base=7),
-            )
-            new_s_short_term = torch.where(
-                success,
-                self.stability_after_success(state, r, X[:, 1], w_base=16),
-                self.stability_after_failure(state, r, w_base=16),
-            )
+            new_s_long_term, new_s_short_term = self.stability_after_review(state, r, X[:, 1])
+
             # A number between 0 and 1 that represents how much of a non-same-day review this is
             # 1 = long-term
             # 0 = short-term (same-day)

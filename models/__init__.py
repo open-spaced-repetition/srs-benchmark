@@ -6,6 +6,7 @@ from .fsrs_v4 import FSRS4
 from .fsrs_v4dot5 import FSRS4dot5
 from .fsrs_v5 import FSRS5
 from .fsrs_v6 import FSRS6
+from .fsrs_v7 import FSRS7
 from .fsrs_v6_one_step import FSRS_one_step
 from .fsrs_rs import FSRSRsBackend
 from .rnn import RNN
@@ -33,6 +34,7 @@ __all__ = [
     "FSRS4dot5",
     "FSRS5",
     "FSRS6",
+    "FSRS7",
     "FSRS_one_step",
     "FSRSRsBackend",
     "RNN",

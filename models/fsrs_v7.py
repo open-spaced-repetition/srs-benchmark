@@ -719,7 +719,6 @@ class FSRS7(FSRS6):
             new_d = self.init_d(X[:, 1])
             new_d = new_d.clamp(1, 10)
         else:
-            success = X[:, 1] > 1
             r = self.forgetting_curve(
                 X[:, 0],
                 state[:, 0],

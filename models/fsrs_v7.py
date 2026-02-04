@@ -28,37 +28,37 @@ class FSRS7ParameterClipper(FSRS6ParameterClipper):
             w[5] = w[5].clamp(0.001, 4)
             w[6] = w[6].clamp(0.1, 4)
             # Stability (long-term)
-            w[7] = w[7].clamp(0, 2.5)
+            w[7] = w[7].clamp(0, 4)  # subtract 1.5
             w[8] = w[8].clamp(0, 1.2)
-            w[9] = w[9].clamp(0.2, 3)
-            w[10] = w[10].clamp(0.001, 1.2)
-            w[11] = w[11].clamp(0.001, 1)
+            w[9] = w[9].clamp(0.3, 3)
+            w[10] = w[10].clamp(0.01, 1.5)
+            w[11] = w[11].clamp(0.001, 0.9)
             w[12] = w[12].clamp(0.1, 1)
-            w[13] = w[13].clamp(0, 2.5)
+            w[13] = w[13].clamp(0, 3.5)
             w[14] = w[14].clamp(0, 1)
             w[15] = w[15].clamp(1, 7)
             # Stability (short-term)
-            w[16] = w[16].clamp(0, 3)  # subtract 1.5
-            w[17] = w[17].clamp(0, 1.5)
-            w[18] = w[18].clamp(0.2, 5.5)
-            w[19] = w[19].clamp(0.001, 1.2)
-            w[20] = w[20].clamp(0.001, 1.5)
+            w[16] = w[16].clamp(0, 4)  # subtract 1.5
+            w[17] = w[17].clamp(0, 2)
+            w[18] = w[18].clamp(0.5, 6)
+            w[19] = w[19].clamp(0.001, 1.5)
+            w[20] = w[20].clamp(0.001, 2)
             w[21] = w[21].clamp(0.001, 1)
-            w[22] = w[22].clamp(0.2, 4)
+            w[22] = w[22].clamp(0, 5)
             w[23] = w[23].clamp(0, 1)
             w[24] = w[24].clamp(1, 7)
             # Long-short term transition function
-            w[25] = w[25].clamp(2.5, 10)
+            w[25] = w[25].clamp(2.5, 15)
             w[26] = w[26].clamp(0, 1)
             # Forgetting curve
-            w[27] = w[27].clamp(0.0333, 0.3)  # decay 1
-            w[28] = w[28].clamp(0.1, 0.95)  # decay 2
-            w[29] = w[29].clamp(0.75, 0.95)  # base 1
-            w[30] = w[30].clamp(0.75, 0.97)  # base 2
-            w[31] = w[31].clamp(0.001, 1)  # weight 1
-            w[32] = w[32].clamp(0.001, 1)  # weight 2
-            w[33] = w[33].clamp(0, 1.25)  # S weight power 1 (subtract 1)
-            w[34] = w[34].clamp(0, 1.25)  # S weight power 2 (subtract 0.25)
+            w[27] = w[27].clamp(0.01, 0.25)  # decay 1
+            w[28] = w[28].clamp(w[27], 0.95)  # decay 2
+            w[29] = w[29].clamp(0.5, 0.85)  # base 1
+            w[30] = w[30].clamp(w[29], 0.99)  # base 2
+            w[31] = w[31].clamp(0.01, 1)  # weight 1
+            w[32] = w[32].clamp(0.1, 1)  # weight 2
+            w[33] = w[33].clamp(0, 0.9)  # S weight power 1
+            w[34] = w[34].clamp(0.1, 1.1)  # S weight power 2
             module.w.data = w
 
 
@@ -69,43 +69,12 @@ class FSRS7(FSRS6):
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
-    init_w = [
-        0.0023,
-        1.7647,
-        3.7175,
-        12.162,  # Initial S
-        5.2595,
-        0.4694,
-        3.0984,  # Difficulty
-        0.9315,
-        0.2607,
-        1.4791,
-        0.1873,
-        0.0016,
-        0.7225,
-        0.0,
-        0.6864,
-        1.2075,  # Stability (long-term)
-        1.0916,
-        0.3196,
-        3.6801,
-        0.1121,
-        0.1142,
-        0.0598,
-        2.3272,
-        0.4398,
-        1.2,  # Stability (short-term)
-        2.5,
-        0.9998,  # Long-short term transition function
-        0.0388,
-        0.2869,
-        0.75,
-        0.9699,
-        0.3825,
-        0.4612,
-        0.7163,
-        0.3741,
-    ]
+    init_w = [0.041, 2.4175, 4.1283, 11.9709,  # Initial S
+              5.6385, 0.4468, 3.262,  # Difficulty
+              2.3054, 0.1688, 1.3325, 0.3524, 0.0049, 0.7503, 0.0896, 0.6625, 1.15,  # Stability (long-term)
+              0.882, 0.3072, 3.5875, 0.303, 0.0107, 0.2279, 2.6413, 0.5594, 1.15,  # Stability (short-term)
+              2.5, 1.0,  # Long-short term transition function
+              0.0723, 0.1634, 0.5, 0.9555, 0.2245, 0.6232, 0.1362, 0.3862]
 
     def __init__(self, config: Config, w: Optional[List[float]] = None):
         super().__init__(config)
@@ -167,9 +136,9 @@ class FSRS7(FSRS6):
         t_over_s = t / s
         R1 = (1 + factor1 * t_over_s) ** decay1
         R2 = (1 + factor2 * t_over_s) ** decay2
-        # Subtracting 1 and 0.25 so that w[33] and w[34] won't have to be negative
-        weight1 = base_weight1 * s ** (swp1 - 1)
-        weight2 = base_weight2 * s ** (swp2 - 0.25)
+        # S weight power 1 (swp1) with a minus sign
+        weight1 = base_weight1 * s ** -swp1
+        weight2 = base_weight2 * s ** swp2
         numerator = weight1 * R1 + weight2 * R2
         denominator = weight1 + weight2
         return numerator / denominator
@@ -180,9 +149,10 @@ class FSRS7(FSRS6):
         hard_penalty = torch.where(rating == 2, self.w[14], 1)
         easy_bonus = torch.where(rating == 4, self.w[15], 1)
         pls = self.stability_after_failure_long_term(state, r)
+        # -1.5 so that w[7] doesn't have to be negative
         SInc = (
             1
-            + torch.exp(self.w[7])
+            + torch.exp(self.w[7] - 1.5)
             * (11 - state[:, 1])
             * torch.pow(state[:, 0], -self.w[8])
             * (torch.exp((1 - r) * self.w[9]) - 1)
@@ -610,13 +580,25 @@ class FSRS7(FSRS6):
 
             return total_loss, current_rating_stability
 
-        # Initial parameter sets
-        # this was originally intended to be a loop that tries several different sets of forgetting curve parameters
-        # but it didn't improve log loss, so I only kept the default ones
+        # Initial parameter sets to try
         initial_forgetting_curve_params = [
-            # you can put multiple lists of forgetting curve params here to improve log loss
-            # but I wasn't able to find more lists of params to try that actually DO improve log loss
             self.init_w[-8:],
+            [0.0594, 0.3358, 0.598, 0.9517, 0.3122, 0.5685, 0.2371, 0.4871],
+            [0.0441, 0.2533, 0.6823, 0.9598, 0.3613, 0.5202, 0.2283, 0.4783],
+            [0.0621, 0.2475, 0.6496, 0.9744, 0.313, 0.5662, 0.2336, 0.4836],
+            [0.0462, 0.2962, 0.6938, 0.9592, 0.3341, 0.5273, 0.2185, 0.4685],
+            [0.0422, 0.2813, 0.6713, 0.9421, 0.2935, 0.5985, 0.2183, 0.4683],
+            [0.0568, 0.1563, 0.6567, 0.9633, 0.3682, 0.5041, 0.1952, 0.4452],
+            [0.0651, 0.2502, 0.6682, 0.9472, 0.3757, 0.4933, 0.2408, 0.4908],
+            [0.0548, 0.1655, 0.6138, 0.9654, 0.3251, 0.5717, 0.1418, 0.3918],
+            [0.0381, 0.2803, 0.7202, 0.9491, 0.3362, 0.5166, 0.2248, 0.4748],
+            [0.0422, 0.1935, 0.694, 0.9549, 0.3871, 0.4704, 0.2413, 0.4913],
+            [0.0651, 0.1916, 0.623, 0.972, 0.3528, 0.5484, 0.2373, 0.4873],
+            [0.0508, 0.3743, 0.5863, 0.9448, 0.2974, 0.606, 0.1444, 0.3944],
+            [0.0498, 0.3753, 0.6875, 0.9319, 0.3758, 0.4984, 0.2268, 0.4768],
+            [0.0618, 0.1663, 0.5977, 0.9682, 0.3619, 0.5066, 0.2972, 0.5472],
+            [0.0656, 0.197, 0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096]
+
         ]
 
         # Track all candidates with their losses

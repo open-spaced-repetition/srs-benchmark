@@ -68,7 +68,7 @@ class FSRS7(FSRS6):
     Include same-day reviews: python script.py --algo FSRS-7 --recency --short --secs --processes 20
     Exclude same-day reviews: python script.py --algo FSRS-7 --recency --short --secs --equalize_test_with_non_secs --processes 20
     """
-    
+
     n_epoch: int = 8
     batch_size: int = 1024
     lr: float = 2e-2

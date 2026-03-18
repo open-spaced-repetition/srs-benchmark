@@ -46,7 +46,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS-7: the newest version. Unlike all previous versions, which have been designed to work with integer interval lengths, FSRS-7 has been designed to work with fractional interval lengths. It is the only version that can give realistic predictions of probability of recall for same-day reviews. The biggest change is that the forgetting curve now has 8 optimizable parameters and uses a rather complex formula.
         - FSRS-7 default param.: FSRS-7 with default parameters, without per-user optimization.
         - FSRS-7 recency: FSRS-7 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
-    - FSRS-rs: the Rust port of FSRS-6. See also: https://github.com/open-spaced-repetition/fsrs-rs
+    - FSRS-rs: the Rust port of FSRS-6 with recency weighting. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
 

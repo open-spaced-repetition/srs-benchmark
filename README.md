@@ -37,18 +37,15 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
 ### Algorithms and algorithm families
 
 - Two component or three component* model of memory:
-    - FSRS v1 and v2: the initial experimental versions of FSRS.
+    - FSRS v1 and v2: the initial experimental versions of FSRS, used only by Jarrett Ye.
     - FSRS v3: the first official release of the FSRS algorithm, made available as a custom scheduling script.
-    - FSRS v4: the upgraded version of FSRS, made better with help from the community.
+    - FSRS v4: the upgraded version of FSRS, made better with help from the community. It is the first version that was integrated into Anki.
     - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
-    - FSRS-5: the upgraded version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
-    - FSRS-6: the latest version of FSRS. The formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
-        - FSRS-6 default param.: FSRS-6 with default parameters.
-        - FSRS-6 S0: FSRS-6 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
-        - FSRS-6 binary: FSRS-6 which treats `hard` and `easy` grades as `good`.
-        - FSRS-6 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.
-        - FSRS-6 deck: different parameters are used for each deck.
-        - FSRS-6 recency: FSRS-6 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
+    - FSRS-5: unlike the previous versions, FSRS-5 uses the same-day review data to refine its prediction for the next review. Same-day reviews are used only for training, and not for evaluation.
+    - FSRS-6: the formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
+    - FSRS-7: the newest version. Unlike all previous versions, which have been designed to work with integer interval lengths, FSRS-7 has been designed to work with fractional interval lengths. It is the only version that can give realistic predictions of probability of recall for same-day reviews. The biggest change is that the forgetting curve now has 8 optimizable parameters and uses a rather complex formula.
+        - FSRS-7 default param.: FSRS-7 with default parameters, without per-user optimization.
+        - FSRS-7 recency: FSRS-7 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
     - FSRS-rs: the Rust port of FSRS-6. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
@@ -102,6 +99,8 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | RWKV | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0020 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3332±0.0041 | 0.05378±0.00096 | 0.7329±0.0020 | FIL, G, SR, AT |
 | MOVING-AVG | 0 | 0.3369±0.0042 | 0.05915±0.00082 | 0.7001±0.0026 | --- |
+| FSRS-7 recency | 35 | 0.3418±0.0043 | 0.0625±0.0010 | 0.7091±0.0023 | 0.00236±0.00075 | FIL, G, SR |
+| FSRS-7 | 35 | 0.3439±0.0043 | 0.0655±0.0011 | 0.7062±0.0023 | 0.00261±0.00088 | FIL, G, SR |
 | FSRS-rs | 21 | 0.3443±0.0041 | 0.0635±0.0011 | 0.7074±0.0022 | IL, G, SR |
 | FSRS-6 recency | 21 | 0.3444±0.0042 | 0.0629±0.0010 | 0.7057±0.0023 | IL, G, SR |
 | GRU-P-short | 297 | 0.3458±0.0043 | 0.0622±0.0011 | 0.6990±0.0025 | IL, G, SR|
@@ -113,6 +112,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-6 deck | 21 | 0.3554±0.0044 | 0.0732±0.0013 | 0.6973±0.0023 | IL, G, SR |
 | FSRS-5 | 19 | 0.3560±0.0045 | 0.0741±0.0013 | 0.7011±0.0023 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.3624±0.0046 | 0.0764±0.0013 | 0.6893±0.0023 | IL, G |
+| FSRS-7 default param. | 0 | 0.3629±0.0044 | 0.0910±0.0014 | 0.6944±0.0024 | 0.0005±0.0017 | FIL, G, SR |
 | FSRS-6 default param. | 0 | 0.3664±0.0044 | 0.0924±0.0014 | 0.6939±0.0023 | IL, G, SR |
 | DASH-short | 9 | 0.3681±0.0045 | 0.0858±0.0014 | 0.6225±0.0029 | IL, G, SR|
 | DASH | 9 | 0.3682±0.0045 | 0.0836±0.0013 | 0.6312±0.0026 | IL, G |
@@ -142,7 +142,10 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | **RWKV-P** | 2762884 | **0.2660±0.0036** | 0.03212±0.00045 | **0.8450±0.0017** | [Yes](#features-note) |
 | RWKV | 2762884 | 0.2975±0.0037 | 0.05438±0.00081 | 0.7964±0.0017 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3140±0.0038 | 0.05200±0.00077 | 0.7622±0.0018 | FIL, G, SR, AT |
+| FSRS-7 recency | 35 | 0.3240±0.0040 | 0.06335±0.00089 | 0.7381±0.0019 | FIL, G, SR |
+| FSRS-7 | 35 | 0.3258±0.0040 | 0.06625±0.00092 | 0.7355±0.0020 | FIL, G, SR |
 | MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
+| FSRS-7 default param. | 0 | 0.3431±0.0040 | 0.0922±0.0011 | 0.7204±0.0020 | FIL, G, SR |
 | DASH[MCM] | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
 | GRU-P | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |
 | DASH | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |
@@ -187,16 +190,15 @@ This table is based on 10,000 collections.
 
 ## Default Parameters
 
-FSRS-6:
+FSRS-7:
 
 ```
-0.212, 1.2931, 2.3065, 8.2956,
-6.4133, 0.8334, 3.0194, 0.001,
-1.8722, 0.1666, 0.796,
-1.4835, 0.0614, 0.2629, 1.6483,
-0.6014, 1.8729,
-0.5425, 0.0912, 0.0658,
-0.1542,
+0.041, 2.4175, 4.1283, 11.9709,
+5.6385, 0.4468, 3.262,
+2.3054, 0.1688, 1.3325, 0.3524, 0.0049, 0.7503, 0.0896, 0.6625, 1.15,
+0.882, 0.3072, 3.5875, 0.303, 0.0107, 0.2279, 2.6413, 0.5594, 1.15,
+2.5, 1.0,
+0.0723, 0.1634, 0.5, 0.9555, 0.2245, 0.6232, 0.1362, 0.3862
 ```
 
 ## Comparisons with SuperMemo 15/16/17

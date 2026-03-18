@@ -711,7 +711,7 @@ class FSRS7(FSRS6):
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
-        :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty, state[:,2] is success of the previous review
+        :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
         :return state:
         """
         if torch.equal(state, torch.zeros_like(state)):

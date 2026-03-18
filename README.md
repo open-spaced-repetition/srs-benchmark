@@ -37,18 +37,15 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
 ### Algorithms and algorithm families
 
 - Two component or three component* model of memory:
-    - FSRS v1 and v2: the initial experimental versions of FSRS.
+    - FSRS v1 and v2: the initial experimental versions of FSRS, used only by Jarrett Ye.
     - FSRS v3: the first official release of the FSRS algorithm, made available as a custom scheduling script.
-    - FSRS v4: the upgraded version of FSRS, made better with help from the community.
+    - FSRS v4: the upgraded version of FSRS, made better with help from the community. It is the first version that was integrated into Anki.
     - FSRS-4.5: the minorly improved version based on FSRS v4. The shape of the forgetting curve has been changed.
-    - FSRS-5: the upgraded version of FSRS. Unlike the previous versions, it uses the same-day review data. Same-day reviews are used only for training, and not for evaluation.
-    - FSRS-6: the latest version of FSRS. The formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
-        - FSRS-6 default param.: FSRS-6 with default parameters.
-        - FSRS-6 S0: FSRS-6 where only the first 4 parameters (values of initial stability after the first review) are optimized and the rest are set to default.
-        - FSRS-6 binary: FSRS-6 which treats `hard` and `easy` grades as `good`.
-        - FSRS-6 preset: different parameters are used for each preset. The minimum number of presets in Anki is one, a preset can be applied to multiple decks.
-        - FSRS-6 deck: different parameters are used for each deck.
-        - FSRS-6 recency: FSRS-6 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
+    - FSRS-5: unlike the previous versions, FSRS-5 uses the same-day review data to refine its prediction for the next review. Same-day reviews are used only for training, and not for evaluation.
+    - FSRS-6: the formula for handling same-day reviews has been improved. More importantly, FSRS-6 has an optimizable parameter that controls the flatness of the forgetting curve, meaning that the shape of the curve is different for different users.
+    - FSRS-7: the newest version. Unlike all previous versions, which have been designed to work with integer interval lengths, FSRS-7 has been designed to work with fractional interval lengths. It is the only version that can give realistic predictions of probability of recall for same-day reviews. The biggest change is that the forgetting curve now has 8 optimizable parameters and uses a rather complex formula.
+        - FSRS-7 default param.: FSRS-7 with default parameters, without per-user optimization.
+        - FSRS-7 recency: FSRS-7 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
     - FSRS-rs: the Rust port of FSRS-6. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.

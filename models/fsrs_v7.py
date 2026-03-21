@@ -91,7 +91,7 @@ class FSRS7(FSRS6):
         0.7503,
         0.0896,
         0.6625,
-        1.15,  # Stability (long-term)
+        1.3,  # Stability (long-term)
         0.882,
         0.3072,
         3.5875,
@@ -100,7 +100,7 @@ class FSRS7(FSRS6):
         0.2279,
         2.6413,
         0.5594,
-        1.15,  # Stability (short-term)
+        1.3,  # Stability (short-term)
         2.5,
         1.0,  # Long-short term transition function
         0.0723,
@@ -118,15 +118,16 @@ class FSRS7(FSRS6):
         if w is None:
             w = self.init_w
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+        self.gamma = 0.5
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS7ParameterClipper(config)
 
     def batch_process(
-        self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
-        real_batch_size: int,
+            self,
+            sequences: Tensor,
+            delta_ts: Tensor,
+            seq_lens: Tensor,
+            real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
         stabilities, difficulties = outputs[
@@ -145,13 +146,20 @@ class FSRS7(FSRS6):
             self.w[-3],
             self.w[-2],
             self.w[-1],
-        )
-        retentions = retentions.clamp(0.0001, 0.9999)
+        ).clamp(0.0001, 0.9999)
+
         output = {
             "retentions": retentions,
             "stabilities": stabilities,
             "difficulties": difficulties,
         }
+
+        sigma = torch.tensor([9999., 9999., 9999., 9999., 0.523, 0.2528, 0.4329, 0.2966, 0.2139, 0.2889, 0.1862, 0.0829, 0.175, 0.3812, 0.3013, 0.9104, 0.3234, 0.2448, 0.3273, 0.1842, 0.1542, 0.1735, 0.4608, 0.311, 0.864, 0.4053, 0.162, 0.0418, 0.2596, 0.0798, 0.0682, 0.1282, 0.1397, 0.1407, 0.1489]).to(self.config.device)
+        output["penalty"] = (
+                torch.sum(torch.square(self.w - self.init_w_tensor) / torch.square(sigma))
+                * real_batch_size
+                * self.gamma
+        )
         return output
 
     def forgetting_curve(
@@ -738,10 +746,6 @@ class FSRS7(FSRS6):
                 self.w[-1],
             )
 
-            if not torch.isfinite(r).all():
-                print("R contains NaN/Inf")
-                print(f"r={r}\n")
-
             new_s_long_term, new_s_short_term = self.stability_after_review(
                 state, r, X[:, 1]
             )
@@ -752,18 +756,8 @@ class FSRS7(FSRS6):
             coefficient = self.transition_function(X[:, 0])
             new_s = coefficient * new_s_long_term + (1 - coefficient) * new_s_short_term
 
-            if not torch.isfinite(new_s).all():
-                print("S contains NaN/Inf")
-                print(f"s={state[:, 0]}")
-                print(f"new_s={new_s}\n")
-
             new_d = self.next_d(state, X[:, 1])
             new_d = new_d.clamp(1, 10)
-
-            if not torch.isfinite(new_d).all():
-                print("D contains NaN/Inf")
-                print(f"d={state[:, 1]}")
-                print(f"new_d={new_d}\n")
 
         new_s = new_s.clamp(self.config.s_min, 36500)
         return torch.stack([new_s, new_d], dim=1)

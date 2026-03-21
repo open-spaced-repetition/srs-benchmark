@@ -123,11 +123,11 @@ class FSRS7(FSRS6):
         self.clipper = FSRS7ParameterClipper(config)
 
     def batch_process(
-            self,
-            sequences: Tensor,
-            delta_ts: Tensor,
-            seq_lens: Tensor,
-            real_batch_size: int,
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
         stabilities, difficulties = outputs[
@@ -154,11 +154,49 @@ class FSRS7(FSRS6):
             "difficulties": difficulties,
         }
 
-        sigma = torch.tensor([9999., 9999., 9999., 9999., 0.523, 0.2528, 0.4329, 0.2966, 0.2139, 0.2889, 0.1862, 0.0829, 0.175, 0.3812, 0.3013, 0.9104, 0.3234, 0.2448, 0.3273, 0.1842, 0.1542, 0.1735, 0.4608, 0.311, 0.864, 0.4053, 0.162, 0.0418, 0.2596, 0.0798, 0.0682, 0.1282, 0.1397, 0.1407, 0.1489]).to(self.config.device)
+        sigma = torch.tensor(
+            [
+                9999.0,
+                9999.0,
+                9999.0,
+                9999.0,
+                0.523,
+                0.2528,
+                0.4329,
+                0.2966,
+                0.2139,
+                0.2889,
+                0.1862,
+                0.0829,
+                0.175,
+                0.3812,
+                0.3013,
+                0.9104,
+                0.3234,
+                0.2448,
+                0.3273,
+                0.1842,
+                0.1542,
+                0.1735,
+                0.4608,
+                0.311,
+                0.864,
+                0.4053,
+                0.162,
+                0.0418,
+                0.2596,
+                0.0798,
+                0.0682,
+                0.1282,
+                0.1397,
+                0.1407,
+                0.1489,
+            ]
+        ).to(self.config.device)
         output["penalty"] = (
-                torch.sum(torch.square(self.w - self.init_w_tensor) / torch.square(sigma))
-                * real_batch_size
-                * self.gamma
+            torch.sum(torch.square(self.w - self.init_w_tensor) / torch.square(sigma))
+            * real_batch_size
+            * self.gamma
         )
         return output
 

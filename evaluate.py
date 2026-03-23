@@ -247,7 +247,7 @@ if __name__ == "__main__":
 
     else:
         for scale in ("users", "reviews"):
-            print(f"Weighted by number of {scale}\n")
+            print(f"Weighted by number of {scale}")
             print(
                 "| Model | #Params | LogLoss | RMSE(bins) | AUC | MBE | Input features |"
             )
@@ -294,3 +294,4 @@ if __name__ == "__main__":
                         rounded_mean, rounded_CI = sigdig(wmean, CI)
                         result += f" {rounded_mean}±{rounded_CI} |"
                 print(result + f" {input_features} |")
+                print()

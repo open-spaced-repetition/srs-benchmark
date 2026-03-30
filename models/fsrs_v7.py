@@ -718,7 +718,7 @@ class FSRS7(FSRS6):
         a1, a2, a3, a4 = -8.09, -3.83, -2.5, -1.0
 
         if len(rating_stability) == 0:
-            raise Exception("Not enough data for pretraining!")
+            raise Exception("Not enough data for parameter initialization!")
         elif len(rating_stability) == 1:
             rating = list(rating_stability.keys())[0]
             factor = rating_stability[rating] / r_s0_default[str(rating)]

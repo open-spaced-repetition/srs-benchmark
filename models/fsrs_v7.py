@@ -14,9 +14,11 @@ from scipy.optimize import minimize  # type: ignore
 from config import Config
 
 from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
+
 PENALTY_W_1 = 0.5
 PENALTY_W_2 = 0.0015
 PENALTY_W_L2 = 0.5
+
 
 class FSRS7ParameterClipper(FSRS6ParameterClipper):
     def __call__(self, module):
@@ -166,17 +168,58 @@ class FSRS7(FSRS6):
             n_reviews=10,
             target_dr=0.90,
             n_newton=4,
-            target_drs=[0.99]  # for the second penalty
+            target_drs=[0.99],  # for the second penalty
         )
-        sigma = torch.tensor([9999., 9999., 9999., 9999., 0.523, 0.2528, 0.4329, 0.2966, 0.2139, 0.2889, 0.1862, 0.0829, 0.175, 0.3812, 0.3013, 0.9104, 0.3234, 0.2448, 0.3273, 0.1842, 0.1542, 0.1735, 0.4608, 0.311, 0.864, 0.4053, 0.162, 0.0418, 0.2596, 0.0798, 0.0682, 0.1282, 0.1397, 0.1407, 0.1489]).to(self.config.device)
-        L2_penalty = torch.sum(torch.square(self.w - self.init_w_tensor) / torch.square(sigma))
+        sigma = torch.tensor(
+            [
+                9999.0,
+                9999.0,
+                9999.0,
+                9999.0,
+                0.523,
+                0.2528,
+                0.4329,
+                0.2966,
+                0.2139,
+                0.2889,
+                0.1862,
+                0.0829,
+                0.175,
+                0.3812,
+                0.3013,
+                0.9104,
+                0.3234,
+                0.2448,
+                0.3273,
+                0.1842,
+                0.1542,
+                0.1735,
+                0.4608,
+                0.311,
+                0.864,
+                0.4053,
+                0.162,
+                0.0418,
+                0.2596,
+                0.0798,
+                0.0682,
+                0.1282,
+                0.1397,
+                0.1407,
+                0.1489,
+            ]
+        ).to(self.config.device)
+        L2_penalty = torch.sum(
+            torch.square(self.w - self.init_w_tensor) / torch.square(sigma)
+        )
         # sched_penalty_1 penalizes huge interval growth for non-same-day reviews
         # sched_penalty_2 penalizes short (<10 minutes) intervals at 99% DR
         # L2 penalty penalizes deviation from default parameters
-        output["penalty"] = (PENALTY_W_1 * sched_penalty_1
-                            + PENALTY_W_2 * sched_penalty_2
-                            + PENALTY_W_L2 * L2_penalty) \
-                            * real_batch_size
+        output["penalty"] = (
+            PENALTY_W_1 * sched_penalty_1
+            + PENALTY_W_2 * sched_penalty_2
+            + PENALTY_W_L2 * L2_penalty
+        ) * real_batch_size
         # end = time.perf_counter_ns()
         # total = end - start
         # penalty_only = end - start_2

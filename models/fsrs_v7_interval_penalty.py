@@ -57,49 +57,54 @@ import math
 import torch
 
 # ── physical constants ────────────────────────────────────────────────────────
-_MIN_T   = 1.0 / 86_400.0     # 1 second expressed in days
-_MAX_T   = 36_500.0           # 100 years in days
-_ONE_DAY = 1.0                # threshold separating short-term from long-term
-_SHORT_C = 600.0 / 86_400.0   # 10 minutes in days
-_INV_C   = 1.0 / _SHORT_C     # = 144.0  (86 400 / 600)
+_MIN_T = 1.0 / 86_400.0  # 1 second expressed in days
+_MAX_T = 36_500.0  # 100 years in days
+_ONE_DAY = 1.0  # threshold separating short-term from long-term
+_SHORT_C = 600.0 / 86_400.0  # 10 minutes in days
+_INV_C = 1.0 / _SHORT_C  # = 144.0  (86 400 / 600)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Forgetting-curve kernel
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _fc_R_and_dRdt(
     t: torch.Tensor,
     s: torch.Tensor,
     w: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    decay1 = -w[-8];  decay2 = -w[-7]
+    decay1 = -w[-8]
+    decay2 = -w[-7]
 
     # ── Guard: base values must be strictly positive for real-valued pow ──────
-    base1  =  w[-6].clamp(min=1e-4);  base2  =  w[-5].clamp(min=1e-4)
+    base1 = w[-6].clamp(min=1e-4)
+    base2 = w[-5].clamp(min=1e-4)
     # ── Guard: weight magnitudes must be strictly positive so wt_sum ≠ 0 ─────
-    bw1    =  w[-4].clamp(min=1e-4);  bw2    =  w[-3].clamp(min=1e-4)
-    swp1   =  w[-2];  swp2   =  w[-1]
+    bw1 = w[-4].clamp(min=1e-4)
+    bw2 = w[-3].clamp(min=1e-4)
+    swp1 = w[-2]
+    swp2 = w[-1]
 
     c1 = base1 ** (1.0 / decay1) - 1.0
     c2 = base2 ** (1.0 / decay2) - 1.0
 
-    tos    = t / s
+    tos = t / s
     inner1 = (1.0 + c1 * tos).clamp(min=1e-9)
     inner2 = (1.0 + c2 * tos).clamp(min=1e-9)
 
-    R1     = inner1 ** decay1
-    R2     = inner2 ** decay2
+    R1 = inner1**decay1
+    R2 = inner2**decay2
 
-    wt1    = bw1 * s.pow(-swp1)
-    wt2    = bw2 * s.pow( swp2)
-    wt_sum = (wt1 + wt2).clamp(min=1e-9)   # ← guard denominator
+    wt1 = bw1 * s.pow(-swp1)
+    wt2 = bw2 * s.pow(swp2)
+    wt_sum = (wt1 + wt2).clamp(min=1e-9)  # ← guard denominator
 
-    R      = ((wt1 * R1 + wt2 * R2) / wt_sum).clamp(0.0, 1.0)   # ← hard clamp
+    R = ((wt1 * R1 + wt2 * R2) / wt_sum).clamp(0.0, 1.0)  # ← hard clamp
 
     dR1_dt = decay1 * inner1.pow(decay1 - 1.0) * (c1 / s)
     dR2_dt = decay2 * inner2.pow(decay2 - 1.0) * (c2 / s)
-    dR_dt  = ((wt1 * dR1_dt + wt2 * dR2_dt) / wt_sum).clamp(max=0.0)  # ← ≤ 0
+    dR_dt = ((wt1 * dR1_dt + wt2 * dR2_dt) / wt_sum).clamp(max=0.0)  # ← ≤ 0
 
     return R, dR_dt
 
@@ -107,6 +112,7 @@ def _fc_R_and_dRdt(
 # ══════════════════════════════════════════════════════════════════════════════
 # Differentiable interval root-finder
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _interval_differentiable(
     s: torch.Tensor,
@@ -141,37 +147,41 @@ def _interval_differentiable(
         on w from earlier stability updates, giving the correct total gradient.
     """
     # ── Phase 1: Newton in log(t) — pure Python scalars, no autograd ─────────
-    s_f  = float(s.detach())
-    d1   = float(-w[-8]);  d2   = float(-w[-7])
-    b1   = float( w[-6]);  b2   = float( w[-5])
-    bw1f = float( w[-4]);  bw2f = float( w[-3])
-    sw1f = float( w[-2]);  sw2f = float( w[-1])
+    s_f = float(s.detach())
+    d1 = float(-w[-8])
+    d2 = float(-w[-7])
+    b1 = float(w[-6])
+    b2 = float(w[-5])
+    bw1f = float(w[-4])
+    bw2f = float(w[-3])
+    sw1f = float(w[-2])
+    sw2f = float(w[-1])
 
-    c1f   = b1 ** (1.0 / d1) - 1.0
-    c2f   = b2 ** (1.0 / d2) - 1.0
-    wt1f  = bw1f * s_f ** (-sw1f)
-    wt2f  = bw2f * s_f **  sw2f
-    wtsf  = wt1f + wt2f
+    c1f = b1 ** (1.0 / d1) - 1.0
+    c2f = b2 ** (1.0 / d2) - 1.0
+    wt1f = bw1f * s_f ** (-sw1f)
+    wt2f = bw2f * s_f**sw2f
+    wtsf = wt1f + wt2f
 
-    u_f   = math.log(max(s_f, 1e-10))    # start at log(s) — R(s,s) ≈ 0.85 < 0.9
+    u_f = math.log(max(s_f, 1e-10))  # start at log(s) — R(s,s) ≈ 0.85 < 0.9
 
     for _ in range(n_newton):
-        u_f    = max(math.log(_MIN_T), min(u_f, math.log(_MAX_T)))
-        t_f    = max(_MIN_T, min(math.exp(u_f), _MAX_T))
-        tos    = t_f / s_f
-        i1     = max(1.0 + c1f * tos, 1e-9)
-        i2     = max(1.0 + c2f * tos, 1e-9)
-        R_f    = (wt1f * i1 ** d1 + wt2f * i2 ** d2) / wtsf
-        dR1    = d1 * i1 ** (d1 - 1.0) * c1f / s_f
-        dR2    = d2 * i2 ** (d2 - 1.0) * c2f / s_f
+        u_f = max(math.log(_MIN_T), min(u_f, math.log(_MAX_T)))
+        t_f = max(_MIN_T, min(math.exp(u_f), _MAX_T))
+        tos = t_f / s_f
+        i1 = max(1.0 + c1f * tos, 1e-9)
+        i2 = max(1.0 + c2f * tos, 1e-9)
+        R_f = (wt1f * i1**d1 + wt2f * i2**d2) / wtsf
+        dR1 = d1 * i1 ** (d1 - 1.0) * c1f / s_f
+        dR2 = d2 * i2 ** (d2 - 1.0) * c2f / s_f
         dRdt_f = (wt1f * dR1 + wt2f * dR2) / wtsf
         # df/du = dR/dt · t  (always < 0; guard against numerical zero)
         dfdu_f = min(dRdt_f * t_f, -1e-12)
-        u_f   -= (R_f - target) / dfdu_f
+        u_f -= (R_f - target) / dfdu_f
 
     t_star_f = max(_MIN_T, min(math.exp(u_f), _MAX_T))
     # create a plain tensor on the same device/dtype as w, no grad
-    t_star   = w.new_tensor(t_star_f)
+    t_star = w.new_tensor(t_star_f)
 
     # ── Phase 2: IFT lift — one step with grad ────────────────────────────────
     t_d = t_star.detach()
@@ -192,6 +202,7 @@ def _interval_differentiable(
 # FSRS-7 state-update equations (PyTorch, autograd-compatible)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def _init_d(w: torch.Tensor, rating: int) -> torch.Tensor:
     return (w[4] - torch.exp(w[5] * (rating - 1)) + 1.0).clamp(1.0, 10.0)
 
@@ -207,46 +218,52 @@ def _next_d_good(w: torch.Tensor, d: torch.Tensor) -> torch.Tensor:
 
 
 def _s_fail_long(
-    w: torch.Tensor, s: torch.Tensor,
-    d: torch.Tensor, r: torch.Tensor,
+    w: torch.Tensor,
+    s: torch.Tensor,
+    d: torch.Tensor,
+    r: torch.Tensor,
 ) -> torch.Tensor:
-    raw = (w[10] * d.pow(-w[11])
-           * ((s + 1.0).pow(w[12]) - 1.0)
-           * torch.exp((1.0 - r) * w[13]))
+    raw = (
+        w[10]
+        * d.pow(-w[11])
+        * ((s + 1.0).pow(w[12]) - 1.0)
+        * torch.exp((1.0 - r) * w[13])
+    )
     return torch.minimum(s, raw)
 
 
 def _s_fail_short(
-    w: torch.Tensor, s: torch.Tensor,
-    d: torch.Tensor, r: torch.Tensor,
+    w: torch.Tensor,
+    s: torch.Tensor,
+    d: torch.Tensor,
+    r: torch.Tensor,
 ) -> torch.Tensor:
-    raw = (w[19] * d.pow(-w[20])
-           * ((s + 1.0).pow(w[21]) - 1.0)
-           * torch.exp((1.0 - r) * w[22]))
+    raw = (
+        w[19]
+        * d.pow(-w[20])
+        * ((s + 1.0).pow(w[21]) - 1.0)
+        * torch.exp((1.0 - r) * w[22])
+    )
     return torch.minimum(s, raw)
 
 
 def _next_s_good(w, s, d, delta_t):
     r = _fc_R_and_dRdt(delta_t, s, w)[0]
 
-    sf_l  = _s_fail_long(w, s, d, r)
+    sf_l = _s_fail_long(w, s, d, r)
     # clamp to prevent exp() overflow when (1-r)*w[9] is large
-    si_l  = (1.0
-             + torch.exp(w[7] - 1.5)
-             * (11.0 - d)
-             * s.pow(-w[8])
-             * (torch.exp(((1.0 - r) * w[9]).clamp(max=30.0)) - 1.0))
+    si_l = 1.0 + torch.exp(w[7] - 1.5) * (11.0 - d) * s.pow(-w[8]) * (
+        torch.exp(((1.0 - r) * w[9]).clamp(max=30.0)) - 1.0
+    )
     s_lng = torch.maximum(sf_l, s * si_l)
 
     sf_sh = _s_fail_short(w, s, d, r)
-    si_sh = (1.0
-             + torch.exp(w[16] - 1.5)
-             * (11.0 - d)
-             * s.pow(-w[17])
-             * (torch.exp(((1.0 - r) * w[18]).clamp(max=30.0)) - 1.0))
+    si_sh = 1.0 + torch.exp(w[16] - 1.5) * (11.0 - d) * s.pow(-w[17]) * (
+        torch.exp(((1.0 - r) * w[18]).clamp(max=30.0)) - 1.0
+    )
     s_sht = torch.maximum(sf_sh, s * si_sh)
 
-    coef  = (1.0 - w[26] * torch.exp(-w[25] * delta_t)).clamp(0.0, 1.0)  # ← guard
+    coef = (1.0 - w[26] * torch.exp(-w[25] * delta_t)).clamp(0.0, 1.0)  # ← guard
     return (coef * s_lng + (1.0 - coef) * s_sht).clamp(0.0001, 36_500.0)
 
 
@@ -254,7 +271,15 @@ def _next_s_good(w, s, d, delta_t):
 # Public penalty function
 # ══════════════════════════════════════════════════════════════════════════════
 
-def fsrs7_interval_growth_penalty(w, *, n_reviews=10, target_dr=0.90, n_newton=4, target_drs=[0.95, 0.96, 0.97, 0.98, 0.99]):
+
+def fsrs7_interval_growth_penalty(
+    w,
+    *,
+    n_reviews=10,
+    target_dr=0.90,
+    n_newton=4,
+    target_drs=[0.95, 0.96, 0.97, 0.98, 0.99],
+):
     """
     Returns (penalty_1, penalty_2).
 
@@ -266,7 +291,7 @@ def fsrs7_interval_growth_penalty(w, *, n_reviews=10, target_dr=0.90, n_newton=4
             w, n_reviews=n_reviews, target_dr=target_dr, n_newton=n_newton
         )
     except Exception as e1:
-        print(f'Error when calculating penalty 1: {e1}')
+        print(f"Error when calculating penalty 1: {e1}")
         p1 = w.new_zeros(())
     if not torch.isfinite(p1):
         p1 = w.new_zeros(())
@@ -276,7 +301,7 @@ def fsrs7_interval_growth_penalty(w, *, n_reviews=10, target_dr=0.90, n_newton=4
             w, n_reviews=n_reviews, n_newton=n_newton, target_drs=target_drs
         )
     except Exception as e2:
-        print(f'Error when calculating penalty 2: {e2}')
+        print(f"Error when calculating penalty 2: {e2}")
         p2 = w.new_zeros(())
     if not torch.isfinite(p2):
         p2 = w.new_zeros(())
@@ -294,12 +319,13 @@ def _fsrs7_interval_growth_penalty_impl(w, *, n_reviews, target_dr, n_newton):
         intervals.append(t)
         s = _next_s_good(w, s, d, t)
         d = _next_d_good(w, d)
-    ivls   = torch.stack(intervals)
+    ivls = torch.stack(intervals)
     ratios = ivls[1:] / ivls[:-1]
-    mask   = ivls[:-1].detach() >= _ONE_DAY
+    mask = ivls[:-1].detach() >= _ONE_DAY
     if not mask.any():
         return w.new_zeros(())
     return ratios[mask].max() ** 2
+
 
 def _fsrs7_short_interval_penalty_impl(w, *, n_reviews, n_newton, target_drs):
     """
@@ -328,12 +354,12 @@ def _fsrs7_short_interval_penalty_impl(w, *, n_reviews, n_newton, target_drs):
             d = _next_d_good(w, d)
 
         ivls = torch.stack(intervals)
-        mask = ivls.detach() < _ONE_DAY   # detach so mask is a plain bool tensor
+        mask = ivls.detach() < _ONE_DAY  # detach so mask is a plain bool tensor
         if not mask.any():
             continue
 
-        avg_t  = ivls[mask].mean().clamp(min=_MIN_T)
-        inv_x  = 1.0 / avg_t
+        avg_t = ivls[mask].mean().clamp(min=_MIN_T)
+        inv_x = 1.0 / avg_t
         penalties.append(inv_x.clamp(min=_INV_C) - _INV_C)
 
     if not penalties:

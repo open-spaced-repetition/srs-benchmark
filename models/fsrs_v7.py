@@ -13,6 +13,10 @@ from scipy.optimize import minimize  # type: ignore
 
 from config import Config
 
+from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
+PENALTY_W_1 = 0.5
+PENALTY_W_2 = 0.0015
+PENALTY_W_L2 = 0.5
 
 class FSRS7ParameterClipper(FSRS6ParameterClipper):
     def __call__(self, module):
@@ -129,6 +133,8 @@ class FSRS7(FSRS6):
         seq_lens: Tensor,
         real_batch_size: int,
     ) -> dict[str, Tensor]:
+        # start = time.perf_counter_ns()
+
         outputs, _ = self.forward(sequences)
         stabilities, difficulties = outputs[
             seq_lens - 1,
@@ -154,50 +160,27 @@ class FSRS7(FSRS6):
             "difficulties": difficulties,
         }
 
-        sigma = torch.tensor(
-            [
-                9999.0,
-                9999.0,
-                9999.0,
-                9999.0,
-                0.523,
-                0.2528,
-                0.4329,
-                0.2966,
-                0.2139,
-                0.2889,
-                0.1862,
-                0.0829,
-                0.175,
-                0.3812,
-                0.3013,
-                0.9104,
-                0.3234,
-                0.2448,
-                0.3273,
-                0.1842,
-                0.1542,
-                0.1735,
-                0.4608,
-                0.311,
-                0.864,
-                0.4053,
-                0.162,
-                0.0418,
-                0.2596,
-                0.0798,
-                0.0682,
-                0.1282,
-                0.1397,
-                0.1407,
-                0.1489,
-            ]
-        ).to(self.config.device)
-        output["penalty"] = (
-            torch.sum(torch.square(self.w - self.init_w_tensor) / torch.square(sigma))
-            * real_batch_size
-            * self.gamma
+        # start_2 = time.perf_counter_ns()
+        sched_penalty_1, sched_penalty_2 = fsrs7_interval_growth_penalty(
+            self.w,
+            n_reviews=10,
+            target_dr=0.90,
+            n_newton=4,
+            target_drs=[0.99]  # for the second penalty
         )
+        sigma = torch.tensor([9999., 9999., 9999., 9999., 0.523, 0.2528, 0.4329, 0.2966, 0.2139, 0.2889, 0.1862, 0.0829, 0.175, 0.3812, 0.3013, 0.9104, 0.3234, 0.2448, 0.3273, 0.1842, 0.1542, 0.1735, 0.4608, 0.311, 0.864, 0.4053, 0.162, 0.0418, 0.2596, 0.0798, 0.0682, 0.1282, 0.1397, 0.1407, 0.1489]).to(self.config.device)
+        L2_penalty = torch.sum(torch.square(self.w - self.init_w_tensor) / torch.square(sigma))
+        # sched_penalty_1 penalizes huge interval growth for non-same-day reviews
+        # sched_penalty_2 penalizes short (<10 minutes) intervals at 99% DR
+        # L2 penalty penalizes deviation from default parameters
+        output["penalty"] = (PENALTY_W_1 * sched_penalty_1
+                            + PENALTY_W_2 * sched_penalty_2
+                            + PENALTY_W_L2 * L2_penalty) \
+                            * real_batch_size
+        # end = time.perf_counter_ns()
+        # total = end - start
+        # penalty_only = end - start_2
+        # print(f'batch_process took {total/1_000_000:.2f} ms, calculating penalty took {penalty_only/1_000_000:.2f} ms')
         return output
 
     def forgetting_curve(
@@ -718,7 +701,7 @@ class FSRS7(FSRS6):
         a1, a2, a3, a4 = -8.09, -3.83, -2.5, -1.0
 
         if len(rating_stability) == 0:
-            raise Exception("Not enough data for parameter initialization!")
+            raise Exception("Not enough data for pretraining!")
         elif len(rating_stability) == 1:
             rating = list(rating_stability.keys())[0]
             factor = rating_stability[rating] / r_s0_default[str(rating)]

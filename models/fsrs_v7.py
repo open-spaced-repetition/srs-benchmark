@@ -15,6 +15,9 @@ from config import Config
 
 from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
 
+# scheduling penalty 1 penalizes huge interval growth for non-same-day reviews, makes log loss worse
+# scheduling penalty 2 penalizes short (<10 minutes) intervals at 99% DR, makes log loss worse
+# L2 penalty penalizes deviation from default parameters, improves log loss very slightly
 PENALTY_W_1 = 0.5
 PENALTY_W_2 = 0.0015
 PENALTY_W_L2 = 0.5

@@ -76,6 +76,7 @@ class FSRS7(FSRS6):
     Run like this
     Include same-day reviews: python script.py --algo FSRS-7 --recency --short --secs --processes 20
     Exclude same-day reviews: python script.py --algo FSRS-7 --recency --short --secs --equalize_test_with_non_secs --processes 20
+    Other flags that can be used with FSRS-7: --default, --S0, --sched_penalties, --two_buttons, --partitions
     """
 
     n_epoch: int = 8

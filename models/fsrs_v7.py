@@ -174,8 +174,8 @@ class FSRS7(FSRS6):
                 target_drs=[0.99],  # for the second penalty
             )
         else:
-            sched_penalty_1 = torch.zeros(1, device=self.config.device)
-            sched_penalty_2 = torch.zeros(1, device=self.config.device)
+            sched_penalty_1 = torch.zeros([], device=self.config.device)
+            sched_penalty_2 = torch.zeros([], device=self.config.device)
         sigma = torch.tensor(
             [
                 9999.0,

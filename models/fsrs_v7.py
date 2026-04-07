@@ -37,7 +37,7 @@ class FSRS7ParameterClipper(FSRS6ParameterClipper):
             w[5] = w[5].clamp(0.001, 4)
             w[6] = w[6].clamp(0.1, 4)
             # Stability (long-term)
-            w[7] = w[7].clamp(0, 4)  # subtract 1.5
+            w[7] = w[7].clamp(0, 4)  # subtract 1.5, see stability_after_review
             w[8] = w[8].clamp(0, 1.2)
             w[9] = w[9].clamp(0.3, 3)
             w[10] = w[10].clamp(0.01, 1.5)
@@ -47,7 +47,7 @@ class FSRS7ParameterClipper(FSRS6ParameterClipper):
             w[14] = w[14].clamp(0, 1)
             w[15] = w[15].clamp(1, 7)
             # Stability (short-term)
-            w[16] = w[16].clamp(0, 4)  # subtract 1.5
+            w[16] = w[16].clamp(0, 4)  # subtract 1.5, see stability_after_review
             w[17] = w[17].clamp(0, 2)
             w[18] = w[18].clamp(0.5, 6)
             w[19] = w[19].clamp(0.001, 1.5)

@@ -293,7 +293,8 @@ Run `uv run script.py --help` for the full list. Common options include:
 | `--secs` | Use `elapsed_seconds` as the interval instead of days. | Off |
 | `--duration` | Add review duration feature (LSTM only). | Off |
 | `--default` | Evaluate default parameters (no training). | Off |
-| `--S0` | FSRS-5/FSRS-6 with only S0 initialization. | Off |
+| `--S0` | FSRS-5/6/7 with only S0 initialization. | Off |
+| `--sched_penalties` | FSRS-7 with penalties that punish very large interval growth and multiple 1 second intervals in a row. | Off |
 | `--two_buttons` | Treat Hard and Easy as Good. | Off |
 | `--recency` | Enable recency weighting during training. | Off |
 | `--partitions` | Partition training by `deck` or `preset`. | Default: `none` |

@@ -165,13 +165,17 @@ class FSRS7(FSRS6):
         }
 
         # start_2 = time.perf_counter_ns()
-        sched_penalty_1, sched_penalty_2 = fsrs7_interval_growth_penalty(
-            self.w,
-            n_reviews=10,
-            target_dr=0.90,
-            n_newton=4,
-            target_drs=[0.99],  # for the second penalty
-        )
+        if self.config.sched_penalties:
+            sched_penalty_1, sched_penalty_2 = fsrs7_interval_growth_penalty(
+                self.w,
+                n_reviews=10,
+                target_dr=0.90,
+                n_newton=4,
+                target_drs=[0.99],  # for the second penalty
+            )
+        else:
+            sched_penalty_1 = torch.zeros(1, device=self.config.device)
+            sched_penalty_2 = torch.zeros(1, device=self.config.device)
         sigma = torch.tensor(
             [
                 9999.0,

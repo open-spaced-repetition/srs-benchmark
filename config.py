@@ -55,7 +55,6 @@ def create_parser():
     )
     parser.add_argument("--dev", action="store_true", help="for local development")
 
-    # Add this line:
     parser.add_argument(
         "--max-user-id",
         type=int,
@@ -77,6 +76,12 @@ def create_parser():
     )
     parser.add_argument(
         "--S0", action="store_true", help="FSRS-5/FSRS-6 with only S0 initialization"
+    )
+    parser.add_argument(
+        "--sched_penalties",
+        default=False,
+        action="store_true",
+        help="Enable FSRS-7 scheduling penalties (penalty 1 & 2). L2 penalty is always on. (default: False)",
     )
     parser.add_argument(
         "--two_buttons", action="store_true", help="treat Hard and Easy as Good"
@@ -207,6 +212,7 @@ class Config:
         self.equalize_test_with_non_secs: bool = args.equalize_test_with_non_secs
         self.two_buttons: bool = args.two_buttons
         self.only_S0: bool = args.S0
+        self.sched_penalties: bool = args.sched_penalties  # only for FSRS-7
         self.save_evaluation_file: bool = args.file
         self.generate_plots: bool = args.plot
         self.save_weights: bool = args.weights

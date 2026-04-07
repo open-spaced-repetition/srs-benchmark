@@ -127,7 +127,6 @@ class FSRS7(FSRS6):
         if w is None:
             w = self.init_w
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
-        self.gamma = 0.5
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS7ParameterClipper(config)
 

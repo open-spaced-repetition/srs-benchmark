@@ -73,10 +73,16 @@ class FSRS7ParameterClipper(FSRS6ParameterClipper):
 
 class FSRS7(FSRS6):
     """
-    Run like this
-    Include same-day reviews: python script.py --algo FSRS-7 --recency --short --secs --processes 20
-    Exclude same-day reviews: python script.py --algo FSRS-7 --recency --short --secs --equalize_test_with_non_secs --processes 20
-    Other flags that can be used with FSRS-7: --default, --S0, --sched_penalties, --two_buttons, --partitions
+    README entries and the corresponding flags
+    Without same-day reviews:
+    FSRS-7 = python script.py --algo FSRS-7 --short --secs --equalize_test_with_non_secs --processes 15
+    FSRS-7 sched. penalties = python script.py --algo FSRS-7 --sched_penalties --short --secs --equalize_test_with_non_secs --processes 15
+    FSRS-7 recency = python script.py --algo FSRS-7 --recency --short --secs --equalize_test_with_non_secs --processes 15
+    FSRS-7 default param. = python script.py --algo FSRS-7 --default --short --secs --equalize_test_with_non_secs --processes 15
+    FSRS-7 deck = python script.py --algo FSRS-7 --partitions deck --short --secs --equalize_test_with_non_secs --processes 15
+    FSRS-7 preset = python script.py --algo FSRS-7 --partitions preset --short --secs --equalize_test_with_non_secs --processes 15
+    To include same-day reviews, simply remove --equalize_test_with_non_secs. FSRS-7 is intended to be always be used with --short --secs.
+    Other flags that can be used with FSRS-7: --S0, --two_buttons
     """
 
     n_epoch: int = 8

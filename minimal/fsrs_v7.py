@@ -188,10 +188,10 @@ class FSRS7(nn.Module):
         state: [batch_size, 2]  — stability, difficulty
         """
         if torch.equal(state, torch.zeros_like(state)):
-            keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
+            keys = torch.tensor([1, 2, 3, 4], device=X.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
-            new_s = torch.ones_like(state[:, 0], device=self.config.device)
+            new_s = torch.ones_like(state[:, 0])
             w = self.w.to(X.device)
             new_s[index[0]] = w[index[1]]
             new_d = self.init_d(X[:, 1])

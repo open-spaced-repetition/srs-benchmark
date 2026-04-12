@@ -9,7 +9,7 @@ class LogisticRegression(BaseModel):
     batch_size: int = 1024
     lr: float = 1e-1
     betas: tuple = (0.8, 0.85)
-    wd: float = 0.01
+    wd: float = 1e-2
 
     def __init__(
         self, config: Config, state_dict=None
@@ -46,15 +46,12 @@ class LogisticRegression(BaseModel):
         same_day = (feature_elapsed_days_real_bl < 1).float()
         feature_rating_is_hard = (feature_rating_bl == 2).float()
         feature_rating_is_better_than_hard = (feature_rating_bl > 2).float()
-        feature_rating_onehot_bl4 = torch.nn.functional.one_hot((feature_rating_bl.long() - 1).clamp(min=0), num_classes=4).float()
         feature_rating_onehot_bl3 = (feature_rating_bl > 1).float().unsqueeze(-1) * torch.nn.functional.one_hot((feature_rating_bl.long() - 2).clamp(min=0), num_classes=3).float()
         success_bl = (feature_rating_bl > 1).float()
         is_first_review_bl = torch.zeros_like(feature_rating_bl)
         is_first_review_bl[:, 0] = 1
         first_rating_bl = feature_rating_bl[:, 0].unsqueeze(-1).expand(B, L)
-        first_rating_onehot_bl4 = torch.nn.functional.one_hot((first_rating_bl.long() - 1).clamp(min=0), num_classes=4).float()
         first_rating_onehot_bl3 = (first_rating_bl > 1).float().unsqueeze(-1) * torch.nn.functional.one_hot((first_rating_bl.long() - 2).clamp(min=0), num_classes=3).float()
-        first_rating_is_better_than_hard = (first_rating_bl > 2).float()
 
         same_day_fail = same_day * (1 - is_first_review_bl) * (feature_rating_bl == 1.0).float()
         non_same_day_fail = (1 - same_day) * (1 - is_first_review_bl) * (feature_rating_bl == 1.0).float()
@@ -64,48 +61,14 @@ class LogisticRegression(BaseModel):
         non_same_day_pass = (1 - same_day) * (1 - is_first_review_bl) * (feature_rating_bl > 1).float()
         num_same_day_pass = torch.cumsum(same_day_pass, dim=-1)
         num_non_same_day_pass = torch.cumsum(non_same_day_pass, dim=-1)
-        num_same_day = torch.cumsum(same_day, dim=-1)
-        num_non_same_day = torch.cumsum(1.0 - same_day, dim=-1)
         num_pass = torch.cumsum((feature_rating_bl > 1).float(), dim=-1)
         has_passed = (num_pass > 0).float()
-
-        elapsed_given_succ = torch.where(success_bl.bool(), feature_elapsed_days_real_bl, torch.zeros_like(success_bl))
-        elapsed_given_succ_premax = torch.cummax(elapsed_given_succ, dim=-1).values
 
         times = feature_elapsed_days_real_bl.cumsum(dim=-1)
         first_or_lapse_time = torch.where((is_first_review_bl.bool() | (1 - success_bl).bool()), times, torch.zeros_like(times))
         time_since_first_or_lapse = times - torch.cummax(first_or_lapse_time, dim=-1).values
         
         label_is_same_day = (label_elapsed_days_int_bl == 0).float()
-
-        in_blh = torch.concat(
-            (
-                torch.ones_like(feature_rating_bl).unsqueeze(-1),
-                feature_rating_onehot_bl4,
-                first_rating_onehot_bl4,
-                first_rating_onehot_bl4 * is_first_review_bl.unsqueeze(-1),
-                transform_elapsed_days_real(feature_elapsed_days_real_bl).unsqueeze(-1),
-                is_first_review_bl.unsqueeze(-1),
-                (1 + num_same_day_fail).log().unsqueeze(-1),
-                (1 + num_non_same_day_fail).log().unsqueeze(-1),
-                (1 + num_same_day_fail * label_is_same_day).log().unsqueeze(-1),
-                (1 + num_non_same_day_fail * (1 - label_is_same_day)).log().unsqueeze(-1),
-                (1 + num_same_day_pass).log().unsqueeze(-1),
-                (1 + num_non_same_day_pass).log().unsqueeze(-1),
-                (1 + num_same_day_pass * label_is_same_day).log().unsqueeze(-1),
-                (1 + num_non_same_day_pass * (1 - label_is_same_day)).log().unsqueeze(-1),
-                (1 + num_same_day).log().unsqueeze(-1),
-                (1 + num_non_same_day).log().unsqueeze(-1),
-                (1 + num_same_day * label_is_same_day).log().unsqueeze(-1),
-                (1 + num_non_same_day * (1 - label_is_same_day)).log().unsqueeze(-1),
-                has_passed.unsqueeze(-1),
-                transform_elapsed_days_real(elapsed_given_succ_premax).unsqueeze(-1),
-                transform_elapsed_days_real(time_since_first_or_lapse).unsqueeze(-1),
-                label_is_same_day.unsqueeze(-1),
-                transform_elapsed_days_real(label_elapsed_days_real_bl).unsqueeze(-1),
-            ),
-            dim=-1
-        )
         deg_1_in_blh = torch.concat(
             (
                 torch.ones_like(feature_rating_bl).unsqueeze(-1),
@@ -119,7 +82,6 @@ class LogisticRegression(BaseModel):
             ),
             dim=-1
         )
-        # [0, 2, 3, 4, 10, 11, 15, 22, 1, 6, 7, 8, 12, 13, 16, 20, 21, 27, 29, 30, 31], device=x_blh.device), True)
         deg_0_in_blh = torch.concat(
             (
                 torch.ones_like(feature_rating_bl).unsqueeze(-1),
@@ -158,6 +120,11 @@ class LogisticRegression(BaseModel):
     ) -> torch.optim.Optimizer:
         return torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=wd, betas=betas)
 
+    def log(self, x):
+        params = [round(x, 4) for x in self.coefficients.tolist()]
+        x["parameters"] = params
+        x["state"] = [round(x, 4) for x in self.coef_res.tolist()]
 
 def transform_elapsed_days_real(x):
     return ((x + 1e-5).log() + 1.3) / 5
+    

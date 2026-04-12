@@ -1,0 +1,599 @@
+"""
+Standalone FSRS-7 model.
+
+All methods from the original inheritance chain (FSRS-1 → … → FSRS-7) are
+inlined here so this file has no dependency on any other model file.
+Scheduling penalties are omitted; only the L2 regularisation term is kept.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import List, Optional, Union
+
+import numpy as np
+import pandas as pd
+import torch
+from scipy.optimize import minimize
+from torch import Tensor, nn
+from tqdm.auto import tqdm  # type: ignore
+
+# Weight for L2 regularisation (same as original with sched_penalties=False)
+PENALTY_W_L2 = 0.5
+
+
+# ── parameter clipper ─────────────────────────────────────────────────────────
+
+
+class FSRS7ParameterClipper:
+    def __init__(self, s_min: float, init_s_max: float) -> None:
+        self.s_min = s_min
+        self.init_s_max = init_s_max
+
+    def __call__(self, module: nn.Module) -> None:
+        if not hasattr(module, "w"):
+            return
+        w = module.w.data
+        w[0] = w[0].clamp(self.s_min, self.init_s_max / 2)
+        w[1] = w[1].clamp(w[0], self.init_s_max)
+        w[2] = w[2].clamp(w[1], self.init_s_max)
+        w[3] = w[3].clamp(w[2], self.init_s_max)
+        w[4] = w[4].clamp(1, 10)
+        w[5] = w[5].clamp(0.001, 4)
+        w[6] = w[6].clamp(0.1, 4)
+        # Long-term stability
+        w[7] = w[7].clamp(0, 4)
+        w[8] = w[8].clamp(0, 1.2)
+        w[9] = w[9].clamp(0.3, 3)
+        w[10] = w[10].clamp(0.01, 1.5)
+        w[11] = w[11].clamp(0.001, 0.9)
+        w[12] = w[12].clamp(0.1, 1)
+        w[13] = w[13].clamp(0, 3.5)
+        w[14] = w[14].clamp(0, 1)
+        w[15] = w[15].clamp(1, 7)
+        # Short-term stability
+        w[16] = w[16].clamp(0, 4)
+        w[17] = w[17].clamp(0, 2)
+        w[18] = w[18].clamp(0.5, 6)
+        w[19] = w[19].clamp(0.001, 1.5)
+        w[20] = w[20].clamp(0.001, 2)
+        w[21] = w[21].clamp(0.001, 1)
+        w[22] = w[22].clamp(0, 5)
+        w[23] = w[23].clamp(0, 1)
+        w[24] = w[24].clamp(1, 7)
+        # Long-short transition
+        w[25] = w[25].clamp(2.5, 15)
+        w[26] = w[26].clamp(0, 1)
+        # Forgetting curve
+        w[27] = w[27].clamp(0.01, 0.25)        # decay 1
+        w[28] = w[28].clamp(w[27], 0.95)       # decay 2
+        w[29] = w[29].clamp(0.5, 0.85)         # base 1
+        w[30] = w[30].clamp(w[29], 0.99)       # base 2
+        w[31] = w[31].clamp(0.01, 1)           # weight 1
+        w[32] = w[32].clamp(0.1, 1)            # weight 2
+        w[33] = w[33].clamp(0, 0.9)            # S weight power 1
+        w[34] = w[34].clamp(0.1, 1.1)          # S weight power 2
+        module.w.data = w
+
+
+# ── FSRS-7 model ──────────────────────────────────────────────────────────────
+
+
+class FSRS7(nn.Module):
+    n_epoch: int = 8
+    batch_size: int = 1024
+    lr: float = 2e-2
+    wd: float = 1e-5
+    betas: tuple = (0.8, 0.85)
+
+    # Default parameters obtained via multi-user optimisation
+    init_w: List[float] = [
+        0.041,
+        2.4175,
+        4.1283,
+        11.9709,   # Initial S (ratings 1-4)
+        5.6385,
+        0.4468,
+        3.262,     # Difficulty
+        2.3054,
+        0.1688,
+        1.3325,
+        0.3524,
+        0.0049,
+        0.7503,
+        0.0896,
+        0.6625,
+        1.3,       # Long-term stability
+        0.882,
+        0.3072,
+        3.5875,
+        0.303,
+        0.0107,
+        0.2279,
+        2.6413,
+        0.5594,
+        1.3,       # Short-term stability
+        2.5,
+        1.0,       # Long-short transition
+        0.0723,
+        0.1634,
+        0.5,
+        0.9555,
+        0.2245,
+        0.6232,
+        0.1362,
+        0.3862,    # Forgetting curve
+    ]
+
+    # Per-parameter standard deviations used for L2 regularisation
+    _sigma: List[float] = [
+        9999.0, 9999.0, 9999.0, 9999.0,
+        0.523, 0.2528, 0.4329,
+        0.2966, 0.2139, 0.2889, 0.1862, 0.0829, 0.175, 0.3812, 0.3013, 0.9104,
+        0.3234, 0.2448, 0.3273, 0.1842, 0.1542, 0.1735, 0.4608, 0.311, 0.864,
+        0.4053, 0.162,
+        0.0418, 0.2596, 0.0798, 0.0682, 0.1282, 0.1397, 0.1407, 0.1489,
+    ]
+
+    def __init__(self, config, w: Optional[List[float]] = None) -> None:
+        super().__init__()
+        self.config = config
+        if w is None:
+            w = self.init_w
+        self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+        self.init_w_tensor = self.w.data.clone().to(self.config.device)
+        self.clipper = FSRS7ParameterClipper(config.s_min, config.init_s_max)
+
+    # ── standard nn.Module helpers ────────────────────────────────────────────
+
+    def get_optimizer(
+        self, lr: float, wd: float, betas: tuple = (0.9, 0.999)
+    ) -> torch.optim.Optimizer:
+        return torch.optim.Adam(self.parameters(), lr=lr, betas=betas)
+
+    def apply_parameter_clipper(self) -> None:
+        self.apply(self.clipper)
+
+    def apply_gradient_constraints(self) -> None:
+        pass
+
+    def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        return train_set
+
+    def state_dict(self) -> list:  # type: ignore[override]
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+    # ── forward pass ──────────────────────────────────────────────────────────
+
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
+        """inputs: [seq_len, batch_size, 2]"""
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def step(self, X: Tensor, state: Tensor) -> Tensor:
+        """
+        X:     [batch_size, 2]  — elapsed time, rating
+        state: [batch_size, 2]  — stability, difficulty
+        """
+        if torch.equal(state, torch.zeros_like(state)):
+            keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
+            keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
+            new_s = torch.ones_like(state[:, 0], device=self.config.device)
+            w = self.w.to(X.device)
+            new_s[index[0]] = w[index[1]]
+            new_d = self.init_d(X[:, 1])
+            new_d = new_d.clamp(1, 10)
+        else:
+            r = self.forgetting_curve(
+                X[:, 0],
+                state[:, 0],
+                -self.w[-8],
+                -self.w[-7],
+                self.w[-6],
+                self.w[-5],
+                self.w[-4],
+                self.w[-3],
+                self.w[-2],
+                self.w[-1],
+            )
+            new_s_long, new_s_short = self.stability_after_review(state, r, X[:, 1])
+            coef = self.transition_function(X[:, 0])
+            new_s = coef * new_s_long + (1 - coef) * new_s_short
+            new_d = self.next_d(state, X[:, 1])
+            new_d = new_d.clamp(1, 10)
+        new_s = new_s.clamp(self.config.s_min, 36500)
+        return torch.stack([new_s, new_d], dim=1)
+
+    # ── batch processing (called by Trainer) ─────────────────────────────────
+
+    def batch_process(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities, difficulties = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=self.config.device),
+        ].transpose(0, 1)
+
+        retentions = self.forgetting_curve(
+            delta_ts,
+            stabilities,
+            -self.w[-8],
+            -self.w[-7],
+            self.w[-6],
+            self.w[-5],
+            self.w[-4],
+            self.w[-3],
+            self.w[-2],
+            self.w[-1],
+        ).clamp(0.0001, 0.9999)
+
+        sigma = torch.tensor(self._sigma, device=self.config.device)
+        L2_penalty = torch.sum(
+            torch.square(self.w - self.init_w_tensor) / torch.square(sigma)
+        )
+
+        return {
+            "retentions": retentions,
+            "stabilities": stabilities,
+            "difficulties": difficulties,
+            "penalty": PENALTY_W_L2 * L2_penalty * real_batch_size,
+        }
+
+    # ── FSRS-7 equations ──────────────────────────────────────────────────────
+
+    def forgetting_curve(
+        self,
+        t: Tensor,
+        s: Tensor,
+        decay1: Tensor,
+        decay2: Tensor,
+        base1: Tensor,
+        base2: Tensor,
+        base_weight1: Tensor,
+        base_weight2: Tensor,
+        swp1: Tensor,
+        swp2: Tensor,
+    ) -> Tensor:
+        t_over_s = t / s
+
+        def power_law_retention(base: Tensor, decay: Tensor) -> Tensor:
+            factor = base ** (1 / decay) - 1
+            return (1 + factor * t_over_s) ** decay
+
+        R1 = power_law_retention(base1, decay1)
+        R2 = power_law_retention(base2, decay2)
+        weight1 = base_weight1 * s ** -swp1
+        weight2 = base_weight2 * s ** swp2
+        return (weight1 * R1 + weight2 * R2) / (weight1 + weight2)
+
+    def stability_after_review(
+        self, state: Tensor, r: Tensor, rating: Tensor
+    ) -> tuple[Tensor, Tensor]:
+        w = self.w
+        batch_size = state.shape[0]
+        old_s = state[:, 0]
+        old_d = state[:, 1]
+        success = rating > 1
+
+        w_base = torch.tensor([7, 16], device=w.device)
+        w_sinc_base = w[w_base]
+        w_sinc_s_exp = w[w_base + 1]
+        w_sinc_r_mult = w[w_base + 2]
+        w_fail_mult = w[w_base + 3]
+        w_fail_d_exp = w[w_base + 4]
+        w_fail_s_exp = w[w_base + 5]
+        w_fail_r_mult = w[w_base + 6]
+        w_hard = w[w_base + 7]
+        w_easy = w[w_base + 8]
+
+        hard_penalty = torch.where(
+            rating.unsqueeze(1) == 2,
+            w_hard.unsqueeze(0),
+            torch.ones(batch_size, 2, device=w.device),
+        )
+        easy_bonus = torch.where(
+            rating.unsqueeze(1) == 4,
+            w_easy.unsqueeze(0),
+            torch.ones(batch_size, 2, device=w.device),
+        )
+
+        new_s_fail = (
+            w_fail_mult
+            * torch.pow(old_d.unsqueeze(1), -w_fail_d_exp)
+            * (torch.pow(old_s.unsqueeze(1) + 1, w_fail_s_exp) - 1)
+            * torch.exp((1 - r).unsqueeze(1) * w_fail_r_mult)
+        )
+        pls = torch.minimum(old_s.unsqueeze(1), new_s_fail)
+
+        SInc = (
+            1
+            + torch.exp(w_sinc_base - 1.5)
+            * (11 - old_d).unsqueeze(1)
+            * torch.pow(old_s.unsqueeze(1), -w_sinc_s_exp)
+            * (torch.exp((1 - r).unsqueeze(1) * w_sinc_r_mult) - 1)
+            * hard_penalty
+            * easy_bonus
+        )
+        new_s_success = torch.maximum(pls, old_s.unsqueeze(1) * SInc)
+        new_s_both = torch.where(success.unsqueeze(1), new_s_success, pls)
+        return new_s_both[:, 0], new_s_both[:, 1]
+
+    def transition_function(self, delta_t: Tensor) -> Tensor:
+        return 1 - self.w[26] * torch.exp(-self.w[25] * delta_t)
+
+    def init_d(self, rating: Union[int, Tensor]) -> Tensor:
+        return self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
+
+    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+        return delta_d * (10 - old_d) / 9
+
+    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+        return 0.01 * init + 0.99 * current
+
+    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
+        delta_d = -self.w[6] * (rating - 3)
+        new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
+        return self.mean_reversion(self.init_d(4), new_d)
+
+    # ── S0 initialisation helpers ─────────────────────────────────────────────
+
+    def bin_interval(self, delta_t: Union[pd.Series, np.ndarray, float]) -> np.ndarray:
+        """Bin intervals into 10-min / 2-hour / 1-day buckets."""
+        if isinstance(delta_t, pd.Series):
+            intervals = delta_t.values
+        else:
+            intervals = (
+                np.array([delta_t]) if not isinstance(delta_t, np.ndarray) else delta_t
+            )
+        ten_minutes = 10 / (24 * 60)
+        two_hours = 2 / 24
+        one_day = 1.0
+        binned = np.zeros_like(intervals)
+
+        mask_short = intervals < two_hours
+        binned[mask_short] = np.maximum(
+            np.floor(intervals[mask_short] / ten_minutes) * ten_minutes,
+            ten_minutes,
+        )
+        mask_medium = (intervals >= two_hours) & (intervals < one_day)
+        binned[mask_medium] = np.maximum(
+            np.floor(intervals[mask_medium] / two_hours) * two_hours,
+            two_hours,
+        )
+        mask_long = intervals >= one_day
+        binned[mask_long] = np.maximum(np.floor(intervals[mask_long]), one_day)
+
+        return binned if len(binned) > 1 else binned[0]
+
+    def f_interpolate(
+        self,
+        a1: float,
+        a2: float,
+        a3: float,
+        a4: float,
+        rating_stability: dict,
+    ) -> dict:
+        """Log-linear interpolation/extrapolation for missing S0 values."""
+        log_anchor = {1: a1, 2: a2, 3: a3, 4: a4}
+        known = sorted(rating_stability.keys())
+        missing = [r for r in [1, 2, 3, 4] if r not in known]
+        log_S0 = {r: np.log(rating_stability[r]) for r in known}
+
+        def interpolate(target: int, r_low: int, r_high: int) -> float:
+            t = (log_anchor[target] - log_anchor[r_low]) / (
+                log_anchor[r_high] - log_anchor[r_low]
+            )
+            return log_S0[r_low] + t * (log_S0[r_high] - log_S0[r_low])
+
+        def extrapolate(target: int, anchor: int) -> float:
+            return log_S0[anchor] + (log_anchor[target] - log_anchor[anchor])
+
+        if len(known) == 3:
+            m = missing[0]
+            if m == 1:
+                log_S0[1] = extrapolate(1, 2)
+            elif m == 2:
+                log_S0[2] = interpolate(2, 1, 3)
+            elif m == 3:
+                log_S0[3] = interpolate(3, 2, 4)
+            elif m == 4:
+                log_S0[4] = extrapolate(4, 3)
+        elif len(known) == 2:
+            if known == [1, 2]:
+                log_S0[3] = extrapolate(3, 2)
+                log_S0[4] = extrapolate(4, 3)
+            elif known == [1, 3]:
+                log_S0[2] = interpolate(2, 1, 3)
+                log_S0[4] = extrapolate(4, 3)
+            elif known == [1, 4]:
+                log_S0[2] = interpolate(2, 1, 4)
+                log_S0[3] = interpolate(3, 1, 4)
+            elif known == [2, 3]:
+                log_S0[1] = extrapolate(1, 2)
+                log_S0[4] = extrapolate(4, 3)
+            elif known == [2, 4]:
+                log_S0[3] = interpolate(3, 2, 4)
+                log_S0[1] = extrapolate(1, 2)
+            elif known == [3, 4]:
+                log_S0[2] = extrapolate(2, 3)
+                log_S0[1] = extrapolate(1, 2)
+
+        S0 = {r: np.exp(log_S0[r]) for r in [1, 2, 3, 4]}
+        result = {r: float(round(np.clip(S0[r], 0.0001, 100), 4)) for r in [1, 2, 3, 4]}
+
+        # Enforce monotonicity
+        for pair in [[1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4]]:
+            if result[pair[0]] > result[pair[1]]:
+                if pair[0] in known and pair[1] not in known:
+                    result[pair[1]] = result[pair[0]]
+                elif pair[1] in known and pair[0] not in known:
+                    result[pair[0]] = result[pair[1]]
+                else:
+                    result[pair[1]], result[pair[0]] = result[pair[0]], result[pair[1]]
+
+        values = list(result.values())
+        assert values == sorted(values), f"{values}"
+        return result
+
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
+        """Optimise initial stabilities (w[0:4]) and forgetting-curve params from data."""
+        train_set_copy = train_set.copy()
+        train_set_copy["delta_t_binned"] = self.bin_interval(train_set_copy["delta_t"])
+
+        S0_dataset_group = (
+            train_set_copy[train_set_copy["i"] == 2]
+            .groupby(by=["first_rating", "delta_t_binned"], group_keys=False)
+            .agg({"y": ["mean", "count"]})
+            .reset_index()
+        )
+
+        average_recall = train_set["y"].mean()
+        r_s0_default = {str(i): self.init_w[i - 1] for i in range(1, 5)}
+
+        def evaluate_param_set(
+            param_set: list,
+        ) -> tuple[float, dict]:
+            decay1, decay2, base1, base2, weight1, weight2, swp1, swp2 = param_set
+            current_rating_stability: dict = {}
+            current_rating_count: dict = {}
+            total_loss = 0.0
+
+            for first_rating in ("1", "2", "3", "4"):
+                group = S0_dataset_group[
+                    S0_dataset_group["first_rating"] == first_rating
+                ]
+                if group.empty:
+                    if self.config.verbose_inadequate_data:
+                        tqdm.write(
+                            f"Not enough data for first rating {first_rating}."
+                        )
+                    continue
+
+                delta_t = group["delta_t_binned"]
+                recall = (
+                    group["y"]["mean"] * group["y"]["count"] + average_recall * 1
+                ) / (group["y"]["count"] + 1)
+                count = group["y"]["count"]
+                init_s0 = r_s0_default[first_rating]
+
+                def loss(stability: float, _dt=delta_t, _r=recall, _c=count, _s0=init_s0) -> float:
+                    y_pred = self.forgetting_curve(
+                        _dt,
+                        stability,
+                        -decay1,
+                        -decay2,
+                        base1,
+                        base2,
+                        weight1,
+                        weight2,
+                        swp1,
+                        swp2,
+                    )
+                    y_pred = np.clip(y_pred, 0.0001, 0.9999)
+                    logloss = float(
+                        sum(-(_r * np.log(y_pred) + (1 - _r) * np.log(1 - y_pred)) * _c)
+                    )
+                    l1 = float(np.abs(stability - _s0)) / 16
+                    return logloss + l1
+
+                res = minimize(
+                    loss,
+                    x0=init_s0,
+                    bounds=((self.config.s_min, self.config.init_s_max),),
+                    options={"maxiter": int(sum(count))},
+                )
+                stability = float(res.x[0])
+                current_rating_stability[int(first_rating)] = stability
+                current_rating_count[int(first_rating)] = int(sum(count))
+                total_loss += res.fun
+
+            # Enforce S0 ordering
+            for small_r, big_r in (
+                (1, 2), (2, 3), (3, 4), (1, 3), (2, 4), (1, 4),
+            ):
+                if small_r in current_rating_stability and big_r in current_rating_stability:
+                    if current_rating_stability[small_r] > current_rating_stability[big_r]:
+                        if current_rating_count[small_r] > current_rating_count[big_r]:
+                            current_rating_stability[big_r] = current_rating_stability[small_r]
+                        else:
+                            current_rating_stability[small_r] = current_rating_stability[big_r]
+
+            return total_loss, current_rating_stability
+
+        # Candidate forgetting-curve parameter sets (from original)
+        initial_fc_params = [
+            self.init_w[-8:],
+            [0.0594, 0.3358, 0.598,  0.9517, 0.3122, 0.5685, 0.2371, 0.4871],
+            [0.0441, 0.2533, 0.6823, 0.9598, 0.3613, 0.5202, 0.2283, 0.4783],
+            [0.0621, 0.2475, 0.6496, 0.9744, 0.313,  0.5662, 0.2336, 0.4836],
+            [0.0462, 0.2962, 0.6938, 0.9592, 0.3341, 0.5273, 0.2185, 0.4685],
+            [0.0422, 0.2813, 0.6713, 0.9421, 0.2935, 0.5985, 0.2183, 0.4683],
+            [0.0568, 0.1563, 0.6567, 0.9633, 0.3682, 0.5041, 0.1952, 0.4452],
+            [0.0651, 0.2502, 0.6682, 0.9472, 0.3757, 0.4933, 0.2408, 0.4908],
+            [0.0548, 0.1655, 0.6138, 0.9654, 0.3251, 0.5717, 0.1418, 0.3918],
+            [0.0381, 0.2803, 0.7202, 0.9491, 0.3362, 0.5166, 0.2248, 0.4748],
+            [0.0422, 0.1935, 0.694,  0.9549, 0.3871, 0.4704, 0.2413, 0.4913],
+            [0.0651, 0.1916, 0.623,  0.972,  0.3528, 0.5484, 0.2373, 0.4873],
+            [0.0508, 0.3743, 0.5863, 0.9448, 0.2974, 0.606,  0.1444, 0.3944],
+            [0.0498, 0.3753, 0.6875, 0.9319, 0.3758, 0.4984, 0.2268, 0.4768],
+            [0.0618, 0.1663, 0.5977, 0.9682, 0.3619, 0.5066, 0.2972, 0.5472],
+            [0.0656, 0.197,  0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096],
+        ]
+
+        candidates = []
+        for param_set in initial_fc_params:
+            total_loss, rating_stability = evaluate_param_set(param_set)
+            candidates.append((total_loss, list(param_set), rating_stability.copy()))
+        candidates.sort(key=lambda x: x[0])
+        best_total_loss, best_fc_params, rating_stability = candidates[0]
+
+        if self.config.verbose_inadequate_data:
+            tqdm.write(f"Best FC params: {best_fc_params}, loss: {best_total_loss:.4f}")
+
+        # Anchor values for log-linear interpolation
+        a1, a2, a3, a4 = -8.09, -3.83, -2.5, -1.0
+
+        if len(rating_stability) == 0:
+            raise Exception("Not enough data for pretraining!")
+        elif len(rating_stability) == 1:
+            rating = list(rating_stability.keys())[0]
+            factor = rating_stability[rating] / float(r_s0_default[str(rating)])
+            initial_stabilities = [v * factor for v in map(float, r_s0_default.values())]
+        elif len(rating_stability) in (2, 3):
+            filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
+            if any(math.isnan(x) or math.isinf(x) for x in filled.values()):
+                raise Exception("NaN/inf in S0 interpolation")
+            initial_stabilities = [filled[r] for r in [1, 2, 3, 4]]
+        else:
+            initial_stabilities = [
+                v for _, v in sorted(rating_stability.items())
+            ]
+
+        self.w.data[0:4] = Tensor(
+            [
+                max(min(self.config.init_s_max, x), self.config.s_min)
+                for x in initial_stabilities
+            ]
+        )
+        if best_fc_params is not None:
+            self.w.data[-8:] = Tensor(best_fc_params)
+
+        self.init_w_tensor = self.w.data.clone().to(self.config.device)

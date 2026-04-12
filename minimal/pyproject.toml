@@ -1,0 +1,36 @@
+[project]
+name = "fsrs7-benchmark"
+version = "0.1.0"
+description = "Minimalistic FSRS-7 benchmark — train and evaluate on Anki review logs"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.0",
+    "numpy",
+    "pandas",
+    "pyarrow>=15",
+    "scipy",
+    "scikit-learn",
+    "statsmodels>=0.14",
+    "tqdm",
+    "fsrs-optimizer>=6.5.0",
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+  { index = "pytorch-cpu",   marker = "sys_platform == 'darwin'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url  = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url  = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[build-system]
+requires      = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

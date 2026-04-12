@@ -23,6 +23,7 @@ MODEL_REGISTRY: dict[ModelName, Type[TrainableModel]] = {
     "Anki": Anki,
     "RNN": RNN,
     "GRU": RNN,  # GRU uses the RNN class definition as per original script
+    "LogisticRegression": LogisticRegression,
     "LSTM": LSTM,
     "GRU-P": GRU_P,
     "Transformer": Transformer,
@@ -102,6 +103,7 @@ def create_model(
     elif model_name in [
         "RNN",
         "GRU",
+        "LogisticRegression",
         "LSTM",
         "GRU-P",
         "Transformer",

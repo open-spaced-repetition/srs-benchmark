@@ -90,6 +90,7 @@ class BaseFeatureEngineer(ABC):
                 df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
 
         df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
+        df["delta_t_int"] = df["elapsed_days"].map(lambda x: max(0, x))
         return df
 
     def _compute_histories(self, df: pd.DataFrame) -> pd.DataFrame:

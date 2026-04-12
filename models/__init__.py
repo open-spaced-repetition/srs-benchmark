@@ -12,6 +12,7 @@ from .fsrs_rs import FSRSRsBackend
 from .rnn import RNN
 from .gru_p import GRU_P
 from .lstm import LSTM
+from .logistic_regression import LogisticRegression
 from .transformer import Transformer
 from .hlr import HLR
 from .act_r import ACT_R
@@ -39,6 +40,7 @@ __all__ = [
     "FSRSRsBackend",
     "RNN",
     "GRU_P",
+    "LogisticRegression",
     "LSTM",
     "Transformer",
     "HLR",

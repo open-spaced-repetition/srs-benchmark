@@ -141,7 +141,7 @@ class FSRS7(nn.Module):
         if w is None:
             w = self.init_w
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
-        self.init_w_tensor = self.w.data.clone().to(self.config.device)
+        self.init_w_tensor = self.w.data.clone()
         self.clipper = FSRS7ParameterClipper(config.s_min, config.init_s_max)
 
     # ── standard nn.Module helpers ────────────────────────────────────────────
@@ -188,12 +188,11 @@ class FSRS7(nn.Module):
         state: [batch_size, 2]  — stability, difficulty
         """
         if torch.equal(state, torch.zeros_like(state)):
-            keys = torch.tensor([1, 2, 3, 4], device=X.device)
+            keys = torch.tensor([1, 2, 3, 4])
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             new_s = torch.ones_like(state[:, 0])
-            w = self.w.to(X.device)
-            new_s[index[0]] = w[index[1]]
+            new_s[index[0]] = self.w[index[1]]
             new_d = self.init_d(X[:, 1])
             new_d = new_d.clamp(1, 10)
         else:
@@ -229,7 +228,7 @@ class FSRS7(nn.Module):
         outputs, _ = self.forward(sequences)
         stabilities, difficulties = outputs[
             seq_lens - 1,
-            torch.arange(real_batch_size, device=self.config.device),
+            torch.arange(real_batch_size),
         ].transpose(0, 1)
 
         retentions = self.forgetting_curve(
@@ -245,7 +244,7 @@ class FSRS7(nn.Module):
             self.w[-1],
         ).clamp(0.0001, 0.9999)
 
-        sigma = torch.tensor(self._sigma, device=self.config.device)
+        sigma = torch.tensor(self._sigma)
         L2_penalty = torch.sum(
             torch.square(self.w - self.init_w_tensor) / torch.square(sigma)
         )
@@ -596,4 +595,4 @@ class FSRS7(nn.Module):
         if best_fc_params is not None:
             self.w.data[-8:] = Tensor(best_fc_params)
 
-        self.init_w_tensor = self.w.data.clone().to(self.config.device)
+        self.init_w_tensor = self.w.data.clone()

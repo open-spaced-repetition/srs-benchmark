@@ -92,13 +92,9 @@ class Config:
 
 
 def build_config(args: argparse.Namespace) -> Config:
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
-    )
     return Config(
         data_path=Path(args.data),
         max_user_id=args.max_user_id,
-        device=device,
         batch_size=args.batch_size,
         n_splits=args.n_splits,
         seed=args.seed,
@@ -467,7 +463,6 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="FSRS-7 benchmark")
     p.add_argument("--data", default="../anki-revlogs-10k", help="Path to dataset")
     p.add_argument("--processes", type=int, default=1, help="Number of parallel workers")
-    p.add_argument("--cpu", action="store_true", help="Force CPU even if CUDA is available")
     p.add_argument("--batch-size", dest="batch_size", type=int, default=512)
     p.add_argument("--n-splits", dest="n_splits", type=int, default=5)
     p.add_argument("--seed", type=int, default=42)

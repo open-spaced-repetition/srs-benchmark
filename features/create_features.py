@@ -71,6 +71,9 @@ def _create_features_with_equalized_test(
     engineer_secs = create_feature_engineer(config_secs)
     df_secs = engineer_secs.create_features(df.copy())
 
+    # Set lapses for RMSE (bins)
+    df_secs["rmse_bins_lapse"] = df_non_secs["rmse_bins_lapse"]
+
     # Find intersection of processed data
     df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
 

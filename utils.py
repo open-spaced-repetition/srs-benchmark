@@ -52,7 +52,7 @@ def rmse_matrix(df):
     tmp["i"] = tmp["i"].map(
         lambda x: round(1.99 * np.power(1.89, np.floor(np.log(x) / np.log(1.89))), 0)
     )
-    tmp["lapse"] = tmp["lapse"].map(
+    tmp["rmse_bins_lapse"] = tmp["rmse_bins_lapse"].map(
         lambda x: (
             round(1.65 * np.power(1.73, np.floor(np.log(x) / np.log(1.73))), 0)
             if x != 0
@@ -62,7 +62,7 @@ def rmse_matrix(df):
     if "weights" not in tmp.columns:
         tmp["weights"] = 1
     tmp = (
-        tmp.groupby(["delta_t", "i", "lapse"])
+        tmp.groupby(["delta_t", "i", "rmse_bins_lapse"])
         .agg({"y": "mean", "p": "mean", "weights": "sum"})
         .reset_index()
     )

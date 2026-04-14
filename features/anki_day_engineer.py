@@ -1,30 +1,24 @@
 import pandas as pd
-import torch
 
-from utils import cum_concat
+from models import logistic_regression
 from .base import BaseFeatureEngineer
 
 
 class AnkiDayEngineer(BaseFeatureEngineer):
-    def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        (feature_real, feature_int, label_real, label_int, rating) tensors
-        """
-        (feature_real, feature_int, label_real, label_int), r_history_list = self.get_history_lists(df)
-        df["tensor"] = [
-            torch.tensor([x[:-1] for x in trio]).transpose(0, 1).float()
-            for sublists in zip(feature_real, feature_int, label_real, label_int, r_history_list)
-            for trio in zip(*sublists)
-        ]
+    def _model_specific_postprocessing(self, df:pd.DataFrame) -> pd.DataFrame:
+        if self.config.use_secs_intervals:
+            x = logistic_regression.create_features(df)
+            df = pd.concat([df, x], axis=1)
+        else:
+            # for --equalize_test_with_non_secs only
+            pass
         return df
 
-    def get_time_history_list(self, df: pd.DataFrame) -> pd.Series:
-        feature_real = df.groupby("card_id", group_keys=False)["delta_t_secs"].apply(lambda x: cum_concat([[i] for i in x]))
-        df["label_delta_t_secs"] = df.groupby("card_id")["delta_t_secs"].shift(-1)
-        label_real = df.groupby("card_id", group_keys=False)["label_delta_t_secs"].apply(lambda x: cum_concat([[i] for i in x]))
-        df.drop("label_delta_t_secs", axis=1)
-        feature_int = df.groupby("card_id", group_keys=False)["delta_t_int"].apply(lambda x: cum_concat([[i] for i in x]))
-        df["label_delta_t_int"] = df.groupby("card_id")["delta_t_int"].shift(-1)
-        label_int = df.groupby("card_id", group_keys=False)["label_delta_t_int"].apply(lambda x: cum_concat([[i] for i in x]))
-        df.drop("label_delta_t_int", axis=1)
-        return (feature_real, feature_int, label_real, label_int)
+    def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        df["feature_rating"] = df["rating"].shift(1).fillna(0)
+        return df
+
+    def _compute_histories(self, df: pd.DataFrame) -> pd.DataFrame:
+        if self.config.use_secs_intervals:
+            df["delta_t"] = df["delta_t_secs"]
+        return df

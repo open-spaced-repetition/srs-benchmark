@@ -44,17 +44,6 @@ def mean_bias_error(y, p):
 
 def rmse_matrix(df):
     tmp = df.copy()
-
-    def count_lapse(r_history, t_history):
-        lapse = 0
-        for r, t in zip(r_history.split(","), t_history.split(",")):
-            if t != "0" and r == "1":
-                lapse += 1
-        return lapse
-
-    tmp["lapse"] = tmp.apply(
-        lambda x: count_lapse(x["r_history"], x["t_history"]), axis=1
-    )
     tmp["delta_t"] = tmp["elapsed_days"].map(
         lambda x: round(
             2.48 * np.power(3.62, np.floor(np.log(max(x, 1e-6)) / np.log(3.62))), 2

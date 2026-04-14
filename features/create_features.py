@@ -79,10 +79,10 @@ def _create_features_with_equalized_test(
         "Length mismatch between seconds and non-seconds data"
     )
     assert np.equal(df_intersect["i"], df_non_secs["i"]).all(), "Review count mismatch"
-    assert np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all(), (
+    assert "t_history" not in df_intersect or np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all(), (
         "Time history mismatch"
     )
-    assert np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all(), (
+    assert "r_history" not in df_intersect or np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all(), (
         "Rating history mismatch"
     )
 

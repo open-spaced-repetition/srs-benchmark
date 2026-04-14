@@ -43,6 +43,9 @@ class BaseFeatureEngineer(ABC):
         # Execute common postprocessing steps
         df = self._common_postprocessing(df)
 
+        if hasattr(self, "_model_specific_postprocessing"):
+            df = self._model_specific_postprocessing(df)
+
         return df
 
     def _common_preprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -207,20 +210,20 @@ class BaseFeatureEngineer(ABC):
         Common postprocessing steps shared by all models
         """
         # Set first rating and labels
-        df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
+        df["first_rating"] = df.groupby("card_id")["rating"].transform("first").astype(str)
         df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+
+        # Find lapses for RMSE (bins)
+        df["is_lapse"] = ((df["rating"] == 1) & (df["delta_t"].astype(str) != "0")).astype(int)
+        df["lapse"] = df.groupby("card_id")["is_lapse"].transform("cumsum") - df["is_lapse"]
+        df.drop(columns=["is_lapse"])
 
         # Handle short-term reviews
         if self.config.include_short_term:
             df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
 
         # Recalculate review sequence number
-        df["i"] = (
-            df.groupby("card_id")
-            .apply(lambda x: (x["elapsed_days"] > 0).cumsum(), include_groups=False)
-            .reset_index(level=0, drop=True)
-            + 1
-        )
+        df["i"] = df["elapsed_days"].gt(0).groupby(df["card_id"]).cumsum().add(1)
 
         # Handle outliers and non-continuous rows (only for non-seconds intervals)
         if not self.config.use_secs_intervals:
@@ -229,7 +232,7 @@ class BaseFeatureEngineer(ABC):
                 raise ValueError(
                     "No data after handling outliers and non-continuous rows"
                 )
-
+        
         return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
     def _handle_outliers_and_continuity(self, df: pd.DataFrame) -> pd.DataFrame:

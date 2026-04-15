@@ -49,6 +49,8 @@ def create_features(df):
     first_rating_onehot *= (first_r > 1).astype(np.float32)[:, None]
 
     # --- cumsum counts (group-aware) ---
+    df["_same_day"]  = same_day
+    df["_non_same_day"]  = 1 - same_day
     df["_sd_fail"]  = same_day * not_first * fail
     df["_nsd_fail"] = (1 - same_day) * not_first * fail
     df["_sd_pass"]  = same_day * not_first * success
@@ -60,6 +62,8 @@ def create_features(df):
     num_same_day_pass  = g["_sd_pass"].cumsum().values
     num_nsd_pass       = g["_nsd_pass"].cumsum().values
     num_pass           = g["_pass"].cumsum().values
+    num_same_day       = g["_same_day"].cumsum().values
+    num_non_same_day   = g["_non_same_day"].cumsum().values
     has_passed         = (num_pass > 0).astype(np.float32)
 
     # --- time / time_since_first_or_lapse ---
@@ -114,17 +118,24 @@ def create_features(df):
         has_passed,
         t_time_since_lapse,
         label_is_same_day,
+        transform_elapsed_days_real_np(times),
+        (first_r > 1) * np.log1p(num_same_day_fail),
+        (first_r > 1) * np.log1p(num_nsd_fail),
+        (first_r > 1) * np.log1p(num_same_day),
+        (first_r > 1) * np.log1p(num_non_same_day),
+
     ], axis=1)
 
     # --- final y_lH = [deg1 * v, deg0] ---
     v = t_label_real[:, None]
+    # has_passed = np.expand_dims(has_passed, axis=-1)
     y = np.concatenate([deg1 * v, deg0], axis=1)
 
     cols = [f"feat_{i}" for i in range(y.shape[1])]
     result = pd.DataFrame(y, index=df.index, columns=cols)
 
     # cleanup temp cols
-    df.drop(columns=["_r","_sd_fail","_nsd_fail","_sd_pass","_nsd_pass","_pass","_elapsed_real","_flt","feat_elapsed_real","feat_elapsed_int"], inplace=True)
+    df.drop(columns=["_r", "_same_day", "_non_same_day", "_sd_fail","_nsd_fail","_sd_pass","_nsd_pass","_pass","_elapsed_real","_flt","feat_elapsed_real","feat_elapsed_int"], inplace=True)
     return result
 
 class LogisticRegression(BaseModel):
@@ -132,25 +143,29 @@ class LogisticRegression(BaseModel):
     batch_size = int(2 ** 11)
     lr: float = 2e-1
     betas: tuple = (0.8, 0.85)
-    wd: float = 1e-2
+    wd: float = 3e-1
 
     def __init__(self, config, state_dict=None):
         super().__init__(config)
-        super().__init__(config)
-        mean = torch.tensor([-0.9125, -0.7233, -0.5761, -0.4087,  0.2976,  0.0926,  0.3503, -0.3414,
-            -0.3245, -0.2032,  1.5807,  0.0816,  0.3976,  0.5160,  0.2769,  0.5066,
-            0.6300,  1.3532,  1.3429,  1.4083, -0.7107,  0.4998,  0.1423, -0.2108,
-            0.2767,  0.2703,  0.4023,  0.4328, -0.2254])
+        mean = torch.tensor([-0.9012, -0.6941, -0.6258, -0.4678,  0.3926,  0.1316,  0.3508, -0.3259,
+            -0.2125, -0.1402,  1.2775,  0.0669,  0.3914,  0.5828,  0.9292,  1.1583,
+            1.4103,  0.9388,  0.9164,  0.9797, -0.6411,  0.4951,  0.1038, -0.1564,
+            0.4332,  0.3287,  0.3429,  0.4068, -0.1779, -0.0585, -0.1062, -0.3521,
+            -0.1613, -0.1758])
         self.register_buffer('mean', mean)
-        std = torch.tensor([0.2519, 0.2501, 0.2121, 0.1172, 0.1461, 0.1370, 0.1457, 0.1070, 0.0819,
-            0.0736, 0.4088, 0.2184, 0.2105, 0.1901, 0.1622, 0.1910, 0.1691, 0.3706,
-            0.6443, 0.3314, 0.1577, 0.0584, 0.1096, 0.2270, 0.0770, 0.0682, 0.0876,
-            0.1757, 0.2187])
+        std = torch.tensor([0.2869, 0.2811, 0.2910, 0.2166, 0.1740, 0.1612, 0.1428, 0.1352, 0.1284,
+            0.0331, 0.4013, 0.2065, 0.2022, 0.1670, 0.2454, 0.2954, 0.2896, 0.3473,
+            0.5685, 0.2795, 0.1298, 0.0467, 0.1200, 0.1317, 0.0785, 0.1190, 0.0854,
+            0.1634, 0.1892, 0.1052, 0.0750, 0.1913, 0.1372, 0.0783])
         self.register_buffer('std', std)
         self.n_features = mean.size(0)
         self.coef_res = nn.Parameter(torch.zeros(self.n_features))
         if state_dict is not None:
             self.load_state_dict(state_dict)
+
+    @property
+    def coefficients(self):
+        return self.coef_res * self.std + self.mean
 
     def optimize(self, df):
         x_all = df.loc[:, df.columns.str.startswith("feat_")]
@@ -175,7 +190,7 @@ class LogisticRegression(BaseModel):
                 x = x_all[idx]
                 y = y_all[idx]
                 weights = weights_all[idx]
-                logits_bl = torch.einsum('bh,h->b', x, self.coefficients)
+                logits_bl = torch.mv(x, self.coefficients)
                 loss = torch.nn.functional.binary_cross_entropy_with_logits(
                     logits_bl, y, reduction='none'
                 )
@@ -190,12 +205,8 @@ class LogisticRegression(BaseModel):
         df = df.copy()
         x = df.loc[:, df.columns.str.startswith("feat_")]
         x = torch.tensor(np.array(x), dtype=torch.float)
-        logits_bl = torch.einsum('bh,h->b', x, self.coefficients)
+        logits_bl = torch.mv(x, self.coefficients)
         return torch.sigmoid(logits_bl)
-
-    @property
-    def coefficients(self):
-        return self.coef_res * self.std + self.mean
 
     def log(self, x):
         params = [round(x, 4) for x in self.coefficients.tolist()]

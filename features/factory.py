@@ -1,4 +1,4 @@
-from features.anki_day_engineer import AnkiDayEngineer
+from features.anki_day_engineer import LogisticRegressionEngineer
 
 from .base import BaseFeatureEngineer
 from .fsrs_engineer import FSRSFeatureEngineer
@@ -40,7 +40,7 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
     "Anki": FSRSFeatureEngineer,
     "90%": FSRSFeatureEngineer,
     # Specialized models
-    "LogisticRegression": AnkiDayEngineer,
+    "LogisticRegression": LogisticRegressionEngineer,
     "LSTM": LSTMFeatureEngineer,
     "GRU-P": GRUPFeatureEngineer,
     "HLR": HLRFeatureEngineer,

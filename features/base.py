@@ -43,8 +43,8 @@ class BaseFeatureEngineer(ABC):
         # Execute common postprocessing steps
         df = self._common_postprocessing(df)
 
-        if hasattr(self, "_model_specific_postprocessing"):
-            df = self._model_specific_postprocessing(df)
+        # Model-specific postprocessing steps
+        df = self._model_specific_postprocessing(df)
 
         return df
 
@@ -313,3 +313,15 @@ class BaseFeatureEngineer(ABC):
         t_history_list = self.get_time_history_list(df)
         r_history_list = self.get_rating_history_list(df)
         return t_history_list, r_history_list
+
+    def _model_specific_postprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Model-specific post processing
+
+        Args:
+            df: Dataframe after common post processing
+
+        Returns:
+            Dataframe with model-specific post processing
+        """
+        pass

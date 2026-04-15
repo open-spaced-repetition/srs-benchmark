@@ -191,8 +191,7 @@ class LogisticRegression(BaseModel):
         x = df.loc[:, df.columns.str.startswith("feat_")]
         x = torch.tensor(np.array(x), dtype=torch.float)
         logits_bl = torch.einsum('bh,h->b', x, self.coefficients)
-        return torch.full_like(logits_bl, 0.9)
-        # return torch.sigmoid(logits_bl)
+        return torch.sigmoid(logits_bl)
 
     @property
     def coefficients(self):

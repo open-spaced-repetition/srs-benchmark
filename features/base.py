@@ -324,4 +324,4 @@ class BaseFeatureEngineer(ABC):
         Returns:
             Dataframe with model-specific post processing
         """
-        pass
+        return df

@@ -82,8 +82,9 @@ def create_features(df):
     t_elapsed_real        = transform_elapsed_days_real_np(df["feat_elapsed_real"].values.astype(np.float32))
     t_label_real          = transform_elapsed_days_real_np(label_real.astype(np.float32))
     t_time_since_lapse    = transform_elapsed_days_real_np(time_since_first_or_lapse)
+    t_times               = transform_elapsed_days_real_np(times)
 
-    # --- deg_1 block (8 cols) ---
+    # --- deg_1 block ---
     deg1 = np.stack([
         np.ones(len(df), dtype=np.float32),          # bias
         rating_onehot[:, 0],
@@ -97,7 +98,7 @@ def create_features(df):
         np.log1p(num_same_day_pass),
     ], axis=1)
 
-    # --- deg_0 block (13 cols) ---
+    # --- deg_0 block ---
     deg0 = np.stack([
         np.ones(len(df), dtype=np.float32),
         rating_onehot[:, 0],
@@ -118,7 +119,7 @@ def create_features(df):
         has_passed,
         t_time_since_lapse,
         label_is_same_day,
-        transform_elapsed_days_real_np(times),
+        t_times,
         (first_r > 1) * np.log1p(num_same_day_fail),
         (first_r > 1) * np.log1p(num_nsd_fail),
         (first_r > 1) * np.log1p(num_same_day),

@@ -1,4 +1,4 @@
-from features.anki_day_engineer import LogisticRegressionEngineer
+from features.logistic_regression_engineer import LogisticRegressionEngineer
 
 from .base import BaseFeatureEngineer
 from .fsrs_engineer import FSRSFeatureEngineer

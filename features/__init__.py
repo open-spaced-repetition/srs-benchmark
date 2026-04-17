@@ -1,6 +1,7 @@
 from .base import BaseFeatureEngineer
 from .fsrs_engineer import FSRSFeatureEngineer
 from .lstm_engineer import LSTMFeatureEngineer
+from .logistic_regression_engineer import LogisticRegressionEngineer
 from .dash_engineer import (
     DashFeatureEngineer,
     DashMCMFeatureEngineer,
@@ -32,6 +33,7 @@ __all__ = [
     "EbisuFeatureEngineer",
     "AVGFeatureEngineer",
     "RMSEBinsExploitFeatureEngineer",
+    "LogisticRegressionEngineer",
     "create_feature_engineer",
     "get_supported_models",
     "create_features",

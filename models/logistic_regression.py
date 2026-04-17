@@ -11,10 +11,45 @@ def transform_elapsed_days_real_np(x):
     return (np.log(x + 1e-5) + 1.3) / 5
 
 def create_features(df):
+    """
+        1. log(t)
+        2. [Rating == 2] × log(t)
+        3. [Rating == 3] × log(t)
+        4. [Rating == 4] × log(t)
+        5. (is_hard AND is_first_review) × log(t)
+        6. (better_than_hard AND is_first_review) × log(t)
+        7. log(1 + cumulative same-day fails) × log(t)
+        8. log(1 + cumulative non-same-day passes * not same-day t) × log(t)
+        9. log(1 + cumulative non-same-day fails * not same-day t) × log(t)
+        10. log(1 + cumulative same-day passes) × log(t)
+        11. 1 (constant)
+        12. Rating == 2
+        13. Rating == 3
+        14. Rating == 4
+        15. First rating == 2
+        16. First rating == 3
+        17. First rating == 4
+        18. First rating == 2 AND is_first_review
+        19. First rating == 3 AND is_first_review
+        20. First rating == 4 AND is_first_review
+        21. log(1 + cumulative same-day fails)
+        22. log(1 + cumulative non-same-day passes * not same-day t)
+        23. log(previous elapsed time)
+        24. log(1 + cumulative non-same-day fails)
+        25. log(1 + cumulative non-same-day passes)
+        26. log(1 + cumulative same-day passes * same-day t)
+        27. Has ever passed (binary)
+        28. log(time since first review or last lapse)
+        29. t is same-day (binary)
+        30. log(cumulative time)
+        31. [first_rating > 1] * log(1 + cumulative same-day fails)
+        32. [first_rating > 1] * log(1 + cumulative non-same-day fails)
+        33. [first_rating > 1] * log(1 + cumulative same-day count)
+        34. [first_rating > 1] * log(1 + cumulative non-same-day count)
+    """
     df = df.copy()
     g = df.groupby("card_id", sort=False)
 
-    # --- shifted features (per group) ---
     df["feat_elapsed_real"] = g["delta_t_secs"].shift(1).fillna(0)
     df["feat_elapsed_int"]  = g["delta_t_int"].shift(1).fillna(0)
     r = df["feature_rating"].values

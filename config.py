@@ -271,6 +271,8 @@ class Config:
             _file_name_parts.append("-default")
         if self.only_S0:
             _file_name_parts.append("-S0")
+        if self.sched_penalties:
+            _file_name_parts.append("-sched_penalties")
         if self.two_buttons:
             # Suffix is '-binary' for backward compatibility with existing analysis scripts.
             _file_name_parts.append("-binary")

@@ -123,12 +123,10 @@ def create_features(df):
         (first_r > 1) * np.log1p(num_nsd_fail),
         (first_r > 1) * np.log1p(num_same_day),
         (first_r > 1) * np.log1p(num_non_same_day),
-
     ], axis=1)
 
     # --- final y_lH = [deg1 * v, deg0] ---
     v = t_label_real[:, None]
-    # has_passed = np.expand_dims(has_passed, axis=-1)
     y = np.concatenate([deg1 * v, deg0], axis=1)
 
     cols = [f"feat_{i}" for i in range(y.shape[1])]
@@ -142,7 +140,8 @@ class LogisticRegression(BaseModel):
     n_epoch = 10
     batch_size = int(2 ** 11)
     lr: float = 2e-1
-    betas: tuple = (0.8, 0.85)
+    betas: tuple = (0.0, 0.85)
+    adam_eps = 1e-8
     wd: float = 3e-1
 
     def __init__(self, config, state_dict=None):
@@ -166,22 +165,21 @@ class LogisticRegression(BaseModel):
     @property
     def coefficients(self):
         return self.coef_res * self.std + self.mean
-
+    
     def optimize(self, df):
+        xrange = np.linspace(0, 1, len(df))
+        df["weights"] = 0.1 + 0.9 * np.power(xrange, 4)
         x_all = df.loc[:, df.columns.str.startswith("feat_")]
         x_all = torch.tensor(np.array(x_all), dtype=torch.float)
         y_all = torch.tensor(np.array(df["y"]), dtype=torch.float)
         weights_all = torch.tensor(np.array(df["weights"]), dtype=torch.float)
         B = x_all.size(0)
 
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd, betas=self.betas, fused=True)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd, betas=self.betas, eps=self.adam_eps, fused=True)
         steps_per_epoch = (B + self.batch_size - 1) // self.batch_size
         total_steps = self.n_epoch * steps_per_epoch
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=total_steps,
-            eta_min=0,
-        ) 
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=0)
+
         for _ in range(self.n_epoch):
             perm = torch.randperm(B)
             for i in range(0, B, self.batch_size):

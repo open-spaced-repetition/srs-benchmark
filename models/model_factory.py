@@ -23,6 +23,7 @@ MODEL_REGISTRY: dict[ModelName, Type[TrainableModel]] = {
     "Anki": Anki,
     "RNN": RNN,
     "GRU": RNN,  # GRU uses the RNN class definition as per original script
+    "LogisticRegression": LogisticRegression,
     "LSTM": LSTM,
     "GRU-P": GRU_P,
     "Transformer": Transformer,
@@ -116,7 +117,11 @@ def create_model(
         else:
             constructor_kwargs["state_dict"] = None  # type: ignore
         instance = model_cls(**constructor_kwargs)  # type: ignore
-
+    elif model_name in [
+        "LogisticRegression",
+    ]:
+        constructor_kwargs["state_dict"] = model_params  # type: ignore
+        instance = model_cls(**constructor_kwargs)  # type: ignore
     else:
         # This case should ideally not be reached if all registered models are handled.
         raise ValueError(f"Unhandled instantiation logic for model: {model_name}")

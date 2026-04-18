@@ -64,6 +64,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - RWKV: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture, which combines the properties of an RNN and a Transformer. The neural network takes in as input the entire review history, all cards included. <a id="features-note"></a>Along with the usual features, it has additional access to: duration of the review, sibling card information, deck and preset structure/hierarchy, day of the week. Unlike other algorithms in this benchmark, RWKV is not optimized on each user individually. Instead, it is trained on 5 thousand users and evaluated on another 5 thousand; this process is repeated twice to get full coverage of the dataset.
         - RWKV-P: predicts the result of a review at the time just before the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. Just like GRU-P, it may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
 - Other:
+    - LogisticRegression: performs a logistic regression based on 34 features computed from the card history.
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline. An algorithm that doesn't outperform AVG cannot be considered good.
     - MOVING-AVG: unlike AVG, which uses the overall retention across all reviews as its prediction of probability of recall, MOVING-AVG outputs higher values if recent reviews were successful and lower values if recent reviews were lapses. By adjusting its predictions based on the outcome of recent reviews, it's trying to capture trends in retention instead of assuming that retention is always the same.
     - RMSE-BINS-EXPLOIT: an algorithm that exploits the calculation of RMSE (bins) by simulating the bins and keeping the error term close to 0.
@@ -99,6 +100,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | RWKV | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0020 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3332±0.0041 | 0.05378±0.00096 | 0.7329±0.0020 | FIL, G, SR, AT |
 | MOVING-AVG | 0 | 0.3369±0.0042 | 0.05915±0.00082 | 0.7001±0.0026 | --- |
+| LogisticRegression | 34 | 0.3393±0.0042 | 0.0604±0.0010 | 0.7108±0.0023 | IL, FIL, G, SR |
 | FSRS-7 recency | 35 | 0.3414±0.0043 | 0.0627±0.0010 | 0.7097±0.0022 | FIL, G, SR |
 | FSRS-7 | 35 | 0.3437±0.0043 | 0.0655±0.0011 | 0.7069±0.0023 | FIL, G, SR |
 | FSRS-rs | 21 | 0.3443±0.0041 | 0.0635±0.0011 | 0.7074±0.0022 | IL, G, SR |
@@ -136,6 +138,7 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | **RWKV-P** | 2762884 | **0.2660±0.0036** | 0.03212±0.00045 | **0.8450±0.0017** | [Yes](#features-note) |
 | RWKV | 2762884 | 0.2975±0.0037 | 0.05438±0.00081 | 0.7964±0.0017 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3140±0.0038 | 0.05200±0.00077 | 0.7622±0.0018 | FIL, G, SR, AT |
+| LogisticRegression | 34 | 0.3195±0.0040 | 0.05815±0.00082 | 0.7446±0.0020 | IL, FIL, G, SR |
 | FSRS-7 recency | 35 | 0.3240±0.0040 | 0.06335±0.00089 | 0.7381±0.0019 | FIL, G, SR |
 | FSRS-7 | 35 | 0.3258±0.0040 | 0.06625±0.00092 | 0.7355±0.0020 | FIL, G, SR |
 | MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |

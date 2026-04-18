@@ -316,6 +316,8 @@ def process(
                     del trained_model, inner_opt
                     if config.device.type == "mps":
                         torch.mps.empty_cache()
+                elif config.model_name == "LogisticRegression":
+                    partition_weights[partition] = model.optimize(train_partition)
                 else:
                     trainer = Trainer(
                         model=model,
@@ -348,29 +350,37 @@ def process(
         for partition in testset["partition"].unique():
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
-            my_collection = Collection(
-                create_model(config, weights) if weights else create_model(config),
-                config,
-            )
-            retentions, stabilities, difficulties = my_collection.batch_predict(
-                partition_testset
-            )
-            partition_testset["p"] = retentions
-            if stabilities:
-                partition_testset["s"] = stabilities
-            if difficulties:
-                partition_testset["d"] = difficulties
+            if config.model_name == "LogisticRegression":
+                model = create_model(config, weights)
+                retentions = model.predict(partition_testset)
+                partition_testset["p"] = retentions
+            else:
+                my_collection = Collection(
+                    create_model(config, weights) if weights else create_model(config),
+                    config,
+                )
+                retentions, stabilities, difficulties = my_collection.batch_predict(
+                    partition_testset
+                )
+                partition_testset["p"] = retentions
+                if stabilities:
+                    partition_testset["s"] = stabilities
+                if difficulties:
+                    partition_testset["d"] = difficulties
             p.extend(retentions)
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)
 
     save_tmp_df = pd.concat(save_tmp)
-    del save_tmp_df["tensor"]
+    if "tensor" in save_tmp_df:
+        del save_tmp_df["tensor"]
     save_evaluation_file(user_id, save_tmp_df, config)
 
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
+    if hasattr(model, "log"):
+        model.log(stats)
     return stats, raw
 
 

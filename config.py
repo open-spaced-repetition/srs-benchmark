@@ -39,6 +39,7 @@ ModelName = Literal[
     "RMSE-BINS-EXPLOIT",
     "MOVING-AVG",
     "90%",
+    "LogisticRegression",
 ]
 
 

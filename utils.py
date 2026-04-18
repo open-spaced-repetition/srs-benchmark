@@ -44,17 +44,6 @@ def mean_bias_error(y, p):
 
 def rmse_matrix(df):
     tmp = df.copy()
-
-    def count_lapse(r_history, t_history):
-        lapse = 0
-        for r, t in zip(r_history.split(","), t_history.split(",")):
-            if t != "0" and r == "1":
-                lapse += 1
-        return lapse
-
-    tmp["lapse"] = tmp.apply(
-        lambda x: count_lapse(x["r_history"], x["t_history"]), axis=1
-    )
     tmp["delta_t"] = tmp["elapsed_days"].map(
         lambda x: round(
             2.48 * np.power(3.62, np.floor(np.log(max(x, 1e-6)) / np.log(3.62))), 2
@@ -63,7 +52,7 @@ def rmse_matrix(df):
     tmp["i"] = tmp["i"].map(
         lambda x: round(1.99 * np.power(1.89, np.floor(np.log(x) / np.log(1.89))), 0)
     )
-    tmp["lapse"] = tmp["lapse"].map(
+    tmp["rmse_bins_lapse"] = tmp["rmse_bins_lapse"].map(
         lambda x: (
             round(1.65 * np.power(1.73, np.floor(np.log(x) / np.log(1.73))), 0)
             if x != 0
@@ -73,7 +62,7 @@ def rmse_matrix(df):
     if "weights" not in tmp.columns:
         tmp["weights"] = 1
     tmp = (
-        tmp.groupby(["delta_t", "i", "lapse"])
+        tmp.groupby(["delta_t", "i", "rmse_bins_lapse"])
         .agg({"y": "mean", "p": "mean", "weights": "sum"})
         .reset_index()
     )

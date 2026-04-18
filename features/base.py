@@ -43,6 +43,9 @@ class BaseFeatureEngineer(ABC):
         # Execute common postprocessing steps
         df = self._common_postprocessing(df)
 
+        # Model-specific postprocessing steps
+        df = self._model_specific_postprocessing(df)
+
         return df
 
     def _common_preprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -90,6 +93,7 @@ class BaseFeatureEngineer(ABC):
                 df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
 
         df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
+        df["delta_t_int"] = df["elapsed_days"].map(lambda x: max(0, x))
         return df
 
     def _compute_histories(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -206,20 +210,26 @@ class BaseFeatureEngineer(ABC):
         Common postprocessing steps shared by all models
         """
         # Set first rating and labels
-        df["first_rating"] = df["r_history"].map(lambda x: x[0] if len(x) > 0 else "")
+        df["first_rating"] = (
+            df.groupby("card_id")["rating"].transform("first").astype(str)
+        )
         df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+
+        # Find lapses for RMSE (bins)
+        df["is_lapse"] = (
+            (df["rating"] == 1) & (df["delta_t"].astype(str) != "0")
+        ).astype(int)
+        df["rmse_bins_lapse"] = (
+            df.groupby("card_id")["is_lapse"].transform("cumsum") - df["is_lapse"]
+        )
+        df.drop(columns=["is_lapse"], inplace=True)
 
         # Handle short-term reviews
         if self.config.include_short_term:
             df = df[(df["delta_t"] != 0) | (df["i"] == 1)].copy()
 
         # Recalculate review sequence number
-        df["i"] = (
-            df.groupby("card_id")
-            .apply(lambda x: (x["elapsed_days"] > 0).cumsum(), include_groups=False)
-            .reset_index(level=0, drop=True)
-            + 1
-        )
+        df["i"] = df["elapsed_days"].gt(0).groupby(df["card_id"]).cumsum().add(1)
 
         # Handle outliers and non-continuous rows (only for non-seconds intervals)
         if not self.config.use_secs_intervals:
@@ -309,3 +319,15 @@ class BaseFeatureEngineer(ABC):
         t_history_list = self.get_time_history_list(df)
         r_history_list = self.get_rating_history_list(df)
         return t_history_list, r_history_list
+
+    def _model_specific_postprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Model-specific post processing
+
+        Args:
+            df: Dataframe after common post processing
+
+        Returns:
+            Dataframe with model-specific post processing
+        """
+        return df

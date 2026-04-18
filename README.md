@@ -100,7 +100,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | RWKV | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0020 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3332±0.0041 | 0.05378±0.00096 | 0.7329±0.0020 | FIL, G, SR, AT |
 | MOVING-AVG | 0 | 0.3369±0.0042 | 0.05915±0.00082 | 0.7001±0.0026 | --- |
-| LogisticRegression | 34 | 0.3393±0.0042 | 0.0605±0.0010 | 0.7108±0.0023 | IL, FIL, G, SR |
+| LogisticRegression | 34 | 0.3393±0.0042 | 0.0604±0.0010 | 0.7108±0.0023 | IL, FIL, G, SR |
 | FSRS-7 recency | 35 | 0.3414±0.0043 | 0.0627±0.0010 | 0.7097±0.0022 | FIL, G, SR |
 | FSRS-7 | 35 | 0.3437±0.0043 | 0.0655±0.0011 | 0.7069±0.0023 | FIL, G, SR |
 | FSRS-rs | 21 | 0.3443±0.0041 | 0.0635±0.0011 | 0.7074±0.0022 | IL, G, SR |

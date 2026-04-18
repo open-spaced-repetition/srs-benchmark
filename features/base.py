@@ -216,7 +216,7 @@ class BaseFeatureEngineer(ABC):
         # Find lapses for RMSE (bins)
         df["is_lapse"] = ((df["rating"] == 1) & (df["delta_t"].astype(str) != "0")).astype(int)
         df["rmse_bins_lapse"] = df.groupby("card_id")["is_lapse"].transform("cumsum") - df["is_lapse"]
-        df.drop(columns=["is_lapse"])
+        df.drop(columns=["is_lapse"], inplace=True)
 
         # Handle short-term reviews
         if self.config.include_short_term:

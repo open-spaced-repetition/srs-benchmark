@@ -15,7 +15,7 @@ class LogisticRegressionEngineer(BaseFeatureEngineer):
         return df
 
     def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        df["feature_rating"] = df["rating"].shift(1).fillna(0)
+        df["feature_rating"] = df.groupby("card_id")["rating"].shift(1).fillna(0)
         return df
 
     def _compute_histories(self, df: pd.DataFrame) -> pd.DataFrame:

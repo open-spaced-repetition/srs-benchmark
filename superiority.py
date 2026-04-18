@@ -134,7 +134,7 @@ if __name__ == "__main__":
     index_v1 = models.index("FSRSv1")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_lstm] = "LSTM"
-    models[index_logistic_regression] = "LogisticRegresson"
+    models[index_logistic_regression] = "LogisticRegression"
     models[index_6_default] = "FSRS-6\ndef. param."
     models[index_6_S0] = "FSRS-6 S0"
     models[index_v4] = "FSRS v4"

@@ -195,7 +195,9 @@ if __name__ == "__main__":
         if model_name.startswith("FSRS"):
             models[idx] = model_name.replace("-short", "")
     index_lstm = models.index("LSTM-short-secs-duration-equalize_test_with_non_secs")
-    index_logistic_regression = models.index("LogisticRegression-short-secs-recency-equalize_test_with_non_secs")
+    index_logistic_regression = models.index(
+        "LogisticRegression-short-secs-recency-equalize_test_with_non_secs"
+    )
     index_6_default = models.index("FSRS-6-default")
     index_6_S0 = models.index("FSRS-6-S0")
     index_v4 = models.index("FSRSv4")

@@ -5,7 +5,7 @@ from .base import BaseFeatureEngineer
 
 
 class LogisticRegressionEngineer(BaseFeatureEngineer):
-    def _model_specific_postprocessing(self, df:pd.DataFrame) -> pd.DataFrame:
+    def _model_specific_postprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         if self.config.use_secs_intervals:
             x = logistic_regression.create_features(df)
             df = pd.concat([df, x], axis=1)

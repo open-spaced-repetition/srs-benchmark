@@ -210,12 +210,18 @@ class BaseFeatureEngineer(ABC):
         Common postprocessing steps shared by all models
         """
         # Set first rating and labels
-        df["first_rating"] = df.groupby("card_id")["rating"].transform("first").astype(str)
+        df["first_rating"] = (
+            df.groupby("card_id")["rating"].transform("first").astype(str)
+        )
         df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
 
         # Find lapses for RMSE (bins)
-        df["is_lapse"] = ((df["rating"] == 1) & (df["delta_t"].astype(str) != "0")).astype(int)
-        df["rmse_bins_lapse"] = df.groupby("card_id")["is_lapse"].transform("cumsum") - df["is_lapse"]
+        df["is_lapse"] = (
+            (df["rating"] == 1) & (df["delta_t"].astype(str) != "0")
+        ).astype(int)
+        df["rmse_bins_lapse"] = (
+            df.groupby("card_id")["is_lapse"].transform("cumsum") - df["is_lapse"]
+        )
         df.drop(columns=["is_lapse"], inplace=True)
 
         # Handle short-term reviews
@@ -232,7 +238,7 @@ class BaseFeatureEngineer(ABC):
                 raise ValueError(
                     "No data after handling outliers and non-continuous rows"
                 )
-        
+
         return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
     def _handle_outliers_and_continuity(self, df: pd.DataFrame) -> pd.DataFrame:

@@ -112,7 +112,11 @@ if __name__ == "__main__":
                 "FIL, G, SR, AT",
             ),
             ("MOVING-AVG", 0, "---"),
-            ("LogisticRegression-short-secs-recency-equalize_test_with_non_secs", 34, "IL, FIL, G, SR"),
+            (
+                "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
+                34,
+                "IL, FIL, G, SR",
+            ),
             ("FSRS-7-short-secs-recency-equalize_test_with_non_secs", 35, "FIL, G, SR"),
             ("FSRS-7-short-secs-equalize_test_with_non_secs", 35, "FIL, G, SR"),
             ("FSRS-6-short-recency", 21, "IL, G, SR"),

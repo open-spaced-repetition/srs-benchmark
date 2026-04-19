@@ -20,11 +20,12 @@ jobs:
         with:
           python-version: '3.14'
           enable-cache: true
-      - uses: facebook/pyrefly@main
 
       - name: Install dependencies
         run: |
           uv sync --dev
+
+      - uses: facebook/pyrefly@main
 
       # Update output format to enable automatic inline annotations.
       - name: Run Ruff

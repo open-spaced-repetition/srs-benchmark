@@ -14,21 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
           enable-cache: true
-    
+
       - name: Install dependencies
         run: |
-          uv python install
+          uv sync --dev
+
+      - uses: facebook/pyrefly@main
 
       # Update output format to enable automatic inline annotations.
       - name: Run Ruff
         run: uvx ruff check --output-format=github .
-
-      - name: Run Mypy
-        run: |
-          uv sync && uv tool install ty && ty check . || true
-          uvx mypy .

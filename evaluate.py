@@ -119,7 +119,11 @@ if __name__ == "__main__":
             ),
             ("FSRS-7-short-secs-recency-equalize_test_with_non_secs", 35, "FIL, G, SR"),
             ("FSRS-7-short-secs-equalize_test_with_non_secs", 35, "FIL, G, SR"),
-            ("FSRS-7-sched_penalties-short-secs-equalize_test_with_non_secs", 35, "FIL, G, SR"),
+            (
+                "FSRS-7-sched_penalties-short-secs-equalize_test_with_non_secs",
+                35,
+                "FIL, G, SR",
+            ),
             ("FSRS-6-short-recency", 21, "IL, G, SR"),
             ("FSRS-rs-short", 21, "IL, G, SR"),
             ("FSRS-6-short", 21, "IL, G, SR"),

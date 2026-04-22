@@ -15,18 +15,14 @@ if __name__ == "__main__":
         "RWKV",
         "LSTM-short-secs-duration-equalize_test_with_non_secs",
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
+        "FSRS-7-short-secs-recency-equalize_test_with_non_secs",
         "GRU-P-short",
         "FSRS-rs-short",
-        "FSRS-6-short-recency",
         "FSRS-6-short",
-        "FSRS-6-short-preset",
         "MOVING-AVG",
-        "FSRS-6-binary-short",
-        "FSRS-6-short-deck",
         "GRU-P",
-        "FSRS-6-S0-short",
         "FSRS-5-short",
-        "FSRS-6-default-short",
+        "FSRS-7-default-short-secs-equalize_test_with_non_secs",
         "FSRS-4.5",
         "FSRSv4",
         "DASH-short",
@@ -121,24 +117,25 @@ if __name__ == "__main__":
                     percentages[j, i] = j_i_up
 
     # small changes to labels
-    for idx, model_name in enumerate(models):
-        if model_name.startswith("FSRS"):
-            models[idx] = model_name.replace("-short", "")
-    index_lstm = models.index("LSTM-short-secs-duration-equalize_test_with_non_secs")
-    index_logistic_regression = models.index(
-        "LogisticRegression-short-secs-recency-equalize_test_with_non_secs"
-    )
-    index_6_default = models.index("FSRS-6-default")
-    index_6_S0 = models.index("FSRS-6-S0")
+    for i, model in enumerate(models):
+        models[i] = (
+            model.replace("-secs", "")
+            .replace("-short", "")
+            .replace("-duration", "")
+            .replace("-equalize_test_with_non_secs", "")
+        )
+
+    index_LogReg = models.index("LogisticRegression-recency")
+    index_FSRS_7_recency = models.index("FSRS-7-recency")
+    index_FSRS_7_default = models.index("FSRS-7-default")
     index_v4 = models.index("FSRSv4")
     index_v3 = models.index("FSRSv3")
     index_v2 = models.index("FSRSv2")
     index_v1 = models.index("FSRSv1")
     index_Ebisu_v2 = models.index("Ebisu-v2")
-    models[index_lstm] = "LSTM"
-    models[index_logistic_regression] = "LogisticRegression"
-    models[index_6_default] = "FSRS-6\ndef. param."
-    models[index_6_S0] = "FSRS-6 S0"
+    models[index_LogReg] = "Logistic Regression\nrecency"
+    models[index_FSRS_7_recency] = "FSRS-7\nrecency"
+    models[index_FSRS_7_default] = "FSRS-7\ndef. param."
     models[index_v4] = "FSRS v4"
     models[index_v3] = "FSRS v3"
     models[index_v2] = "FSRS v2"
@@ -202,6 +199,40 @@ if __name__ == "__main__":
                     color="white",
                     fontsize=6.5,
                 )
+
+    def diagonal_check(percentages, models):
+        """
+        Enforce:
+          - upper triangle (i < j): >= 0.5
+          - lower triangle (i > j): < 0.5
+        """
+        upper_i, upper_j = np.triu_indices_from(percentages, k=1)
+        lower_i, lower_j = np.tril_indices_from(percentages, k=-1)
+
+        upper_vals = percentages[upper_i, upper_j]
+        lower_vals = percentages[lower_i, lower_j]
+
+        upper_bad = upper_vals < 0.5
+        lower_bad = lower_vals >= 0.5
+
+        if np.any(upper_bad) or np.any(lower_bad):
+            errors = []
+
+            for i, j, v in zip(upper_i[upper_bad], upper_j[upper_bad], upper_vals[upper_bad]):
+                errors.append(
+                    f"Above diagonal violation: row='{models[i]}', col='{models[j]}', value={100 * v:.1f}% (must be >= 50.0%)"
+                )
+
+            for i, j, v in zip(lower_i[lower_bad], lower_j[lower_bad], lower_vals[lower_bad]):
+                errors.append(
+                    f"Below diagonal violation: row='{models[i]}', col='{models[j]}', value={100 * v:.1f}% (must be < 50.0%)"
+                )
+
+            raise ValueError("Diagonal check failed:\n" + "\n".join(errors))
+
+        print("Diagonal check passed.")
+
+    diagonal_check(percentages, models)
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=8, rotation=45)
     ax.set_yticks(np.arange(n), labels=models, fontsize=8)

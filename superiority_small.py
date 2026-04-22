@@ -80,7 +80,7 @@ if __name__ == "__main__":
     df = pd.read_csv(csv_name)
 
     n_collections = len(df)
-    print(n_collections)
+    print(f'Number of collections: {n_collections}')
     n = len(models)
     percentages = np.full((n, n), -1.0)
     for i in range(n):
@@ -201,6 +201,40 @@ if __name__ == "__main__":
                     color="white",
                     fontsize=15,
                 )
+
+        def diagonal_check(percentages, models):
+        """
+        Enforce:
+          - upper triangle (i < j): >= 0.5
+          - lower triangle (i > j): < 0.5
+        """
+        upper_i, upper_j = np.triu_indices_from(percentages, k=1)
+        lower_i, lower_j = np.tril_indices_from(percentages, k=-1)
+
+        upper_vals = percentages[upper_i, upper_j]
+        lower_vals = percentages[lower_i, lower_j]
+
+        upper_bad = upper_vals < 0.5
+        lower_bad = lower_vals >= 0.5
+
+        if np.any(upper_bad) or np.any(lower_bad):
+            errors = []
+
+            for i, j, v in zip(upper_i[upper_bad], upper_j[upper_bad], upper_vals[upper_bad]):
+                errors.append(
+                    f"Above diagonal violation: row='{models[i]}', col='{models[j]}', value={100 * v:.1f}% (must be >= 50.0%)"
+                )
+
+            for i, j, v in zip(lower_i[lower_bad], lower_j[lower_bad], lower_vals[lower_bad]):
+                errors.append(
+                    f"Below diagonal violation: row='{models[i]}', col='{models[j]}', value={100 * v:.1f}% (must be < 50.0%)"
+                )
+
+            raise ValueError("Diagonal check failed:\n" + "\n".join(errors))
+
+        print("Diagonal check passed.")
+    
+    diagonal_check(percentages, models)
 
     ax.set_xticks(np.arange(n), labels=models, fontsize=15, rotation=45)
     ax.set_yticks(np.arange(n), labels=models, fontsize=15)

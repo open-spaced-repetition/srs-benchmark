@@ -281,8 +281,9 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     import math
     import torch
     from pathlib import Path
-    from sklearn.metrics import roc_auc_score, log_loss
+    from sklearn.metrics import roc_auc_score, log_loss, precision_score, recall_score
     from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
+    import relplot
 
     if config.generate_plots:
         try:
@@ -317,6 +318,10 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     logloss = log_loss(y_true=y, y_pred=p, labels=[0, 1])
     rmse_bins = rmse_matrix(df)
     mbe = mean_bias_error(y, p)
+    smECE = relplot.smECE(np.array(p), np.array(y))
+    y_hat_90 = (np.array(p) >= 0.9).astype(int)
+    precision_90 = precision_score(y, y_hat_90, zero_division=0)
+    recall_90    = recall_score(y, y_hat_90, zero_division=0)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
     except Exception:
@@ -326,8 +331,11 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
             "RMSE": round(rmse_raw, 6),
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
-            "ICI": round(ici, 6),
+            "smECE": round(smECE, 6),
             "AUC": auc,
+            "precision@90": round(precision_90, 6),
+            "recall@90": round(recall_90, 6),
+            "ICI": round(ici, 6),
             "MBE": round(mbe, 6),
         },
         "user": int(user_id),

@@ -20,14 +20,14 @@ if __name__ == "__main__":
             "RWKV-short-secs",
             "LSTM-short-secs-duration",
             "LogisticRegression-short-secs-recency",
+            "FSRS-7-short-secs-recency",
             "MOVING-AVG-short-secs",
             "GRU-P-short-secs",
             "DASH-short-secs",
-            "FSRS-6-short-secs-recency",
+            "FSRS-6-short-secs",
             "ACT-R-short-secs",
             "FSRS-4.5-short-secs",
             "FSRS-5-short-secs",
-            "FSRSv4-short-secs",
             "HLR-short-secs",
             "Ebisu-v2-short-secs",
         ]
@@ -37,12 +37,12 @@ if __name__ == "__main__":
             "RWKV",
             "LSTM-short-secs-duration-equalize_test_with_non_secs",
             "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
+            "FSRS-7-short-secs-recency-equalize_test_with_non_secs",
             "GRU-P-short",
-            "FSRS-6-short-recency",
+            "FSRS-6-short",
             "MOVING-AVG",
             "FSRS-5-short",
             "FSRS-4.5",
-            "FSRSv4",
             "DASH",
             "ACT-R",
             "HLR",
@@ -134,15 +134,15 @@ if __name__ == "__main__":
         )
 
     index_lstm = models.index("LSTM")
-    index_logistic_regression = models.index("LogisticRegression-recency")
-    index_v4 = models.index("FSRSv4")
     index_Ebisu_v2 = models.index("Ebisu-v2")
-    index_FSRS_6_recency = models.index("FSRS-6-recency")
+    index_FSRS_7_recency = models.index("FSRS-7-recency")
+    index_FSRS_6 = models.index("FSRS-6")
+    index_LogReg = models.index("LogisticRegression-recency")
     models[index_lstm] = "LSTM"
-    models[index_logistic_regression] = "LogisticRegression"
-    models[index_v4] = "FSRS v4"
     models[index_Ebisu_v2] = "Ebisu v2"
-    models[index_FSRS_6_recency] = "FSRS-6\nrecency"
+    models[index_FSRS_7_recency] = "FSRS-7\nrecency"
+    models[index_FSRS_6] = "FSRS-6"
+    models[index_LogReg] = "Logistic Regression\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

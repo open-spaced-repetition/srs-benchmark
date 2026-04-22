@@ -46,6 +46,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS-7: the newest version. Unlike all previous versions, which have been designed to work with integer interval lengths, FSRS-7 has been designed to work with fractional interval lengths. It is the only version that can give realistic predictions of probability of recall for same-day reviews. The biggest change is that the forgetting curve now has 8 optimizable parameters and uses a rather complex formula.
         - FSRS-7 default param.: FSRS-7 with default parameters, without per-user optimization.
         - FSRS-7 recency: FSRS-7 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
+        - FSRS-7 sched. penalties: FSRS-7 with penalties that address 2 issues: extremely short intervals for same-day reviews at high (97-99%) desired retention and massive interval length jumps at low desired retention. They make scheduling based on FSRS-7 more reasonable (from the perspective of an average user) at the cost of making FSRS-7's predictive ability a little worse.
     - FSRS-rs: the Rust port of FSRS-6 with recency weighting. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
@@ -103,6 +104,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | LogisticRegression | 34 | 0.3393±0.0042 | 0.0604±0.0010 | 0.7108±0.0023 | IL, FIL, G, SR |
 | FSRS-7 recency | 35 | 0.3414±0.0043 | 0.0627±0.0010 | 0.7097±0.0022 | FIL, G, SR |
 | FSRS-7 | 35 | 0.3437±0.0043 | 0.0655±0.0011 | 0.7069±0.0023 | FIL, G, SR |
+| FSRS-7 sched. penalties | 35 | 0.3438±0.0043 | 0.0663±0.0011 | 0.7065±0.0023 | FIL, G, SR |
 | FSRS-rs | 21 | 0.3443±0.0041 | 0.0635±0.0011 | 0.7074±0.0022 | IL, G, SR |
 | GRU-P-short | 297 | 0.3458±0.0043 | 0.0622±0.0011 | 0.6990±0.0025 | IL, G, SR|
 | FSRS-6 | 21 | 0.3460±0.0042 | 0.0653±0.0011 | 0.7034±0.0023 | IL, G, SR |
@@ -139,10 +141,11 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | RWKV | 2762884 | 0.2975±0.0037 | 0.05438±0.00081 | 0.7964±0.0017 | [Yes](#features-note) |
 | LSTM | 8869 | 0.3140±0.0038 | 0.05200±0.00077 | 0.7622±0.0018 | FIL, G, SR, AT |
 | LogisticRegression | 34 | 0.3195±0.0040 | 0.05815±0.00082 | 0.7446±0.0020 | IL, FIL, G, SR |
-| FSRS-7 recency | 35 | 0.3240±0.0040 | 0.06335±0.00089 | 0.7381±0.0019 | FIL, G, SR |
-| FSRS-7 | 35 | 0.3258±0.0040 | 0.06625±0.00092 | 0.7355±0.0020 | FIL, G, SR |
+| FSRS-7 recency | 35 | 0.3236±0.0041 | 0.06339±0.00088 | 0.7394±0.0019 | FIL, G, SR |
+| FSRS-7 | 35 | 0.3255±0.0041 | 0.06617±0.00091 | 0.7366±0.0019 | FIL, G, SR |
+| FSRS-7 sched. penalties | 35 | 0.3259±0.0041 | 0.06675±0.00091 | 0.7362±0.0019 | FIL, G, SR |
 | MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
-| FSRS-7 default param. | 0 | 0.3431±0.0040 | 0.0922±0.0011 | 0.7204±0.0020 | FIL, G, SR |
+| FSRS-7 default param. | 0 | 0.3431±0.0040 | 0.0921±0.0011 | 0.7206±0.0020 | FIL, G, SR |
 | DASH[MCM] | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
 | GRU-P | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |
 | DASH | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |

@@ -227,6 +227,7 @@ def _configure_process_device(device_id: Optional[int]) -> None:
         except Exception:
             pass
 
+
 def _is_inadequate_training_data_error(exc: Exception) -> bool:
     msg = str(exc).strip().lower()
     return (
@@ -234,6 +235,7 @@ def _is_inadequate_training_data_error(exc: Exception) -> bool:
         or "not enough data for pretraining" in msg
         or "inadequate data" in msg
     )
+
 
 def _is_deck_or_preset_partition_mode() -> bool:
     """
@@ -254,12 +256,14 @@ def _is_deck_or_preset_partition_mode() -> bool:
 
     return False
 
+
 def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if config.use_recency_weighting:
         x = np.linspace(0, 1, len(out))
         out["weights"] = 0.25 + 0.75 * np.power(x, 3)
     return out
+
 
 def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
     """

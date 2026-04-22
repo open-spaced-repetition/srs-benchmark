@@ -4,7 +4,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, Any
 from pathlib import Path
 import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -227,6 +227,77 @@ def _configure_process_device(device_id: Optional[int]) -> None:
         except Exception:
             pass
 
+def _is_inadequate_training_data_error(exc: Exception) -> bool:
+    msg = str(exc).strip().lower()
+    return (
+        msg.endswith("inadequate.")
+        or "not enough data for pretraining" in msg
+        or "inadequate data" in msg
+    )
+
+def _is_deck_or_preset_partition_mode() -> bool:
+    """
+    True when run uses partitioning by deck or preset.
+    Handles either scalar or iterable config.partitions shapes.
+    """
+    partitions = getattr(config, "partitions", None)
+    if partitions is None:
+        return False
+
+    targets = {"deck", "preset"}
+
+    if isinstance(partitions, str):
+        return partitions.lower() in targets
+
+    if isinstance(partitions, (list, tuple, set)):
+        return any(str(x).lower() in targets for x in partitions)
+
+    return False
+
+def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    if config.use_recency_weighting:
+        x = np.linspace(0, 1, len(out))
+        out["weights"] = 0.25 + 0.75 * np.power(x, 3)
+    return out
+
+def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
+    """
+    Train any trainable model on provided train_df and return model weights/state.
+    Works for FSRS variants, LSTM, etc.
+    """
+    model = create_model(config)
+
+    if config.default_params:
+        return model.state_dict()
+
+    if config.model_name == "LSTM":
+        model = model.to(config.device)
+        inner_opt = get_inner_opt(
+            model.parameters(),
+            path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
+        )
+        trained_model = finetune(
+            train_df,
+            model,
+            inner_opt.state_dict(),
+        )
+        weights = copy.deepcopy(trained_model.state_dict())
+        del trained_model, inner_opt
+        if config.device.type == "mps":
+            torch.mps.empty_cache()
+        return weights
+
+    trainer = Trainer(
+        model=model,
+        train_set=train_df,
+        test_set=None,
+        batch_size=config.batch_size,
+    )
+    if config.only_S0:
+        return trainer.model.state_dict()
+    return trainer.train()
+
 
 @catch_exceptions
 def process(
@@ -255,9 +326,11 @@ def process(
         return process_fsrs_rs(user_id, dataset, config)
 
     # Process trainable models
+    use_double_fallback = _is_deck_or_preset_partition_mode()
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
+
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         if not config.train_equals_test:
             train_set = dataset.iloc[train_index]
@@ -266,77 +339,80 @@ def process(
                 # Ignores the train_index and test_index
                 train_set = dataset[dataset[f"{split_i}_train"]]
                 test_set = dataset[dataset[f"{split_i}_test"]]
-                train_index, test_index = (
-                    None,
-                    None,
-                )  # train_index and test_index no longer have the same meaning as before
+                train_index, test_index = (None, None)
         else:
             train_set = dataset.copy()
             test_set = dataset[
                 dataset["review_th"] >= dataset.iloc[test_index]["review_th"].min()
             ].copy()
+
         if config.no_test_same_day:
             test_set = test_set[test_set["elapsed_days"] > 0].copy()
         if config.no_train_same_day:
             train_set = train_set[train_set["elapsed_days"] > 0].copy()
 
         testsets.append(test_set)
+
+        # User-level fallback (per split), only for deck/preset partitioning
+        user_level_weights = None
+        if use_double_fallback and not config.default_params:
+            try:
+                user_train_for_fallback = _apply_recency_weighting(train_set)
+                user_level_weights = copy.deepcopy(
+                    _fit_trainable_weights(user_train_for_fallback)
+                )
+            except Exception as e:
+                if _is_inadequate_training_data_error(e):
+                    if config.verbose_inadequate_data:
+                        print(
+                            f"User {user_id}, split {split_i}: "
+                            "insufficient full-user data for fallback; "
+                            "will use default parameters if needed."
+                        )
+                    user_level_weights = None
+                else:
+                    print(f"User: {user_id}")
+                    raise e
+
         partition_weights = {}
+
         for partition in train_set["partition"].unique():
             try:
                 train_partition = train_set[train_set["partition"] == partition].copy()
+
                 if not config.train_equals_test:
                     assert (
                         train_partition["review_th"].max() < test_set["review_th"].min()
                     )
-                if config.use_recency_weighting:
-                    x = np.linspace(0, 1, len(train_partition))
-                    train_partition["weights"] = 0.25 + 0.75 * np.power(x, 3)
 
-                model = create_model(config)
-                if config.default_params:
-                    partition_weights[partition] = model.state_dict()
-                    continue
+                train_partition = _apply_recency_weighting(train_partition)
 
-                if config.model_name == "LSTM":
-                    model = model.to(config.device)
-                    inner_opt = get_inner_opt(
-                        model.parameters(),
-                        path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
-                    )
-                    trained_model = finetune(
-                        train_partition,
-                        model,
-                        inner_opt.state_dict(),
-                    )
-                    partition_weights[partition] = copy.deepcopy(
-                        trained_model.state_dict()
-                    )
-                    # Clean up trained model and optimizer
-                    del trained_model, inner_opt
-                    if config.device.type == "mps":
-                        torch.mps.empty_cache()
-                elif config.model_name == "LogisticRegression":
-                    partition_weights[partition] = model.optimize(train_partition)
-                else:
-                    trainer = Trainer(
-                        model=model,
-                        train_set=train_partition,
-                        test_set=None,
-                        batch_size=config.batch_size,
-                    )
-                    if config.only_S0:
-                        partition_weights[partition] = trainer.model.state_dict()
-                    else:
-                        partition_weights[partition] = trainer.train()
+                partition_weights[partition] = copy.deepcopy(
+                    _fit_trainable_weights(train_partition)
+                )
+
             except Exception as e:
-                if str(e).endswith("inadequate."):
-                    if config.verbose_inadequate_data:
-                        print("Skipping - Inadequate data")
+                if _is_inadequate_training_data_error(e):
+                    # Double fallback:
+                    # partition-specific -> user-level -> defaults
+                    if use_double_fallback and user_level_weights is not None:
+                        if config.verbose_inadequate_data:
+                            print(
+                                f"User {user_id}, split {split_i}, partition {partition}: "
+                                "insufficient partition data, using user-level weights."
+                            )
+                        partition_weights[partition] = copy.deepcopy(user_level_weights)
+                    else:
+                        if config.verbose_inadequate_data:
+                            print(
+                                f"User {user_id}, split {split_i}, partition {partition}: "
+                                "insufficient partition data and no user-level fallback, using defaults."
+                            )
+                        partition_weights[partition] = create_model(config).state_dict()
                 else:
                     print(f"User: {user_id}")
                     raise e
-                partition_weights[partition] = create_model(config).state_dict()
+
         w_list.append(partition_weights)
 
         if config.train_equals_test:
@@ -350,37 +426,29 @@ def process(
         for partition in testset["partition"].unique():
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
-            if config.model_name == "LogisticRegression":
-                model = create_model(config, weights)
-                retentions = model.predict(partition_testset)
-                partition_testset["p"] = retentions
-            else:
-                my_collection = Collection(
-                    create_model(config, weights) if weights else create_model(config),
-                    config,
-                )
-                retentions, stabilities, difficulties = my_collection.batch_predict(
-                    partition_testset
-                )
-                partition_testset["p"] = retentions
-                if stabilities:
-                    partition_testset["s"] = stabilities
-                if difficulties:
-                    partition_testset["d"] = difficulties
+            my_collection = Collection(
+                create_model(config, weights) if weights else create_model(config),
+                config,
+            )
+            retentions, stabilities, difficulties = my_collection.batch_predict(
+                partition_testset
+            )
+            partition_testset["p"] = retentions
+            if stabilities:
+                partition_testset["s"] = stabilities
+            if difficulties:
+                partition_testset["d"] = difficulties
             p.extend(retentions)
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)
 
     save_tmp_df = pd.concat(save_tmp)
-    if "tensor" in save_tmp_df:
-        del save_tmp_df["tensor"]
+    del save_tmp_df["tensor"]
     save_evaluation_file(user_id, save_tmp_df, config)
 
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
-    if hasattr(model, "log"):
-        model.log(stats)
     return stats, raw
 
 

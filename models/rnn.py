@@ -10,7 +10,7 @@ class RNN(BaseModel):
     decay = -0.5
     factor = 0.9 ** (1 / decay) - 1
 
-    def __init__(self, config: Config, state_dict:dict|None=None):
+    def __init__(self, config: Config, state_dict: dict | None = None):
         super().__init__(config)
         self.n_input = 2
         self.n_hidden = 2

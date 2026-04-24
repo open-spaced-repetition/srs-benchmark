@@ -3,6 +3,7 @@ from typing import Any
 import torch
 from typing import ParamSpec
 from torch import Tensor
+
 P = ParamSpec("P")
 
 
@@ -204,7 +205,15 @@ def reference_backward(
     )
 
 
-def single_timestep(r_BHK: Tensor, k_BHK: Tensor, v_BHK: Tensor, w_BHK: Tensor, a_BHK: Tensor, k_deformed_BHK: Tensor, state_BHKK: Tensor):
+def single_timestep(
+    r_BHK: Tensor,
+    k_BHK: Tensor,
+    v_BHK: Tensor,
+    w_BHK: Tensor,
+    a_BHK: Tensor,
+    k_deformed_BHK: Tensor,
+    state_BHKK: Tensor,
+):
     r_BHK1 = r_BHK.unsqueeze(-1)
     k_BHK1 = k_BHK.unsqueeze(-1)
     v_BHK1 = v_BHK.unsqueeze(-1)
@@ -224,7 +233,15 @@ def single_timestep(r_BHK: Tensor, k_BHK: Tensor, v_BHK: Tensor, w_BHK: Tensor, 
     return out_BHK1.squeeze(-1), state_BHKK
 
 
-def reference_rwkv7(r_BTHK: Tensor, k_BTHK: Tensor, v_BTHK: Tensor, w_BTHK: Tensor, a_BTHK: Tensor, k_deformed_BTHK: Tensor, skip_BT: Tensor):
+def reference_rwkv7(
+    r_BTHK: Tensor,
+    k_BTHK: Tensor,
+    v_BTHK: Tensor,
+    w_BTHK: Tensor,
+    a_BTHK: Tensor,
+    k_deformed_BTHK: Tensor,
+    skip_BT: Tensor,
+):
     out_dtype = k_BTHK.dtype
     r_BTHK = r_BTHK.float()
     k_BTHK = k_BTHK.float()

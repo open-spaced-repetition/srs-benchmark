@@ -779,7 +779,7 @@ class FSRS7(FSRS6):
                     item[1]
                     for item in sorted(rating_stability.items(), key=lambda x: x[0])
                 ]
-            case x:
+            case _:
                 raise Exception("impossible")
 
         # Update initial stabilities (w[0:4])

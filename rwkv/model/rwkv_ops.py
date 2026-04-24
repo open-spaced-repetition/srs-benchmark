@@ -75,7 +75,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     k_deformed_BTHK,
                     skip_BT,
                     state_checkpoints,
-                    grad_BTHK,
+                    grad_BTHK, # type: ignore
                 )
             )
         elif r_BTHK.dtype == torch.float:
@@ -89,7 +89,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     k_deformed_BTHK,
                     skip_BT,
                     state_checkpoints,
-                    grad_BTHK,
+                    grad_BTHK, # type: ignore
                 )
             )
         elif r_BTHK.dtype == torch.half:
@@ -103,7 +103,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     k_deformed_BTHK,
                     skip_BT,
                     state_checkpoints,
-                    grad_BTHK,
+                    grad_BTHK, # type: ignore
                 )
             )
         else:

@@ -525,6 +525,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         if outer_it > 0 and outer_it % LOG_STEPS == 0:
             wandb_log["outer_lr"] = outer_lr
             wandb_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
+            assert outer_loss_running
             wandb_log["train_exponential_average"] = outer_loss_running
             evaluate(
                 train_df_list[: min(len(train_df_list), 5)],

@@ -54,7 +54,8 @@ class RWKV7_WKV(torch.autograd.Function):
             # return reference_rwkv7(r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK)
 
     @staticmethod
-    def backward(ctx: Any, grad_BTHK: Tensor):
+    def backward(ctx: Any, *grad_outputs: Tensor):
+        grad_BTHK = grad_outputs[0]
         (
             r_BTHK,
             k_BTHK,

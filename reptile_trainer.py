@@ -446,7 +446,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
 
     gamma = 0.995
     eta = 0.95
-    outer_loss_running = None
+    outer_loss_running: float | None = None
     exp_loss_dict = {}
     recent_losses_total = 0.0
     recent_losses_n = 0

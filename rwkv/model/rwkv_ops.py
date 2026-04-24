@@ -2,13 +2,13 @@ from typing import Any
 
 import torch
 from typing import ParamSpec
-
+from torch import Tensor
 P = ParamSpec("P")
 
 
 class RWKV7_WKV(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, *inputs):
+    def forward(ctx, *inputs: Tensor):
         r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT = inputs
         assert all(
             i.is_contiguous()
@@ -53,7 +53,7 @@ class RWKV7_WKV(torch.autograd.Function):
             # return reference_rwkv7(r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK)
 
     @staticmethod
-    def backward(ctx: Any, *grad_outputs):
+    def backward(ctx: Any, grad_BTHK: Tensor):
         (
             r_BTHK,
             k_BTHK,
@@ -75,7 +75,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     k_deformed_BTHK,
                     skip_BT,
                     state_checkpoints,
-                    grad_BTHK, # type: ignore
+                    grad_BTHK,
                 )
             )
         elif r_BTHK.dtype == torch.float:
@@ -89,7 +89,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     k_deformed_BTHK,
                     skip_BT,
                     state_checkpoints,
-                    grad_BTHK, # type: ignore
+                    grad_BTHK,
                 )
             )
         elif r_BTHK.dtype == torch.half:
@@ -103,7 +103,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     k_deformed_BTHK,
                     skip_BT,
                     state_checkpoints,
-                    grad_BTHK, # type: ignore
+                    grad_BTHK,
                 )
             )
         else:
@@ -113,14 +113,14 @@ class RWKV7_WKV(torch.autograd.Function):
 
 # Unused reference code for backpropagation for RWKV-7 wkv.
 def reference_backward(
-    r_BTHK,
-    k_BTHK,
-    v_BTHK,
-    w_BTHK,
-    a_BTHK,
-    k_deformed_BTHK,
+    r_BTHK: Tensor,
+    k_BTHK: Tensor,
+    v_BTHK: Tensor,
+    w_BTHK: Tensor,
+    a_BTHK: Tensor,
+    k_deformed_BTHK: Tensor,
     state_checkpoints,
-    grad_BTHK,
+    grad_BTHK: Tensor,
 ):
     B, T, H, K = r_BTHK.shape
 
@@ -204,7 +204,7 @@ def reference_backward(
     )
 
 
-def single_timestep(r_BHK, k_BHK, v_BHK, w_BHK, a_BHK, k_deformed_BHK, state_BHKK):
+def single_timestep(r_BHK: Tensor, k_BHK: Tensor, v_BHK: Tensor, w_BHK: Tensor, a_BHK: Tensor, k_deformed_BHK: Tensor, state_BHKK: Tensor):
     r_BHK1 = r_BHK.unsqueeze(-1)
     k_BHK1 = k_BHK.unsqueeze(-1)
     v_BHK1 = v_BHK.unsqueeze(-1)
@@ -224,7 +224,7 @@ def single_timestep(r_BHK, k_BHK, v_BHK, w_BHK, a_BHK, k_deformed_BHK, state_BHK
     return out_BHK1.squeeze(-1), state_BHKK
 
 
-def reference_rwkv7(r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT):
+def reference_rwkv7(r_BTHK: Tensor, k_BTHK: Tensor, v_BTHK: Tensor, w_BTHK: Tensor, a_BTHK: Tensor, k_deformed_BTHK: Tensor, skip_BT: Tensor):
     out_dtype = k_BTHK.dtype
     r_BTHK = r_BTHK.float()
     k_BTHK = k_BTHK.float()

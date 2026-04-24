@@ -44,14 +44,14 @@ class LSTM(BaseModel):
     """
 
     def __init__(
-        self, config: Config, state_dict=None, input_mean=None, input_std=None
+        self, config: Config, state_dict=None, input_mean=torch.tensor(0.0), input_std=torch.tensor(1.0)
     ):
         super().__init__(config)
         self.register_buffer(
-            "input_mean", torch.tensor(0.0) if input_mean is None else input_mean
+            "input_mean", input_mean
         )
         self.register_buffer(
-            "input_std", torch.tensor(1.0) if input_std is None else input_std
+            "input_std", input_std
         )
         self.use_duration_feature = config.lstm_use_duration
         num_main_inputs = 1 + (1 if self.use_duration_feature else 0)

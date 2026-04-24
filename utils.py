@@ -96,9 +96,9 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
             f"R ({algo})"
         ].map(get_bin)
 
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.gca()
     if graph:
-        fig = plt.figure(figsize=(6, 6))
-        ax = fig.gca()
         ax.axhline(y=0.0, color="black", linestyle="-")
 
     universal_metric_list = []

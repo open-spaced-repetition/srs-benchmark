@@ -218,12 +218,16 @@ if __name__ == "__main__":
         if np.any(upper_bad) or np.any(lower_bad):
             errors = []
 
-            for i, j, v in zip(upper_i[upper_bad], upper_j[upper_bad], upper_vals[upper_bad]):
+            for i, j, v in zip(
+                upper_i[upper_bad], upper_j[upper_bad], upper_vals[upper_bad]
+            ):
                 errors.append(
                     f"Above diagonal violation: row='{models[i]}', col='{models[j]}', value={100 * v:.1f}% (must be >= 50.0%)"
                 )
 
-            for i, j, v in zip(lower_i[lower_bad], lower_j[lower_bad], lower_vals[lower_bad]):
+            for i, j, v in zip(
+                lower_i[lower_bad], lower_j[lower_bad], lower_vals[lower_bad]
+            ):
                 errors.append(
                     f"Below diagonal violation: row='{models[i]}', col='{models[j]}', value={100 * v:.1f}% (must be < 50.0%)"
                 )

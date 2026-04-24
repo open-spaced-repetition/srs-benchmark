@@ -321,7 +321,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     smECE = relplot.smECE(np.array(p), np.array(y))
     y_hat_90 = (np.array(p) >= 0.9).astype(int)
     precision_90 = precision_score(y, y_hat_90, zero_division=0)
-    recall_90    = recall_score(y, y_hat_90, zero_division=0)
+    recall_90 = recall_score(y, y_hat_90, zero_division=0)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
     except Exception:

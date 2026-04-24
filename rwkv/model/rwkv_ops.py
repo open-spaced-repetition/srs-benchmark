@@ -1,4 +1,9 @@
+from typing import Any
+
 import torch
+from typing import ParamSpec
+
+P = ParamSpec("P")
 
 
 class RWKV7_WKV(torch.autograd.Function):
@@ -48,7 +53,7 @@ class RWKV7_WKV(torch.autograd.Function):
             # return reference_rwkv7(r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK)
 
     @staticmethod
-    def backward(ctx, grad_BTHK):
+    def backward(ctx: Any, *grad_outputs):
         (
             r_BTHK,
             k_BTHK,
@@ -101,6 +106,8 @@ class RWKV7_WKV(torch.autograd.Function):
                     grad_BTHK,
                 )
             )
+        else:
+            raise ValueError(f"Unsupported dtype: {r_BTHK.dtype}")
         return r_grad, k_grad, v_grad, w_grad, a_grad, k_deformed_grad, None
 
 

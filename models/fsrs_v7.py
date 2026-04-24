@@ -1,3 +1,4 @@
+from typing import assert_never
 from typing import List, Union
 import torch
 from torch import nn, Tensor
@@ -7,7 +8,7 @@ import torch.nn.functional as F
 from torch.nn import Sigmoid
 import pandas as pd
 import numpy as np
-import tqdm
+from tqdm.auto import tqdm
 import time
 from scipy.optimize import minimize  # type: ignore
 
@@ -239,6 +240,7 @@ class FSRS7(FSRS6):
         # print(f'batch_process took {total/1_000_000:.2f} ms, calculating penalty took {penalty_only/1_000_000:.2f} ms')
         return output
 
+    # pyrefly: ignore[bad-override]
     def forgetting_curve(
         self,
         t,
@@ -755,24 +757,30 @@ class FSRS7(FSRS6):
 
         # Anchor values for log-linear interpolation/extrapolation
         a1, a2, a3, a4 = -8.09, -3.83, -2.5, -1.0
-
-        if len(rating_stability) == 0:
-            initial_stabilities = list(r_s0_default.values())
-        elif len(rating_stability) == 1:
-            rating = list(rating_stability.keys())[0]
-            factor = rating_stability[rating] / r_s0_default[str(rating)]
-            initial_stabilities = list(map(lambda x: x * factor, r_s0_default.values()))
-        elif len(rating_stability) in [2, 3]:
-            filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
-            if any([np.isnan(x) for x in filled.values()]) or any(
-                [np.isinf(x) for x in filled.values()]
-            ):
-                raise Exception("NaN/inf in S0 interpolation")
-            initial_stabilities = [filled[r] for r in [1, 2, 3, 4]]
-        elif len(rating_stability) == 4:
-            initial_stabilities = [
-                item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
-            ]
+        initial_stabilities = list(r_s0_default.values())
+        match len(rating_stability):
+            case 0:
+                initial_stabilities = list(r_s0_default.values())
+            case 1:
+                rating = list(rating_stability.keys())[0]
+                factor = rating_stability[rating] / r_s0_default[str(rating)]
+                initial_stabilities = list(
+                    map(lambda x: x * factor, r_s0_default.values())
+                )
+            case 2 | 3:
+                filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
+                if any([np.isnan(x) for x in filled.values()]) or any(
+                    [np.isinf(x) for x in filled.values()]
+                ):
+                    raise Exception("NaN/inf in S0 interpolation")
+                initial_stabilities = [filled[r] for r in [1, 2, 3, 4]]
+            case 4:
+                initial_stabilities = [
+                    item[1]
+                    for item in sorted(rating_stability.items(), key=lambda x: x[0])
+                ]
+            case x:
+                raise Exception("impossible")
 
         # Update initial stabilities (w[0:4])
         self.w.data[0:4] = Tensor(

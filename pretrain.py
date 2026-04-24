@@ -4,7 +4,7 @@ import torch
 from features import create_features
 from models.base import BaseModel
 from models.trainable import TrainableModel
-from other import Trainer
+from script import Trainer
 from config import create_parser, Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from models.fsrs_v6 import FSRS6
@@ -51,6 +51,8 @@ if __name__ == "__main__":
         batch_size = 512
         model = FSRS6(config)
         model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
+    else:
+        raise ValueError(f"Unsupported pretrain model: {config.model_name}")
 
     total = 0
     for param in model.parameters():

@@ -106,6 +106,7 @@ class BaseFeatureEngineer(ABC):
         ].apply(lambda x: cum_concat([[i] for i in x]))
 
         # Calculate time history (seconds)
+        t_history_secs_list: Optional[pd.Series] = None
         if self.config.use_secs_intervals:
             t_history_secs_list = df.groupby("card_id", group_keys=False)[
                 "delta_t_secs"
@@ -131,7 +132,7 @@ class BaseFeatureEngineer(ABC):
         df = self._set_time_histories(
             df,
             t_history_non_secs_list,
-            t_history_secs_list if self.config.use_secs_intervals else None,
+            t_history_secs_list,
         )
 
         return df

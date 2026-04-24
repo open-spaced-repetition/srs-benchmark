@@ -19,6 +19,7 @@ try:
     from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
 except Exception as e:
     logging.exception("Failed to import fsrs_optimizer: %s", e)
+    DEFAULT_PARAMETER = []
 
 
 def chen_rule(data, weights=None):

@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pandas as pd
 import torch
 from .base import BaseFeatureEngineer
@@ -18,7 +20,7 @@ class FSRSFeatureEngineer(BaseFeatureEngineer):
 
         # Create tensor features with shape (sequence_length, 2)
         # Each row contains [time_interval, rating] for that step
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
                 0, 1
             )

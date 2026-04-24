@@ -1,11 +1,11 @@
-from typing import Dict, Type, Union, List, Optional
+from typing import Any, Dict, Union, List, Optional, cast
 import torch
 from config import Config, ModelName
 
 from models import *
 
 
-MODEL_REGISTRY: dict[ModelName, Type[TrainableModel]] = {
+MODEL_REGISTRY = {
     "FSRSv1": FSRS1,
     "FSRSv2": FSRS2,
     "FSRSv3": FSRS3,

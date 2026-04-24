@@ -42,6 +42,11 @@ explicit = true
 requires = ["setuptools", "wheel", "torch"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+dev = [
+    "pandas-stubs>=3.0.0.260204",
+]
+
 [tool.mypy]
 ignore_missing_imports = true
 

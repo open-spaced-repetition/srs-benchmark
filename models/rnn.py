@@ -1,4 +1,4 @@
-from typing import Union
+from typing import cast, Union
 import torch
 from torch import nn, Tensor
 from config import Config

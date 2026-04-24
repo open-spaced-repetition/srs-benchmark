@@ -31,7 +31,7 @@ def get_benchmark_info(db_path, db_size, user_id):
                 load_tensor(txn, key_review_ths, device="cpu").tolist(),
                 load_tensor(txn, key_rmse_bins, device="cpu").tolist(),
             )
-    return None
+    return [], []
 
 
 def get_stats(
@@ -244,8 +244,7 @@ def run(
             # ahead_raw["s"] = [dict_stats.s[review_th] for review_th in equalize_review_ths]
             # ahead_raw["d"] = [dict_stats.d[review_th] for review_th in equalize_review_ths]
             imm_raw["label_elapsed_seconds"] = [
-                label_elapsed_seconds[review_th].tolist()
-                for review_th in equalize_review_ths
+                label_elapsed_seconds[review_th] for review_th in equalize_review_ths
             ]
             imm_raw["p_all"] = [
                 imm_ps_all[review_th].tolist() for review_th in equalize_review_ths

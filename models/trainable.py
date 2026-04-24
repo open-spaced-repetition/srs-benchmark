@@ -1,4 +1,4 @@
-from typing import Iterator, Protocol, Union
+from typing import Any, Iterator, Mapping, Protocol, Union
 from typing_extensions import Self
 import torch
 from torch import Tensor
@@ -106,11 +106,13 @@ class TrainableModel(Protocol):
         """Forward pass of the neural network."""
         ...
 
-    def load_state_dict(self, state_dict: dict) -> None:
+    def load_state_dict(
+        self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False
+    ):
         """Load model state dictionary."""
         ...
 
-    def state_dict(self) -> dict:
+    def state_dict(self):
         """Return model state dictionary."""
         ...
 

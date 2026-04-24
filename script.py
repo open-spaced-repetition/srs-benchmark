@@ -4,7 +4,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-from typing import Optional, Any
+from typing import Optional, Any, cast
 from pathlib import Path
 import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed

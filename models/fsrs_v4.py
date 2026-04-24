@@ -208,6 +208,7 @@ class FSRS4(FSRS3):
 
         w1 = 0.41
         w2 = 0.54
+        initial_stabilities = list(r_s0_default.values())
 
         if len(rating_stability) == 0:
             initial_stabilities = list(r_s0_default.values())

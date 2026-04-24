@@ -319,6 +319,7 @@ class FSRS_one_step(BaseModel):
 
         w1 = 0.41
         w2 = 0.54
+        initial_stabilities = list(r_s0_default.values())
 
         if len(rating_stability) == 0:
             raise ValueError("Not enough data for parameters initialization!")

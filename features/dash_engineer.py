@@ -1,7 +1,8 @@
+from typing import Any, List, cast
+
 import pandas as pd
 import torch
 import numpy as np
-from typing import List
 from .base import BaseFeatureEngineer
 
 
@@ -17,7 +18,7 @@ class DashFeatureEngineer(BaseFeatureEngineer):
         """
         t_history_list, r_history_list = self.get_history_lists(df)
 
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             torch.tensor(
                 self._dash_tw_features(r_item[:-1], t_item[1:], enable_decay=False),
                 dtype=torch.float32,
@@ -81,7 +82,7 @@ class DashMCMFeatureEngineer(DashFeatureEngineer):
         """
         t_history_list, r_history_list = self.get_history_lists(df)
 
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             torch.tensor(
                 self._dash_tw_features(r_item[:-1], t_item[1:], enable_decay=True),
                 dtype=torch.float32,
@@ -105,7 +106,7 @@ class DashACTRFeatureEngineer(BaseFeatureEngineer):
         """
         t_history_list, r_history_list = self.get_history_lists(df)
 
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             torch.tensor(
                 self._dash_actr_features(r_item[:-1], t_item[1:]),
                 dtype=torch.float32,

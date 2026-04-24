@@ -1,7 +1,8 @@
+from typing import Any, List, cast
+
 import pandas as pd
 import torch
 import numpy as np
-from typing import List
 from .base import BaseFeatureEngineer
 
 
@@ -17,7 +18,7 @@ class GRUPFeatureEngineer(BaseFeatureEngineer):
         """
         t_history_list, r_history_list = self.get_history_lists(df)
 
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
             for t_sublist, r_sublist in zip(t_history_list, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)
@@ -38,7 +39,7 @@ class HLRFeatureEngineer(BaseFeatureEngineer):
         """
         _, r_history_list = self.get_history_lists(df)
 
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             torch.tensor(
                 [
                     np.sqrt(
@@ -69,7 +70,7 @@ class ACTRFeatureEngineer(BaseFeatureEngineer):
         """
         t_history_list, _ = self.get_history_lists(df)
 
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             (torch.cumsum(torch.tensor([t_item]), dim=1)).transpose(0, 1)
             for t_sublist in t_history_list
             for t_item in t_sublist
@@ -90,7 +91,7 @@ class NN17FeatureEngineer(BaseFeatureEngineer):
         """
         t_history_list, r_history_list = self.get_history_lists(df)
 
-        df["tensor"] = [
+        cast(Any, df)["tensor"] = [
             torch.tensor(
                 (t_item[:-1], r_item[:-1], self._r_history_to_l_history(r_item[:-1]))
             ).transpose(0, 1)

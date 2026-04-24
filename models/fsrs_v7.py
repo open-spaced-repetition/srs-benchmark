@@ -371,7 +371,7 @@ class FSRS7(FSRS6):
             intervals = (
                 np.array([delta_t]) if not isinstance(delta_t, np.ndarray) else delta_t
             )
-
+        intervals = np.array(intervals)
         # Define bin boundaries in days
         ten_minutes = 10 / (24 * 60)  # 0.006944...
         two_hours = 2 / 24  # 0.0833...
@@ -389,7 +389,7 @@ class FSRS7(FSRS6):
         # 2-24 hours: 2-hour bins
         mask_medium = (intervals >= two_hours) & (intervals < one_day)
         binned[mask_medium] = np.maximum(
-            np.floor(intervals[mask_medium] / two_hours) * two_hours,
+            np.floor(np.array(intervals[mask_medium]) / two_hours) * two_hours,
             two_hours,  # Ensure minimum of 2 hours
         )
 

@@ -112,7 +112,7 @@ class TrainableModel(Protocol):
         """Load model state dictionary."""
         ...
 
-    def state_dict(self):
+    def state_dict(self)-> list[float]:
         """Return model state dictionary."""
         ...
 

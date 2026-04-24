@@ -46,7 +46,7 @@ class BaseModel(nn.Module):
     def apply_parameter_clipper(self):
         self.apply(self.clipper)
 
-    def state_dict(self) -> Any:  # type: ignore[override]
+    def state_dict(self):
         return super().state_dict()
 
     def load_state_dict(

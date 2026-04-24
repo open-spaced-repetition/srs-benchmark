@@ -202,7 +202,7 @@ if __name__ == "__main__":
                     fontsize=15,
                 )
 
-        def diagonal_check(percentages, models):
+    def diagonal_check(percentages, models):
         """
         Enforce:
           - upper triangle (i < j): >= 0.5

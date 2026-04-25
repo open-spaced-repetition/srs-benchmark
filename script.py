@@ -462,7 +462,7 @@ def process(
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
-    if hasattr(model, "log"):
+    if config.model_name == "LogisticRegression":
         model.log(stats)
     return stats, raw
 

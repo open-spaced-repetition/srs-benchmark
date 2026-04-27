@@ -11,7 +11,12 @@ from itertools import accumulate
 from numbers import Real
 from typing import TYPE_CHECKING, Any, cast
 from config import Config
-from models.trainable import ModelState, ParameterList, PartitionedModelState, TrainingState
+from models.trainable import (
+    ModelState,
+    ParameterList,
+    PartitionedModelState,
+    TrainingState,
+)
 
 if TYPE_CHECKING:
     from models.trainable import TrainableModel

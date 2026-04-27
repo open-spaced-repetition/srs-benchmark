@@ -1,9 +1,15 @@
-from typing import Any, Iterator, Mapping, Protocol, Union
+from typing import Any, Hashable, Iterator, Mapping, Protocol, TypeAlias, Union
 from typing_extensions import Self
 import torch
 from torch import Tensor
 import pandas as pd
 from config import Config
+
+ParameterList: TypeAlias = list[float]
+TorchStateDict: TypeAlias = Mapping[str, Any]
+ModelState: TypeAlias = ParameterList | TorchStateDict
+PartitionedModelState: TypeAlias = dict[Hashable, ModelState]
+TrainingState: TypeAlias = ModelState | PartitionedModelState
 
 
 class TrainableModel(Protocol):
@@ -108,12 +114,12 @@ class TrainableModel(Protocol):
 
     def load_state_dict(
         self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False
-    ):
+    ) -> Any:
         """Load model state dictionary."""
         ...
 
-    def state_dict(self)-> list[float]:
-        """Return model state dictionary."""
+    def benchmark_state(self) -> ModelState:
+        """Return either serializable parameters or a torch state dict."""
         ...
 
     def train(self, mode: bool = True) -> Self:
@@ -127,6 +133,3 @@ class TrainableModel(Protocol):
     def to(self, device: torch.device) -> Self:
         """Move model to specified device."""
         ...
-
-    def optimize(self, other): ...
-    def predict(self, other): ...

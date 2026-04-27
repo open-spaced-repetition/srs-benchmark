@@ -26,6 +26,7 @@ from utils import (
     batch_process_wrapper,
     sort_jsonl,
     Collection,
+    get_model_state,
 )
 from data_loader import UserDataLoader
 from model_processors import (
@@ -110,7 +111,7 @@ class Trainer:
 
     def train(self):
         best_loss = np.inf
-        best_w = self.model.state_dict()  # initialize to current weights
+        best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
         for k in range(self.n_epoch):
@@ -181,7 +182,7 @@ class Trainer:
             self.avg_train_losses.append(losses[0])
             self.avg_eval_losses.append(losses[1] if len(losses) > 1 else 0)
 
-            w = self.model.state_dict()
+            w = get_model_state(self.model)
 
             if self.test_set is None:
                 weighted_loss = losses[0]
@@ -273,7 +274,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
     model = create_model(config)
 
     if config.default_params:
-        return model.state_dict()
+        return get_model_state(model)
 
     if config.model_name == "LSTM":
         model = model.to(config.device)
@@ -286,13 +287,13 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
             model,
             inner_opt.state_dict(),
         )
-        weights = copy.deepcopy(trained_model.state_dict())
+        weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt
         if config.device.type == "mps":
             torch.mps.empty_cache()
         return weights
     elif config.model_name == "LogisticRegression":
-        return model.optimize(train_df)
+        return cast(Any, model).optimize(train_df)
 
     trainer = Trainer(
         model=model,
@@ -301,7 +302,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         batch_size=config.batch_size,
     )
     if config.only_S0:
-        return trainer.model.state_dict()
+        return get_model_state(trainer.model)
     return trainer.train()
 
 
@@ -414,7 +415,9 @@ def process(
                                 f"User {user_id}, split {split_i}, partition {partition}: "
                                 "insufficient partition data and no user-level fallback, using defaults."
                             )
-                        partition_weights[partition] = create_model(config).state_dict()
+                        partition_weights[partition] = get_model_state(
+                            create_model(config)
+                        )
                 else:
                     print(f"User: {user_id}")
                     raise e
@@ -427,6 +430,7 @@ def process(
     p = []
     y = []
     save_tmp = []
+    model: Any = None
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         for partition in testset["partition"].unique():
@@ -434,7 +438,7 @@ def process(
             weights = w.get(partition, None)
             if config.model_name == "LogisticRegression":
                 model = create_model(config, weights)
-                retentions = model.predict(partition_testset)
+                retentions = cast(Any, model).predict(partition_testset)
                 partition_testset["p"] = retentions
             else:
                 my_collection = Collection(
@@ -450,7 +454,7 @@ def process(
                 if difficulties:
                     partition_testset["d"] = difficulties
 
-            p.extend(retentions)
+            p.extend(cast(list[Any], retentions))
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)
 
@@ -462,8 +466,8 @@ def process(
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
-    if config.model_name == "LogisticRegression":
-        model.log(stats)
+    if config.model_name == "LogisticRegression" and model is not None:
+        cast(Any, model).log(stats)
     return stats, raw
 
 

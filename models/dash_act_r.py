@@ -58,7 +58,7 @@ class DASH_ACTR(BaseModel):
         outputs = self.forward(sequences)
         return {"retentions": outputs}
 
-    def state_dict(self):
+    def benchmark_state(self):
         return list(
             map(
                 lambda x: round(float(x), 4),

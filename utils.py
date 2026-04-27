@@ -4,11 +4,14 @@ import matplotlib.pyplot as plt
 import traceback
 import torch
 from torch import Tensor
+from pathlib import Path
 from sklearn.metrics import root_mean_squared_error  # type: ignore
 from functools import wraps
 from itertools import accumulate
-from typing import TYPE_CHECKING
+from numbers import Real
+from typing import TYPE_CHECKING, Any, cast
 from config import Config
+from models.trainable import ModelState, ParameterList, PartitionedModelState, TrainingState
 
 if TYPE_CHECKING:
     from models.trainable import TrainableModel
@@ -36,6 +39,10 @@ def catch_exceptions(func):
             return None, error_msg
 
     return wrapper
+
+
+def get_model_state(model: "TrainableModel") -> ModelState:
+    return model.benchmark_state()
 
 
 def mean_bias_error(y, p):
@@ -341,18 +348,12 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
         "user": int(user_id),
         "size": len(y),
     }
-    if (
-        w_list
-        and isinstance(w_list[0], dict)
-        and all(isinstance(w, list) for w in w_list[0].values())
-    ):
-        stats["parameters"] = {
-            int(partition): list(map(lambda x: round(x, 6), w))
-            for partition, w in w_list[-1].items()
-        }
-    elif config.save_weights and w_list:
-        Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
-        torch.save(w_list[-1][0], f"weights/{file_name}/{user_id}.pth")
+    if w_list:
+        parameters = result_parameters(w_list[-1])
+        if parameters is not None:
+            cast(Any, stats)["parameters"] = parameters
+        elif config.save_weights:
+            save_model_state(w_list[-1], file_name, user_id)
     if config.save_raw_output:
         raw = {
             "user": int(user_id),
@@ -362,6 +363,35 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     else:
         raw = None
     return stats, raw
+
+
+def is_parameter_list(state: Any) -> bool:
+    return isinstance(state, list) and all(isinstance(x, Real) for x in state)
+
+
+def rounded_parameter_list(state: ParameterList) -> ParameterList:
+    return [round(float(x), 6) for x in state]
+
+
+def result_parameters(
+    state: TrainingState,
+) -> ParameterList | dict[str, ParameterList] | None:
+    if is_parameter_list(state):
+        return rounded_parameter_list(cast(ParameterList, state))
+
+    if isinstance(state, dict) and all(is_parameter_list(w) for w in state.values()):
+        partition_state = state
+        return {
+            str(partition): rounded_parameter_list(cast(ParameterList, w))
+            for partition, w in partition_state.items()
+        }
+
+    return None
+
+
+def save_model_state(state: TrainingState, file_name: str, user_id: int) -> None:
+    Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
+    torch.save(state, f"weights/{file_name}/{user_id}.pth")
 
 
 def sort_jsonl(file):

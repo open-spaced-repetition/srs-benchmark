@@ -5,7 +5,7 @@ from config import Config, ModelName
 from models import *
 
 
-MODEL_REGISTRY = {
+MODEL_REGISTRY: dict[ModelName, Any] = {
     "FSRSv1": FSRS1,
     "FSRSv2": FSRS2,
     "FSRSv3": FSRS3,
@@ -126,4 +126,4 @@ def create_model(
         # This case should ideally not be reached if all registered models are handled.
         raise ValueError(f"Unhandled instantiation logic for model: {model_name}")
 
-    return instance.to(config.device)
+    return cast(TrainableModel, instance.to(config.device))

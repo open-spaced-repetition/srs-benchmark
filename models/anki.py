@@ -139,7 +139,7 @@ class Anki(BaseModel):
         retentions = self.forgetting_curve(delta_ts, intervals)
         return {"retentions": retentions, "intervals": intervals}
 
-    def state_dict(self):
+    def benchmark_state(self):
         return list(
             map(
                 lambda x: round(float(x), 4),

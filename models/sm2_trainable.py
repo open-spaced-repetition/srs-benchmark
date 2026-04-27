@@ -91,7 +91,7 @@ class SM2(BaseModel):
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
 
-    def state_dict(self):
+    def benchmark_state(self):
         return list(
             map(
                 lambda x: round(float(x), 4),

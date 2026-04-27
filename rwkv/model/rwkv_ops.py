@@ -1,10 +1,7 @@
 from typing import Any
 
 import torch
-from typing import ParamSpec
 from torch import Tensor
-
-P = ParamSpec("P")
 
 
 class RWKV7_WKV(torch.autograd.Function):
@@ -37,6 +34,8 @@ class RWKV7_WKV(torch.autograd.Function):
                 out, state_checkpoints = torch.ops.rwkv.rwkv7_wkv_forward_half.default(
                     r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT
                 )
+            else:
+                raise ValueError(f"Unsupported dtype: {r_BTHK.dtype}")
 
             ctx.save_for_backward(
                 r_BTHK,

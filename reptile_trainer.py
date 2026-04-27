@@ -11,7 +11,7 @@ from fsrs_optimizer import (  # type: ignore
     BatchLoader,
     DevicePrefetchLoader,
 )
-from multiprocess import Pool
+from multiprocess import Pool  # type: ignore
 import copy
 import numpy as np
 from models.trainable import TrainableModel

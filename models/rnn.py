@@ -1,4 +1,4 @@
-from typing import Union
+from typing import cast, Union
 import torch
 from torch import nn, Tensor
 from config import Config
@@ -10,7 +10,7 @@ class RNN(BaseModel):
     decay = -0.5
     factor = 0.9 ** (1 / decay) - 1
 
-    def __init__(self, config: Config, state_dict=None):
+    def __init__(self, config: Config, state_dict: dict | None = None):
         super().__init__(config)
         self.n_input = 2
         self.n_hidden = 2
@@ -22,8 +22,8 @@ class RNN(BaseModel):
                 hidden_size=self.n_hidden,
                 num_layers=self.n_layers,
             )
-            nn.init.orthogonal_(self.rnn.weight_ih_l0)
-            nn.init.orthogonal_(self.rnn.weight_hh_l0)
+            nn.init.orthogonal_(cast(Tensor, self.rnn.weight_ih_l0))
+            nn.init.orthogonal_(cast(Tensor, self.rnn.weight_hh_l0))
             self.rnn.bias_ih_l0.data.fill_(0)  # type: ignore
             self.rnn.bias_hh_l0.data.fill_(0)  # type: ignore
         else:

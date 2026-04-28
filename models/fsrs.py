@@ -40,7 +40,7 @@ class FSRS(BaseModel):
             "difficulties": difficulties,
         }
 
-    def state_dict(self):
+    def benchmark_state(self):
         """Override to use precision based on config.use_secs_intervals"""
         precision = 6 if self.config.use_secs_intervals else 4
         return list(

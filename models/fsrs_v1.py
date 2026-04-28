@@ -87,7 +87,7 @@ class FSRS1(FSRS):
             outputs.append(state)
         return torch.stack(outputs), state
 
-    def state_dict(self):
+    def benchmark_state(self):
         return list(
             map(
                 lambda x: round(float(x), 4),

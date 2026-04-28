@@ -390,14 +390,14 @@ class SrsRWKV(ModuleType):
             loss_tensor=loss_tensor.detach(),
             ahead_avg=ahead_avg.detach(),
             ahead_raw_avg=ahead_raw_avg.detach(),
-            ahead_n=ahead_mask.sum().detach(),
+            ahead_n=int(ahead_mask.sum().detach().item()),
             ahead_equalize_avg=ahead_equalize_avg.detach(),
             ahead_raw_equalize_avg=ahead_raw_equalize_avg.detach(),
-            ahead_equalize_n=ahead_equalize_mask.sum().detach(),
+            ahead_equalize_n=int(ahead_equalize_mask.sum().detach().item()),
             imm_avg=immediate_avg.detach(),
-            imm_n=immediate_mask.sum().detach(),
+            imm_n=int(immediate_mask.sum().detach().item()),
             imm_binary_equalize_avg=immediate_binary_equalize_avg.detach(),
-            imm_binary_equalize_n=immediate_equalize_mask.sum().detach(),
+            imm_binary_equalize_n=int(immediate_equalize_mask.sum().detach().item()),
             w_loss_avg=w_avg.detach(),
             ahead_logits_mag_loss_avg=ahead_logits_mag_avg.detach(),
             ahead_logits_diff_loss_avg=ahead_logits_diff_avg.detach(),
@@ -452,7 +452,7 @@ class AnkiRWKVDictStatistics:
     imm_ps_all: dict
     label_ratings: dict[int, float]
     label_elapsed_seconds: dict[int, float]
-    w: dict
+    w: torch.Tensor
 
 
 def extract_p(stats: SrsRWKVIterStatistics):
@@ -581,7 +581,9 @@ def naive_splits(data_list: list[RWKVSample]):
 
 
 if __name__ == "__main__":
-    model = SrsRWKV()
+    from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
+
+    model = SrsRWKV(DEFAULT_ANKI_RWKV_CONFIG)
     t_param = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Number of trainable parameters:", t_param)
     a_param = sum(p.numel() for p in model.parameters())

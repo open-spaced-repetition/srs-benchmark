@@ -20,6 +20,7 @@ dependencies = [
     "multiprocess>=0.70.18",
     "fsrs-rs-python>=0.8.2",
     "psutil>=7.2.2",
+    "relplot>=1.0.3",
 ]
 
 [tool.uv.sources]
@@ -41,6 +42,11 @@ explicit = true
 [build-system]
 requires = ["setuptools", "wheel", "torch"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pandas-stubs>=3.0.0.260204",
+]
 
 [tool.mypy]
 ignore_missing_imports = true

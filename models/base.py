@@ -1,7 +1,10 @@
+from typing import Any, Mapping
+
 import torch
 from torch import nn, Tensor
 import pandas as pd
 from config import Config
+from .trainable import ModelState
 
 
 class BaseParameterClipper:
@@ -43,3 +46,14 @@ class BaseModel(nn.Module):
 
     def apply_parameter_clipper(self):
         self.apply(self.clipper)
+
+    def benchmark_state(self) -> ModelState:
+        return super().state_dict()
+
+    def load_state_dict(
+        self,
+        state_dict: Mapping[str, Any],
+        strict: bool = True,
+        assign: bool = False,
+    ) -> Any:
+        return super().load_state_dict(state_dict, strict=strict, assign=assign)

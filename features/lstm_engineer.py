@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pandas as pd
 import torch
 import numpy as np
@@ -90,6 +92,8 @@ class LSTMFeatureEngineer(BaseFeatureEngineer):
 
         # Apply history creation grouped by card
         grouped = df.groupby("card_id", group_keys=False)
-        df["tensor"] = grouped[df.columns.difference(["card_id"])].apply(get_history)
+        cast(Any, df)["tensor"] = grouped[df.columns.difference(["card_id"])].apply(
+            get_history
+        )
 
         return df

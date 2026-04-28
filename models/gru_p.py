@@ -1,3 +1,5 @@
+from typing import cast
+
 import torch
 from torch import nn, Tensor
 
@@ -22,8 +24,8 @@ class GRU_P(BaseModel):
             hidden_size=self.n_hidden,
             num_layers=self.n_layers,
         )
-        nn.init.orthogonal_(self.rnn.weight_ih_l0)
-        nn.init.orthogonal_(self.rnn.weight_hh_l0)
+        nn.init.orthogonal_(cast(Tensor, self.rnn.weight_ih_l0))
+        nn.init.orthogonal_(cast(Tensor, self.rnn.weight_hh_l0))
         self.rnn.bias_ih_l0.data.fill_(0)  # type: ignore
         self.rnn.bias_hh_l0.data.fill_(0)  # type: ignore
 

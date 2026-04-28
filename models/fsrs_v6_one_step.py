@@ -1,3 +1,4 @@
+from pandas import Series
 from typing import List, Optional
 import math
 import pandas as pd
@@ -21,7 +22,7 @@ class FSRS_one_step(BaseModel):
         self.w = w.copy()
         self.lr = 1e-4
 
-    def forgetting_curve(self, t: float, s: float) -> float:
+    def forgetting_curve(self, t: float | Series, s: float) -> float:
         """Calculates retrievability based on the new formula."""
         decay = -self.w[20]
         factor = 0.9 ** (1 / decay) - 1
@@ -192,7 +193,7 @@ class FSRS_one_step(BaseModel):
                     self.grad[15] = C * (common_factor * easy_bonus)
                 if rating == 4:
                     self.grad[16] = C * (common_factor * hard_penalty)
-
+            assert self.last_d
             last_d = self.last_d
             init_d_4 = self.w[4] - math.exp(self.w[5] * (4 - 1)) + 1
             d_intermediate = last_d + (-self.w[6] * (rating - 3) * (10 - last_d) / 9)
@@ -319,6 +320,7 @@ class FSRS_one_step(BaseModel):
 
         w1 = 0.41
         w2 = 0.54
+        initial_stabilities = list(r_s0_default.values())
 
         if len(rating_stability) == 0:
             raise ValueError("Not enough data for parameters initialization!")

@@ -71,7 +71,7 @@ class ACT_R(BaseModel):
     def activation(self, m):
         return 1 / (1 + torch.exp((self.w[3] - m) / self.w[2]))
 
-    def state_dict(self):
+    def benchmark_state(self):
         return list(
             map(
                 lambda x: round(float(x), 4),

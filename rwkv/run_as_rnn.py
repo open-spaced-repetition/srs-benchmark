@@ -378,6 +378,7 @@ def run(data_path, model_path, label_db_path, label_db_size, user_id, verbose):
 
     time_start = time.time()
     for i, row in df.iterrows():
+        i = int(i)
         if (i + 1) % 100 == 0:
             print(f"{i}/{len(df)}, rate: {(i + 1) / (time.time() - time_start):.2f}")
 

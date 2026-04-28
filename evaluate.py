@@ -6,13 +6,13 @@ import math
 import argparse
 
 
-def sigdig(value, CI):
-    def num_lead_zeros(x):
+def sigdig(value: float, CI: float):
+    def num_lead_zeros(x: float) -> float:
         return math.inf if x == 0 else -math.floor(math.log10(abs(x))) - 1
 
     n_lead_zeros_CI = num_lead_zeros(CI)
     CI_sigdigs = 2
-    decimals = n_lead_zeros_CI + CI_sigdigs
+    decimals = int(n_lead_zeros_CI + CI_sigdigs)
     rounded_CI = round(CI, decimals)
     rounded_value = round(value, decimals)
     if n_lead_zeros_CI > num_lead_zeros(rounded_CI):

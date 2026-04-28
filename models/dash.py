@@ -73,7 +73,7 @@ class DASH(BaseModel):
         outputs = self.forward(sequences.transpose(0, 1))
         return {"retentions": outputs.squeeze(1)}
 
-    def state_dict(self):
+    def benchmark_state(self):
         return (
             self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
         )

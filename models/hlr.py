@@ -38,7 +38,7 @@ class HLR(BaseModel):
     def forgetting_curve(self, t, s):
         return 0.5 ** (t / s)
 
-    def state_dict(self):
+    def benchmark_state(self):
         return (
             self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
         )

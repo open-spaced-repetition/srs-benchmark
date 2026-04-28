@@ -313,8 +313,8 @@ def get_rwkv_data(data_path, user_id, equalize_review_ths=[]):
 
 @dataclass
 class ModuleData:
-    split_len: np.array
-    split_B: np.array
+    split_len: np.ndarray
+    split_B: np.ndarray
     from_perm: torch.Tensor
     to_perm: torch.Tensor  # the inverse of from_perm
 

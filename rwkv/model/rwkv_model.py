@@ -33,7 +33,7 @@ class RWKV7Config:
     )
     n_heads: int
     n_layers: int
-    channel_mixer_factor: int
+    channel_mixer_factor: float
 
     # For stacking RWKV7 on top of one-another. We allow sending in the total number of layers and a layer offset so that we can achieve better initialization
     layer_offset: int

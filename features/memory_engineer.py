@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pandas as pd
 from .base import BaseFeatureEngineer
 
@@ -30,7 +32,7 @@ class EbisuFeatureEngineer(BaseFeatureEngineer):
         t_history_list, r_history_list = self.get_history_lists(df)
 
         # Create tuple sequences for Ebisu
-        df["sequence"] = [
+        cast(Any, df)["sequence"] = [
             tuple(zip(t_item[:-1], r_item[:-1]))
             for t_sublist, r_sublist in zip(t_history_list, r_history_list)
             for t_item, r_item in zip(t_sublist, r_sublist)

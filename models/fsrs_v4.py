@@ -126,7 +126,7 @@ class FSRS4(FSRS3):
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[7] * init + (1 - self.w[7]) * current
 
-    def state_dict(self):
+    def benchmark_state(self):
         return list(
             map(
                 lambda x: round(float(x), 4),
@@ -208,6 +208,7 @@ class FSRS4(FSRS3):
 
         w1 = 0.41
         w2 = 0.54
+        initial_stabilities = list(r_s0_default.values())
 
         if len(rating_stability) == 0:
             initial_stabilities = list(r_s0_default.values())

@@ -227,6 +227,18 @@ wheels = [
 ]
 
 [[package]]
+name = "deprecation"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5a/d3/8ae2869247df154b64c1884d7346d412fed0c49df84db635aab2d1c40e62/deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff", size = 173788, upload-time = "2020-04-20T14:23:38.738Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a", size = 11178, upload-time = "2020-04-20T14:23:36.581Z" },
+]
+
+[[package]]
 name = "dill"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1409,6 +1421,24 @@ wheels = [
 ]
 
 [[package]]
+name = "relplot"
+version = "1.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "deprecation" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "seaborn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/df/9becaad4f326a8888b7aaca66cc4383e82ca198be614b12ba0c3f2e41190/relplot-1.0.3.tar.gz", hash = "sha256:838f3681ffcc9ffcdc3521a162fed6908830075e5ba4b21d66a8c1db2bdd4999", size = 19011, upload-time = "2025-11-04T17:24:15.973Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/75/12/2bacb856a27293be5ab420db8ffb52e9fff44f1cc6869d1fd1f78267e132/relplot-1.0.3-py3-none-any.whl", hash = "sha256:a807187018207d7215311271d81ec10161f27338b3555f6cfbe1b33a32e2f35e", size = 17740, upload-time = "2025-11-04T17:24:14.567Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.32.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1529,6 +1559,20 @@ wheels = [
 ]
 
 [[package]]
+name = "seaborn"
+version = "0.13.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/59/a451d7420a77ab0b98f7affa3a1d78a313d2f7281a57afb1a34bae8ab412/seaborn-0.13.2.tar.gz", hash = "sha256:93e60a40988f4d65e9f4885df477e2fdaff6b73a9ded434c1ab356dd57eefff7", size = 1457696, upload-time = "2024-01-25T13:21:52.551Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/11/00d3c3dfc25ad54e731d91449895a79e4bf2384dc3ac01809010ba88f6d5/seaborn-0.13.2-py3-none-any.whl", hash = "sha256:636f8336facf092165e27924f223d3c62ca560b1f2bb5dff7ab7fad265361987", size = 294914, upload-time = "2024-01-25T13:21:49.598Z" },
+]
+
+[[package]]
 name = "sentry-sdk"
 version = "2.51.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1593,6 +1637,7 @@ dependencies = [
     { name = "pandas" },
     { name = "psutil" },
     { name = "pyarrow" },
+    { name = "relplot" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "statsmodels" },
@@ -1621,6 +1666,7 @@ requires-dist = [
     { name = "pandas" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "pyarrow", specifier = ">=15" },
+    { name = "relplot", specifier = ">=1.0.3" },
     { name = "scikit-learn" },
     { name = "scipy", specifier = ">=1.16.3" },
     { name = "statsmodels", specifier = ">=0.14.6" },

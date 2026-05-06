@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 from torch import nn, Tensor
 
@@ -39,18 +41,20 @@ class Transformer(BaseModel):
             except FileNotFoundError:
                 pass
 
-    def forward(self, src):
+    def forward[SeqLen, BatchSize](
+        self, src: Tensor[SeqLen, BatchSize, 2]
+    ) -> tuple[Tensor[SeqLen, BatchSize, 1], None]:
         tgt = torch.zeros(1, src.shape[1], self.n_input).to(device=self.config.device)
         output = self.transformer(src, tgt)
         output = self.fc(output)
         output = torch.exp(output).repeat(src.shape[0], 1, 1)
         return output, None
 
-    def batch_process(
+    def batch_process[SeqLen, BatchSize](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[SeqLen, BatchSize, 2],
+        delta_ts: Tensor[BatchSize],
+        seq_lens: Tensor[BatchSize],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)

@@ -21,6 +21,9 @@ class FSRS(BaseModel):
     def forgetting_curve(self, t, s):
         raise NotImplementedError("Forgetting curve not implemented")
 
+    def forward(self, inputs: Tensor) -> tuple[Tensor, Tensor]:
+        raise NotImplementedError("Forward pass not implemented")
+
     def batch_process(
         self,
         sequences: Tensor,

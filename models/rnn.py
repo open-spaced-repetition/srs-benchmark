@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import cast, Union
 import torch
 from torch import nn, Tensor
@@ -49,16 +51,18 @@ class RNN(BaseModel):
             except FileNotFoundError:
                 pass
 
-    def forward(self, x, hx=None):
+    def forward[SeqLen, BatchSize](
+        self, x: Tensor[SeqLen, BatchSize, 2], hx=None
+    ) -> tuple[Tensor[SeqLen, BatchSize, 1], Tensor]:
         x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x))
         return output, h
 
-    def batch_process(
+    def batch_process[SeqLen, BatchSize](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[SeqLen, BatchSize, 2],
+        delta_ts: Tensor[BatchSize],
+        seq_lens: Tensor[BatchSize],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)

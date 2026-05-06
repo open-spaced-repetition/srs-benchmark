@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import assert_never
 from typing import List, Union
 import torch
@@ -348,7 +350,9 @@ class FSRS7(FSRS6):
     def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
         return delta_d * (10 - old_d) / 9
 
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+    def mean_reversion[BatchSize](
+        self, init: Tensor | float, current: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:
         return 0.01 * init + 0.99 * current
 
     def next_d(self, state: Tensor, rating: Tensor) -> Tensor:

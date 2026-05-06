@@ -1,2 +1,3 @@
 tensor-shapes = true
+search-path = [".pyrefly-stubs/tensor_shapes/fixtures"]
 check-unannotated-defs = false

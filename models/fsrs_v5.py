@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List, Union
 import pandas as pd
 import torch
@@ -99,11 +101,11 @@ class FSRS5(FSRS4dot5):
     def apply_gradient_constraints(self):
         pass
 
-    def batch_process(
+    def batch_process[SeqLen, BatchSize](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[SeqLen, BatchSize, 2],
+        delta_ts: Tensor[BatchSize],
+        seq_lens: Tensor[BatchSize],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         output = super().batch_process(sequences, delta_ts, seq_lens, real_batch_size)
@@ -117,7 +119,9 @@ class FSRS5(FSRS4dot5):
         )
         return output
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
+    def stability_after_failure[BatchSize](
+        self, state: Tensor[BatchSize, 2], r: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:  # type: ignore[override]
         old_s = state[:, 0]
         new_s = (
             self.w[11]
@@ -128,24 +132,32 @@ class FSRS5(FSRS4dot5):
         new_minimum_s = old_s / torch.exp(self.w[17] * self.w[18])
         return torch.minimum(new_s, new_minimum_s)
 
-    def stability_short_term(self, state: Tensor, rating: Tensor) -> Tensor:
+    def stability_short_term[BatchSize](
+        self, state: Tensor[BatchSize, 2], rating: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:
         new_s = state[:, 0] * torch.exp(self.w[17] * (rating - 3 + self.w[18]))
         return new_s
 
-    def init_d(self, rating: Union[int, Tensor]) -> Tensor:
+    def init_d[BatchSize](self, rating: Union[int, Tensor[BatchSize]]) -> Tensor:
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
-    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+    def linear_damping[BatchSize](
+        self, delta_d: Tensor[BatchSize], old_d: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:
         return delta_d * (10 - old_d) / 9
 
-    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
+    def next_d[BatchSize](
+        self, state: Tensor[BatchSize, 2], rating: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:
         delta_d = -self.w[6] * (rating - 3)
         new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
         new_d = self.mean_reversion(self.init_d(4), new_d)
         return new_d
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize](
+        self, X: Tensor[BatchSize, 2], state: Tensor[BatchSize, 2]
+    ) -> Tensor[BatchSize, 2]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty

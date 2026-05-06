@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List, Optional
 import torch
 from torch import nn, Tensor
@@ -36,9 +38,12 @@ class FSRS2(FSRS1):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
-    def stability_after_success(
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_success[BatchSize](
+        self,
+        state: Tensor[BatchSize, 2],
+        new_d: Tensor[BatchSize],
+        r: Tensor[BatchSize],
+    ) -> Tensor[BatchSize]:
         new_s = state[:, 0] * (
             1
             + torch.exp(self.w[6])
@@ -48,9 +53,12 @@ class FSRS2(FSRS1):
         )
         return new_s
 
-    def stability_after_failure(  # type: ignore[override]
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_failure[BatchSize](  # type: ignore[override]
+        self,
+        state: Tensor[BatchSize, 2],
+        new_d: Tensor[BatchSize],
+        r: Tensor[BatchSize],
+    ) -> Tensor[BatchSize]:
         new_s = (
             self.w[10]
             * torch.pow(new_d, self.w[11])
@@ -59,10 +67,14 @@ class FSRS2(FSRS1):
         )
         return new_s
 
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+    def mean_reversion[BatchSize](
+        self, init: Tensor | float, current: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:
         return self.w[5] * init + (1 - self.w[5]) * current
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize](
+        self, X: Tensor[BatchSize, 2], state: Tensor[BatchSize, 2]
+    ) -> Tensor[BatchSize, 2]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
@@ -87,9 +99,11 @@ class FSRS2(FSRS1):
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d], dim=1)
 
-    def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
-    ) -> tuple[Tensor, Tensor]:
+    def forward[SeqLen, BatchSize](
+        self,
+        inputs: Tensor[SeqLen, BatchSize, 2],
+        state: Optional[Tensor[BatchSize, 2]] = None,
+    ) -> tuple[Tensor[SeqLen, BatchSize, 2], Tensor[BatchSize, 2]]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """

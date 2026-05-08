@@ -31,7 +31,7 @@ if __name__ == "__main__":
     lr = 4e-2
     wd = 1e-4
     batch_size = 65536
-    if config.model_name == "RNN":  # GRU pretraining path was intentionally removed.
+    if config.model_name == "RNN":
         model = RNN(config)
         model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
     elif config.model_name == "Transformer":

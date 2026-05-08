@@ -1,6 +1,5 @@
-from typing import cast
 import torch
-from torch import nn, Tensor
+from torch import nn
 from config import Config
 from models.base import BaseModel
 

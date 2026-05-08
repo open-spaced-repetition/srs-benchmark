@@ -47,6 +47,8 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
         - FSRS-7 default param.: FSRS-7 with default parameters, without per-user optimization.
         - FSRS-7 recency: FSRS-7 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
         - FSRS-7 sched. penalties: FSRS-7 with penalties that address 2 issues: extremely short intervals for same-day reviews at high (97-99%) desired retention and massive interval length jumps at low desired retention. They make scheduling based on FSRS-7 more reasonable (from the perspective of an average user) at the cost of making FSRS-7's predictive ability a little worse.
+        - FSRS-7 preset: FSRS-7 where different presets have different parameters. If some preset has too few reviews for optimization, user-specific parameters (optimized on all data from this user) are used.
+        - FSRS-7 deck: similar to above, but with different parameters for each deck.
     - FSRS-rs: the Rust port of FSRS-6 with recency weighting. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
@@ -105,9 +107,11 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-7 recency | 35 | 0.3414±0.0043 | 0.0627±0.0010 | 0.7097±0.0022 | FIL, G, SR |
 | FSRS-7 | 35 | 0.3437±0.0043 | 0.0655±0.0011 | 0.7069±0.0023 | FIL, G, SR |
 | FSRS-7 sched. penalties | 35 | 0.3438±0.0043 | 0.0663±0.0011 | 0.7065±0.0023 | FIL, G, SR |
+| FSRS-7 preset | 35 | 0.3438±0.0043 | 0.0650±0.0011 | 0.7079±0.0023 | FIL, G, SR |
 | FSRS-rs | 21 | 0.3443±0.0041 | 0.0635±0.0011 | 0.7074±0.0022 | IL, G, SR |
 | GRU-P-short | 297 | 0.3458±0.0043 | 0.0622±0.0011 | 0.6990±0.0025 | IL, G, SR|
 | FSRS-6 | 21 | 0.3460±0.0042 | 0.0653±0.0011 | 0.7034±0.0023 | IL, G, SR |
+| FSRS-7 deck | 35 | 0.3514±0.0044 | 0.0725±0.0013 | 0.7016±0.0022 | FIL, G, SR |
 | GRU-P | 297 | 0.3521±0.0043 | 0.0633±0.0011 | 0.6868±0.0025 | IL, G |
 | FSRS-5 | 19 | 0.3560±0.0045 | 0.0741±0.0013 | 0.7011±0.0023 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.3624±0.0046 | 0.0764±0.0013 | 0.6893±0.0023 | IL, G |
@@ -144,7 +148,9 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | FSRS-7 recency | 35 | 0.3236±0.0041 | 0.06339±0.00088 | 0.7394±0.0019 | FIL, G, SR |
 | FSRS-7 | 35 | 0.3255±0.0041 | 0.06617±0.00091 | 0.7366±0.0019 | FIL, G, SR |
 | FSRS-7 sched. penalties | 35 | 0.3259±0.0041 | 0.06675±0.00091 | 0.7362±0.0019 | FIL, G, SR |
+| FSRS-7 preset | 35 | 0.3261±0.0041 | 0.06572±0.00092 | 0.7361±0.0019 | FIL, G, SR |
 | MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
+| FSRS-7 deck | 35 | 0.3329±0.0041 | 0.0730±0.0010 | 0.7274±0.0020 | FIL, G, SR |
 | FSRS-7 default param. | 0 | 0.3431±0.0040 | 0.0921±0.0011 | 0.7206±0.0020 | FIL, G, SR |
 | DASH[MCM] | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
 | GRU-P | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |

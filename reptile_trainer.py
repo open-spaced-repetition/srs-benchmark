@@ -237,8 +237,8 @@ def finetune_adapt(
     inner_steps,
     reg_scale,
     clip_norm,
-):
-    """Adapts over all batches"""
+) -> tuple[Tensor, int]:
+    """Adapts over all batches. Returns (inner_loss, training_flops)."""
     model.train()
     assert (
         not meta_model_params.requires_grad
@@ -249,9 +249,39 @@ def finetune_adapt(
         data,
         target_device=DEVICE,
     )
+
+    # Profile forward FLOPs on the very first real batch, then scale by total tokens.
+    # FlopCounterMode is available in torch >= 2.1; skip gracefully if absent.
+    forward_flops_per_token: float | None = None
+    total_tokens = 0
+
+    try:
+        from torch.utils.flop_counter import FlopCounterMode as _FlopCounterMode  # type: ignore
+
+        _FlopCounterMode_available = True
+    except ImportError:
+        _FlopCounterMode_available = False
+
     for step in range(inner_steps):
         batch_count = 0
         for batch in device_loader:
+            sequences, delta_ts, labels, seq_lens, weights = batch
+            batch_tokens = int(seq_lens.sum().item())
+            total_tokens += batch_tokens
+
+            # Profile on the very first non-empty batch (no effect on model state).
+            if (
+                forward_flops_per_token is None
+                and _FlopCounterMode_available
+                and batch_tokens > 0
+            ):
+                with _FlopCounterMode(display=False) as _fc:  # type: ignore[reportPossiblyUnbound]
+                    with torch.no_grad():
+                        model.eval()
+                        model.batch_process(sequences, delta_ts, seq_lens, seq_lens.shape[0])
+                model.train()
+                forward_flops_per_token = _fc.get_total_flops() / batch_tokens
+
             inner_opt.zero_grad()
             batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
                 model, batch, batch_size_exp
@@ -269,7 +299,13 @@ def finetune_adapt(
 
     if inner_loss is None:
         raise ValueError("No batches found in data loader")
-    return inner_loss
+
+    # Compute total FLOPs: 3× forward FLOPs (forward + backward + param-gradient update).
+    training_flops = 0
+    if forward_flops_per_token is not None and total_tokens > 0:
+        training_flops = int(3 * total_tokens * forward_flops_per_token)
+
+    return inner_loss, training_flops
 
 
 def get_inner_opt(params, path=None):
@@ -287,8 +323,14 @@ def get_inner_opt(params, path=None):
     return opt
 
 
-def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS):
-    """A fine tuning procedure designed to generalize as well as possible given the data"""
+def finetune(
+    df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
+) -> tuple:
+    """A fine tuning procedure designed to generalize as well as possible given the data.
+
+    Returns (learner, training_flops) where training_flops is the total number of
+    floating-point operations used during optimization (3 × forward FLOPs × total tokens).
+    """
     lr_start_raw = finetune_params["lr_start_raw"]
     lr_middle_raw = finetune_params["lr_middle_raw"]
     lr_end_raw = finetune_params["lr_end_raw"]
@@ -341,7 +383,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         max_seq_len=MAX_SEQ_LEN,
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
-    _ = finetune_adapt(
+    _, training_flops = finetune_adapt(
         df_loader,
         meta_model_params,
         learner,
@@ -352,7 +394,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         reg_scale=reg_scale,
         clip_norm=clip_norm,
     )
-    return learner
+    return learner, training_flops
 
 
 def evaluate(
@@ -384,7 +426,7 @@ def evaluate(
                     None,
                 )  # train_index and test_index no longer have the same meaning as before
 
-            finetuned_model = finetune(
+            finetuned_model, _ = finetune(
                 train_set.copy(),
                 model,
                 inner_opt_state,

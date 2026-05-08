@@ -252,7 +252,7 @@ def finetune_adapt(
     )
 
     # Profile forward FLOPs on the very first real batch, then scale by total tokens.
-    # FlopCounterMode is available in torch >= 2.1; skip gracefully if absent.
+    # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
     forward_flops_per_token: float | None = None
     total_tokens = 0
 
@@ -297,7 +297,8 @@ def finetune_adapt(
     if inner_loss is None:
         raise ValueError("No batches found in data loader")
 
-    # Compute total FLOPs: 3× forward FLOPs (forward + backward + param-gradient update).
+    # Compute total FLOPs: 3× forward FLOPs per the standard ML convention
+    # (1× forward + 2× backward, where backward ≈ 2× forward for dense layers).
     training_flops = 0
     if forward_flops_per_token is not None and total_tokens > 0:
         training_flops = int(3 * total_tokens * forward_flops_per_token)

@@ -115,7 +115,7 @@ class Trainer:
         epoch_len = len(self.train_set.y_train)
 
         # Profile forward FLOPs on the first training batch, then scale by total tokens.
-        # FlopCounterMode is available in torch >= 2.1; skip gracefully if absent.
+        # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
         forward_flops_per_token: float = 0.0
         try:
             from torch.utils.flop_counter import FlopCounterMode as _FlopCounterMode  # type: ignore
@@ -167,7 +167,8 @@ class Trainer:
             best_loss = weighted_loss
             best_w = w
 
-        # Total FLOPs: 3× forward FLOPs (forward + backward + param-gradient update).
+        # Total FLOPs: 3× forward FLOPs per the standard ML convention
+        # (1× forward + 2× backward, where backward ≈ 2× forward for dense layers).
         self.total_training_flops: int = int(
             3 * total_tokens_trained * forward_flops_per_token
         )
@@ -498,8 +499,8 @@ def process(
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
-    # Save total optimization FLOPs (3 × forward FLOPs × total tokens trained).
-    # This reflects actual compute spent on gradient steps across all splits/partitions.
+    # Save total optimization FLOPs (3× forward FLOPs × total tokens trained per the
+    # standard ML convention). Reflects actual compute across all splits/partitions.
     stats["train_flops"] = total_flops
     if config.model_name == "LogisticRegression" and model is not None:
         cast(Any, model).log(stats)

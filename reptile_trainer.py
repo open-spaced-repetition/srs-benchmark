@@ -270,12 +270,18 @@ def finetune_adapt(
             total_tokens += batch_tokens
 
             # Profile on the very first non-empty batch (no effect on model state).
-            if forward_flops_per_token is None and _FMC is not None and batch_tokens > 0:
+            if (
+                forward_flops_per_token is None
+                and _FMC is not None
+                and batch_tokens > 0
+            ):
                 sequences, delta_ts = batch[0], batch[1]
                 with _FMC(display=False) as _fc:
                     with torch.no_grad():
                         model.eval()
-                        model.batch_process(sequences, delta_ts, seq_lens, seq_lens.shape[0])
+                        model.batch_process(
+                            sequences, delta_ts, seq_lens, seq_lens.shape[0]
+                        )
                 model.train()
                 forward_flops_per_token = _fc.get_total_flops() / batch_tokens
 

@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from pathlib import Path
+from typing import Any
 from config import create_parser, Config
 from fsrs_optimizer import (  # type: ignore
     BatchDataset,
@@ -255,27 +256,23 @@ def finetune_adapt(
     forward_flops_per_token: float | None = None
     total_tokens = 0
 
+    # Import FlopCounterMode once; store None if unavailable (torch < 2.1).
     try:
-        from torch.utils.flop_counter import FlopCounterMode as _FlopCounterMode  # type: ignore
-
-        _FlopCounterMode_available = True
+        from torch.utils.flop_counter import FlopCounterMode as _FMC  # type: ignore
     except ImportError:
-        _FlopCounterMode_available = False
+        _FMC = None  # type: ignore[assignment]
 
     for step in range(inner_steps):
         batch_count = 0
         for batch in device_loader:
-            sequences, delta_ts, labels, seq_lens, weights = batch
+            seq_lens = batch[3]
             batch_tokens = int(seq_lens.sum().item())
             total_tokens += batch_tokens
 
             # Profile on the very first non-empty batch (no effect on model state).
-            if (
-                forward_flops_per_token is None
-                and _FlopCounterMode_available
-                and batch_tokens > 0
-            ):
-                with _FlopCounterMode(display=False) as _fc:  # type: ignore[reportPossiblyUnbound]
+            if forward_flops_per_token is None and _FMC is not None and batch_tokens > 0:
+                sequences, delta_ts = batch[0], batch[1]
+                with _FMC(display=False) as _fc:
                     with torch.no_grad():
                         model.eval()
                         model.batch_process(sequences, delta_ts, seq_lens, seq_lens.shape[0])
@@ -325,7 +322,7 @@ def get_inner_opt(params, path=None):
 
 def finetune(
     df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
-) -> tuple:
+) -> tuple[Any, int]:
     """A fine tuning procedure designed to generalize as well as possible given the data.
 
     Returns (learner, training_flops) where training_flops is the total number of

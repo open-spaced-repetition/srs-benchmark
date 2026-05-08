@@ -10,7 +10,6 @@ from .dash_engineer import (
     DashACTRFeatureEngineer,
 )
 from .neural_engineer import (
-    GRUPFeatureEngineer,
     HLRFeatureEngineer,
     ACTRFeatureEngineer,
     NN17FeatureEngineer,
@@ -34,7 +33,6 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
     "FSRS-rs": FSRSFeatureEngineer,
     "FSRS-6-one-step": FSRSOneStepFeatureEngineer,
     "RNN": FSRSFeatureEngineer,
-    "GRU": FSRSFeatureEngineer,
     "Transformer": FSRSFeatureEngineer,
     "SM2-trainable": FSRSFeatureEngineer,
     "Anki": FSRSFeatureEngineer,
@@ -42,7 +40,6 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
     # Specialized models
     "LogisticRegression": LogisticRegressionEngineer,
     "LSTM": LSTMFeatureEngineer,
-    "GRU-P": GRUPFeatureEngineer,
     "HLR": HLRFeatureEngineer,
     "ACT-R": ACTRFeatureEngineer,
     "NN-17": NN17FeatureEngineer,

@@ -17,7 +17,7 @@ class TrainableModel(Protocol):
     Protocol for trainable models that depend on nn.Module.
 
     This Protocol defines the interface that all neural network-based trainable models must implement.
-    Models including LSTM, RNN, Transformer, NN_17, GRU_P, etc. should all follow this protocol.
+    Models including LSTM, RNN, Transformer, NN_17, etc. should all follow this protocol.
     """
 
     # Class attributes that should be available

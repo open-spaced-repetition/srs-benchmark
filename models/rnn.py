@@ -1,4 +1,4 @@
-from typing import cast, Union
+from typing import cast
 import torch
 from torch import nn, Tensor
 from config import Config
@@ -16,22 +16,11 @@ class RNN(BaseModel):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
-        if self.config.model_name == "GRU":
-            self.rnn: Union[nn.GRU, nn.RNN] = nn.GRU(
-                input_size=self.n_input,
-                hidden_size=self.n_hidden,
-                num_layers=self.n_layers,
-            )
-            nn.init.orthogonal_(cast(Tensor, self.rnn.weight_ih_l0))
-            nn.init.orthogonal_(cast(Tensor, self.rnn.weight_hh_l0))
-            self.rnn.bias_ih_l0.data.fill_(0)  # type: ignore
-            self.rnn.bias_hh_l0.data.fill_(0)  # type: ignore
-        else:
-            self.rnn = nn.RNN(
-                input_size=self.n_input,
-                hidden_size=self.n_hidden,
-                num_layers=self.n_layers,
-            )
+        self.rnn = nn.RNN(
+            input_size=self.n_input,
+            hidden_size=self.n_hidden,
+            num_layers=self.n_layers,
+        )
 
         self.fc = nn.Linear(self.n_hidden, self.n_out)
 

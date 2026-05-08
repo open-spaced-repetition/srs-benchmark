@@ -8,7 +8,7 @@ from .base import BaseFeatureEngineer
 class FSRSFeatureEngineer(BaseFeatureEngineer):
     """
     Feature engineer for FSRS models (FSRSv1, FSRSv2, FSRSv3, FSRSv4, FSRS-4.5, FSRS-5, FSRS-6)
-    Also handles RNN, GRU, Transformer, SM2-trainable, Anki, and 90% models
+    Also handles RNN, Transformer, SM2-trainable, Anki, and 90% models
     """
 
     def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:

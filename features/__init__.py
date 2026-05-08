@@ -8,7 +8,6 @@ from .dash_engineer import (
     DashACTRFeatureEngineer,
 )
 from .neural_engineer import (
-    GRUPFeatureEngineer,
     HLRFeatureEngineer,
     ACTRFeatureEngineer,
     NN17FeatureEngineer,
@@ -25,7 +24,6 @@ __all__ = [
     "DashFeatureEngineer",
     "DashMCMFeatureEngineer",
     "DashACTRFeatureEngineer",
-    "GRUPFeatureEngineer",
     "HLRFeatureEngineer",
     "ACTRFeatureEngineer",
     "NN17FeatureEngineer",

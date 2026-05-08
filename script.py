@@ -120,15 +120,17 @@ class Trainer:
         try:
             from torch.utils.flop_counter import FlopCounterMode as _FlopCounterMode  # type: ignore
 
-            _profile_batch = next(iter(self.train_data_loader))
-            _n_tokens_profile = int(_profile_batch[3].sum().item())
-            if _n_tokens_profile > 0:
-                with _FlopCounterMode(display=False) as _fc:
-                    with torch.no_grad():
-                        self.model.eval()
-                        batch_process_wrapper(self.model, _profile_batch)
-                self.model.train()
-                forward_flops_per_token = _fc.get_total_flops() / _n_tokens_profile
+            forward_flops_per_token = 0.0
+            for _profile_batch in self.train_data_loader:
+                _n_tokens_profile = int(_profile_batch[3].sum().item())
+                if _n_tokens_profile > 0:
+                    with _FlopCounterMode(display=False) as _fc:
+                        with torch.no_grad():
+                            self.model.eval()
+                            batch_process_wrapper(self.model, _profile_batch)
+                    self.model.train()
+                    forward_flops_per_token = _fc.get_total_flops() / _n_tokens_profile
+                    break
         except (ImportError, StopIteration):
             pass  # FlopCounterMode unavailable or empty loader; train_flops will be 0
 

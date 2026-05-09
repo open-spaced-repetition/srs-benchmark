@@ -247,6 +247,11 @@ class FSRS_one_step(BaseModel):
         self.w[20] = max(0.1, min(self.w[20], 0.8))
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
+        # Heuristic upper-bound constants for S0 initialization FLOPs accounting.
+        loss_flops_per_bin = 100
+        groupby_flops_per_row = 50  # hash + accumulate for mean/count
+        self.init_flops_upper_bound = groupby_flops_per_row * len(train_set)
+
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
             .groupby(by=["first_rating", "delta_t"], group_keys=False)
@@ -295,6 +300,10 @@ class FSRS_one_step(BaseModel):
                 x0=init_s0,
                 bounds=((self.config.s_min, self.config.init_s_max),),
                 options={"maxiter": int(sum(count))},
+            )
+            num_bins = len(delta_t)
+            self.init_flops_upper_bound += (
+                int(getattr(res, "nfev", 0)) * num_bins * loss_flops_per_bin
             )
             params = res.x
             stability = params[0]

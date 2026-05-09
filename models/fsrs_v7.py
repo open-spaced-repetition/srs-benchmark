@@ -595,8 +595,14 @@ class FSRS7(FSRS6):
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         # Heuristic upper-bound constants for S0 initialization FLOPs accounting.
-        loss_flops_per_bin = 100
+        # loss_flops_per_bin: bumped from 100 to 150 for safety margin on
+        # pow/log transcendental costs in forgetting_curve + logloss.
+        loss_flops_per_bin = 150
         groupby_flops_per_row = 50  # hash + accumulate for mean/count
+        ordering_flops_per_call = (
+            24  # 6 rating pairs * ~4 FLOPs (compare + maybe assign)
+        )
+        f_interpolate_flops = 200  # log-linear fit on <=3 points
         self.init_flops_upper_bound = groupby_flops_per_row * len(train_set)
 
         # start = time.perf_counter()
@@ -719,6 +725,9 @@ class FSRS7(FSRS6):
                                 current_rating_stability[big_rating]
                             )
 
+            # Account for the ordering-constraint loop's tiny FLOP cost.
+            self.init_flops_upper_bound += ordering_flops_per_call
+
             return total_loss, current_rating_stability
 
         # Initial parameter sets to try
@@ -777,6 +786,9 @@ class FSRS7(FSRS6):
                 )
             case 2 | 3:
                 filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
+                # Account for the small but non-zero cost of f_interpolate
+                # (log-linear fit on <=3 points: a few log/exp calls and arithmetic).
+                self.init_flops_upper_bound += f_interpolate_flops
                 if any([np.isnan(x) for x in filled.values()]) or any(
                     [np.isinf(x) for x in filled.values()]
                 ):

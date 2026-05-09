@@ -341,7 +341,7 @@ def objective(trial, df_list, model, inner_opt_state):
                 if config.no_test_same_day:
                     test_set = test_set[test_set["elapsed_days"] > 0].copy()
 
-            finetuned_model = finetune(
+            finetuned_model, _ = finetune(
                 df=train_set.copy(),
                 model=meta_model,
                 inner_opt_state=local_inner_opt_state,

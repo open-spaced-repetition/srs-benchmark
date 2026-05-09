@@ -248,8 +248,16 @@ class FSRS_one_step(BaseModel):
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         # Heuristic upper-bound constants for S0 initialization FLOPs accounting.
-        loss_flops_per_bin = 100
+        # loss_flops_per_bin: bumped from 100 to 150 for safety margin on
+        # pow/log transcendental costs in forgetting_curve + logloss.
+        loss_flops_per_bin = 150
         groupby_flops_per_row = 50  # hash + accumulate for mean/count
+        ordering_flops_per_call = (
+            24  # 6 rating pairs * ~4 FLOPs (compare + maybe assign)
+        )
+        interpolation_flops_per_call = (
+            200  # log-linear interpolation/extrapolation math in missing-rating branches
+        )
         self.init_flops_upper_bound = groupby_flops_per_row * len(train_set)
 
         S0_dataset_group = (
@@ -326,6 +334,8 @@ class FSRS_one_step(BaseModel):
                         rating_stability[big_rating] = rating_stability[small_rating]
                     else:
                         rating_stability[small_rating] = rating_stability[big_rating]
+        # Account for the ordering-constraint loop's tiny FLOP cost.
+        self.init_flops_upper_bound += ordering_flops_per_call
 
         w1 = 0.41
         w2 = 0.54
@@ -338,6 +348,7 @@ class FSRS_one_step(BaseModel):
             factor = rating_stability[rating] / r_s0_default[str(rating)]
             initial_stabilities = list(map(lambda x: x * factor, r_s0_default.values()))
         elif len(rating_stability) == 2:
+            self.init_flops_upper_bound += interpolation_flops_per_call
             if 1 not in rating_stability and 2 not in rating_stability:
                 rating_stability[2] = np.power(
                     rating_stability[3], 1 / (1 - w2)
@@ -384,6 +395,7 @@ class FSRS_one_step(BaseModel):
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         elif len(rating_stability) == 3:
+            self.init_flops_upper_bound += interpolation_flops_per_call
             if 1 not in rating_stability:
                 rating_stability[1] = np.power(rating_stability[2], 1 / w1) * np.power(
                     rating_stability[3], 1 - 1 / w1

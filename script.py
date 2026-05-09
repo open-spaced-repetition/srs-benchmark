@@ -37,6 +37,7 @@ from model_processors import (
     process_fsrs_rs,
     fsrs_one_step,
 )
+from flops_counter import CombinedFlopCounter
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -89,6 +90,7 @@ class Trainer:
         self.avg_train_losses: list[float] = []
         self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
+        self.total_training_flops: int = 0
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         self.train_set = BatchDataset(
@@ -109,10 +111,34 @@ class Trainer:
             )
             self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
+    def _run_training_epoch(self, epoch_len: int) -> None:
+        """Run one optimization epoch over train_data_loader."""
+        for batch in self.train_data_loader:
+            self.model.train()
+            self.optimizer.zero_grad()
+            result = batch_process_wrapper(self.model, batch)
+            loss = (
+                self.loss_fn(result["retentions"], result["labels"]) * result["weights"]
+            ).sum()
+            if "penalty" in result:
+                loss += result["penalty"] / epoch_len
+            loss.backward()
+
+            # Apply model-specific gradient constraints
+            self.model.apply_gradient_constraints()
+
+            self.optimizer.step()
+            self.scheduler.step()
+
+            # Apply model-specific parameter constraints (clipper)
+            self.model.apply_parameter_clipper()
+
     def train(self):
         best_loss = np.inf
         best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
+
+        self.total_training_flops = 0
 
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
@@ -120,31 +146,15 @@ class Trainer:
                 best_loss = weighted_loss
                 best_w = w
 
-            for i, batch in enumerate(self.train_data_loader):
-                self.model.train()
-                self.optimizer.zero_grad()
-                result = batch_process_wrapper(self.model, batch)
-                loss = (
-                    self.loss_fn(result["retentions"], result["labels"])
-                    * result["weights"]
-                ).sum()
-                if "penalty" in result:
-                    loss += result["penalty"] / epoch_len
-                loss.backward()
-
-                # Apply model-specific gradient constraints
-                self.model.apply_gradient_constraints()
-
-                self.optimizer.step()
-                self.scheduler.step()
-
-                # Apply model-specific parameter constraints (clipper)
-                self.model.apply_parameter_clipper()
+            with CombinedFlopCounter() as _fc:
+                self._run_training_epoch(epoch_len)
+            self.total_training_flops += int(_fc.get_total_flops())
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
             best_loss = weighted_loss
             best_w = w
+
         return best_w
 
     def eval(self):
@@ -266,15 +276,18 @@ def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
+def _fit_trainable_weights(train_df: pd.DataFrame) -> tuple[Any, int]:
     """
-    Train any trainable model on provided train_df and return model weights/state.
-    Works for FSRS variants, LSTM, etc.
+    Train any trainable model on provided train_df and return (model weights/state, training_flops).
+    training_flops is the total number of FLOPs spent on optimization, including:
+    - measured training/adaptation FLOPs when applicable, and
+    - FSRS initialize_parameters upper-bound FLOPs when applicable.
+    Non-trainable paths (default params, LogisticRegression) return train_flops=0.
     """
     model = create_model(config)
 
     if config.default_params:
-        return get_model_state(model)
+        return get_model_state(model), 0
 
     if config.model_name == "LSTM":
         model = model.to(config.device)
@@ -282,7 +295,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
             model.parameters(),
             path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
         )
-        trained_model = finetune(
+        trained_model, training_flops = finetune(
             train_df,
             model,
             inner_opt.state_dict(),
@@ -291,9 +304,9 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         del trained_model, inner_opt
         if config.device.type == "mps":
             torch.mps.empty_cache()
-        return weights
+        return weights, training_flops
     elif config.model_name == "LogisticRegression":
-        return cast(Any, model).optimize(train_df)
+        return cast(Any, model).optimize(train_df), 0
 
     trainer = Trainer(
         model=model,
@@ -301,9 +314,15 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         test_set=None,
         batch_size=config.batch_size,
     )
+    init_flops_upper_bound = (
+        int(getattr(trainer.model, "init_flops_upper_bound", 0))
+        if config.model_name.startswith("FSRS")
+        else 0
+    )
     if config.only_S0:
-        return get_model_state(trainer.model)
-    return trainer.train()
+        return get_model_state(trainer.model), init_flops_upper_bound
+    best_w = trainer.train()
+    return best_w, trainer.total_training_flops + init_flops_upper_bound
 
 
 @catch_exceptions
@@ -337,6 +356,8 @@ def process(
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
+    # Accumulate total optimization FLOPs across all splits/partitions actually trained.
+    total_flops = 0
 
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         if not config.train_equals_test:
@@ -365,9 +386,11 @@ def process(
         if use_double_fallback and not config.default_params:
             try:
                 user_train_for_fallback = _apply_recency_weighting(train_set)
-                user_level_weights = copy.deepcopy(
-                    _fit_trainable_weights(user_train_for_fallback)
+                user_level_weights_raw, fallback_flops = _fit_trainable_weights(
+                    user_train_for_fallback
                 )
+                user_level_weights = copy.deepcopy(user_level_weights_raw)
+                total_flops += fallback_flops
             except Exception as e:
                 if _is_inadequate_training_data_error(e):
                     if config.verbose_inadequate_data:
@@ -394,9 +417,9 @@ def process(
 
                 train_partition = _apply_recency_weighting(train_partition)
 
-                partition_weights[partition] = copy.deepcopy(
-                    _fit_trainable_weights(train_partition)
-                )
+                weights, partition_flops = _fit_trainable_weights(train_partition)
+                partition_weights[partition] = copy.deepcopy(weights)
+                total_flops += partition_flops
 
             except Exception as e:
                 if _is_inadequate_training_data_error(e):
@@ -466,6 +489,8 @@ def process(
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
+    # Save total optimization FLOPs measured over actual optimization steps.
+    stats["train_flops"] = total_flops
     if config.model_name == "LogisticRegression" and model is not None:
         cast(Any, model).log(stats)
     return stats, raw

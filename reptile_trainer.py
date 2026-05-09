@@ -269,20 +269,30 @@ def finetune_adapt(
             batch_tokens = int(seq_lens.sum().item())
             total_tokens += batch_tokens
 
-            # Profile on the very first non-empty batch (no effect on model state).
+            # Profile in train mode on the first non-empty batch, restoring buffers after.
             if (
                 forward_flops_per_token is None
                 and _FMC is not None
                 and batch_tokens > 0
             ):
                 sequences, delta_ts = batch[0], batch[1]
+                _buffer_snapshot = {
+                    name: buffer.detach().clone() for name, buffer in model.named_buffers()
+                }
+                _was_training = model.training
                 with _FMC(display=False) as _fc:
                     with torch.no_grad():
-                        model.eval()
+                        model.train()
                         model.batch_process(
                             sequences, delta_ts, seq_lens, seq_lens.shape[0]
                         )
-                model.train()
+                with torch.no_grad():
+                    for name, buffer in model.named_buffers():
+                        snap = _buffer_snapshot.get(name)
+                        if snap is not None:
+                            buffer.copy_(snap)
+                if not _was_training:
+                    model.eval()
                 forward_flops_per_token = _fc.get_total_flops() / batch_tokens
 
             inner_opt.zero_grad()

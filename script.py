@@ -114,7 +114,7 @@ class Trainer:
         best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
-        # Profile forward FLOPs on the first training batch, then scale by total tokens.
+        # Profile forward FLOPs in train mode on the first training batch, then scale by total tokens.
         # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
         forward_flops_per_token: float = 0.0
         try:
@@ -124,11 +124,22 @@ class Trainer:
             for _profile_batch in self.train_data_loader:
                 _n_tokens_profile = int(_profile_batch[3].sum().item())
                 if _n_tokens_profile > 0:
+                    _buffer_snapshot = {
+                        name: buffer.detach().clone()
+                        for name, buffer in self.model.named_buffers()
+                    }
+                    _was_training = self.model.training
                     with _FlopCounterMode(display=False) as _fc:
                         with torch.no_grad():
-                            self.model.eval()
+                            self.model.train()
                             batch_process_wrapper(self.model, _profile_batch)
-                    self.model.train()
+                    with torch.no_grad():
+                        for name, buffer in self.model.named_buffers():
+                            snap = _buffer_snapshot.get(name)
+                            if snap is not None:
+                                buffer.copy_(snap)
+                    if not _was_training:
+                        self.model.eval()
                     forward_flops_per_token = _fc.get_total_flops() / _n_tokens_profile
                     break
         except (ImportError, StopIteration):

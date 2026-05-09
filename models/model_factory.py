@@ -24,6 +24,7 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
     "RNN": RNN,
     "LogisticRegression": LogisticRegression,
     "LSTM": LSTM,
+    "GRU": GRU,
     "Transformer": Transformer,
     "NN-17": NN_17,
     "90%": ConstantModel,
@@ -100,6 +101,7 @@ def create_model(
 
     elif model_name in [
         "RNN",
+        "GRU",
         "LSTM",
         "Transformer",
         "NN-17",

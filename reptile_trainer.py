@@ -252,14 +252,14 @@ def finetune_adapt(
     )
 
     def _run_adaptation() -> Tensor:
-        latest_inner_loss: Tensor | None = None
+        last_batch_inner_loss: Tensor | None = None
         for _ in range(inner_steps):
             for batch in device_loader:
                 inner_opt.zero_grad()
                 batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
                     model, batch, batch_size_exp
                 )
-                latest_inner_loss = batch_inner_loss
+                last_batch_inner_loss = batch_inner_loss
                 reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
                 assert reg_loss.requires_grad
                 loss = inner_loss_scaled + reg_scale * reg_loss
@@ -268,9 +268,9 @@ def finetune_adapt(
                 inner_opt.step()
 
             inner_scheduler.step()
-        if latest_inner_loss is None:
+        if last_batch_inner_loss is None:
             raise ValueError("No batches found in data loader")
-        return latest_inner_loss
+        return last_batch_inner_loss
 
     with CombinedFlopCounter() as _fc:
         inner_loss = _run_adaptation()

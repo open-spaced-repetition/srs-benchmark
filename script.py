@@ -138,7 +138,7 @@ class Trainer:
         best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
-        total_training_flops = 0
+        self.total_training_flops = 0
 
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
@@ -148,14 +148,13 @@ class Trainer:
 
             with CombinedFlopCounter() as _fc:
                 self._run_training_epoch(epoch_len)
-            total_training_flops += int(_fc.get_total_flops())
+            self.total_training_flops += int(_fc.get_total_flops())
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
             best_loss = weighted_loss
             best_w = w
 
-        self.total_training_flops = total_training_flops
         return best_w
 
     def eval(self):

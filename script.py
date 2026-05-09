@@ -290,8 +290,10 @@ def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
 def _fit_trainable_weights(train_df: pd.DataFrame) -> tuple[Any, int]:
     """
     Train any trainable model on provided train_df and return (model weights/state, training_flops).
-    training_flops is the total number of FLOPs spent on optimization (gradient steps).
-    Non-trainable paths (default params, LogisticRegression, only_S0) return train_flops=0.
+    training_flops is the total number of FLOPs spent on optimization, including:
+    - measured training/adaptation FLOPs when applicable, and
+    - FSRS initialize_parameters upper-bound FLOPs when applicable.
+    Non-trainable paths (default params, LogisticRegression) return train_flops=0.
     """
     model = create_model(config)
 
@@ -323,10 +325,15 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> tuple[Any, int]:
         test_set=None,
         batch_size=config.batch_size,
     )
+    init_flops_upper_bound = (
+        int(getattr(trainer.model, "init_flops_upper_bound", 0))
+        if config.model_name.startswith("FSRS")
+        else 0
+    )
     if config.only_S0:
-        return get_model_state(trainer.model), 0
+        return get_model_state(trainer.model), init_flops_upper_bound
     best_w = trainer.train()
-    return best_w, trainer.total_training_flops
+    return best_w, trainer.total_training_flops + init_flops_upper_bound
 
 
 @catch_exceptions

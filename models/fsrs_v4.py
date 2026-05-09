@@ -135,6 +135,10 @@ class FSRS4(FSRS3):
         )
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
+        LOSS_FLOPS_PER_BIN = 100
+        GROUPBY_FLOPS_PER_ROW = 50  # hash + accumulate for mean/count
+        self.init_flops_upper_bound = GROUPBY_FLOPS_PER_ROW * len(train_set)
+
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
             .groupby(by=["first_rating", "delta_t"], group_keys=False)
@@ -183,6 +187,10 @@ class FSRS4(FSRS3):
                 x0=init_s0,
                 bounds=((self.config.s_min, self.config.init_s_max),),
                 options={"maxiter": int(sum(count))},
+            )
+            G_r = len(delta_t)
+            self.init_flops_upper_bound += (
+                int(getattr(res, "nfev", 0)) * G_r * LOSS_FLOPS_PER_BIN
             )
             params = res.x
             stability = params[0]

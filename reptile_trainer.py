@@ -245,27 +245,27 @@ def finetune_adapt(
         not meta_model_params.requires_grad
     )  # Do not update the meta model's parameters by accident
 
-    last_inner_loss: list[Tensor | None] = [None]
     device_loader = DevicePrefetchLoader(
         data,
         target_device=DEVICE,
     )
 
     # Import FlopCounterMode once; store None if unavailable (torch < 2.1).
-    _FMC: Any | None
+    flop_counter_mode_class: Any | None
     try:
-        from torch.utils.flop_counter import FlopCounterMode as _FMC  # type: ignore
+        from torch.utils.flop_counter import FlopCounterMode as flop_counter_mode_class  # type: ignore
     except ImportError:
-        _FMC = None
+        flop_counter_mode_class = None
 
-    def _run_adaptation() -> None:
+    def _run_adaptation() -> Tensor | None:
+        latest_inner_loss: Tensor | None = None
         for _ in range(inner_steps):
             for batch in device_loader:
                 inner_opt.zero_grad()
                 batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
                     model, batch, batch_size_exp
                 )
-                last_inner_loss[0] = batch_inner_loss
+                latest_inner_loss = batch_inner_loss
                 reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
                 assert reg_loss.requires_grad
                 loss = inner_loss_scaled + reg_scale * reg_loss
@@ -274,19 +274,20 @@ def finetune_adapt(
                 inner_opt.step()
 
             inner_scheduler.step()
+        return latest_inner_loss
 
     training_flops = 0
-    if _FMC is None:
-        _run_adaptation()
+    if flop_counter_mode_class is None:
+        inner_loss = _run_adaptation()
     else:
-        with _FMC(display=False) as _fc:
-            _run_adaptation()
+        with flop_counter_mode_class(display=False) as _fc:
+            inner_loss = _run_adaptation()
         training_flops = int(_fc.get_total_flops())
 
-    if last_inner_loss[0] is None:
+    if inner_loss is None:
         raise ValueError("No batches found in data loader")
 
-    return last_inner_loss[0], training_flops
+    return inner_loss, training_flops
 
 
 def get_inner_opt(params, path=None):

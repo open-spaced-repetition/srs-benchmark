@@ -5,15 +5,6 @@ from config import Config
 from models.base import BaseModel
 
 
-class ResBlock(nn.Module):
-    def __init__(self, module):
-        super().__init__()
-        self.module = module
-
-    def forward(self, inputs):
-        return self.module(inputs) + inputs
-
-
 class RNNWrapper(nn.Module):
     def __init__(self, module):
         super().__init__()
@@ -24,84 +15,50 @@ class RNNWrapper(nn.Module):
         return outputs
 
 
-class LSTM(BaseModel):
+class GRU(BaseModel):
     """
-    This model is trained with reptile_trainer.py, and was run with the flags
-    ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
-    It uses:
+    This model uses:
     - same-day reviews as features
     - fractional intervals
     - optional duration of each review as an input feature (enable with --duration)
     - its own version of --recency
-    For prediction, it uses 'elapsed_days' for input to the forgetting curve.
 
-    This model with the default batch size (16384) uses a lot of memory.
-    If memory becomes a concern, use '--processes 1'.
-    Alternatively, reduce the batch size but the results would no longer be reproducible.
-
-    This model was trained on 100 users of the same dataset that it is tested on.
-    The effect on the resulting metrics is minor, but future work should be done to remove this influence.
+    Pretraining: python reptile_trainer.py --algo GRU --short --secs --processes 3
+    Per-user optimization: python script.py --algo GRU --short --secs --processes 3
     """
 
     def __init__(
-        self,
-        config: Config,
-        state_dict=None,
-        input_mean=torch.tensor(0.0),
-        input_std=torch.tensor(1.0),
+        self, config: Config, state_dict=None, input_mean=None, input_std=None
     ):
         super().__init__(config)
-        self.register_buffer("input_mean", input_mean)
-        self.register_buffer("input_std", input_std)
-        self.use_duration_feature = config.lstm_use_duration
+        self.register_buffer(
+            "input_mean", torch.tensor(0.0) if input_mean is None else input_mean
+        )
+        self.register_buffer(
+            "input_std", torch.tensor(1.0) if input_std is None else input_std
+        )
+        # self.use_duration_feature = config.lstm_use_duration
+        self.use_duration_feature = False
         num_main_inputs = 1 + (1 if self.use_duration_feature else 0)
         self.n_input = num_main_inputs + 4  # rating is expanded to 4 dims
-        self.n_hidden = 20
-        self.n_curves = 3
+        self.n_hidden = 10
+        self.n_curves = 2
 
         self.process = nn.Sequential(
             nn.Linear(self.n_input, self.n_hidden),
             nn.SiLU(),
             nn.LayerNorm(self.n_hidden, bias=False),
-            nn.Linear(self.n_hidden, self.n_hidden),
-            nn.SiLU(),
-            ResBlock(
-                nn.Sequential(
-                    nn.LayerNorm(self.n_hidden, bias=False),
-                    RNNWrapper(
-                        nn.LSTM(
-                            input_size=self.n_hidden,
-                            hidden_size=self.n_hidden,
-                            num_layers=1,
-                        )
-                    ),
-                )
-            ),
-            ResBlock(
-                nn.Sequential(
-                    nn.LayerNorm(self.n_hidden),
-                    RNNWrapper(
-                        nn.LSTM(
-                            input_size=self.n_hidden,
-                            hidden_size=self.n_hidden,
-                            num_layers=1,
-                        )
-                    ),
-                )
-            ),
-            ResBlock(
-                nn.Sequential(
-                    nn.LayerNorm(self.n_hidden, bias=False),
-                    nn.Linear(self.n_hidden, self.n_hidden),
-                    nn.SiLU(),
-                    nn.LayerNorm(self.n_hidden, bias=False),
-                    nn.Linear(self.n_hidden, self.n_hidden),
-                    nn.SiLU(),
+            RNNWrapper(
+                nn.GRU(
+                    input_size=self.n_hidden,
+                    hidden_size=self.n_hidden,
+                    num_layers=1
                 )
             ),
             nn.LayerNorm(self.n_hidden, bias=False),
             nn.Linear(self.n_hidden, self.n_hidden),
             nn.SiLU(),
+            nn.LayerNorm(self.n_hidden, bias=False)
         )
 
         for name, param in self.named_parameters():

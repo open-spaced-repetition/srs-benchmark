@@ -8,12 +8,11 @@ The new architecture follows the Strategy pattern with a factory for creating ap
 
 ```
 BaseFeatureEngineer (Abstract Base Class)
-├── FSRSFeatureEngineer      # FSRS family, RNN, GRU, Transformer, etc.
+├── FSRSFeatureEngineer      # FSRS family, RNN, Transformer, etc.
 ├── LSTMFeatureEngineer      # LSTM with additional features
 ├── DashFeatureEngineer      # DASH time window features
 ├── DashMCMFeatureEngineer   # DASH with decay
 ├── DashACTRFeatureEngineer  # DASH with ACT-R features
-├── GRUPFeatureEngineer      # GRU-P with shifted intervals
 ├── HLRFeatureEngineer       # HLR with success/failure counts
 ├── ACTRFeatureEngineer      # ACT-R activation features
 ├── NN17FeatureEngineer      # NN-17 with lapse history
@@ -64,7 +63,7 @@ from features import get_supported_models
 models = get_supported_models()
 print(models)
 # ['FSRSv1', 'FSRSv2', 'FSRSv3', 'FSRSv4', 'FSRS-4.5', 'FSRS-5', 'FSRS-6',
-#  'RNN', 'GRU', 'GRU-P', 'LSTM', 'Transformer', 'NN-17',
+#  'RNN', 'LSTM', 'Transformer', 'NN-17',
 #  'SM2', 'SM2-trainable', 'Ebisu-v2', 'HLR', 'ACT-R', 'Anki',
 #  'DASH', 'DASH[MCM]', 'DASH[ACT-R]', 'AVG', 'RMSE-BINS-EXPLOIT', '90%']
 ```
@@ -75,7 +74,7 @@ print(models)
 - `fsrs_engineer.py`: FSRS family models
 - `lstm_engineer.py`: LSTM model with additional features
 - `dash_engineer.py`: DASH variants (DASH, DASH[MCM], DASH[ACT-R])
-- `neural_engineer.py`: Other neural models (GRU-P, HLR, ACT-R, NN-17)
+- `neural_engineer.py`: Other neural models (HLR, ACT-R, NN-17)
 - `memory_engineer.py`: Memory models (SM2, Ebisu)
 - `simple_engineer.py`: Simple models (AVG, RMSE-BINS-EXPLOIT)
 - `factory.py`: Factory function for creating appropriate engineers
@@ -146,7 +145,7 @@ create_feature_engineer(config)
 
 ### FSRS Models
 - Standard tensor format: `[time_intervals, ratings]`
-- Used by: FSRSv1-6, RNN, GRU, Transformer, SM2-trainable, Anki, 90%
+- Used by: FSRSv1-6, RNN, Transformer, SM2-trainable, Anki, 90%
 
 ### LSTM Model
 - Additional features: new card counts, review counts, daily statistics
@@ -162,7 +161,6 @@ create_feature_engineer(config)
 - **Ebisu**: (time_interval, rating) tuple sequences
 
 ### Other Neural Models
-- **GRU-P**: Shifted time intervals and ratings
 - **HLR**: Square root of success/failure counts
 - **ACT-R**: Cumulative time intervals
 - **NN-17**: Time intervals, ratings, and lapse history

@@ -22,10 +22,9 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
     "SM2-trainable": SM2,
     "Anki": Anki,
     "RNN": RNN,
-    "GRU": RNN,  # GRU uses the RNN class definition as per original script
     "LogisticRegression": LogisticRegression,
     "LSTM": LSTM,
-    "GRU-P": GRU_P,
+    "GRU": GRU,
     "Transformer": Transformer,
     "NN-17": NN_17,
     "90%": ConstantModel,
@@ -104,7 +103,6 @@ def create_model(
         "RNN",
         "GRU",
         "LSTM",
-        "GRU-P",
         "Transformer",
         "NN-17",
     ]:  # Neural nets

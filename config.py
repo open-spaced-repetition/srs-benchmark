@@ -19,7 +19,6 @@ ModelName = Literal[
     # Neural networks
     "RNN",
     "GRU",
-    "GRU-P",
     "LSTM",
     "Transformer",
     "NN-17",
@@ -248,8 +247,6 @@ class Config:
 
         # Device configuration
         if torch.cuda.is_available() and self.model_name in [
-            "GRU",
-            "GRU-P",
             "LSTM",
             "RNN",
             "NN-17",

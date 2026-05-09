@@ -155,7 +155,7 @@ class Trainer:
             best_loss = weighted_loss
             best_w = w
 
-        self.total_training_flops: int = total_training_flops
+        self.total_training_flops = total_training_flops
         return best_w
 
     def eval(self):

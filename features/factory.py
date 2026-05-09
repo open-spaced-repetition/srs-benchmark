@@ -40,6 +40,7 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
     # Specialized models
     "LogisticRegression": LogisticRegressionEngineer,
     "LSTM": LSTMFeatureEngineer,
+    "GRU": LSTMFeatureEngineer,
     "HLR": HLRFeatureEngineer,
     "ACT-R": ACTRFeatureEngineer,
     "NN-17": NN17FeatureEngineer,

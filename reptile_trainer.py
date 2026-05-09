@@ -20,6 +20,7 @@ import wandb
 import time
 from itertools import chain
 from features import create_features
+from flops_counter import CombinedFlopCounter
 
 BATCH_SIZE = 16384
 BATCH_SIZE_EXP = 1.0
@@ -250,13 +251,6 @@ def finetune_adapt(
         target_device=DEVICE,
     )
 
-    # Import FlopCounterMode once; store None if unavailable (torch < 2.1).
-    flop_counter_cls: Any | None
-    try:
-        from torch.utils.flop_counter import FlopCounterMode as flop_counter_cls  # type: ignore
-    except ImportError:
-        flop_counter_cls = None
-
     def _run_adaptation() -> Tensor | None:
         latest_inner_loss: Tensor | None = None
         for _ in range(inner_steps):
@@ -276,13 +270,9 @@ def finetune_adapt(
             inner_scheduler.step()
         return latest_inner_loss
 
-    training_flops = 0
-    if flop_counter_cls is None:
+    with CombinedFlopCounter() as _fc:
         inner_loss = _run_adaptation()
-    else:
-        with flop_counter_cls(display=False) as _fc:
-            inner_loss = _run_adaptation()
-        training_flops = int(_fc.get_total_flops())
+    training_flops = int(_fc.get_total_flops())
 
     if inner_loss is None:
         raise ValueError("No batches found in data loader")

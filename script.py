@@ -37,6 +37,7 @@ from model_processors import (
     process_fsrs_rs,
     fsrs_one_step,
 )
+from flops_counter import CombinedFlopCounter
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -136,16 +137,6 @@ class Trainer:
         best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
-        # Track training FLOPs directly on the actual optimization steps when available.
-        # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
-        flop_counter_mode = None
-        try:
-            from torch.utils.flop_counter import FlopCounterMode  # type: ignore
-
-            flop_counter_mode = FlopCounterMode
-        except ImportError:
-            pass  # FlopCounterMode unavailable; train_flops will be 0
-
         total_training_flops = 0
 
         for k in range(self.n_epoch):
@@ -154,12 +145,9 @@ class Trainer:
                 best_loss = weighted_loss
                 best_w = w
 
-            if flop_counter_mode is None:
+            with CombinedFlopCounter() as _fc:
                 self._run_training_epoch(epoch_len)
-            else:
-                with flop_counter_mode(display=False) as _fc:
-                    self._run_training_epoch(epoch_len)
-                total_training_flops += int(_fc.get_total_flops())
+            total_training_flops += int(_fc.get_total_flops())
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:

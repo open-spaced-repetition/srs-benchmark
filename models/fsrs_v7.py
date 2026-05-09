@@ -599,12 +599,10 @@ class FSRS7(FSRS6):
         # pow/log transcendental costs in forgetting_curve + logloss.
         loss_flops_per_bin = 150
         groupby_flops_per_row = 50  # hash + accumulate for mean/count
-        ordering_flops_per_call = (
-            24  # 6 rating pairs * ~4 FLOPs (compare + maybe assign)
-        )
+        ordering_flops_per_call = 24  # 6 rating pairs * ~4 FLOPs (compare + maybe assign)
         f_interpolate_flops = 200  # log-linear fit on <=3 points
         self.init_flops_upper_bound = groupby_flops_per_row * len(train_set)
-
+    
         # start = time.perf_counter()
         # Create binned intervals if using --secs
         # With FSRS-7 --secs should always be used
@@ -617,14 +615,14 @@ class FSRS7(FSRS6):
         else:
             train_set_copy = train_set
             group_by_cols = ["first_rating", "delta_t"]
-
+    
         S0_dataset_group = (
             train_set_copy[train_set_copy["i"] == 2]
             .groupby(by=group_by_cols, group_keys=False)
             .agg({"y": ["mean", "count"]})
             .reset_index()
         )
-
+    
         average_recall = train_set["y"].mean()
         r_s0_default = {str(i): self.init_w[i - 1] for i in range(1, 5)}
 
@@ -634,7 +632,7 @@ class FSRS7(FSRS6):
             current_rating_stability = {}
             current_rating_count = {}
             total_loss = 0
-
+    
             # For each rating, optimize initial stability using current forgetting curve params
             for first_rating in ("1", "2", "3", "4"):
                 group = S0_dataset_group[
@@ -646,7 +644,7 @@ class FSRS7(FSRS6):
                             f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
                         )
                     continue
-
+    
                 if self.config.use_secs_intervals:
                     delta_t = group["delta_t_binned"]
                 else:
@@ -655,9 +653,9 @@ class FSRS7(FSRS6):
                     group["y"]["mean"] * group["y"]["count"] + average_recall * 1
                 ) / (group["y"]["count"] + 1)
                 count = group["y"]["count"]
-
+    
                 init_s0 = r_s0_default[first_rating]
-
+    
                 def loss(stability):
                     assert first_rating in ["1", "2", "3", "4"]
                     y_pred = self.forgetting_curve(
@@ -679,7 +677,7 @@ class FSRS7(FSRS6):
                     )
                     l1 = (np.abs(stability - init_s0)) / 16
                     return logloss + l1
-
+    
                 res = minimize(
                     loss,
                     x0=init_s0,
@@ -690,12 +688,12 @@ class FSRS7(FSRS6):
                 self.init_flops_upper_bound += (
                     int(getattr(res, "nfev", 0)) * num_bins * loss_flops_per_bin
                 )
-
+    
                 stability = res.x[0]
                 current_rating_stability[int(first_rating)] = stability
                 current_rating_count[int(first_rating)] = sum(count)
                 total_loss += res.fun
-
+    
             # Apply stability ordering constraints
             for small_rating, big_rating in (
                 (1, 2),
@@ -724,12 +722,12 @@ class FSRS7(FSRS6):
                             current_rating_stability[small_rating] = (
                                 current_rating_stability[big_rating]
                             )
-
+    
             # Account for the ordering-constraint loop's tiny FLOP cost.
             self.init_flops_upper_bound += ordering_flops_per_call
-
+    
             return total_loss, current_rating_stability
-
+    
         # Initial parameter sets to try
         initial_forgetting_curve_params = [
             self.init_w[-8:],
@@ -749,29 +747,29 @@ class FSRS7(FSRS6):
             [0.0618, 0.1663, 0.5977, 0.9682, 0.3619, 0.5066, 0.2972, 0.5472],
             [0.0656, 0.197, 0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096],
         ]
-
+    
         # Track all candidates with their losses
         candidates = []  # List of (loss, param_set, rating_stability)
-
+    
         # Evaluate initial parameter sets
         for param_set in initial_forgetting_curve_params:
             total_loss, rating_stability = evaluate_param_set(param_set)
             candidates.append((total_loss, param_set.copy(), rating_stability.copy()))
-
+    
         # Sort candidates by loss (best first)
         candidates.sort(key=lambda x: x[0])
-
+    
         # Use the best combination found
         best_total_loss, best_forgetting_curve_params, best_rating_stability = (
             candidates[0]
         )
-
+    
         rating_stability = best_rating_stability
-
+    
         if self.config.verbose_inadequate_data:
             tqdm.write(f"Best forgetting curve params: {best_forgetting_curve_params}")
             tqdm.write(f"Best total loss: {best_total_loss}")
-
+    
         # Anchor values for log-linear interpolation/extrapolation
         a1, a2, a3, a4 = -8.09, -3.83, -2.5, -1.0
         initial_stabilities = list(r_s0_default.values())
@@ -801,7 +799,7 @@ class FSRS7(FSRS6):
                 ]
             case _:
                 raise Exception("impossible")
-
+    
         # Update initial stabilities (w[0:4])
         self.w.data[0:4] = Tensor(
             list(
@@ -811,13 +809,13 @@ class FSRS7(FSRS6):
                 )
             )
         )
-
+    
         # Update forgetting curve parameters with the best found parameters
         if best_forgetting_curve_params is not None:
             self.w.data[-8:] = Tensor(best_forgetting_curve_params)
-
+    
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
-
+    
         # end = time.perf_counter()
         # print(f'Pretrain took {end - start:.2f} seconds, {(end - start) * 1000:.0f} milliseconds')
 

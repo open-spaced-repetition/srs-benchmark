@@ -1,0 +1,142 @@
+import torch
+from torch import nn, Tensor
+
+from config import Config
+from models.base import BaseModel
+
+
+class RNNWrapper(nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+
+    def forward(self, inputs):
+        outputs, _ = self.module(inputs)
+        return outputs
+
+
+class GRU(BaseModel):
+    """
+    This model uses:
+    - same-day reviews as features
+    - fractional intervals
+    - optional duration of each review as an input feature (enable with --duration)
+    - its own version of --recency
+
+    Pretraining: python reptile_trainer.py --algo GRU --short --secs --processes 3
+    Per-user optimization: python script.py --algo GRU --short --secs --processes 3
+    """
+
+    def __init__(
+        self, config: Config, state_dict=None, input_mean=None, input_std=None
+    ):
+        super().__init__(config)
+        self.register_buffer(
+            "input_mean", torch.tensor(0.0) if input_mean is None else input_mean
+        )
+        self.register_buffer(
+            "input_std", torch.tensor(1.0) if input_std is None else input_std
+        )
+        # self.use_duration_feature = config.lstm_use_duration
+        self.use_duration_feature = False
+        num_main_inputs = 1 + (1 if self.use_duration_feature else 0)
+        self.n_input = num_main_inputs + 4  # rating is expanded to 4 dims
+        self.n_hidden = 10
+        self.n_curves = 2
+
+        self.process = nn.Sequential(
+            nn.Linear(self.n_input, self.n_hidden),
+            nn.SiLU(),
+            nn.LayerNorm(self.n_hidden, bias=False),
+            RNNWrapper(
+                nn.GRU(
+                    input_size=self.n_hidden,
+                    hidden_size=self.n_hidden,
+                    num_layers=1
+                )
+            ),
+            nn.LayerNorm(self.n_hidden, bias=False),
+            nn.Linear(self.n_hidden, self.n_hidden),
+            nn.SiLU(),
+            nn.LayerNorm(self.n_hidden, bias=False)
+        )
+
+        for name, param in self.named_parameters():
+            if "weight_ih" in name:  # Input-to-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif "weight_hh" in name:  # Hidden-to-hidden weights
+                nn.init.orthogonal_(param.data)
+            elif "bias_ih" in name:  # Biases
+                start_index = len(param.data) // 4
+                end_index = len(param.data) // 2
+                param.data[start_index:end_index].fill_(1.0)
+
+        self.w_fc = nn.Linear(self.n_hidden, self.n_curves)
+        self.s_fc = nn.Linear(self.n_hidden, self.n_curves)
+        self.d_fc = nn.Linear(self.n_hidden, self.n_curves)
+
+        if state_dict is not None:
+            self.load_state_dict(state_dict)
+        else:
+            try:
+                self.load_state_dict(
+                    torch.load(
+                        f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
+                        weights_only=True,
+                        map_location=self.config.device,
+                    )
+                )
+            except FileNotFoundError:
+                pass
+
+    def set_normalization_params(self, mean_i, std_i):
+        self.register_buffer("input_mean", mean_i)
+        self.register_buffer("input_std", std_i)
+
+    def forward(self, x_lni, hx=None):
+        x_rating = x_lni[..., -1:]
+        x_features = x_lni[..., :-1]
+
+        x_delay = torch.log(1e-5 + x_features[..., :1])
+        if self.use_duration_feature:
+            x_duration = torch.log(
+                torch.clamp(x_features[..., 1:2], min=100, max=60000)
+            )
+            x_main = torch.cat([x_delay, x_duration], dim=-1)
+        else:
+            x_main = x_delay
+
+        x_main = (x_main - self.input_mean) / self.input_std
+
+        x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))
+        x_rating = torch.nn.functional.one_hot(
+            x_rating.squeeze(-1).long() - 1, num_classes=4
+        ).float()
+        x = torch.cat([x_main, x_rating], dim=-1)
+        x_lnh = self.process(x)
+
+        w_lnh = torch.nn.functional.softmax(self.w_fc(x_lnh), dim=-1)
+        s_lnh = torch.exp(torch.clamp(self.s_fc(x_lnh), min=-25, max=25))
+        d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
+        return w_lnh, s_lnh, d_lnh
+
+    def batch_process(
+        self,
+        sequences: Tensor,
+        delta_n: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        w_lnh, s_lnh, d_lnh = self.forward(sequences)
+        (_, n, h) = w_lnh.shape
+        delta_nh = delta_n.unsqueeze(-1).expand(n, h)
+        w_nh = w_lnh[seq_lens - 1, torch.arange(n, device=self.config.device)]
+        s_nh = s_lnh[seq_lens - 1, torch.arange(n, device=self.config.device)]
+        d_nh = d_lnh[seq_lens - 1, torch.arange(n, device=self.config.device)]
+        retentions = self.forgetting_curve(delta_nh, w_nh, s_nh, d_nh)
+        return {"retentions": retentions, "stabilities": s_nh}
+
+    def forgetting_curve(self, t_nh, w_nh, s_nh, d_nh):
+        return (1 - 1e-7) * (
+            torch.sum(w_nh * (1 + t_nh / (1e-7 + s_nh)) ** -d_nh, dim=-1)
+        )

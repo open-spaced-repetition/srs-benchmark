@@ -18,6 +18,7 @@ ModelName = Literal[
     "FSRS-rs",
     # Neural networks
     "RNN",
+    "GRU",
     "LSTM",
     "Transformer",
     "NN-17",

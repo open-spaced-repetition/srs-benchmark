@@ -251,11 +251,11 @@ def finetune_adapt(
     )
 
     # Import FlopCounterMode once; store None if unavailable (torch < 2.1).
-    flop_counter_mode_class: Any | None
+    flop_counter_cls: Any | None
     try:
-        from torch.utils.flop_counter import FlopCounterMode as flop_counter_mode_class  # type: ignore
+        from torch.utils.flop_counter import FlopCounterMode as flop_counter_cls  # type: ignore
     except ImportError:
-        flop_counter_mode_class = None
+        flop_counter_cls = None
 
     def _run_adaptation() -> Tensor | None:
         latest_inner_loss: Tensor | None = None
@@ -277,10 +277,10 @@ def finetune_adapt(
         return latest_inner_loss
 
     training_flops = 0
-    if flop_counter_mode_class is None:
+    if flop_counter_cls is None:
         inner_loss = _run_adaptation()
     else:
-        with flop_counter_mode_class(display=False) as _fc:
+        with flop_counter_cls(display=False) as _fc:
             inner_loss = _run_adaptation()
         training_flops = int(_fc.get_total_flops())
 

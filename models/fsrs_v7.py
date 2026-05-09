@@ -594,9 +594,10 @@ class FSRS7(FSRS6):
         return result
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
-        LOSS_FLOPS_PER_BIN = 100
-        GROUPBY_FLOPS_PER_ROW = 50  # hash + accumulate for mean/count
-        self.init_flops_upper_bound = GROUPBY_FLOPS_PER_ROW * len(train_set)
+        # Heuristic upper-bound constants for S0 initialization FLOPs accounting.
+        loss_flops_per_bin = 100
+        groupby_flops_per_row = 50  # hash + accumulate for mean/count
+        self.init_flops_upper_bound = groupby_flops_per_row * len(train_set)
 
         # start = time.perf_counter()
         # Create binned intervals if using --secs
@@ -679,9 +680,9 @@ class FSRS7(FSRS6):
                     bounds=((self.config.s_min, self.config.init_s_max),),
                     options={"maxiter": int(sum(count))},
                 )
-                G_r = len(delta_t)
+                num_bins = len(delta_t)
                 self.init_flops_upper_bound += (
-                    int(getattr(res, "nfev", 0)) * G_r * LOSS_FLOPS_PER_BIN
+                    int(getattr(res, "nfev", 0)) * num_bins * loss_flops_per_bin
                 )
 
                 stability = res.x[0]

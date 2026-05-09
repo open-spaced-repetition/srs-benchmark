@@ -110,6 +110,7 @@ class Trainer:
             self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
     def _run_training_epoch(self, epoch_len: int) -> None:
+        """Run one optimization epoch over train_data_loader."""
         for batch in self.train_data_loader:
             self.model.train()
             self.optimizer.zero_grad()
@@ -139,9 +140,9 @@ class Trainer:
         # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
         flop_counter_mode = None
         try:
-            from torch.utils.flop_counter import FlopCounterMode as _FlopCounterMode  # type: ignore
+            from torch.utils.flop_counter import FlopCounterMode  # type: ignore
 
-            flop_counter_mode = _FlopCounterMode
+            flop_counter_mode = FlopCounterMode
         except ImportError:
             pass  # FlopCounterMode unavailable; train_flops will be 0
 

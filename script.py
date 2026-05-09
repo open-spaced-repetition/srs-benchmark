@@ -120,7 +120,6 @@ class Trainer:
         try:
             from torch.utils.flop_counter import FlopCounterMode as _FlopCounterMode  # type: ignore
 
-            forward_flops_per_token = 0.0
             for _profile_batch in self.train_data_loader:
                 _n_tokens_profile = int(_profile_batch[3].sum().item())
                 if _n_tokens_profile > 0:

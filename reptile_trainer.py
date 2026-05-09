@@ -253,7 +253,8 @@ def finetune_adapt(
 
     # Profile forward FLOPs on the very first real batch, then scale by total tokens.
     # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
-    forward_flops_per_token: float | None = None
+    forward_flops_per_token = 0.0
+    profiled_forward_flops = False
     total_tokens = 0
 
     # Import FlopCounterMode once; store None if unavailable (torch < 2.1).
@@ -270,14 +271,11 @@ def finetune_adapt(
             total_tokens += batch_tokens
 
             # Profile in train mode on the first non-empty batch, restoring buffers after.
-            if (
-                forward_flops_per_token is None
-                and _FMC is not None
-                and batch_tokens > 0
-            ):
+            if not profiled_forward_flops and _FMC is not None and batch_tokens > 0:
                 sequences, delta_ts = batch[0], batch[1]
                 _buffer_snapshot = {
-                    name: buffer.detach().clone() for name, buffer in model.named_buffers()
+                    name: buffer.detach().clone()
+                    for name, buffer in model.named_buffers()
                 }
                 _was_training = model.training
                 with _FMC(display=False) as _fc:
@@ -294,6 +292,7 @@ def finetune_adapt(
                 if not _was_training:
                     model.eval()
                 forward_flops_per_token = _fc.get_total_flops() / batch_tokens
+                profiled_forward_flops = True
 
             inner_opt.zero_grad()
             batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
@@ -316,7 +315,7 @@ def finetune_adapt(
     # Compute total FLOPs: 3× forward FLOPs per the standard ML convention
     # (1× forward + 2× backward, where backward ≈ 2× forward for dense layers).
     training_flops = 0
-    if forward_flops_per_token is not None and total_tokens > 0:
+    if profiled_forward_flops and total_tokens > 0:
         training_flops = int(3 * total_tokens * forward_flops_per_token)
 
     return inner_loss, training_flops

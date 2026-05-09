@@ -11,6 +11,7 @@ from .fsrs_v6_one_step import FSRS_one_step
 from .fsrs_rs import FSRSRsBackend
 from .rnn import RNN
 from .lstm import LSTM
+from .gru import GRU
 from .logistic_regression import LogisticRegression
 from .transformer import Transformer
 from .hlr import HLR
@@ -40,6 +41,7 @@ __all__ = [
     "RNN",
     "LogisticRegression",
     "LSTM",
+    "GRU",
     "Transformer",
     "HLR",
     "ACT_R",

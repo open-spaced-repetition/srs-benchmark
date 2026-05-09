@@ -430,7 +430,7 @@ def evaluate(
                 test_set  = df[df[f"{split_i}_test"]]
                 train_index, test_index = None, None
 
-            finetuned_model = finetune(
+            finetuned_model, training_flops = finetune(
                 train_set.copy(),
                 model,
                 inner_opt_state,

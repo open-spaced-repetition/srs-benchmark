@@ -239,39 +239,44 @@ def finetune_adapt(
     inner_steps,
     reg_scale,
     clip_norm,
-):
-    """Adapts over all batches."""
+) -> tuple[Tensor, int]:
+    """Adapts over all batches. Returns (inner_loss, training_flops)."""
     model.train()
     assert (
         not meta_model_params.requires_grad
     )  # Do not update the meta model's parameters by accident
 
-    inner_loss = None
     device_loader = DevicePrefetchLoader(
         data,
         target_device=DEVICE,
     )
-    for step in range(inner_steps):
-        batch_count = 0
-        for batch in device_loader:
-            inner_opt.zero_grad()
-            batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
-                model, batch, batch_size_exp
-            )
-            inner_loss = batch_inner_loss
-            reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
-            assert reg_loss.requires_grad
-            loss = inner_loss_scaled + reg_scale * reg_loss
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
-            inner_opt.step()
-            batch_count += 1
 
-        inner_scheduler.step()
+    def _run_adaptation() -> Tensor:
+        last_batch_inner_loss: Tensor | None = None
+        for _ in range(inner_steps):
+            for batch in device_loader:
+                inner_opt.zero_grad()
+                batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
+                    model, batch, batch_size_exp
+                )
+                last_batch_inner_loss = batch_inner_loss
+                reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
+                assert reg_loss.requires_grad
+                loss = inner_loss_scaled + reg_scale * reg_loss
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
+                inner_opt.step()
 
-    if inner_loss is None:
-        raise ValueError("No batches found in data loader")
-    return inner_loss
+            inner_scheduler.step()
+        if last_batch_inner_loss is None:
+            raise ValueError("No batches found in data loader")
+        return last_batch_inner_loss
+
+    with CombinedFlopCounter() as _fc:
+        inner_loss = _run_adaptation()
+    training_flops = int(_fc.get_total_flops())
+
+    return inner_loss, training_flops
 
 
 def get_inner_opt(
@@ -306,8 +311,14 @@ def get_inner_opt(
     return opt
 
 
-def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS):
-    """A fine tuning procedure designed to generalize as well as possible given the data."""
+def finetune(
+    df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
+) -> tuple[Any, int]:
+    """A fine tuning procedure designed to generalize as well as possible given the data.
+
+    Returns (learner, training_flops) where training_flops is the total number of
+    floating-point operations measured during optimization steps.
+    """
     lr_start_raw   = finetune_params["lr_start_raw"]
     lr_middle_raw  = finetune_params["lr_middle_raw"]
     lr_end_raw     = finetune_params["lr_end_raw"]
@@ -342,7 +353,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
     # values.  We do NOT pass `path` here: the saved optimizer state was
     # generated with INNER_ADAM_BETA1/BETA2/WEIGHT_DECAY and reloading it
     # when those values differ would silently corrupt the second-moment
-    # estimates.  Instead we warm-start only the exp-avg state via
+    # estimates. Instead we warm-start only the exp-avg state via
     # inner_opt_state if the betas happen to match, and accept cold-start
     # cost otherwise — which is fine because inner_steps is small (~20).
     inner_opt = get_inner_opt(
@@ -379,7 +390,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         max_seq_len=MAX_SEQ_LEN,
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
-    _ = finetune_adapt(
+    _, training_flops = finetune_adapt(
         df_loader,
         meta_model_params,
         learner,
@@ -390,7 +401,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
         reg_scale=reg_scale,
         clip_norm=clip_norm,
     )
-    return learner
+    return learner, training_flops
 
 
 def evaluate(

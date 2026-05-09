@@ -245,27 +245,27 @@ def finetune_adapt(
         not meta_model_params.requires_grad
     )  # Do not update the meta model's parameters by accident
 
-    inner_loss = None
+    last_inner_loss: list[Tensor | None] = [None]
     device_loader = DevicePrefetchLoader(
         data,
         target_device=DEVICE,
     )
 
     # Import FlopCounterMode once; store None if unavailable (torch < 2.1).
+    _FMC: Any | None
     try:
         from torch.utils.flop_counter import FlopCounterMode as _FMC  # type: ignore
     except ImportError:
-        _FMC = None  # type: ignore[assignment]
+        _FMC = None
 
     def _run_adaptation() -> None:
-        nonlocal inner_loss
         for _ in range(inner_steps):
             for batch in device_loader:
                 inner_opt.zero_grad()
                 batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
                     model, batch, batch_size_exp
                 )
-                inner_loss = batch_inner_loss  # Keep reference to last loss
+                last_inner_loss[0] = batch_inner_loss
                 reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
                 assert reg_loss.requires_grad
                 loss = inner_loss_scaled + reg_scale * reg_loss
@@ -283,10 +283,10 @@ def finetune_adapt(
             _run_adaptation()
         training_flops = int(_fc.get_total_flops())
 
-    if inner_loss is None:
+    if last_inner_loss[0] is None:
         raise ValueError("No batches found in data loader")
 
-    return inner_loss, training_flops
+    return last_inner_loss[0], training_flops
 
 
 def get_inner_opt(params, path=None):

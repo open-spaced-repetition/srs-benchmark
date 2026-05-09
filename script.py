@@ -109,6 +109,27 @@ class Trainer:
             )
             self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
+    def _run_training_epoch(self, epoch_len: int) -> None:
+        for batch in self.train_data_loader:
+            self.model.train()
+            self.optimizer.zero_grad()
+            result = batch_process_wrapper(self.model, batch)
+            loss = (
+                self.loss_fn(result["retentions"], result["labels"]) * result["weights"]
+            ).sum()
+            if "penalty" in result:
+                loss += result["penalty"] / epoch_len
+            loss.backward()
+
+            # Apply model-specific gradient constraints
+            self.model.apply_gradient_constraints()
+
+            self.optimizer.step()
+            self.scheduler.step()
+
+            # Apply model-specific parameter constraints (clipper)
+            self.model.apply_parameter_clipper()
+
     def train(self):
         best_loss = np.inf
         best_w = get_model_state(self.model)  # initialize to current weights
@@ -126,27 +147,6 @@ class Trainer:
 
         total_training_flops = 0
 
-        def _run_training_epoch() -> None:
-            for batch in self.train_data_loader:
-                self.model.train()
-                self.optimizer.zero_grad()
-                result = batch_process_wrapper(self.model, batch)
-                loss = (
-                    self.loss_fn(result["retentions"], result["labels"]) * result["weights"]
-                ).sum()
-                if "penalty" in result:
-                    loss += result["penalty"] / epoch_len
-                loss.backward()
-
-                # Apply model-specific gradient constraints
-                self.model.apply_gradient_constraints()
-
-                self.optimizer.step()
-                self.scheduler.step()
-
-                # Apply model-specific parameter constraints (clipper)
-                self.model.apply_parameter_clipper()
-
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
             if weighted_loss < best_loss:
@@ -154,10 +154,10 @@ class Trainer:
                 best_w = w
 
             if flop_counter_mode is None:
-                _run_training_epoch()
+                self._run_training_epoch(epoch_len)
             else:
                 with flop_counter_mode(display=False) as _fc:
-                    _run_training_epoch()
+                    self._run_training_epoch(epoch_len)
                 total_training_flops += int(_fc.get_total_flops())
 
         weighted_loss, w = self.eval()

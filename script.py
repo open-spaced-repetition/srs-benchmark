@@ -114,52 +114,25 @@ class Trainer:
         best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
-        # Profile forward FLOPs in train mode on the first training batch, then scale by total tokens.
+        # Track training FLOPs directly on the actual optimization steps when available.
         # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
-        forward_flops_per_token: float = 0.0
+        flop_counter_mode = None
         try:
             from torch.utils.flop_counter import FlopCounterMode as _FlopCounterMode  # type: ignore
 
-            for _profile_batch in self.train_data_loader:
-                _n_tokens_profile = int(_profile_batch[3].sum().item())
-                if _n_tokens_profile > 0:
-                    _buffer_snapshot = {
-                        name: buffer.detach().clone()
-                        for name, buffer in self.model.named_buffers()
-                    }
-                    _was_training = self.model.training
-                    with _FlopCounterMode(display=False) as _fc:
-                        with torch.no_grad():
-                            self.model.train()
-                            batch_process_wrapper(self.model, _profile_batch)
-                    with torch.no_grad():
-                        for name, buffer in self.model.named_buffers():
-                            snap = _buffer_snapshot.get(name)
-                            if snap is not None:
-                                buffer.copy_(snap)
-                    if not _was_training:
-                        self.model.eval()
-                    forward_flops_per_token = _fc.get_total_flops() / _n_tokens_profile
-                    break
-        except (ImportError, StopIteration):
-            pass  # FlopCounterMode unavailable or empty loader; train_flops will be 0
+            flop_counter_mode = _FlopCounterMode
+        except ImportError:
+            pass  # FlopCounterMode unavailable; train_flops will be 0
 
-        total_tokens_trained = 0
+        total_training_flops = 0
 
-        for k in range(self.n_epoch):
-            weighted_loss, w = self.eval()
-            if weighted_loss < best_loss:
-                best_loss = weighted_loss
-                best_w = w
-
-            for i, batch in enumerate(self.train_data_loader):
+        def _run_training_epoch() -> None:
+            for batch in self.train_data_loader:
                 self.model.train()
                 self.optimizer.zero_grad()
-                total_tokens_trained += int(batch[3].sum().item())
                 result = batch_process_wrapper(self.model, batch)
                 loss = (
-                    self.loss_fn(result["retentions"], result["labels"])
-                    * result["weights"]
+                    self.loss_fn(result["retentions"], result["labels"]) * result["weights"]
                 ).sum()
                 if "penalty" in result:
                     loss += result["penalty"] / epoch_len
@@ -174,16 +147,25 @@ class Trainer:
                 # Apply model-specific parameter constraints (clipper)
                 self.model.apply_parameter_clipper()
 
+        for k in range(self.n_epoch):
+            weighted_loss, w = self.eval()
+            if weighted_loss < best_loss:
+                best_loss = weighted_loss
+                best_w = w
+
+            if flop_counter_mode is None:
+                _run_training_epoch()
+            else:
+                with flop_counter_mode(display=False) as _fc:
+                    _run_training_epoch()
+                total_training_flops += int(_fc.get_total_flops())
+
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
             best_loss = weighted_loss
             best_w = w
 
-        # Total FLOPs: 3× forward FLOPs per the standard ML convention
-        # (1× forward + 2× backward, where backward ≈ 2× forward for dense layers).
-        self.total_training_flops: int = int(
-            3 * total_tokens_trained * forward_flops_per_token
-        )
+        self.total_training_flops: int = total_training_flops
         return best_w
 
     def eval(self):
@@ -511,8 +493,7 @@ def process(
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
-    # Save total optimization FLOPs (3× forward FLOPs × total tokens trained per the
-    # standard ML convention). Reflects actual compute across all splits/partitions.
+    # Save total optimization FLOPs measured over actual optimization steps.
     stats["train_flops"] = total_flops
     if config.model_name == "LogisticRegression" and model is not None:
         cast(Any, model).log(stats)

@@ -251,72 +251,40 @@ def finetune_adapt(
         target_device=DEVICE,
     )
 
-    # Profile forward FLOPs on the very first real batch, then scale by total tokens.
-    # Uses FlopCounterMode (available since torch 2.1). Skips gracefully if absent.
-    forward_flops_per_token = 0.0
-    profiled_forward_flops = False
-    total_tokens = 0
-
     # Import FlopCounterMode once; store None if unavailable (torch < 2.1).
     try:
         from torch.utils.flop_counter import FlopCounterMode as _FMC  # type: ignore
     except ImportError:
         _FMC = None  # type: ignore[assignment]
 
-    for step in range(inner_steps):
-        batch_count = 0
-        for batch in device_loader:
-            seq_lens = batch[3]
-            batch_tokens = int(seq_lens.sum().item())
-            total_tokens += batch_tokens
+    def _run_adaptation() -> None:
+        nonlocal inner_loss
+        for _ in range(inner_steps):
+            for batch in device_loader:
+                inner_opt.zero_grad()
+                batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
+                    model, batch, batch_size_exp
+                )
+                inner_loss = batch_inner_loss  # Keep reference to last loss
+                reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
+                assert reg_loss.requires_grad
+                loss = inner_loss_scaled + reg_scale * reg_loss
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
+                inner_opt.step()
 
-            # Profile in train mode on the first non-empty batch, restoring buffers after.
-            if not profiled_forward_flops and _FMC is not None and batch_tokens > 0:
-                sequences, delta_ts = batch[0], batch[1]
-                _buffer_snapshot = {
-                    name: buffer.detach().clone()
-                    for name, buffer in model.named_buffers()
-                }
-                _was_training = model.training
-                with _FMC(display=False) as _fc:
-                    with torch.no_grad():
-                        model.train()
-                        model.batch_process(
-                            sequences, delta_ts, seq_lens, seq_lens.shape[0]
-                        )
-                with torch.no_grad():
-                    for name, buffer in model.named_buffers():
-                        snap = _buffer_snapshot.get(name)
-                        if snap is not None:
-                            buffer.copy_(snap)
-                if not _was_training:
-                    model.eval()
-                forward_flops_per_token = _fc.get_total_flops() / batch_tokens
-                profiled_forward_flops = True
+            inner_scheduler.step()
 
-            inner_opt.zero_grad()
-            batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
-                model, batch, batch_size_exp
-            )
-            inner_loss = batch_inner_loss  # Keep reference to last loss
-            reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
-            assert reg_loss.requires_grad
-            loss = inner_loss_scaled + reg_scale * reg_loss
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
-            inner_opt.step()
-            batch_count += 1
-
-        inner_scheduler.step()
+    training_flops = 0
+    if _FMC is None:
+        _run_adaptation()
+    else:
+        with _FMC(display=False) as _fc:
+            _run_adaptation()
+        training_flops = int(_fc.get_total_flops())
 
     if inner_loss is None:
         raise ValueError("No batches found in data loader")
-
-    # Compute total FLOPs: 3× forward FLOPs per the standard ML convention
-    # (1× forward + 2× backward, where backward ≈ 2× forward for dense layers).
-    training_flops = 0
-    if profiled_forward_flops and total_tokens > 0:
-        training_flops = int(3 * total_tokens * forward_flops_per_token)
 
     return inner_loss, training_flops
 
@@ -342,7 +310,7 @@ def finetune(
     """A fine tuning procedure designed to generalize as well as possible given the data.
 
     Returns (learner, training_flops) where training_flops is the total number of
-    floating-point operations used during optimization (3 × forward FLOPs × total tokens).
+    floating-point operations measured during optimization steps.
     """
     lr_start_raw = finetune_params["lr_start_raw"]
     lr_middle_raw = finetune_params["lr_middle_raw"]

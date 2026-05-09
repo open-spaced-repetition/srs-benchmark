@@ -599,7 +599,9 @@ class FSRS7(FSRS6):
         # pow/log transcendental costs in forgetting_curve + logloss.
         loss_flops_per_bin = 150
         groupby_flops_per_row = 50  # hash + accumulate for mean/count
-        ordering_flops_per_call = 24  # 6 rating pairs * ~4 FLOPs (compare + maybe assign)
+        ordering_flops_per_call = (
+            24  # 6 rating pairs * ~4 FLOPs (compare + maybe assign)
+        )
         f_interpolate_flops = 200  # log-linear fit on <=3 points
         self.init_flops_upper_bound = groupby_flops_per_row * len(train_set)
 
@@ -632,7 +634,7 @@ class FSRS7(FSRS6):
             current_rating_stability = {}
             current_rating_count = {}
             total_loss = 0
-    
+
             # For each rating, optimize initial stability using current forgetting curve params
             for first_rating in ("1", "2", "3", "4"):
                 group = S0_dataset_group[
@@ -644,7 +646,7 @@ class FSRS7(FSRS6):
                             f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
                         )
                     continue
-    
+
                 if self.config.use_secs_intervals:
                     delta_t = group["delta_t_binned"]
                 else:
@@ -653,9 +655,9 @@ class FSRS7(FSRS6):
                     group["y"]["mean"] * group["y"]["count"] + average_recall * 1
                 ) / (group["y"]["count"] + 1)
                 count = group["y"]["count"]
-    
+
                 init_s0 = r_s0_default[first_rating]
-    
+
                 def loss(stability):
                     assert first_rating in ["1", "2", "3", "4"]
                     y_pred = self.forgetting_curve(
@@ -677,7 +679,7 @@ class FSRS7(FSRS6):
                     )
                     l1 = (np.abs(stability - init_s0)) / 16
                     return logloss + l1
-    
+
                 res = minimize(
                     loss,
                     x0=init_s0,
@@ -688,12 +690,12 @@ class FSRS7(FSRS6):
                 self.init_flops_upper_bound += (
                     int(getattr(res, "nfev", 0)) * num_bins * loss_flops_per_bin
                 )
-    
+
                 stability = res.x[0]
                 current_rating_stability[int(first_rating)] = stability
                 current_rating_count[int(first_rating)] = sum(count)
                 total_loss += res.fun
-    
+
             # Apply stability ordering constraints
             for small_rating, big_rating in (
                 (1, 2),
@@ -722,10 +724,10 @@ class FSRS7(FSRS6):
                             current_rating_stability[small_rating] = (
                                 current_rating_stability[big_rating]
                             )
-    
+
             # Account for the ordering-constraint loop's tiny FLOP cost.
             self.init_flops_upper_bound += ordering_flops_per_call
-    
+
             return total_loss, current_rating_stability
 
         # Initial parameter sets to try

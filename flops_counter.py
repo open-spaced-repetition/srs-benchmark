@@ -194,4 +194,3 @@ class CombinedFlopCounter:
         if self._elementwise_counter is not None:
             total += int(self._elementwise_counter.total_flops)
         return total
-

@@ -260,7 +260,9 @@ def finetune_adapt(
                     model, batch, batch_size_exp
                 )
                 last_batch_inner_loss = batch_inner_loss
-                reg_loss = torch.sum((get_params_flattened(model) - meta_model_params) ** 2)
+                reg_loss = torch.sum(
+                    (get_params_flattened(model) - meta_model_params) ** 2
+                )
                 assert reg_loss.requires_grad
                 loss = inner_loss_scaled + reg_scale * reg_loss
                 loss.backward()

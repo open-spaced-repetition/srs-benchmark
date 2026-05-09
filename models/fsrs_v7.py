@@ -595,8 +595,12 @@ class FSRS7(FSRS6):
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         # Heuristic upper-bound constants for S0 initialization FLOPs accounting.
-        loss_flops_per_bin = 100
+        # loss_flops_per_bin: bumped from 100 to 150 for safety margin on
+        # pow/log transcendental costs in forgetting_curve + logloss.
+        loss_flops_per_bin = 150
         groupby_flops_per_row = 50  # hash + accumulate for mean/count
+        ordering_flops_per_call = 24  # 6 rating pairs * ~4 FLOPs (compare + maybe assign)
+        f_interpolate_flops = 200  # log-linear fit on <=3 points
         self.init_flops_upper_bound = groupby_flops_per_row * len(train_set)
 
         # start = time.perf_counter()
@@ -622,104 +626,107 @@ class FSRS7(FSRS6):
         average_recall = train_set["y"].mean()
         r_s0_default = {str(i): self.init_w[i - 1] for i in range(1, 5)}
 
-        def evaluate_param_set(param_set):
-            """Evaluate a parameter set and return total loss and rating stabilities"""
-            decay1, decay2, base1, base2, weight1, weight2, swp1, swp2 = param_set
-            current_rating_stability = {}
-            current_rating_count = {}
-            total_loss = 0
+def evaluate_param_set(param_set):
+        """Evaluate a parameter set and return total loss and rating stabilities"""
+        decay1, decay2, base1, base2, weight1, weight2, swp1, swp2 = param_set
+        current_rating_stability = {}
+        current_rating_count = {}
+        total_loss = 0
 
-            # For each rating, optimize initial stability using current forgetting curve params
-            for first_rating in ("1", "2", "3", "4"):
-                group = S0_dataset_group[
-                    S0_dataset_group["first_rating"] == first_rating
-                ]
-                if group.empty:
-                    if self.config.verbose_inadequate_data:
-                        tqdm.write(
-                            f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
-                        )
-                    continue
-
-                if self.config.use_secs_intervals:
-                    delta_t = group["delta_t_binned"]
-                else:
-                    delta_t = group["delta_t"]
-                recall = (
-                    group["y"]["mean"] * group["y"]["count"] + average_recall * 1
-                ) / (group["y"]["count"] + 1)
-                count = group["y"]["count"]
-
-                init_s0 = r_s0_default[first_rating]
-
-                def loss(stability):
-                    assert first_rating in ["1", "2", "3", "4"]
-                    y_pred = self.forgetting_curve(
-                        delta_t,
-                        stability,
-                        -decay1,
-                        -decay2,
-                        base1,
-                        base2,
-                        weight1,
-                        weight2,
-                        swp1,
-                        swp2,
+        # For each rating, optimize initial stability using current forgetting curve params
+        for first_rating in ("1", "2", "3", "4"):
+            group = S0_dataset_group[
+                S0_dataset_group["first_rating"] == first_rating
+            ]
+            if group.empty:
+                if self.config.verbose_inadequate_data:
+                    tqdm.write(
+                        f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
                     )
-                    y_pred = np.clip(y_pred, 0.0001, 0.9999)
-                    logloss = sum(
-                        -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
-                        * count
-                    )
-                    l1 = (np.abs(stability - init_s0)) / 16
-                    return logloss + l1
+                continue
 
-                res = minimize(
-                    loss,
-                    x0=init_s0,
-                    bounds=((self.config.s_min, self.config.init_s_max),),
-                    options={"maxiter": int(sum(count))},
+            if self.config.use_secs_intervals:
+                delta_t = group["delta_t_binned"]
+            else:
+                delta_t = group["delta_t"]
+            recall = (
+                group["y"]["mean"] * group["y"]["count"] + average_recall * 1
+            ) / (group["y"]["count"] + 1)
+            count = group["y"]["count"]
+
+            init_s0 = r_s0_default[first_rating]
+
+            def loss(stability):
+                assert first_rating in ["1", "2", "3", "4"]
+                y_pred = self.forgetting_curve(
+                    delta_t,
+                    stability,
+                    -decay1,
+                    -decay2,
+                    base1,
+                    base2,
+                    weight1,
+                    weight2,
+                    swp1,
+                    swp2,
                 )
-                num_bins = len(delta_t)
-                self.init_flops_upper_bound += (
-                    int(getattr(res, "nfev", 0)) * num_bins * loss_flops_per_bin
+                y_pred = np.clip(y_pred, 0.0001, 0.9999)
+                logloss = sum(
+                    -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
+                    * count
                 )
+                l1 = (np.abs(stability - init_s0)) / 16
+                return logloss + l1
 
-                stability = res.x[0]
-                current_rating_stability[int(first_rating)] = stability
-                current_rating_count[int(first_rating)] = sum(count)
-                total_loss += res.fun
+            res = minimize(
+                loss,
+                x0=init_s0,
+                bounds=((self.config.s_min, self.config.init_s_max),),
+                options={"maxiter": int(sum(count))},
+            )
+            num_bins = len(delta_t)
+            self.init_flops_upper_bound += (
+                int(getattr(res, "nfev", 0)) * num_bins * loss_flops_per_bin
+            )
 
-            # Apply stability ordering constraints
-            for small_rating, big_rating in (
-                (1, 2),
-                (2, 3),
-                (3, 4),
-                (1, 3),
-                (2, 4),
-                (1, 4),
+            stability = res.x[0]
+            current_rating_stability[int(first_rating)] = stability
+            current_rating_count[int(first_rating)] = sum(count)
+            total_loss += res.fun
+
+        # Apply stability ordering constraints
+        for small_rating, big_rating in (
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (1, 3),
+            (2, 4),
+            (1, 4),
+        ):
+            if (
+                small_rating in current_rating_stability
+                and big_rating in current_rating_stability
             ):
                 if (
-                    small_rating in current_rating_stability
-                    and big_rating in current_rating_stability
+                    current_rating_stability[small_rating]
+                    > current_rating_stability[big_rating]
                 ):
                     if (
-                        current_rating_stability[small_rating]
-                        > current_rating_stability[big_rating]
+                        current_rating_count[small_rating]
+                        > current_rating_count[big_rating]
                     ):
-                        if (
-                            current_rating_count[small_rating]
-                            > current_rating_count[big_rating]
-                        ):
-                            current_rating_stability[big_rating] = (
-                                current_rating_stability[small_rating]
-                            )
-                        else:
-                            current_rating_stability[small_rating] = (
-                                current_rating_stability[big_rating]
-                            )
+                        current_rating_stability[big_rating] = (
+                            current_rating_stability[small_rating]
+                        )
+                    else:
+                        current_rating_stability[small_rating] = (
+                            current_rating_stability[big_rating]
+                        )
 
-            return total_loss, current_rating_stability
+        # Account for the ordering-constraint loop's tiny FLOP cost.
+        self.init_flops_upper_bound += ordering_flops_per_call
+
+        return total_loss, current_rating_stability
 
         # Initial parameter sets to try
         initial_forgetting_curve_params = [
@@ -777,6 +784,9 @@ class FSRS7(FSRS6):
                 )
             case 2 | 3:
                 filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
+                # Account for the small but non-zero cost of f_interpolate
+                # (log-linear fit on <=3 points: a few log/exp calls and arithmetic).
+                self.init_flops_upper_bound += f_interpolate_flops
                 if any([np.isnan(x) for x in filled.values()]) or any(
                     [np.isinf(x) for x in filled.values()]
                 ):

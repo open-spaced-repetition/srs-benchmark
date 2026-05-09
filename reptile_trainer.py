@@ -251,7 +251,7 @@ def finetune_adapt(
         target_device=DEVICE,
     )
 
-    def _run_adaptation() -> Tensor | None:
+    def _run_adaptation() -> Tensor:
         latest_inner_loss: Tensor | None = None
         for _ in range(inner_steps):
             for batch in device_loader:
@@ -268,14 +268,13 @@ def finetune_adapt(
                 inner_opt.step()
 
             inner_scheduler.step()
+        if latest_inner_loss is None:
+            raise ValueError("No batches found in data loader")
         return latest_inner_loss
 
     with CombinedFlopCounter() as _fc:
         inner_loss = _run_adaptation()
     training_flops = int(_fc.get_total_flops())
-
-    if inner_loss is None:
-        raise ValueError("No batches found in data loader")
 
     return inner_loss, training_flops
 

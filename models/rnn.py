@@ -16,11 +16,11 @@ class RNN(BaseModel):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
-            self.rnn = nn.RNN(
-                input_size=self.n_input,
-                hidden_size=self.n_hidden,
-                num_layers=self.n_layers,
-            )
+        self.rnn = nn.RNN(
+            input_size=self.n_input,
+            hidden_size=self.n_hidden,
+            num_layers=self.n_layers,
+        )
 
         self.fc = nn.Linear(self.n_hidden, self.n_out)
 

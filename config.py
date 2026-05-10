@@ -248,6 +248,7 @@ class Config:
         # Device configuration
         if torch.cuda.is_available() and self.model_name in [
             "LSTM",
+            "GRU",
             "RNN",
             "NN-17",
             "Transformer",

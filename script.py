@@ -279,6 +279,11 @@ def _get_reptile_trainer_module() -> Any:
 
 
 def _extract_finetuned_model(finetune_result: Any) -> Any:
+    """Normalize trainer finetune output to a model instance.
+
+    reptile_trainer.finetune (LSTM) returns a model directly, while
+    reptile_trainer_gru.finetune (GRU) returns (model, training_flops).
+    """
     if isinstance(finetune_result, tuple):
         if not finetune_result:
             raise ValueError("finetune() returned an empty tuple")

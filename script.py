@@ -230,7 +230,7 @@ def _configure_process_device(device_id: Optional[int]) -> None:
         )
     torch.cuda.set_device(device_id)
     config.device = torch.device(f"cuda:{device_id}")
-    if config.model_name == "LSTM":
+    if config.model_name in ("LSTM", "GRU"):
         try:
             import reptile_trainer
 

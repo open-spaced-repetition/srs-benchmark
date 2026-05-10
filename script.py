@@ -284,6 +284,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
 
     if config.model_name == "LSTM":
         from reptile_trainer import get_inner_opt, finetune
+
         model = model.to(config.device)
         inner_opt = get_inner_opt(
             model.parameters(),
@@ -301,6 +302,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         return weights
     elif config.model_name == "GRU":
         from reptile_trainer_gru import get_inner_opt, finetune
+
         model = model.to(config.device)
         inner_opt = get_inner_opt(
             model.parameters(),

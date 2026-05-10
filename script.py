@@ -15,7 +15,6 @@ from tqdm.auto import tqdm  # type: ignore
 import warnings
 from models.model_factory import create_model
 from models.trainable import TrainableModel
-from reptile_trainer import get_inner_opt, finetune
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser, Config
@@ -220,11 +219,10 @@ def _configure_process_device(device_id: Optional[int]) -> None:
         )
     torch.cuda.set_device(device_id)
     config.device = torch.device(f"cuda:{device_id}")
-    if config.model_name == "LSTM":
+    if config.model_name in ("LSTM", "GRU"):
         try:
-            import reptile_trainer
-
-            reptile_trainer.DEVICE = config.device
+            reptile_trainer_module = _get_reptile_trainer_module()
+            reptile_trainer_module.DEVICE = config.device
         except Exception:
             pass
 
@@ -266,6 +264,18 @@ def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _get_reptile_trainer_module() -> Any:
+    if config.model_name == "LSTM":
+        import reptile_trainer
+
+        return reptile_trainer
+    if config.model_name == "GRU":
+        import reptile_trainer_gru
+
+        return reptile_trainer_gru
+    raise ValueError(f"Unsupported reptile trainer model: {config.model_name}")
+
+
 def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
     """
     Train any trainable model on provided train_df and return model weights/state.
@@ -276,16 +286,20 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
     if config.default_params:
         return get_model_state(model)
 
-    if config.model_name == "LSTM":
+    if config.model_name in ("LSTM", "GRU"):
+        reptile_trainer_module = _get_reptile_trainer_module()
         model = model.to(config.device)
-        inner_opt = get_inner_opt(
+        inner_opt = reptile_trainer_module.get_inner_opt(
             model.parameters(),
             path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
         )
-        trained_model = finetune(
+        finetune_result = reptile_trainer_module.finetune(
             train_df,
             model,
             inner_opt.state_dict(),
+        )
+        trained_model = (
+            finetune_result[0] if isinstance(finetune_result, tuple) else finetune_result
         )
         weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt

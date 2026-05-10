@@ -278,6 +278,14 @@ def _get_reptile_trainer_module() -> Any:
     )
 
 
+def _extract_finetuned_model(finetune_result: Any) -> Any:
+    if isinstance(finetune_result, tuple):
+        if not finetune_result:
+            raise ValueError("finetune() returned an empty tuple")
+        return finetune_result[0]
+    return finetune_result
+
+
 def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
     """
     Train any trainable model on provided train_df and return model weights/state.
@@ -300,9 +308,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
             model,
             inner_opt.state_dict(),
         )
-        trained_model = (
-            finetune_result[0] if isinstance(finetune_result, tuple) else finetune_result
-        )
+        trained_model = _extract_finetuned_model(finetune_result)
         weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt
         if config.device.type == "mps":

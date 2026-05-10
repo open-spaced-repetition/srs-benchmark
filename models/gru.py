@@ -23,7 +23,7 @@ class GRU(BaseModel):
     - optional duration of each review as an input feature (enable with --duration)
     - its own version of --recency
 
-    Pretraining: python reptile_trainer.py --algo GRU --short --secs --processes 3
+    Pretraining: python reptile_trainer_gru.py --algo GRU --short --secs --processes 1
     Per-user optimization: python script.py --algo GRU --short --secs --processes 3
     """
 

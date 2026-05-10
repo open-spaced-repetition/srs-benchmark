@@ -273,7 +273,9 @@ def _get_reptile_trainer_module() -> Any:
         import reptile_trainer_gru
 
         return reptile_trainer_gru
-    raise ValueError(f"Unsupported reptile trainer model: {config.model_name}")
+    raise ValueError(
+        f"Unsupported model_name for reptile trainer: {config.model_name}"
+    )
 
 
 def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:

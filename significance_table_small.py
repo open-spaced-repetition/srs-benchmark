@@ -57,7 +57,6 @@ if __name__ == "__main__":
         "RWKV",
         "LSTM-short-secs-duration-equalize_test_with_non_secs",
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
-        "GRU-P-short",
         "FSRS-6-short-recency",
         "MOVING-AVG",
         "FSRS-5-short",

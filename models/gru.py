@@ -50,15 +50,13 @@ class GRU(BaseModel):
             nn.LayerNorm(self.n_hidden, bias=False),
             RNNWrapper(
                 nn.GRU(
-                    input_size=self.n_hidden,
-                    hidden_size=self.n_hidden,
-                    num_layers=1
+                    input_size=self.n_hidden, hidden_size=self.n_hidden, num_layers=1
                 )
             ),
             nn.LayerNorm(self.n_hidden, bias=False),
             nn.Linear(self.n_hidden, self.n_hidden),
             nn.SiLU(),
-            nn.LayerNorm(self.n_hidden, bias=False)
+            nn.LayerNorm(self.n_hidden, bias=False),
         )
 
         for name, param in self.named_parameters():

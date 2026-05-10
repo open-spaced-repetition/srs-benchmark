@@ -83,7 +83,7 @@ config = Config(args)
 
 FILE_NAME = config.get_evaluation_file_name()
 MODEL_PATH = f"./pretrain/{FILE_NAME}_pretrain.pth"
-OPT_PATH   = f"./pretrain/{FILE_NAME}_opt_pretrain.pth"
+OPT_PATH = f"./pretrain/{FILE_NAME}_opt_pretrain.pth"
 
 CHECKPOINT_DIR = Path("./optuna_checkpoints")
 # Save a Phase 1 snapshot every N outer steps so at most N steps need
@@ -92,6 +92,7 @@ CHECKPOINT_INTERVAL = 1_000
 
 
 # ── Checkpoint helpers ─────────────────────────────────────────────────────────
+
 
 def _save_checkpoint(
     path: Path,
@@ -112,12 +113,12 @@ def _save_checkpoint(
     tmp = path.with_suffix(".tmp")
     torch.save(
         {
-            "outer_it":              outer_it,
-            "meta_model_state":      meta_model.state_dict(),
-            "inner_opt_state":       local_inner_opt_state,
-            "outer_opt_state":       outer_opt.state_dict(),
+            "outer_it": outer_it,
+            "meta_model_state": meta_model.state_dict(),
+            "inner_opt_state": local_inner_opt_state,
+            "outer_opt_state": outer_opt.state_dict(),
             "outer_scheduler_state": outer_scheduler.state_dict(),
-            "trial_params":          trial_params,
+            "trial_params": trial_params,
         },
         tmp,
     )
@@ -146,68 +147,71 @@ def _find_resumable_checkpoint(trial_params: dict):
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 
+
 def objective(trial, df_list, model, inner_opt_state):
     # ── train_adapt_params  (prefix "adapt_") ──────────────────────────────
     # See the HOW TO APPLY table at the top for the reptile_trainer.py mapping.
-    adapt_lr_start_raw   = trial.suggest_float("adapt_lr_start_raw",   1e-4, 2e-2,  log=True)
-    adapt_lr_middle_raw  = trial.suggest_float("adapt_lr_middle_raw",  1e-4, 2e-2,  log=True)
-    adapt_lr_end_raw     = trial.suggest_float("adapt_lr_end_raw",     1e-4, 2e-2,  log=True)
-    adapt_warmup_steps   = trial.suggest_int(  "adapt_warmup_steps",   1,    15)
-    adapt_batch_size_exp = trial.suggest_float("adapt_batch_size_exp", 0.5,  1.5)
-    adapt_clip_norm      = trial.suggest_float("adapt_clip_norm",      20,   20000, log=True)
-    adapt_reg_scale      = trial.suggest_float("adapt_reg_scale",      1e-8, 1e-1,  log=True)
-    adapt_inner_steps    = trial.suggest_int(  "adapt_inner_steps",    5,    30)
-    adapt_weight_decay   = trial.suggest_float("adapt_weight_decay",   1e-4, 1.0,   log=True)
+    adapt_lr_start_raw = trial.suggest_float("adapt_lr_start_raw", 1e-4, 2e-2, log=True)
+    adapt_lr_middle_raw = trial.suggest_float(
+        "adapt_lr_middle_raw", 1e-4, 2e-2, log=True
+    )
+    adapt_lr_end_raw = trial.suggest_float("adapt_lr_end_raw", 1e-4, 2e-2, log=True)
+    adapt_warmup_steps = trial.suggest_int("adapt_warmup_steps", 1, 15)
+    adapt_batch_size_exp = trial.suggest_float("adapt_batch_size_exp", 0.5, 1.5)
+    adapt_clip_norm = trial.suggest_float("adapt_clip_norm", 20, 20000, log=True)
+    adapt_reg_scale = trial.suggest_float("adapt_reg_scale", 1e-8, 1e-1, log=True)
+    adapt_inner_steps = trial.suggest_int("adapt_inner_steps", 5, 30)
+    adapt_weight_decay = trial.suggest_float("adapt_weight_decay", 1e-4, 1.0, log=True)
 
     train_adapt_params = {
-        "lr_start_raw":   adapt_lr_start_raw,
-        "lr_middle_raw":  adapt_lr_middle_raw,
-        "lr_end_raw":     adapt_lr_end_raw,
-        "warmup_steps":   adapt_warmup_steps,
+        "lr_start_raw": adapt_lr_start_raw,
+        "lr_middle_raw": adapt_lr_middle_raw,
+        "lr_end_raw": adapt_lr_end_raw,
+        "warmup_steps": adapt_warmup_steps,
         "batch_size_exp": adapt_batch_size_exp,
-        "clip_norm":      adapt_clip_norm,
-        "reg_scale":      adapt_reg_scale,
-        "inner_steps":    adapt_inner_steps,
-        "weight_decay":   adapt_weight_decay,
+        "clip_norm": adapt_clip_norm,
+        "reg_scale": adapt_reg_scale,
+        "inner_steps": adapt_inner_steps,
+        "weight_decay": adapt_weight_decay,
     }
 
     # ── finetune_params  (prefix "ft_") ────────────────────────────────────
     # ft_adam_beta1/beta2 → inner_adam_beta1/inner_adam_beta2 (see table).
-    ft_lr_start_raw   = trial.suggest_float("ft_lr_start_raw",   5e-4, 5e-3,   log=True)
-    ft_lr_middle_raw  = trial.suggest_float("ft_lr_middle_raw",  5e-4, 1e-2,   log=True)
-    ft_lr_end_raw     = trial.suggest_float("ft_lr_end_raw",     5e-4, 5e-3,   log=True)
-    ft_warmup_steps   = trial.suggest_int(  "ft_warmup_steps",   1,    10)
-    ft_batch_size_exp = trial.suggest_float("ft_batch_size_exp", 0.7,  1.3)
-    ft_clip_norm      = trial.suggest_float("ft_clip_norm",      100,  10000,  log=True)
-    ft_reg_scale      = trial.suggest_float("ft_reg_scale",      1e-6, 1e-2,   log=True)
-    ft_inner_steps    = trial.suggest_int(  "ft_inner_steps",    10,   30)
-    ft_recency_weight = trial.suggest_float("ft_recency_weight", 0.0,  30.0)
-    ft_recency_degree = trial.suggest_float("ft_recency_degree", 1.0,  4.0)
-    ft_weight_decay   = trial.suggest_float("ft_weight_decay",   1e-3, 1.0,    log=True)
-    ft_adam_beta1     = trial.suggest_float("ft_adam_beta1",     0.0,  0.9)
-    ft_adam_beta2     = trial.suggest_float("ft_adam_beta2",     0.9,  0.9999)
+    ft_lr_start_raw = trial.suggest_float("ft_lr_start_raw", 5e-4, 5e-3, log=True)
+    ft_lr_middle_raw = trial.suggest_float("ft_lr_middle_raw", 5e-4, 1e-2, log=True)
+    ft_lr_end_raw = trial.suggest_float("ft_lr_end_raw", 5e-4, 5e-3, log=True)
+    ft_warmup_steps = trial.suggest_int("ft_warmup_steps", 1, 10)
+    ft_batch_size_exp = trial.suggest_float("ft_batch_size_exp", 0.7, 1.3)
+    ft_clip_norm = trial.suggest_float("ft_clip_norm", 100, 10000, log=True)
+    ft_reg_scale = trial.suggest_float("ft_reg_scale", 1e-6, 1e-2, log=True)
+    ft_inner_steps = trial.suggest_int("ft_inner_steps", 10, 30)
+    ft_recency_weight = trial.suggest_float("ft_recency_weight", 0.0, 30.0)
+    ft_recency_degree = trial.suggest_float("ft_recency_degree", 1.0, 4.0)
+    ft_weight_decay = trial.suggest_float("ft_weight_decay", 1e-3, 1.0, log=True)
+    ft_adam_beta1 = trial.suggest_float("ft_adam_beta1", 0.0, 0.9)
+    ft_adam_beta2 = trial.suggest_float("ft_adam_beta2", 0.9, 0.9999)
 
     finetune_params = {
-        "lr_start_raw":     ft_lr_start_raw,
-        "lr_middle_raw":    ft_lr_middle_raw,
-        "lr_end_raw":       ft_lr_end_raw,
-        "warmup_steps":     ft_warmup_steps,
-        "batch_size_exp":   ft_batch_size_exp,
-        "clip_norm":        ft_clip_norm,
-        "reg_scale":        ft_reg_scale,
-        "inner_steps":      ft_inner_steps,
-        "recency_weight":   ft_recency_weight,
-        "recency_degree":   ft_recency_degree,
-        "weight_decay":     ft_weight_decay,
+        "lr_start_raw": ft_lr_start_raw,
+        "lr_middle_raw": ft_lr_middle_raw,
+        "lr_end_raw": ft_lr_end_raw,
+        "warmup_steps": ft_warmup_steps,
+        "batch_size_exp": ft_batch_size_exp,
+        "clip_norm": ft_clip_norm,
+        "reg_scale": ft_reg_scale,
+        "inner_steps": ft_inner_steps,
+        "recency_weight": ft_recency_weight,
+        "recency_degree": ft_recency_degree,
+        "weight_decay": ft_weight_decay,
         "inner_adam_beta1": ft_adam_beta1,
         "inner_adam_beta2": ft_adam_beta2,
     }
 
     # ── outer optimizer hyperparameters  (prefix "outer_") ─────────────────
     # → OUTER_ADAM_BETA1/BETA2/WEIGHT_DECAY in reptile_trainer.py (strip prefix).
-    outer_adam_beta1   = trial.suggest_float("outer_adam_beta1",   0.8,  0.99)
-    outer_adam_beta2   = trial.suggest_float("outer_adam_beta2",   0.9,  0.9999)
-    outer_weight_decay = trial.suggest_float("outer_weight_decay", 1e-4, 1.0,   log=True)
+    outer_adam_beta1 = trial.suggest_float("outer_adam_beta1", 0.8, 0.99)
+    outer_adam_beta2 = trial.suggest_float("outer_adam_beta2", 0.9, 0.9999)
+    outer_weight_decay = trial.suggest_float("outer_weight_decay", 1e-4, 1.0, log=True)
 
     # ── Phase 1: full reptile meta-training ────────────────────────────────
     # Mirrors train() in reptile_trainer.py exactly: same OUTER_STEPS,
@@ -276,9 +280,9 @@ def objective(trial, df_list, model, inner_opt_state):
         # creation, causing an unconditional NameError on every trial.)
         warmup_scale = min(1.0, outer_it / WARMUP_STEPS)
         scaled_adapt_params = copy.copy(train_adapt_params)
-        scaled_adapt_params["lr_start_raw"]  *= warmup_scale
+        scaled_adapt_params["lr_start_raw"] *= warmup_scale
         scaled_adapt_params["lr_middle_raw"] *= warmup_scale
-        scaled_adapt_params["lr_end_raw"]    *= warmup_scale
+        scaled_adapt_params["lr_end_raw"] *= warmup_scale
 
         learner = copy.deepcopy(meta_model)
         task_inner_opt = get_inner_opt(
@@ -311,31 +315,41 @@ def objective(trial, df_list, model, inner_opt_state):
 
         if outer_it % CHECKPOINT_INTERVAL == 0:
             _save_checkpoint(
-                ckpt_path, outer_it, meta_model, local_inner_opt_state,
-                outer_opt, outer_scheduler, trial.params,
+                ckpt_path,
+                outer_it,
+                meta_model,
+                local_inner_opt_state,
+                outer_opt,
+                outer_scheduler,
+                trial.params,
             )
 
     # Unconditional end-of-Phase-1 save so a Phase 2 crash costs only Phase 2.
     _save_checkpoint(
-        ckpt_path, OUTER_STEPS, meta_model, local_inner_opt_state,
-        outer_opt, outer_scheduler, trial.params,
+        ckpt_path,
+        OUTER_STEPS,
+        meta_model,
+        local_inner_opt_state,
+        outer_opt,
+        outer_scheduler,
+        trial.params,
     )
 
     # ── Phase 2: finetune evaluation ───────────────────────────────────────
     # Mirrors evaluate() in reptile_trainer.py exactly.
     # finetune() deepcopies meta_model internally so it is not mutated here.
     all_test_loss = 0
-    all_test_n    = 0
+    all_test_n = 0
     for step, df in enumerate(df_list):
         tscv = TimeSeriesSplit(n_splits=config.n_splits)
         for split_i, (train_index, test_index) in enumerate(tscv.split(df)):
             if config.equalize_test_with_non_secs:
                 # The equalize sets already have same-day filtering baked in.
                 train_set = df[df[f"{split_i}_train"]]
-                test_set  = df[df[f"{split_i}_test"]]
+                test_set = df[df[f"{split_i}_test"]]
             else:
                 train_set = df.iloc[train_index]
-                test_set  = df.iloc[test_index]
+                test_set = df.iloc[test_index]
                 # Mirror evaluate() in reptile_trainer.py: filter same-day
                 # reviews from the test set when requested.
                 if config.no_test_same_day:
@@ -356,7 +370,7 @@ def objective(trial, df_list, model, inner_opt_state):
             with torch.no_grad():
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
                 all_test_loss += test_split_loss.item()
-                all_test_n    += len(test_set)
+                all_test_n += len(test_set)
 
         avg_so_far = all_test_loss / all_test_n
         trial.report(avg_so_far, step)
@@ -400,9 +414,9 @@ def main():
     except FileNotFoundError:
         print("Optimizer file not found.")
 
-    df_dict   = {}
+    df_dict = {}
     num_users = 100
-    users     = list(range(2301, 2301 + num_users))
+    users = list(range(2301, 2301 + num_users))
 
     with Pool(processes=config.num_processes) as pool:
         results = pool.map(process_user, users)
@@ -422,9 +436,9 @@ def main():
     if CHECKPOINT_DIR.exists():
         for candidate in sorted(CHECKPOINT_DIR.glob("trial_*.pt")):
             try:
-                ckpt   = torch.load(candidate, weights_only=False)
+                ckpt = torch.load(candidate, weights_only=False)
                 params = ckpt.get("trial_params")
-                step   = ckpt.get("outer_it", "?")
+                step = ckpt.get("outer_it", "?")
                 if params:
                     print(
                         f"Re-enqueueing interrupted trial from {candidate.name}"
@@ -455,8 +469,8 @@ def main():
         else:
             baseline_trial[f"ft_{k}"] = v
     # Outer optimizer baseline values from the module-level constants.
-    baseline_trial["outer_adam_beta1"]   = OUTER_ADAM_BETA1
-    baseline_trial["outer_adam_beta2"]   = OUTER_ADAM_BETA2
+    baseline_trial["outer_adam_beta1"] = OUTER_ADAM_BETA1
+    baseline_trial["outer_adam_beta2"] = OUTER_ADAM_BETA2
     baseline_trial["outer_weight_decay"] = OUTER_WEIGHT_DECAY
 
     if baseline_trial not in already_enqueued_params:

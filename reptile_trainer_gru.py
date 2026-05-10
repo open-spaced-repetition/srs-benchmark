@@ -39,31 +39,31 @@ OUTER_WEIGHT_DECAY = 0.05376
 
 # Log loss=0.3076
 DEFAULT_TRAIN_ADAPT_PARAMS = {
-    'lr_start_raw':   0.005049,
-    'lr_middle_raw':  0.0007886,
-    'lr_end_raw':     0.003383,
-    'warmup_steps':   3,
-    'batch_size_exp': 0.934,
-    'clip_norm':      303.3,
-    'reg_scale':      0.00043071,
-    'inner_steps':    29,
-    'weight_decay':   INNER_WEIGHT_DECAY,
+    "lr_start_raw": 0.005049,
+    "lr_middle_raw": 0.0007886,
+    "lr_end_raw": 0.003383,
+    "warmup_steps": 3,
+    "batch_size_exp": 0.934,
+    "clip_norm": 303.3,
+    "reg_scale": 0.00043071,
+    "inner_steps": 29,
+    "weight_decay": INNER_WEIGHT_DECAY,
 }
 
 DEFAULT_FINETUNE_PARAMS = {
-    'lr_start_raw':     0.002470,
-    'lr_middle_raw':    0.005842,
-    'lr_end_raw':       0.001227,
-    'warmup_steps':     7,
-    'batch_size_exp':   1.155,
-    'clip_norm':        270.9,
-    'reg_scale':        0.0007204,
-    'inner_steps':      14,
-    'recency_weight':   5.242,
-    'recency_degree':   2.518,
-    'weight_decay':     0.03116,
-    'inner_adam_beta1': INNER_ADAM_BETA1,
-    'inner_adam_beta2': INNER_ADAM_BETA2,
+    "lr_start_raw": 0.002470,
+    "lr_middle_raw": 0.005842,
+    "lr_end_raw": 0.001227,
+    "warmup_steps": 7,
+    "batch_size_exp": 1.155,
+    "clip_norm": 270.9,
+    "reg_scale": 0.0007204,
+    "inner_steps": 14,
+    "recency_weight": 5.242,
+    "recency_degree": 2.518,
+    "weight_decay": 0.03116,
+    "inner_adam_beta1": INNER_ADAM_BETA1,
+    "inner_adam_beta2": INNER_ADAM_BETA2,
 }
 
 parser = create_parser()
@@ -179,19 +179,19 @@ def adapt_on_data(
         not meta_model_params.requires_grad
     )  # Do not update the meta model's parameters by accident
 
-    lr_start_raw   = train_adapt_params["lr_start_raw"]
-    lr_middle_raw  = train_adapt_params["lr_middle_raw"]
-    lr_end_raw     = train_adapt_params["lr_end_raw"]
+    lr_start_raw = train_adapt_params["lr_start_raw"]
+    lr_middle_raw = train_adapt_params["lr_middle_raw"]
+    lr_end_raw = train_adapt_params["lr_end_raw"]
     batch_size_exp = train_adapt_params["batch_size_exp"]
-    warmup_steps   = train_adapt_params["warmup_steps"]
-    clip_norm      = train_adapt_params["clip_norm"]
-    reg_scale      = train_adapt_params["reg_scale"]
-    inner_steps    = train_adapt_params["inner_steps"]
+    warmup_steps = train_adapt_params["warmup_steps"]
+    clip_norm = train_adapt_params["clip_norm"]
+    reg_scale = train_adapt_params["reg_scale"]
+    inner_steps = train_adapt_params["inner_steps"]
 
     # Convert raw LRs: we know ~3e-3 works well for a 16k batch size.
-    lr_start  = lr_start_raw  * (16000 ** (1.0 - batch_size_exp))
+    lr_start = lr_start_raw * (16000 ** (1.0 - batch_size_exp))
     lr_middle = lr_middle_raw * (16000 ** (1.0 - batch_size_exp))
-    lr_end    = lr_end_raw    * (16000 ** (1.0 - batch_size_exp))
+    lr_end = lr_end_raw * (16000 ** (1.0 - batch_size_exp))
 
     inner_scheduler = PiecewiseLinearScheduler(
         inner_opt,
@@ -307,25 +307,25 @@ def get_inner_opt(
 
 def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS):
     """A fine tuning procedure designed to generalize as well as possible given the data."""
-    lr_start_raw   = finetune_params["lr_start_raw"]
-    lr_middle_raw  = finetune_params["lr_middle_raw"]
-    lr_end_raw     = finetune_params["lr_end_raw"]
+    lr_start_raw = finetune_params["lr_start_raw"]
+    lr_middle_raw = finetune_params["lr_middle_raw"]
+    lr_end_raw = finetune_params["lr_end_raw"]
     batch_size_exp = finetune_params["batch_size_exp"]
-    warmup_steps   = finetune_params["warmup_steps"]
-    clip_norm      = finetune_params["clip_norm"]
-    reg_scale      = finetune_params["reg_scale"]
-    inner_steps    = finetune_params["inner_steps"]
+    warmup_steps = finetune_params["warmup_steps"]
+    clip_norm = finetune_params["clip_norm"]
+    reg_scale = finetune_params["reg_scale"]
+    inner_steps = finetune_params["inner_steps"]
     recency_weight = finetune_params["recency_weight"]
     recency_degree = finetune_params["recency_degree"]
     # Inner optimizer hyperparameters — all three now come from finetune_params
     # so that Optuna can tune them independently of the meta-training constants.
-    weight_decay     = finetune_params["weight_decay"]
+    weight_decay = finetune_params["weight_decay"]
     inner_adam_beta1 = finetune_params["inner_adam_beta1"]
     inner_adam_beta2 = finetune_params["inner_adam_beta2"]
 
-    lr_start  = lr_start_raw  * (16000 ** (1.0 - batch_size_exp))
+    lr_start = lr_start_raw * (16000 ** (1.0 - batch_size_exp))
     lr_middle = lr_middle_raw * (16000 ** (1.0 - batch_size_exp))
-    lr_end    = lr_end_raw    * (16000 ** (1.0 - batch_size_exp))
+    lr_end = lr_end_raw * (16000 ** (1.0 - batch_size_exp))
 
     # Set recency weights.
     x = np.linspace(0, 1, len(df))
@@ -409,12 +409,12 @@ def evaluate(
         test_n = 0
         for split_i, (train_index, test_index) in enumerate(tscv.split(df)):
             train_set = df.iloc[train_index]
-            test_set  = df.iloc[test_index]
+            test_set = df.iloc[test_index]
             if NO_TEST_SAME_DAY:
                 test_set = test_set[test_set["elapsed_days"] > 0].copy()
             if EQUALIZE_TEST_WITH_NON_SECS:
                 train_set = df[df[f"{split_i}_train"]]
-                test_set  = df[df[f"{split_i}_test"]]
+                test_set = df[df[f"{split_i}_test"]]
                 train_index, test_index = None, None
 
             finetuned_model = finetune(
@@ -507,11 +507,11 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         # Build train_adapt_params BEFORE get_inner_opt so that weight_decay
         # (and the warmed-up LRs) are available when the optimizer is created.
         train_adapt_params = copy.copy(DEFAULT_TRAIN_ADAPT_PARAMS)
-        train_adapt_params["lr_start_raw"]  *= min(1.0, outer_it / WARMUP_STEPS)
+        train_adapt_params["lr_start_raw"] *= min(1.0, outer_it / WARMUP_STEPS)
         train_adapt_params["lr_middle_raw"] *= min(1.0, outer_it / WARMUP_STEPS)
-        train_adapt_params["lr_end_raw"]    *= min(1.0, outer_it / WARMUP_STEPS)
+        train_adapt_params["lr_end_raw"] *= min(1.0, outer_it / WARMUP_STEPS)
 
-        learner   = copy.deepcopy(model)
+        learner = copy.deepcopy(model)
         inner_opt = get_inner_opt(
             learner.parameters(),
             weight_decay=train_adapt_params["weight_decay"],
@@ -624,10 +624,12 @@ def main():
 
     df_dict = {}
     num_train_users = 100
-    num_test_users  = 30
+    num_test_users = 30
     train_users = list(range(1001, 1001 + num_train_users))
-    test_users  = list(range(1001 + num_train_users, 1001 + num_train_users + num_test_users))
-    all_users   = train_users + test_users
+    test_users = list(
+        range(1001 + num_train_users, 1001 + num_train_users + num_test_users)
+    )
+    all_users = train_users + test_users
 
     time_start = time.time()
     if PROCESSES > 1:
@@ -639,13 +641,13 @@ def main():
         df_dict[user] = result
 
     train_df_list = [df_dict[user_id] for user_id in train_users]
-    test_df_list  = [df_dict[user_id] for user_id in test_users]
+    test_df_list = [df_dict[user_id] for user_id in test_users]
     print(f"Loaded data in {(time.time() - time_start):.3f} seconds.")
 
     # Compute per-feature mean/std normalisation from training data.
     tensor_features = config.get_lstm_tensor_feature_names()
     means = []
-    stds  = []
+    stds = []
     for feature_i, feature in enumerate(tensor_features):
         if feature == "rating":
             continue
@@ -674,33 +676,37 @@ def main():
 
         all_series = np.array(all_series)
         mean = all_series.mean()
-        std  = np.sqrt(((all_series - mean) ** 2).mean())
+        std = np.sqrt(((all_series - mean) ** 2).mean())
         print(f"Training data {feature} mean: {mean}, std: {std}")
         means.append(mean)
         stds.append(std)
 
-    input_mean = torch.tensor(means, dtype=torch.float32, requires_grad=False, device=DEVICE)
-    input_std  = torch.tensor(stds,  dtype=torch.float32, requires_grad=False, device=DEVICE)
+    input_mean = torch.tensor(
+        means, dtype=torch.float32, requires_grad=False, device=DEVICE
+    )
+    input_std = torch.tensor(
+        stds, dtype=torch.float32, requires_grad=False, device=DEVICE
+    )
     model.set_normalization_params(input_mean, input_std)
 
     wandb.init(
         project="srs-benchmark",
         config={
-            "model":             MODEL_NAME,
-            "outer_steps":       OUTER_STEPS,
-            "outer_lr_start":    OUTER_LR_START,
-            "adapt_params":      DEFAULT_TRAIN_ADAPT_PARAMS,
-            "finetune_params":   DEFAULT_FINETUNE_PARAMS,
-            "batch_size":        BATCH_SIZE,
-            "num_train_users":   num_train_users,
-            "num_test_users":    num_test_users,
-            "inner_adam_beta1":  INNER_ADAM_BETA1,
-            "inner_adam_beta2":  INNER_ADAM_BETA2,
-            "inner_weight_decay":INNER_WEIGHT_DECAY,
-            "outer_adam_beta1":  OUTER_ADAM_BETA1,
-            "outer_adam_beta2":  OUTER_ADAM_BETA2,
-            "outer_weight_decay":OUTER_WEIGHT_DECAY,
-            "total_parameters":  total_params,
+            "model": MODEL_NAME,
+            "outer_steps": OUTER_STEPS,
+            "outer_lr_start": OUTER_LR_START,
+            "adapt_params": DEFAULT_TRAIN_ADAPT_PARAMS,
+            "finetune_params": DEFAULT_FINETUNE_PARAMS,
+            "batch_size": BATCH_SIZE,
+            "num_train_users": num_train_users,
+            "num_test_users": num_test_users,
+            "inner_adam_beta1": INNER_ADAM_BETA1,
+            "inner_adam_beta2": INNER_ADAM_BETA2,
+            "inner_weight_decay": INNER_WEIGHT_DECAY,
+            "outer_adam_beta1": OUTER_ADAM_BETA1,
+            "outer_adam_beta2": OUTER_ADAM_BETA2,
+            "outer_weight_decay": OUTER_WEIGHT_DECAY,
+            "total_parameters": total_params,
         },
     )
 

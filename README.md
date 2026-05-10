@@ -60,12 +60,11 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - ACT-R: the algorithm proposed in [this paper](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
 
 - Neural networks:
-    - GRU: a type of recurrent neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. It uses the same power forgetting curve as FSRS-4.5 and FSRS-5 to make the comparison more fair.
-        - GRU-P: a variant of GRU that removes the fixed forgetting curve and predicts the probability of recall directly. This makes it more flexible than GRU, but also more prone to making strange predictions, such as the probability of recall *increasing* over time.
-    - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). It uses short-term reviews and fractional intervals; enable the duration feature with `--duration` (disabled by default).
-      The three aforementioned neural networks were first pretrained on 100 users and then further optimized on each user individually.
+    - GRU: a type of recurrent neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. It uses a mixed power forgetting curve similar to FSRS-7. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). First, it is pre-trained on 100 users to obtain reasonable starting parameters. Then it is optimized on each user individually.
+    - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. Also trained using Reptile.
+      GRU and LSTM were first pretrained on 100 users and then further optimized on each user individually.
     - RWKV: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture, which combines the properties of an RNN and a Transformer. The neural network takes in as input the entire review history, all cards included. <a id="features-note"></a>Along with the usual features, it has additional access to: duration of the review, sibling card information, deck and preset structure/hierarchy, day of the week. Unlike other algorithms in this benchmark, RWKV is not optimized on each user individually. Instead, it is trained on 5 thousand users and evaluated on another 5 thousand; this process is repeated twice to get full coverage of the dataset.
-        - RWKV-P: predicts the result of a review at the time just before the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. Just like GRU-P, it may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
+        - RWKV-P: predicts the result of a review at the time just before the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. It may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
 - Other:
     - Logistic Regression: performs a logistic regression based on 34 features computed from the card history.
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline. An algorithm that doesn't outperform AVG cannot be considered good.
@@ -109,10 +108,8 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-7 sched. penalties | 35 | 0.3438±0.0043 | 0.0663±0.0011 | 0.7065±0.0023 | FIL, G, SR |
 | FSRS-7 preset | 35 | 0.3438±0.0043 | 0.0650±0.0011 | 0.7079±0.0023 | FIL, G, SR |
 | FSRS-rs | 21 | 0.3443±0.0041 | 0.0635±0.0011 | 0.7074±0.0022 | IL, G, SR |
-| GRU-P-short | 297 | 0.3458±0.0043 | 0.0622±0.0011 | 0.6990±0.0025 | IL, G, SR|
 | FSRS-6 | 21 | 0.3460±0.0042 | 0.0653±0.0011 | 0.7034±0.0023 | IL, G, SR |
 | FSRS-7 deck | 35 | 0.3514±0.0044 | 0.0725±0.0013 | 0.7016±0.0022 | FIL, G, SR |
-| GRU-P | 297 | 0.3521±0.0043 | 0.0633±0.0011 | 0.6868±0.0025 | IL, G |
 | FSRS-5 | 19 | 0.3560±0.0045 | 0.0741±0.0013 | 0.7011±0.0023 | IL, G, SR |
 | FSRS-4.5 | 17 | 0.3624±0.0046 | 0.0764±0.0013 | 0.6893±0.0023 | IL, G |
 | FSRS-7 default param. | 0 | 0.3629±0.0044 | 0.0910±0.0014 | 0.6944±0.0024 | FIL, G, SR |
@@ -121,7 +118,6 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | DASH[MCM] | 9 | 0.3688±0.0045 | 0.0861±0.0014 | 0.6343±0.0026 | IL, G |
 | FSRS v4 | 17 | 0.3726±0.0048 | 0.0838±0.0014 | 0.6853±0.0023 | IL, G |
 | DASH[ACT-R] | 5 | 0.3728±0.0047 | 0.0886±0.0016 | 0.6239±0.0027 | IL, G |
-| GRU | 39 | 0.3753±0.0047 | 0.0864±0.0013 | 0.6683±0.0023 | IL, G |
 | AVG | 0 | 0.3945±0.0051 | 0.1034±0.0016 | 0.4997±0.0026 | --- |
 | ACT-R | 5 | 0.4033±0.0054 | 0.1074±0.0017 | 0.5225±0.0025 | IL |
 | FSRS v3 | 13 | 0.4364±0.0068 | 0.1097±0.0019 | 0.6605±0.0023 | IL, G |
@@ -153,7 +149,6 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | FSRS-7 deck | 35 | 0.3329±0.0041 | 0.0730±0.0010 | 0.7274±0.0020 | FIL, G, SR |
 | FSRS-7 default param. | 0 | 0.3431±0.0040 | 0.0921±0.0011 | 0.7206±0.0020 | FIL, G, SR |
 | DASH[MCM] | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
-| GRU-P | 297 | 0.3487±0.0040 | 0.0838±0.0011 | 0.6457±0.0033 | FIL, G, SR |
 | DASH | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |
 | DASH[ACT-R] | 5 | 0.3763±0.0045 | 0.1161±0.0014 | 0.5576±0.0030 | FIL, G, SR |
 | FSRS-6 | 21 | 0.3813±0.0092 | 0.0870±0.0026 | 0.6831±0.0045 | FIL, G, SR |
@@ -162,7 +157,6 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | FSRS-4.5 | 17 | 0.4286±0.0060 | 0.1032±0.0014 | 0.6821±0.0023 | FIL, G, SR |
 | FSRS-5 | 19 | 0.4565±0.0069 | 0.1175±0.0017 | 0.6761±0.0023 | FIL, G, SR |
 | FSRS v4 | 17 | 0.4848±0.0077 | 0.1159±0.0017 | 0.6663±0.0024 | FIL, G, SR |
-| GRU | 39 | 0.590±0.010 | 0.1846±0.0027 | 0.5984±0.0031 | FIL, G, SR |
 | FSRS v3 | 13 | 0.647±0.012 | 0.1413±0.0021 | 0.6389±0.0025 | FIL, G, SR |
 | FSRS v2 | 14 | 0.663±0.012 | 0.1351±0.0019 | 0.6386±0.0023 | FIL, G, SR |
 | HLR | 3 | 0.705±0.014 | 0.1715±0.0024 | 0.6104±0.0028 | FIL, G, SR |

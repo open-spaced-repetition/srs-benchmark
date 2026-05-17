@@ -527,6 +527,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             recent_losses_n = 0
 
         if outer_it > 0 and outer_it % LOG_STEPS == 0:
+            outer_lr = scheduler.get_last_lr()[0]
             metrics_log["outer_lr"] = outer_lr
             metrics_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
             assert outer_loss_running

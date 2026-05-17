@@ -507,8 +507,13 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         metrics_log = {}
         if outer_it > 0 and outer_it % len(train_df_list) == 0:
             outer_lr = scheduler.get_last_lr()[0]
+            recent_avg_loss = (
+                recent_losses_total / recent_losses_n
+                if recent_losses_n
+                else float("nan")
+            )
             print(
-                f"{outer_it}, outer lr: {outer_lr:.4f}, inner lr: {train_adapt_params['lr_middle_raw']:.4f}, exp average: {outer_loss_running:.4f}, inner loss avg: {(recent_losses_total / recent_losses_n):.4f}"
+                f"{outer_it}, outer lr: {outer_lr:.4f}, inner lr: {train_adapt_params['lr_middle_raw']:.4f}, exp average: {outer_loss_running:.4f}, inner loss avg: {recent_avg_loss:.4f}"
             )
             sorted_exp_loss_dict = {
                 k: round(v, 4) for k, v in sorted(exp_loss_dict.items())
@@ -516,7 +521,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             print(sorted_exp_loss_dict)
             metrics_log["outer_lr"] = outer_lr
             metrics_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
-            metrics_log["recent_outer_loss"] = recent_losses_total / recent_losses_n
+            metrics_log["recent_outer_loss"] = recent_avg_loss
             metrics_log["train_exponential_average"] = outer_loss_running
             recent_losses_total = 0.0
             recent_losses_n = 0

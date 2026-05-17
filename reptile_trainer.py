@@ -15,7 +15,6 @@ from multiprocess import Pool  # type: ignore
 import copy
 import numpy as np
 from models.trainable import TrainableModel
-import wandb
 import time
 from itertools import chain
 from features import create_features
@@ -505,7 +504,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
         outer_opt.step()
         scheduler.step()
 
-        wandb_log = {}
+        metrics_log = {}
         if outer_it > 0 and outer_it % len(train_df_list) == 0:
             outer_lr = scheduler.get_last_lr()[0]
             print(
@@ -515,40 +514,37 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
                 k: round(v, 4) for k, v in sorted(exp_loss_dict.items())
             }
             print(sorted_exp_loss_dict)
-            wandb_log["outer_lr"] = outer_lr
-            wandb_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
-            wandb_log["recent_outer_loss"] = recent_losses_total / recent_losses_n
-            wandb_log["train_exponential_average"] = outer_loss_running
+            metrics_log["outer_lr"] = outer_lr
+            metrics_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
+            metrics_log["recent_outer_loss"] = recent_losses_total / recent_losses_n
+            metrics_log["train_exponential_average"] = outer_loss_running
             recent_losses_total = 0.0
             recent_losses_n = 0
 
         if outer_it > 0 and outer_it % LOG_STEPS == 0:
-            wandb_log["outer_lr"] = outer_lr
-            wandb_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
+            metrics_log["outer_lr"] = outer_lr
+            metrics_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
             assert outer_loss_running
-            wandb_log["train_exponential_average"] = outer_loss_running
+            metrics_log["train_exponential_average"] = outer_loss_running
             evaluate(
                 train_df_list[: min(len(train_df_list), 5)],
                 model,
                 inner_opt_state,
                 name="train",
-                log=wandb_log,
+                log=metrics_log,
             )
             evaluate(
                 test_df_list,
                 model,
                 inner_opt_state,
                 name="test",
-                log=wandb_log,
+                log=metrics_log,
             )
 
         if outer_it > 0 and outer_it % CHECKPOINT_STEPS == 0:
             torch.save(model.state_dict(), MODEL_PATH)
             torch.save(inner_opt.state_dict(), INNER_OPT_PATH)
             print("Checkpoint saved.")
-
-        if len(wandb_log) > 0:
-            wandb.log(wandb_log, step=outer_it)
 
     # Set the correct state before exiting to ensure that the right version is saved
     inner_opt.load_state_dict(inner_opt_state)
@@ -658,31 +654,9 @@ def main():
     )
     model.set_normalization_params(input_mean, input_std)
 
-    wandb.init(
-        project="srs-benchmark",
-        config={
-            "model": MODEL_NAME,
-            "outer_steps": OUTER_STEPS,
-            "outer_lr_start": OUTER_LR_START,
-            "adapt_params": DEFAULT_TRAIN_ADAPT_PARAMS,
-            "finetune_params": DEFAULT_FINETUNE_PARAMS,
-            "batch_size": BATCH_SIZE,
-            "num_train_users": num_train_users,
-            "num_test_users": num_test_users,
-            "inner_adam_beta1": INNER_ADAM_BETA1,
-            "inner_adam_beta2": INNER_ADAM_BETA2,
-            "inner_weight_decay": INNER_WEIGHT_DECAY,
-            "outer_adam_beta1": OUTER_ADAM_BETA1,
-            "outer_adam_beta2": OUTER_ADAM_BETA2,
-            "outer_weight_decay": OUTER_WEIGHT_DECAY,
-            "total_parameters": total_params,
-        },
-    )
-
     train(model, inner_opt.state_dict(), train_df_list, test_df_list)
     torch.save(model.state_dict(), MODEL_PATH)
     torch.save(inner_opt.state_dict(), INNER_OPT_PATH)
-    wandb.finish()
 
 
 if __name__ == "__main__":

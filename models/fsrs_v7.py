@@ -23,6 +23,7 @@ from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
 PENALTY_W_1 = 0.5
 PENALTY_W_2 = 0.0015
 PENALTY_W_L2 = 0.5
+# Small stability floor used by custom backward to avoid log/division singularities.
 NUMERICAL_EPSILON = 1e-12
 
 

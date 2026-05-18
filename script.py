@@ -185,8 +185,7 @@ class Trainer:
         # Build datasets
         with _profile_block(self.profile_times, "init/filter_training_data"):
             filtered_train_set = self.model.filter_training_data(train_set)
-        with _profile_block(self.profile_times, "init/build_dataset"):
-            self.build_dataset(filtered_train_set, test_set)
+        self.build_dataset(filtered_train_set, test_set)
 
         # Setup optimizer
         with _profile_block(self.profile_times, "init/setup_optimizer"):
@@ -208,74 +207,82 @@ class Trainer:
         return dict(self.profile_times)
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
-        self.train_set = BatchDataset(
-            train_set.copy(),
-            self.batch_size,
-            max_seq_len=self.max_seq_len,
-        )
-        self.train_data_loader = BatchLoader(self.train_set)
+        with _profile_block(self.profile_times, "build_dataset/create_train_batch_dataset"):
+            self.train_set = BatchDataset(
+                train_set.copy(),
+                self.batch_size,
+                max_seq_len=self.max_seq_len,
+            )
+        with _profile_block(self.profile_times, "build_dataset/create_train_batch_loader"):
+            self.train_data_loader = BatchLoader(self.train_set)
 
         if test_set is None:
             self.test_set = None
             self.test_data_loader = None
         else:
-            self.test_set = BatchDataset(
-                test_set.copy(),
-                batch_size=self.batch_size,
-                max_seq_len=self.max_seq_len,
-            )
-            self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
+            with _profile_block(
+                self.profile_times, "build_dataset/create_test_batch_dataset"
+            ):
+                self.test_set = BatchDataset(
+                    test_set.copy(),
+                    batch_size=self.batch_size,
+                    max_seq_len=self.max_seq_len,
+                )
+            with _profile_block(
+                self.profile_times, "build_dataset/create_test_batch_loader"
+            ):
+                self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
     def train(self):
         best_loss = np.inf
-        best_w = get_model_state(self.model)  # initialize to current weights
+        with _profile_block(self.profile_times, "train/get_initial_model_state"):
+            best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
-        for k in range(self.n_epoch):
-            with _profile_block(self.profile_times, "train/eval_before_epoch"):
-                weighted_loss, w = self.eval()
+        for _ in range(self.n_epoch):
+            weighted_loss, w = self.eval()
             if weighted_loss < best_loss:
                 best_loss = weighted_loss
                 best_w = w
 
-            with _profile_block(self.profile_times, "train/main_batch_loop"):
-                for i, batch in enumerate(self.train_data_loader):
+            for batch in self.train_data_loader:
+                with _profile_block(self.profile_times, "train/set_train_mode"):
                     self.model.train()
+                with _profile_block(self.profile_times, "train/zero_grad"):
                     self.optimizer.zero_grad()
-                    with _profile_block(
-                        self.profile_times, "train/forward_loss_backward"
-                    ):
-                        result = batch_process_wrapper(self.model, batch)
-                        loss = (
-                            self.loss_fn(result["retentions"], result["labels"])
-                            * result["weights"]
-                        ).sum()
-                        if "penalty" in result:
-                            loss += result["penalty"] / epoch_len
-                        loss.backward()
-
-                    # Apply model-specific gradient constraints
+                with _profile_block(self.profile_times, "train/batch_process"):
+                    result = batch_process_wrapper(self.model, batch)
+                with _profile_block(self.profile_times, "train/loss_compute"):
+                    loss = (
+                        self.loss_fn(result["retentions"], result["labels"])
+                        * result["weights"]
+                    ).sum()
+                    if "penalty" in result:
+                        loss += result["penalty"] / epoch_len
+                with _profile_block(self.profile_times, "train/loss_backward"):
+                    loss.backward()
+                with _profile_block(self.profile_times, "train/apply_gradient_constraints"):
                     self.model.apply_gradient_constraints()
-
-                    with _profile_block(self.profile_times, "train/optimizer_step"):
-                        self.optimizer.step()
-                        self.scheduler.step()
-
-                    # Apply model-specific parameter constraints (clipper)
+                with _profile_block(self.profile_times, "train/optimizer_step"):
+                    self.optimizer.step()
+                with _profile_block(self.profile_times, "train/scheduler_step"):
+                    self.scheduler.step()
+                with _profile_block(self.profile_times, "train/apply_parameter_clipper"):
                     self.model.apply_parameter_clipper()
 
-        with _profile_block(self.profile_times, "train/eval_after_training"):
-            weighted_loss, w = self.eval()
+        weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
             best_loss = weighted_loss
             best_w = w
         return best_w
 
     def eval(self):
-        self.model.eval()
+        with _profile_block(self.profile_times, "eval/set_eval_mode"):
+            self.model.eval()
         with torch.no_grad():
             losses = []
-            self.train_data_loader.shuffle = False
+            with _profile_block(self.profile_times, "eval/set_train_loader_shuffle_false"):
+                self.train_data_loader.shuffle = False
             data_loaders = [self.train_data_loader]
             if self.test_data_loader is not None:
                 data_loaders.append(self.test_data_loader)
@@ -287,9 +294,10 @@ class Trainer:
                 loss = 0
                 total = 0
                 epoch_len = len(data_loader.dataset.y_train)
-                with _profile_block(self.profile_times, "eval/data_loader_batches"):
-                    for batch in data_loader:
+                for batch in data_loader:
+                    with _profile_block(self.profile_times, "eval/batch_process"):
                         result = batch_process_wrapper(self.model, batch)
+                    with _profile_block(self.profile_times, "eval/loss_accumulation"):
                         loss += (
                             (
                                 self.loss_fn(result["retentions"], result["labels"])
@@ -303,18 +311,22 @@ class Trainer:
                             loss += (result["penalty"] / epoch_len).detach().item()
                         total += batch[3].shape[0]
                 losses.append(loss / total)
-            self.train_data_loader.shuffle = True
-            self.avg_train_losses.append(losses[0])
-            self.avg_eval_losses.append(losses[1] if len(losses) > 1 else 0)
+            with _profile_block(self.profile_times, "eval/set_train_loader_shuffle_true"):
+                self.train_data_loader.shuffle = True
+            with _profile_block(self.profile_times, "eval/append_loss_history"):
+                self.avg_train_losses.append(losses[0])
+                self.avg_eval_losses.append(losses[1] if len(losses) > 1 else 0)
 
-            w = get_model_state(self.model)
+            with _profile_block(self.profile_times, "eval/get_model_state"):
+                w = get_model_state(self.model)
 
-            if self.test_set is None:
-                weighted_loss = losses[0]
-            else:
-                weighted_loss = (
-                    losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
-                ) / (len(self.train_set) + len(self.test_set))
+            with _profile_block(self.profile_times, "eval/compute_weighted_loss"):
+                if self.test_set is None:
+                    weighted_loss = losses[0]
+                else:
+                    weighted_loss = (
+                        losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
+                    ) / (len(self.train_set) + len(self.test_set))
 
             return weighted_loss, w
 
@@ -427,12 +439,18 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         batch_size=config.batch_size,
     )
     if config.only_S0:
+        _merge_profile_times(
+            script_profile_times, trainer.get_profile_times(), prefix="trainer/"
+        )
         if hasattr(trainer.model, "get_profile_times"):
             fsrs_profile = getattr(trainer.model, "get_profile_times")()
             if isinstance(fsrs_profile, dict):
                 _merge_profile_times(fsrs7_profile_times, fsrs_profile)
         return get_model_state(trainer.model)
     weights = trainer.train()
+    _merge_profile_times(
+        script_profile_times, trainer.get_profile_times(), prefix="trainer/"
+    )
     if hasattr(trainer.model, "get_profile_times"):
         fsrs_profile = getattr(trainer.model, "get_profile_times")()
         if isinstance(fsrs_profile, dict):
@@ -520,12 +538,9 @@ def process(
                     script_profile_times, "process/apply_recency_weighting_user_fallback"
                 ):
                     user_train_for_fallback = _apply_recency_weighting(train_set)
-                with _profile_block(
-                    script_profile_times, "process/train_user_fallback_model"
-                ):
-                    user_level_weights = copy.deepcopy(
-                        _fit_trainable_weights(user_train_for_fallback)
-                    )
+                user_level_weights = copy.deepcopy(
+                    _fit_trainable_weights(user_train_for_fallback)
+                )
             except Exception as e:
                 if _is_inadequate_training_data_error(e):
                     if config.verbose_inadequate_data:
@@ -560,12 +575,9 @@ def process(
                 ):
                     train_partition = _apply_recency_weighting(train_partition)
 
-                with _profile_block(
-                    script_profile_times, "process/train_partition_model"
-                ):
-                    partition_weights[partition] = copy.deepcopy(
-                        _fit_trainable_weights(train_partition)
-                    )
+                partition_weights[partition] = copy.deepcopy(
+                    _fit_trainable_weights(train_partition)
+                )
 
             except Exception as e:
                 if _is_inadequate_training_data_error(e):

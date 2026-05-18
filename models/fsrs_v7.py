@@ -170,7 +170,13 @@ class _FSRS7ForgettingCurveFn(Function):
         grad_swp2 = grad_output * (dy_dw2 * dw2_dswp2)
 
         def _sum_to_shape(g: Tensor, ref: Tensor) -> Tensor:
-            return g.sum_to_size(ref.shape)
+            out = g
+            while out.dim() > ref.dim():
+                out = out.sum(dim=0)
+            for dim, (gdim, rdim) in enumerate(zip(out.shape, ref.shape)):
+                if rdim == 1 and gdim != 1:
+                    out = out.sum(dim=dim, keepdim=True)
+            return out
 
         return (
             _sum_to_shape(grad_t, t),

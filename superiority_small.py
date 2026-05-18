@@ -145,11 +145,18 @@ if __name__ == "__main__":
     models[index_LogReg] = "Logistic Regression\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
-    ax.set_title(
-        "Percent of collections where algorithm A (row) outperforms algorithm B (column)",
-        fontsize=22,
-        pad=10,
-    )
+    if args.same_day:
+        ax.set_title(
+            "Percent of collections where algorithm A (row) outperforms algorithm B (column)\nNo same-day reviews",
+            fontsize=22,
+            pad=10,
+        )
+    else:
+        ax.set_title(
+            "Percent of collections where algorithm A (row) outperforms algorithm B (column)\nWith same-day reviews",
+            fontsize=22,
+            pad=10,
+        )
 
     def rgb2hex(list):
         return f"#{int(round(list[0])):02x}{int(round(list[1])):02x}{int(round(list[2])):02x}"

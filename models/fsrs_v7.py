@@ -108,13 +108,12 @@ class _FSRS7ForgettingCurveFn(Function):
             retention,
         ) = ctx.saved_tensors
 
-        eps = torch.tensor(1e-12, device=s.device, dtype=s.dtype)
-        s_safe = s.clamp_min(eps)
-        base1_safe = base1.clamp_min(eps)
-        base2_safe = base2.clamp_min(eps)
-        inner1_safe = inner1.clamp_min(eps)
-        inner2_safe = inner2.clamp_min(eps)
-        weight_sum_safe = weight_sum.clamp_min(eps)
+        s_safe = s.clamp_min(1e-12)
+        base1_safe = base1.clamp_min(1e-12)
+        base2_safe = base2.clamp_min(1e-12)
+        inner1_safe = inner1.clamp_min(1e-12)
+        inner2_safe = inner2.clamp_min(1e-12)
+        weight_sum_safe = weight_sum.clamp_min(1e-12)
 
         dy_dR1 = weight1 / weight_sum_safe
         dy_dR2 = weight2 / weight_sum_safe
@@ -170,12 +169,18 @@ class _FSRS7ForgettingCurveFn(Function):
         grad_swp2 = grad_output * (dy_dw2 * dw2_dswp2)
 
         def _sum_to_shape(g: Tensor, ref: Tensor) -> Tensor:
-            out = g
-            while out.dim() > ref.dim():
-                out = out.sum(dim=0)
-            for dim, (gdim, rdim) in enumerate(zip(out.shape, ref.shape)):
-                if rdim == 1 and gdim != 1:
-                    out = out.sum(dim=dim, keepdim=True)
+            if g.shape == ref.shape:
+                return g
+            target_shape = ref.shape
+            padded_target = (1,) * (g.dim() - len(target_shape)) + target_shape
+            reduce_dims = tuple(
+                i
+                for i, (gdim, tdim) in enumerate(zip(g.shape, padded_target))
+                if tdim == 1 and gdim != 1
+            )
+            out = g.sum(dim=reduce_dims, keepdim=True) if reduce_dims else g
+            if len(target_shape) != out.dim():
+                out = out.reshape(target_shape)
             return out
 
         return (

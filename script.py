@@ -4,7 +4,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
-from typing import Optional, Any, cast
+from typing import Optional, Any, cast, NamedTuple
 from pathlib import Path
 import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -54,8 +54,19 @@ warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(config.seed)
 tqdm.pandas()
 
-SCRIPT_PROFILE_TIMES: dict[str, float] = defaultdict(float)
-FSRS7_PROFILE_TIMES: dict[str, float] = defaultdict(float)
+# Per-process accumulators used to aggregate timed sections within each process.
+# With ProcessPoolExecutor(spawn), worker mutations stay in worker memory; we aggregate
+# timings in the parent via per-call deltas returned from `process` (no shared-memory
+# cross-process writes to these dicts).
+script_profile_times: dict[str, float] = defaultdict(float)
+fsrs7_profile_times: dict[str, float] = defaultdict(float)
+
+
+class ProcessRunResult(NamedTuple):
+    stats: dict[str, Any]
+    raw: Optional[dict]
+    script_profile_delta: dict[str, float]
+    fsrs7_profile_delta: dict[str, float]
 
 
 def _merge_profile_times(
@@ -88,15 +99,15 @@ def _profile_block(profile: dict[str, float], key: str):
 
 def _plot_stacked_profile(
     profile: dict[str, float], title: str, output_path: Path
-) -> None:
+) -> bool:
     positive_profile = {k: v for k, v in profile.items() if v > 0}
     if not positive_profile:
-        return
+        return False
     ordered = sorted(positive_profile.items(), key=lambda item: item[1], reverse=True)
     fig, ax = plt.subplots(figsize=(14, 7))
     bottom = 0.0
     for key, seconds in ordered:
-        ax.bar(["total"], [seconds], bottom=bottom, label=f"{key} ({seconds:.2f}s)")
+        ax.bar(["cumulative"], [seconds], bottom=bottom, label=f"{key} ({seconds:.2f}s)")
         bottom += seconds
     ax.set_ylabel("seconds")
     ax.set_title(title)
@@ -105,6 +116,7 @@ def _plot_stacked_profile(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=200)
     plt.close(fig)
+    return True
 
 
 class Trainer:
@@ -121,7 +133,6 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.profile_times: dict[str, float] = defaultdict(float)
-        init_start = time.perf_counter()
         self.model = model.to(device=config.device)
         with _profile_block(self.profile_times, "init/initialize_parameters"):
             self.model.initialize_parameters(train_set)
@@ -152,7 +163,6 @@ class Trainer:
         self.avg_train_losses: list[float] = []
         self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
-        self.profile_times["init/total"] += time.perf_counter() - init_start
 
     def get_profile_times(self) -> dict[str, float]:
         return dict(self.profile_times)
@@ -177,7 +187,6 @@ class Trainer:
             self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
     def train(self):
-        train_start = time.perf_counter()
         best_loss = np.inf
         best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
@@ -220,11 +229,9 @@ class Trainer:
         if weighted_loss < best_loss:
             best_loss = weighted_loss
             best_w = w
-        self.profile_times["train/total"] += time.perf_counter() - train_start
         return best_w
 
     def eval(self):
-        eval_start = time.perf_counter()
         self.model.eval()
         with torch.no_grad():
             losses = []
@@ -269,7 +276,6 @@ class Trainer:
                     losses[0] * len(self.train_set) + losses[1] * len(self.test_set)
                 ) / (len(self.train_set) + len(self.test_set))
 
-            self.profile_times["eval/total"] += time.perf_counter() - eval_start
             return weighted_loss, w
 
     def plot(self):
@@ -382,60 +388,70 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
     )
     if config.only_S0:
         _merge_profile_times(
-            SCRIPT_PROFILE_TIMES, trainer.get_profile_times(), prefix="trainer/"
+            script_profile_times, trainer.get_profile_times(), prefix="trainer/"
         )
         if hasattr(trainer.model, "get_profile_times"):
             fsrs_profile = getattr(trainer.model, "get_profile_times")()
             if isinstance(fsrs_profile, dict):
-                _merge_profile_times(FSRS7_PROFILE_TIMES, fsrs_profile)
-                _merge_profile_times(SCRIPT_PROFILE_TIMES, fsrs_profile, prefix="fsrs7/")
+                _merge_profile_times(fsrs7_profile_times, fsrs_profile)
+                _merge_profile_times(
+                    script_profile_times, fsrs_profile, prefix="fsrs7/"
+                )
         return get_model_state(trainer.model)
     weights = trainer.train()
     _merge_profile_times(
-        SCRIPT_PROFILE_TIMES, trainer.get_profile_times(), prefix="trainer/"
+        script_profile_times, trainer.get_profile_times(), prefix="trainer/"
     )
     if hasattr(trainer.model, "get_profile_times"):
         fsrs_profile = getattr(trainer.model, "get_profile_times")()
         if isinstance(fsrs_profile, dict):
-            _merge_profile_times(FSRS7_PROFILE_TIMES, fsrs_profile)
-            _merge_profile_times(SCRIPT_PROFILE_TIMES, fsrs_profile, prefix="fsrs7/")
+            _merge_profile_times(fsrs7_profile_times, fsrs_profile)
+            _merge_profile_times(script_profile_times, fsrs_profile, prefix="fsrs7/")
     return weights
 
 
 @catch_exceptions
 def process(
     user_id: int, device_id: Optional[int] = None
-) -> tuple[dict, Optional[dict], dict[str, float], dict[str, float]]:
-    """Main processing function for all models."""
-    script_profile_before = _snapshot_profile_times(SCRIPT_PROFILE_TIMES)
-    fsrs_profile_before = _snapshot_profile_times(FSRS7_PROFILE_TIMES)
+) -> ProcessRunResult:
+    """Main processing function for all models.
+
+    Returns:
+        ProcessRunResult with fields:
+            stats: User-level summary metrics.
+            raw: Optional raw output payload.
+            script_profile_delta: Per-call timing deltas for script-level sections.
+            fsrs7_profile_delta: Per-call timing deltas for FSRS-7 internals.
+    """
+    script_profile_before = _snapshot_profile_times(script_profile_times)
+    fsrs_profile_before = _snapshot_profile_times(fsrs7_profile_times)
     plt.close("all")
     _configure_process_device(device_id)
 
     # Load data once for all models
     data_loader = UserDataLoader(config)
-    with _profile_block(SCRIPT_PROFILE_TIMES, "process/load_user_data"):
+    with _profile_block(script_profile_times, "process/load_user_data"):
         dataset = data_loader.load_user_data(user_id)
 
     # Handle special cases
     if config.model_name == "SM2" or config.model_name.startswith("Ebisu"):
         stats, raw = process_untrainable(user_id, dataset, config)
-        return stats, raw, {}, {}
+        return ProcessRunResult(stats, raw, {}, {})
     if config.model_name == "AVG":
         stats, raw = baseline(user_id, dataset, config)
-        return stats, raw, {}, {}
+        return ProcessRunResult(stats, raw, {}, {})
     if config.model_name == "RMSE-BINS-EXPLOIT":
         stats, raw = rmse_bins_exploit(user_id, dataset, config)
-        return stats, raw, {}, {}
+        return ProcessRunResult(stats, raw, {}, {})
     if config.model_name == "MOVING-AVG":
         stats, raw = moving_avg(user_id, dataset, config)
-        return stats, raw, {}, {}
+        return ProcessRunResult(stats, raw, {}, {})
     if config.model_name == "FSRS-6-one-step":
         stats, raw = fsrs_one_step(user_id, dataset, config)
-        return stats, raw, {}, {}
+        return ProcessRunResult(stats, raw, {}, {})
     if config.model_name == "FSRS-rs":
         stats, raw = process_fsrs_rs(user_id, dataset, config)
-        return stats, raw, {}, {}
+        return ProcessRunResult(stats, raw, {}, {})
 
     # Process trainable models
     use_double_fallback = _is_deck_or_preset_partition_mode()
@@ -444,7 +460,7 @@ def process(
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
 
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
-        with _profile_block(SCRIPT_PROFILE_TIMES, "process/pandas_split_and_slice"):
+        with _profile_block(script_profile_times, "process/pandas_split_and_slice"):
             if not config.train_equals_test:
                 train_set = dataset.iloc[train_index]
                 test_set = dataset.iloc[test_index]
@@ -471,11 +487,11 @@ def process(
         if use_double_fallback and not config.default_params:
             try:
                 with _profile_block(
-                    SCRIPT_PROFILE_TIMES, "process/apply_recency_weighting_user_fallback"
+                    script_profile_times, "process/apply_recency_weighting_user_fallback"
                 ):
                     user_train_for_fallback = _apply_recency_weighting(train_set)
                 with _profile_block(
-                    SCRIPT_PROFILE_TIMES, "process/train_user_fallback_model"
+                    script_profile_times, "process/train_user_fallback_model"
                 ):
                     user_level_weights = copy.deepcopy(
                         _fit_trainable_weights(user_train_for_fallback)
@@ -498,7 +514,7 @@ def process(
         for partition in train_set["partition"].unique():
             try:
                 with _profile_block(
-                    SCRIPT_PROFILE_TIMES, "process/pandas_partition_slice_train"
+                    script_profile_times, "process/pandas_partition_slice_train"
                 ):
                     train_partition = train_set[
                         train_set["partition"] == partition
@@ -510,12 +526,12 @@ def process(
                     )
 
                 with _profile_block(
-                    SCRIPT_PROFILE_TIMES, "process/apply_recency_weighting_partition"
+                    script_profile_times, "process/apply_recency_weighting_partition"
                 ):
                     train_partition = _apply_recency_weighting(train_partition)
 
                 with _profile_block(
-                    SCRIPT_PROFILE_TIMES, "process/train_partition_model"
+                    script_profile_times, "process/train_partition_model"
                 ):
                     partition_weights[partition] = copy.deepcopy(
                         _fit_trainable_weights(train_partition)
@@ -558,14 +574,14 @@ def process(
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         for partition in testset["partition"].unique():
             with _profile_block(
-                SCRIPT_PROFILE_TIMES, "process/pandas_partition_slice_test"
+                script_profile_times, "process/pandas_partition_slice_test"
             ):
                 partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
             if config.model_name == "LogisticRegression":
                 model = create_model(config, weights)
                 with _profile_block(
-                    SCRIPT_PROFILE_TIMES, "process/predict_partition_model"
+                    script_profile_times, "process/predict_partition_model"
                 ):
                     retentions = cast(Any, model).predict(partition_testset)
                 partition_testset["p"] = retentions
@@ -575,7 +591,7 @@ def process(
                     config,
                 )
                 with _profile_block(
-                    SCRIPT_PROFILE_TIMES, "process/predict_partition_model"
+                    script_profile_times, "process/predict_partition_model"
                 ):
                     retentions, stabilities, difficulties = my_collection.batch_predict(
                         partition_testset
@@ -590,21 +606,21 @@ def process(
             y.extend(partition_testset["y"].tolist())
             save_tmp.append(partition_testset)
 
-    with _profile_block(SCRIPT_PROFILE_TIMES, "process/concat_and_save"):
+    with _profile_block(script_profile_times, "process/concat_and_save"):
         save_tmp_df = pd.concat(save_tmp)
     if "tensor" in save_tmp_df:
         del save_tmp_df["tensor"]
     save_evaluation_file(user_id, save_tmp_df, config)
 
-    with _profile_block(SCRIPT_PROFILE_TIMES, "process/evaluate"):
+    with _profile_block(script_profile_times, "process/evaluate"):
         stats, raw = evaluate(
             y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
         )
     if config.model_name == "LogisticRegression" and model is not None:
         cast(Any, model).log(stats)
-    script_profile_after = _snapshot_profile_times(SCRIPT_PROFILE_TIMES)
-    fsrs_profile_after = _snapshot_profile_times(FSRS7_PROFILE_TIMES)
-    return (
+    script_profile_after = _snapshot_profile_times(script_profile_times)
+    fsrs_profile_after = _snapshot_profile_times(fsrs7_profile_times)
+    return ProcessRunResult(
         stats,
         raw,
         _profile_deltas(script_profile_before, script_profile_after),
@@ -614,8 +630,9 @@ def process(
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
+    main_profile_before = _snapshot_profile_times(script_profile_times)
     unprocessed_users = []
-    with _profile_block(SCRIPT_PROFILE_TIMES, "main/load_parquet_dataset"):
+    with _profile_block(script_profile_times, "main/load_parquet_dataset"):
         dataset = pq.ParquetDataset(config.data_path / "revlogs")
     Path(f"evaluation/{config.get_evaluation_file_name()}").mkdir(
         parents=True, exist_ok=True
@@ -633,7 +650,7 @@ if __name__ == "__main__":
     if config.save_raw_output and raw_file.exists():
         sort_jsonl(raw_file)
 
-    with _profile_block(SCRIPT_PROFILE_TIMES, "main/select_unprocessed_users"):
+    with _profile_block(script_profile_times, "main/select_unprocessed_users"):
         for user_id in dataset.partitioning.dictionaries[0]:
             user_id_value = user_id.as_py()
             # Add the filter here
@@ -643,7 +660,7 @@ if __name__ == "__main__":
                 continue
             unprocessed_users.append(user_id_value)
 
-    with _profile_block(SCRIPT_PROFILE_TIMES, "main/sort_unprocessed_users"):
+    with _profile_block(script_profile_times, "main/sort_unprocessed_users"):
         unprocessed_users.sort()
 
     cuda_device_ids = None
@@ -666,55 +683,72 @@ if __name__ == "__main__":
 
     script_profile_totals: dict[str, float] = defaultdict(float)
     fsrs_profile_totals: dict[str, float] = defaultdict(float)
-    with _profile_block(SCRIPT_PROFILE_TIMES, "main/process_pool_execution"):
-        with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
-            futures = [
-                executor.submit(
-                    process,
-                    user_id,
-                    cuda_device_ids[idx % len(cuda_device_ids)]
-                    if cuda_device_ids
-                    else None,
-                )
-                for idx, user_id in enumerate(unprocessed_users)
-            ]
-            for future in (
-                pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
-            ):
-                try:
-                    result, error = future.result()
-                    if error:
-                        tqdm.write(str(error))
-                    else:
-                        stats, raw, child_script_profile, child_fsrs_profile = result
-                        _merge_profile_times(script_profile_totals, child_script_profile)
-                        _merge_profile_times(fsrs_profile_totals, child_fsrs_profile)
-                        with open(result_file, "a", encoding="utf-8", newline="\n") as f:
-                            f.write(json.dumps(stats, ensure_ascii=False) + "\n")
-                        if raw:
-                            with open(raw_file, "a", encoding="utf-8", newline="\n") as f:
-                                f.write(json.dumps(raw, ensure_ascii=False) + "\n")
-                        pbar.set_description(f"Processed {stats['user']}")
-                except Exception as e:
-                    tqdm.write(str(e))
+    with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
+        future_to_user = {
+            executor.submit(
+                process,
+                user_id,
+                cuda_device_ids[idx % len(cuda_device_ids)] if cuda_device_ids else None,
+            ): user_id
+            for idx, user_id in enumerate(unprocessed_users)
+        }
+        for future in (
+            pbar := tqdm(
+                as_completed(future_to_user), total=len(future_to_user), smoothing=0.03
+            )
+        ):
+            user_id = future_to_user[future]
+            try:
+                result, error = future.result()
+                if error:
+                    tqdm.write(f"User {user_id}: {error}")
+                else:
+                    if not isinstance(result, ProcessRunResult):
+                        tqdm.write(
+                            f"User {user_id}: unexpected process result format: {type(result)}"
+                        )
+                        continue
+                    stats, raw, child_script_profile, child_fsrs_profile = result
+                    _merge_profile_times(script_profile_totals, child_script_profile)
+                    _merge_profile_times(fsrs_profile_totals, child_fsrs_profile)
+                    with open(result_file, "a", encoding="utf-8", newline="\n") as f:
+                        f.write(json.dumps(stats, ensure_ascii=False) + "\n")
+                    if raw:
+                        with open(raw_file, "a", encoding="utf-8", newline="\n") as f:
+                            f.write(json.dumps(raw, ensure_ascii=False) + "\n")
+                    pbar.set_description(f"Processed {stats['user']}")
+            except Exception as e:
+                tqdm.write(f"User {user_id}: {e}")
 
     sort_jsonl(result_file)
     if config.save_raw_output:
         sort_jsonl(raw_file)
 
-    _merge_profile_times(script_profile_totals, SCRIPT_PROFILE_TIMES)
+    main_profile_after = _snapshot_profile_times(script_profile_times)
+    _merge_profile_times(
+        script_profile_totals,
+        _profile_deltas(main_profile_before, main_profile_after),
+    )
     profiling_dir = Path("result/profiling")
-    script_plot_path = profiling_dir / f"{config.get_evaluation_file_name()}_script_timing.png"
+    script_plot_path = (
+        profiling_dir / f"{config.get_evaluation_file_name()}_script_py_timing.png"
+    )
     fsrs_plot_path = profiling_dir / f"{config.get_evaluation_file_name()}_fsrs7_timing.png"
-    _plot_stacked_profile(
+    script_plot_created = _plot_stacked_profile(
         script_profile_totals,
         "script.py timing breakdown",
         script_plot_path,
     )
-    _plot_stacked_profile(
+    fsrs_plot_created = _plot_stacked_profile(
         fsrs_profile_totals,
         "FSRS-7 timing breakdown",
         fsrs_plot_path,
     )
-    print(f"Saved script profiling plot to {script_plot_path}")
-    print(f"Saved FSRS-7 profiling plot to {fsrs_plot_path}")
+    if script_plot_created:
+        print(f"Saved script profiling plot to {script_plot_path}")
+    else:
+        print("No positive script.py profiling data found; script plot was not created.")
+    if fsrs_plot_created:
+        print(f"Saved FSRS-7 profiling plot to {fsrs_plot_path}")
+    else:
+        print("No positive FSRS-7 profiling data found; FSRS-7 plot was not created.")

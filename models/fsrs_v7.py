@@ -143,6 +143,8 @@ class FSRS7(FSRS6):
         self.profile_times[key] += elapsed_seconds
 
     def get_profile_times(self) -> dict[str, float]:
+        # Cumulative timings over this FSRS7 instance lifetime.
+        # Intended for per-instance profiling in the current process.
         return dict(self.profile_times)
 
     def batch_process(
@@ -152,8 +154,6 @@ class FSRS7(FSRS6):
         seq_lens: Tensor,
         real_batch_size: int,
     ) -> dict[str, Tensor]:
-        start_batch = time.perf_counter()
-
         outputs, _ = self.forward(sequences)
         stabilities, difficulties = outputs[
             seq_lens - 1,
@@ -244,7 +244,6 @@ class FSRS7(FSRS6):
         self._add_profile_time(
             "batch_process/penalty_calculation", time.perf_counter() - penalty_start
         )
-        self._add_profile_time("batch_process/total", time.perf_counter() - start_batch)
         return output
 
     # pyrefly: ignore[bad-override]
@@ -602,7 +601,6 @@ class FSRS7(FSRS6):
         return result
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
-        init_start = time.perf_counter()
         # Create binned intervals if using --secs
         # With FSRS-7 --secs should always be used
         prep_start = time.perf_counter()
@@ -818,9 +816,6 @@ class FSRS7(FSRS6):
         self._add_profile_time(
             "initialize_parameters/finalize_parameters",
             time.perf_counter() - finalize_start,
-        )
-        self._add_profile_time(
-            "initialize_parameters/total", time.perf_counter() - init_start
         )
 
     def step(self, X: Tensor, state: Tensor) -> Tensor:

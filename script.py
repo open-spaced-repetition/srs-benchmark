@@ -71,14 +71,18 @@ class Trainer:
         self.batch_size = getattr(self.model, "batch_size", batch_size)
         self.betas = getattr(self.model, "betas", (0.9, 0.999))
         self.max_seq_len = max_seq_len
-        self.n_epoch = self.model.n_epoch
+        self.n_epoch = getattr(self.model, "n_epoch_full", self.model.n_epoch)
+        self.n_epoch_initial = getattr(self.model, "n_epoch_initial", 0)
+        self.lr_full = getattr(self.model, "lr_full", self.model.lr)
+        self.lr_initial = getattr(self.model, "lr_initial", self.lr_full)
 
         # Build datasets
-        self.build_dataset(self.model.filter_training_data(train_set), test_set)
+        self.filtered_train_df = self.model.filter_training_data(train_set)
+        self.build_dataset(self.filtered_train_df, test_set)
 
         # Setup optimizer
         self.optimizer = self.model.get_optimizer(
-            lr=self.model.lr, wd=self.model.wd, betas=self.betas
+            lr=self.lr_full, wd=self.model.wd, betas=self.betas
         )
 
         # Setup scheduler
@@ -89,6 +93,38 @@ class Trainer:
         self.avg_train_losses: list[float] = []
         self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
+
+    def _train_for_epochs(
+        self,
+        data_loader: BatchLoader,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler.CosineAnnealingLR,
+        n_epoch: int,
+    ) -> None:
+        if len(data_loader) == 0:
+            return
+        epoch_len = len(data_loader.dataset.y_train)
+        for _ in range(n_epoch):
+            for batch in data_loader:
+                self.model.train()
+                optimizer.zero_grad()
+                result = batch_process_wrapper(self.model, batch)
+                loss = (
+                    self.loss_fn(result["retentions"], result["labels"])
+                    * result["weights"]
+                ).sum()
+                if "penalty" in result:
+                    loss += result["penalty"] / epoch_len
+                loss.backward()
+
+                # Apply model-specific gradient constraints
+                self.model.apply_gradient_constraints()
+
+                optimizer.step()
+                scheduler.step()
+
+                # Apply model-specific parameter constraints (clipper)
+                self.model.apply_parameter_clipper()
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
         self.train_set = BatchDataset(
@@ -110,9 +146,44 @@ class Trainer:
             self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
     def train(self):
+        get_initial_training_data = getattr(self.model, "get_initial_training_data", None)
+        set_initial_training_stage = getattr(self.model, "set_initial_training_stage", None)
+        if (
+            self.n_epoch_initial > 0
+            and callable(get_initial_training_data)
+            and callable(set_initial_training_stage)
+        ):
+            initial_train_df = get_initial_training_data(self.filtered_train_df)
+            if len(initial_train_df) > 0:
+                initial_train_set = BatchDataset(
+                    initial_train_df.copy(),
+                    self.batch_size,
+                    max_seq_len=self.max_seq_len,
+                )
+                initial_train_data_loader = BatchLoader(initial_train_set)
+                initial_optimizer = self.model.get_optimizer(
+                    lr=self.lr_initial, wd=self.model.wd, betas=self.betas
+                )
+                initial_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    initial_optimizer,
+                    T_max=max(
+                        1,
+                        initial_train_data_loader.batch_nums * self.n_epoch_initial,
+                    ),
+                )
+                set_initial_training_stage(True)
+                try:
+                    self._train_for_epochs(
+                        initial_train_data_loader,
+                        initial_optimizer,
+                        initial_scheduler,
+                        self.n_epoch_initial,
+                    )
+                finally:
+                    set_initial_training_stage(False)
+
         best_loss = np.inf
         best_w = get_model_state(self.model)  # initialize to current weights
-        epoch_len = len(self.train_set.y_train)
 
         for k in range(self.n_epoch):
             weighted_loss, w = self.eval()
@@ -120,26 +191,12 @@ class Trainer:
                 best_loss = weighted_loss
                 best_w = w
 
-            for i, batch in enumerate(self.train_data_loader):
-                self.model.train()
-                self.optimizer.zero_grad()
-                result = batch_process_wrapper(self.model, batch)
-                loss = (
-                    self.loss_fn(result["retentions"], result["labels"])
-                    * result["weights"]
-                ).sum()
-                if "penalty" in result:
-                    loss += result["penalty"] / epoch_len
-                loss.backward()
-
-                # Apply model-specific gradient constraints
-                self.model.apply_gradient_constraints()
-
-                self.optimizer.step()
-                self.scheduler.step()
-
-                # Apply model-specific parameter constraints (clipper)
-                self.model.apply_parameter_clipper()
+            self._train_for_epochs(
+                self.train_data_loader,
+                self.optimizer,
+                self.scheduler,
+                1,
+            )
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:

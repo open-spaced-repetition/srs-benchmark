@@ -85,9 +85,13 @@ class FSRS7(FSRS6):
     Other flags that can be used with FSRS-7: --S0, --two_buttons
     """
 
-    n_epoch: int = 8
+    n_epoch_initial: int = 8
+    n_epoch_full: int = 8
+    n_epoch: int = n_epoch_full
     batch_size: int = 1024
-    lr: float = 2e-2
+    lr_initial: float = 2e-2
+    lr_full: float = 2e-2
+    lr: float = lr_full
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
@@ -136,6 +140,21 @@ class FSRS7(FSRS6):
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS7ParameterClipper(config)
+        self._initial_training_stage = False
+        initial_stage_grad_mask = torch.zeros_like(self.w.data)
+        initial_stage_grad_mask[:4] = 1
+        initial_stage_grad_mask[-8:] = 1
+        self.register_buffer("_initial_stage_grad_mask", initial_stage_grad_mask)
+
+    def set_initial_training_stage(self, enabled: bool) -> None:
+        self._initial_training_stage = enabled
+
+    def get_initial_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        return train_set[train_set["i"] <= 2].copy()
+
+    def apply_gradient_constraints(self):
+        if self._initial_training_stage and self.w.grad is not None:
+            self.w.grad.mul_(self._initial_stage_grad_mask)
 
     def batch_process(
         self,
@@ -594,211 +613,7 @@ class FSRS7(FSRS6):
         return result
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
-        # start = time.perf_counter()
-        # Create binned intervals if using --secs
-        # With FSRS-7 --secs should always be used
-        if self.config.use_secs_intervals:
-            train_set_copy = train_set.copy()
-            train_set_copy["delta_t_binned"] = self.bin_interval(
-                train_set_copy["delta_t"]
-            )
-            group_by_cols = ["first_rating", "delta_t_binned"]
-        else:
-            train_set_copy = train_set
-            group_by_cols = ["first_rating", "delta_t"]
-
-        S0_dataset_group = (
-            train_set_copy[train_set_copy["i"] == 2]
-            .groupby(by=group_by_cols, group_keys=False)
-            .agg({"y": ["mean", "count"]})
-            .reset_index()
-        )
-
-        average_recall = train_set["y"].mean()
-        r_s0_default = {str(i): self.init_w[i - 1] for i in range(1, 5)}
-
-        def evaluate_param_set(param_set):
-            """Evaluate a parameter set and return total loss and rating stabilities"""
-            decay1, decay2, base1, base2, weight1, weight2, swp1, swp2 = param_set
-            current_rating_stability = {}
-            current_rating_count = {}
-            total_loss = 0
-
-            # For each rating, optimize initial stability using current forgetting curve params
-            for first_rating in ("1", "2", "3", "4"):
-                group = S0_dataset_group[
-                    S0_dataset_group["first_rating"] == first_rating
-                ]
-                if group.empty:
-                    if self.config.verbose_inadequate_data:
-                        tqdm.write(
-                            f"Not enough data for first rating {first_rating}. Expected at least 1, got 0."
-                        )
-                    continue
-
-                if self.config.use_secs_intervals:
-                    delta_t = group["delta_t_binned"]
-                else:
-                    delta_t = group["delta_t"]
-                recall = (
-                    group["y"]["mean"] * group["y"]["count"] + average_recall * 1
-                ) / (group["y"]["count"] + 1)
-                count = group["y"]["count"]
-
-                init_s0 = r_s0_default[first_rating]
-
-                def loss(stability):
-                    assert first_rating in ["1", "2", "3", "4"]
-                    y_pred = self.forgetting_curve(
-                        delta_t,
-                        stability,
-                        -decay1,
-                        -decay2,
-                        base1,
-                        base2,
-                        weight1,
-                        weight2,
-                        swp1,
-                        swp2,
-                    )
-                    y_pred = np.clip(y_pred, 0.0001, 0.9999)
-                    logloss = sum(
-                        -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
-                        * count
-                    )
-                    l1 = (np.abs(stability - init_s0)) / 16
-                    return logloss + l1
-
-                res = minimize(
-                    loss,
-                    x0=init_s0,
-                    bounds=((self.config.s_min, self.config.init_s_max),),
-                    options={"maxiter": int(sum(count))},
-                )
-
-                stability = res.x[0]
-                current_rating_stability[int(first_rating)] = stability
-                current_rating_count[int(first_rating)] = sum(count)
-                total_loss += res.fun
-
-            # Apply stability ordering constraints
-            for small_rating, big_rating in (
-                (1, 2),
-                (2, 3),
-                (3, 4),
-                (1, 3),
-                (2, 4),
-                (1, 4),
-            ):
-                if (
-                    small_rating in current_rating_stability
-                    and big_rating in current_rating_stability
-                ):
-                    if (
-                        current_rating_stability[small_rating]
-                        > current_rating_stability[big_rating]
-                    ):
-                        if (
-                            current_rating_count[small_rating]
-                            > current_rating_count[big_rating]
-                        ):
-                            current_rating_stability[big_rating] = (
-                                current_rating_stability[small_rating]
-                            )
-                        else:
-                            current_rating_stability[small_rating] = (
-                                current_rating_stability[big_rating]
-                            )
-
-            return total_loss, current_rating_stability
-
-        # Initial parameter sets to try
-        initial_forgetting_curve_params = [
-            self.init_w[-8:],
-            [0.0594, 0.3358, 0.598, 0.9517, 0.3122, 0.5685, 0.2371, 0.4871],
-            [0.0441, 0.2533, 0.6823, 0.9598, 0.3613, 0.5202, 0.2283, 0.4783],
-            [0.0621, 0.2475, 0.6496, 0.9744, 0.313, 0.5662, 0.2336, 0.4836],
-            [0.0462, 0.2962, 0.6938, 0.9592, 0.3341, 0.5273, 0.2185, 0.4685],
-            [0.0422, 0.2813, 0.6713, 0.9421, 0.2935, 0.5985, 0.2183, 0.4683],
-            [0.0568, 0.1563, 0.6567, 0.9633, 0.3682, 0.5041, 0.1952, 0.4452],
-            [0.0651, 0.2502, 0.6682, 0.9472, 0.3757, 0.4933, 0.2408, 0.4908],
-            [0.0548, 0.1655, 0.6138, 0.9654, 0.3251, 0.5717, 0.1418, 0.3918],
-            [0.0381, 0.2803, 0.7202, 0.9491, 0.3362, 0.5166, 0.2248, 0.4748],
-            [0.0422, 0.1935, 0.694, 0.9549, 0.3871, 0.4704, 0.2413, 0.4913],
-            [0.0651, 0.1916, 0.623, 0.972, 0.3528, 0.5484, 0.2373, 0.4873],
-            [0.0508, 0.3743, 0.5863, 0.9448, 0.2974, 0.606, 0.1444, 0.3944],
-            [0.0498, 0.3753, 0.6875, 0.9319, 0.3758, 0.4984, 0.2268, 0.4768],
-            [0.0618, 0.1663, 0.5977, 0.9682, 0.3619, 0.5066, 0.2972, 0.5472],
-            [0.0656, 0.197, 0.5693, 0.9692, 0.3599, 0.5374, 0.2596, 0.5096],
-        ]
-
-        # Track all candidates with their losses
-        candidates = []  # List of (loss, param_set, rating_stability)
-
-        # Evaluate initial parameter sets
-        for param_set in initial_forgetting_curve_params:
-            total_loss, rating_stability = evaluate_param_set(param_set)
-            candidates.append((total_loss, param_set.copy(), rating_stability.copy()))
-
-        # Sort candidates by loss (best first)
-        candidates.sort(key=lambda x: x[0])
-
-        # Use the best combination found
-        best_total_loss, best_forgetting_curve_params, best_rating_stability = (
-            candidates[0]
-        )
-
-        rating_stability = best_rating_stability
-
-        if self.config.verbose_inadequate_data:
-            tqdm.write(f"Best forgetting curve params: {best_forgetting_curve_params}")
-            tqdm.write(f"Best total loss: {best_total_loss}")
-
-        # Anchor values for log-linear interpolation/extrapolation
-        a1, a2, a3, a4 = -8.09, -3.83, -2.5, -1.0
-        initial_stabilities = list(r_s0_default.values())
-        match len(rating_stability):
-            case 0:
-                initial_stabilities = list(r_s0_default.values())
-            case 1:
-                rating = list(rating_stability.keys())[0]
-                factor = rating_stability[rating] / r_s0_default[str(rating)]
-                initial_stabilities = list(
-                    map(lambda x: x * factor, r_s0_default.values())
-                )
-            case 2 | 3:
-                filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
-                if any([np.isnan(x) for x in filled.values()]) or any(
-                    [np.isinf(x) for x in filled.values()]
-                ):
-                    raise Exception("NaN/inf in S0 interpolation")
-                initial_stabilities = [filled[r] for r in [1, 2, 3, 4]]
-            case 4:
-                initial_stabilities = [
-                    item[1]
-                    for item in sorted(rating_stability.items(), key=lambda x: x[0])
-                ]
-            case _:
-                raise Exception("impossible")
-
-        # Update initial stabilities (w[0:4])
-        self.w.data[0:4] = Tensor(
-            list(
-                map(
-                    lambda x: max(min(self.config.init_s_max, x), self.config.s_min),
-                    initial_stabilities,
-                )
-            )
-        )
-
-        # Update forgetting curve parameters with the best found parameters
-        if best_forgetting_curve_params is not None:
-            self.w.data[-8:] = Tensor(best_forgetting_curve_params)
-
-        self.init_w_tensor = self.w.data.clone().to(self.config.device)
-
-        # end = time.perf_counter()
-        # print(f'Pretrain took {end - start:.2f} seconds, {(end - start) * 1000:.0f} milliseconds')
+        return
 
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """

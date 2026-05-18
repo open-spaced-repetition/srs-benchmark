@@ -147,13 +147,13 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     if args.same_day:
         ax.set_title(
-            "Percent of collections where algorithm A (row) outperforms algorithm B (column)\nNo same-day reviews",
+            "Percent of collections where algorithm A (row) outperforms algorithm B (column)\nWith same-day reviews",
             fontsize=22,
             pad=10,
         )
     else:
         ax.set_title(
-            "Percent of collections where algorithm A (row) outperforms algorithm B (column)\nWith same-day reviews",
+            "Percent of collections where algorithm A (row) outperforms algorithm B (column)\nNo same-day reviews",
             fontsize=22,
             pad=10,
         )

@@ -1,6 +1,7 @@
 from typing import List, Union
 import torch
 from torch import nn, Tensor
+from torch.autograd import Function
 from typing import Optional
 from collections import defaultdict
 from models.fsrs_v6 import FSRS6, FSRS6ParameterClipper
@@ -22,6 +23,167 @@ from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
 PENALTY_W_1 = 0.5
 PENALTY_W_2 = 0.0015
 PENALTY_W_L2 = 0.5
+
+
+class _FSRS7ForgettingCurveFn(Function):
+    @staticmethod
+    def forward(
+        ctx,
+        t: Tensor,
+        s: Tensor,
+        decay1: Tensor,
+        decay2: Tensor,
+        base1: Tensor,
+        base2: Tensor,
+        base_weight1: Tensor,
+        base_weight2: Tensor,
+        swp1: Tensor,
+        swp2: Tensor,
+    ) -> Tensor:
+        t_over_s = t / s
+
+        c1 = torch.pow(base1, 1.0 / decay1) - 1.0
+        c2 = torch.pow(base2, 1.0 / decay2) - 1.0
+
+        inner1 = 1.0 + c1 * t_over_s
+        inner2 = 1.0 + c2 * t_over_s
+
+        r1 = torch.pow(inner1, decay1)
+        r2 = torch.pow(inner2, decay2)
+
+        weight1 = base_weight1 * torch.pow(s, -swp1)
+        weight2 = base_weight2 * torch.pow(s, swp2)
+        weight_sum = weight1 + weight2
+
+        retention = (weight1 * r1 + weight2 * r2) / weight_sum
+
+        ctx.save_for_backward(
+            t,
+            s,
+            decay1,
+            decay2,
+            base1,
+            base2,
+            base_weight1,
+            base_weight2,
+            swp1,
+            swp2,
+            t_over_s,
+            c1,
+            c2,
+            inner1,
+            inner2,
+            r1,
+            r2,
+            weight1,
+            weight2,
+            weight_sum,
+            retention,
+        )
+        return retention
+
+    @staticmethod
+    def backward(ctx, grad_output: Tensor):  # type: ignore[override]
+        (
+            t,
+            s,
+            decay1,
+            decay2,
+            base1,
+            base2,
+            base_weight1,
+            base_weight2,
+            swp1,
+            swp2,
+            t_over_s,
+            c1,
+            c2,
+            inner1,
+            inner2,
+            r1,
+            r2,
+            weight1,
+            weight2,
+            weight_sum,
+            retention,
+        ) = ctx.saved_tensors
+
+        eps = torch.tensor(1e-12, device=s.device, dtype=s.dtype)
+        s_safe = s.clamp_min(eps)
+        base1_safe = base1.clamp_min(eps)
+        base2_safe = base2.clamp_min(eps)
+        inner1_safe = inner1.clamp_min(eps)
+        inner2_safe = inner2.clamp_min(eps)
+        weight_sum_safe = weight_sum.clamp_min(eps)
+
+        dy_dR1 = weight1 / weight_sum_safe
+        dy_dR2 = weight2 / weight_sum_safe
+        dy_dw1 = (r1 - retention) / weight_sum_safe
+        dy_dw2 = (r2 - retention) / weight_sum_safe
+
+        dR1_dt = r1 * decay1 * (c1 / (s_safe * inner1_safe))
+        dR2_dt = r2 * decay2 * (c2 / (s_safe * inner2_safe))
+
+        dR1_ds = r1 * decay1 * (-c1 * t / (s_safe * s_safe * inner1_safe))
+        dR2_ds = r2 * decay2 * (-c2 * t / (s_safe * s_safe * inner2_safe))
+
+        c1_plus_1 = c1 + 1.0
+        c2_plus_1 = c2 + 1.0
+        dc1_dbase1 = c1_plus_1 * (1.0 / decay1) / base1_safe
+        dc2_dbase2 = c2_plus_1 * (1.0 / decay2) / base2_safe
+        dc1_ddecay1 = c1_plus_1 * (-(torch.log(base1_safe)) / (decay1 * decay1))
+        dc2_ddecay2 = c2_plus_1 * (-(torch.log(base2_safe)) / (decay2 * decay2))
+
+        dinner1_dbase1 = t_over_s * dc1_dbase1
+        dinner2_dbase2 = t_over_s * dc2_dbase2
+        dinner1_ddecay1 = t_over_s * dc1_ddecay1
+        dinner2_ddecay2 = t_over_s * dc2_ddecay2
+
+        dR1_dbase1 = r1 * decay1 * (dinner1_dbase1 / inner1_safe)
+        dR2_dbase2 = r2 * decay2 * (dinner2_dbase2 / inner2_safe)
+        dR1_ddecay1 = r1 * (
+            torch.log(inner1_safe) + decay1 * (dinner1_ddecay1 / inner1_safe)
+        )
+        dR2_ddecay2 = r2 * (
+            torch.log(inner2_safe) + decay2 * (dinner2_ddecay2 / inner2_safe)
+        )
+
+        log_s = torch.log(s_safe)
+        dw1_ds = weight1 * (-swp1) / s_safe
+        dw2_ds = weight2 * swp2 / s_safe
+        dw1_dbase_weight1 = torch.pow(s_safe, -swp1)
+        dw2_dbase_weight2 = torch.pow(s_safe, swp2)
+        dw1_dswp1 = -weight1 * log_s
+        dw2_dswp2 = weight2 * log_s
+
+        grad_t = grad_output * (dy_dR1 * dR1_dt + dy_dR2 * dR2_dt)
+        grad_s = grad_output * (
+            dy_dR1 * dR1_ds + dy_dR2 * dR2_ds + dy_dw1 * dw1_ds + dy_dw2 * dw2_ds
+        )
+        grad_decay1 = grad_output * (dy_dR1 * dR1_ddecay1)
+        grad_decay2 = grad_output * (dy_dR2 * dR2_ddecay2)
+        grad_base1 = grad_output * (dy_dR1 * dR1_dbase1)
+        grad_base2 = grad_output * (dy_dR2 * dR2_dbase2)
+        grad_base_weight1 = grad_output * (dy_dw1 * dw1_dbase_weight1)
+        grad_base_weight2 = grad_output * (dy_dw2 * dw2_dbase_weight2)
+        grad_swp1 = grad_output * (dy_dw1 * dw1_dswp1)
+        grad_swp2 = grad_output * (dy_dw2 * dw2_dswp2)
+
+        def _sum_to_shape(g: Tensor, ref: Tensor) -> Tensor:
+            return g.sum_to_size(ref.shape)
+
+        return (
+            _sum_to_shape(grad_t, t),
+            _sum_to_shape(grad_s, s),
+            _sum_to_shape(grad_decay1, decay1),
+            _sum_to_shape(grad_decay2, decay2),
+            _sum_to_shape(grad_base1, base1),
+            _sum_to_shape(grad_base2, base2),
+            _sum_to_shape(grad_base_weight1, base_weight1),
+            _sum_to_shape(grad_base_weight2, base_weight2),
+            _sum_to_shape(grad_swp1, swp1),
+            _sum_to_shape(grad_swp2, swp2),
+        )
 
 
 class FSRS7ParameterClipper(FSRS6ParameterClipper):
@@ -262,20 +424,18 @@ class FSRS7(FSRS6):
         swp2=init_w[-1],
     ):
         # decays must be passed into forgetting_curve with a minus sign
-        t_over_s = t / s
-
-        def power_law_retention(base, decay):
-            factor = base ** (1 / decay) - 1
-            return (1 + factor * t_over_s) ** decay
-
-        R1 = power_law_retention(base1, decay1)
-        R2 = power_law_retention(base2, decay2)
-
-        # S weight power 1 should have a minus sign
-        weight1 = base_weight1 * s**-swp1
-        weight2 = base_weight2 * s**swp2
-
-        return (weight1 * R1 + weight2 * R2) / (weight1 + weight2)
+        return _FSRS7ForgettingCurveFn.apply(
+            t,
+            s,
+            decay1,
+            decay2,
+            base1,
+            base2,
+            base_weight1,
+            base_weight2,
+            swp1,
+            swp2,
+        )
 
     def stability_after_review(
         self, state: Tensor, r: Tensor, rating: Tensor

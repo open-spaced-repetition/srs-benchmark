@@ -119,6 +119,38 @@ def _plot_stacked_profile(
     return True
 
 
+def _write_profiling_plots(
+    script_profile_totals: dict[str, float],
+    fsrs_profile_totals: dict[str, float],
+    script_plot_path: Path,
+    fsrs_plot_path: Path,
+    message_prefix: str = "",
+) -> None:
+    script_plot_created = _plot_stacked_profile(
+        script_profile_totals,
+        "script.py timing breakdown",
+        script_plot_path,
+    )
+    fsrs_plot_created = _plot_stacked_profile(
+        fsrs_profile_totals,
+        "FSRS-7 timing breakdown",
+        fsrs_plot_path,
+    )
+    prefix = f"{message_prefix} " if message_prefix else ""
+    if script_plot_created:
+        print(f"{prefix}Saved script profiling plot to {script_plot_path}")
+    else:
+        print(
+            f"{prefix}No positive script.py profiling data found; script plot was not created."
+        )
+    if fsrs_plot_created:
+        print(f"{prefix}Saved FSRS-7 profiling plot to {fsrs_plot_path}")
+    else:
+        print(
+            f"{prefix}No positive FSRS-7 profiling data found; FSRS-7 plot was not created."
+        )
+
+
 class Trainer:
     optimizer: torch.optim.Optimizer
     test_set: Optional[BatchDataset]
@@ -683,6 +715,14 @@ if __name__ == "__main__":
 
     script_profile_totals: dict[str, float] = defaultdict(float)
     fsrs_profile_totals: dict[str, float] = defaultdict(float)
+    completed_users = 0
+    profiling_dir = Path("result/profiling")
+    script_plot_path = (
+        profiling_dir / f"{config.get_evaluation_file_name()}_script_py_timing.png"
+    )
+    fsrs_plot_path = (
+        profiling_dir / f"{config.get_evaluation_file_name()}_fsrs7_timing.png"
+    )
     with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
         future_to_user = {
             executor.submit(
@@ -719,6 +759,16 @@ if __name__ == "__main__":
                     pbar.set_description(f"Processed {stats['user']}")
             except Exception as e:
                 tqdm.write(f"User {user_id}: {e}")
+            finally:
+                completed_users += 1
+                if completed_users % 50 == 0:
+                    _write_profiling_plots(
+                        script_profile_totals,
+                        fsrs_profile_totals,
+                        script_plot_path,
+                        fsrs_plot_path,
+                        message_prefix=f"[checkpoint {completed_users} users]",
+                    )
 
     sort_jsonl(result_file)
     if config.save_raw_output:
@@ -729,26 +779,9 @@ if __name__ == "__main__":
         script_profile_totals,
         _profile_deltas(main_profile_before, main_profile_after),
     )
-    profiling_dir = Path("result/profiling")
-    script_plot_path = (
-        profiling_dir / f"{config.get_evaluation_file_name()}_script_py_timing.png"
-    )
-    fsrs_plot_path = profiling_dir / f"{config.get_evaluation_file_name()}_fsrs7_timing.png"
-    script_plot_created = _plot_stacked_profile(
+    _write_profiling_plots(
         script_profile_totals,
-        "script.py timing breakdown",
-        script_plot_path,
-    )
-    fsrs_plot_created = _plot_stacked_profile(
         fsrs_profile_totals,
-        "FSRS-7 timing breakdown",
+        script_plot_path,
         fsrs_plot_path,
     )
-    if script_plot_created:
-        print(f"Saved script profiling plot to {script_plot_path}")
-    else:
-        print("No positive script.py profiling data found; script plot was not created.")
-    if fsrs_plot_created:
-        print(f"Saved FSRS-7 profiling plot to {fsrs_plot_path}")
-    else:
-        print("No positive FSRS-7 profiling data found; FSRS-7 plot was not created.")

@@ -427,26 +427,16 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         batch_size=config.batch_size,
     )
     if config.only_S0:
-        _merge_profile_times(
-            script_profile_times, trainer.get_profile_times(), prefix="trainer/"
-        )
         if hasattr(trainer.model, "get_profile_times"):
             fsrs_profile = getattr(trainer.model, "get_profile_times")()
             if isinstance(fsrs_profile, dict):
                 _merge_profile_times(fsrs7_profile_times, fsrs_profile)
-                _merge_profile_times(
-                    script_profile_times, fsrs_profile, prefix="fsrs7/"
-                )
         return get_model_state(trainer.model)
     weights = trainer.train()
-    _merge_profile_times(
-        script_profile_times, trainer.get_profile_times(), prefix="trainer/"
-    )
     if hasattr(trainer.model, "get_profile_times"):
         fsrs_profile = getattr(trainer.model, "get_profile_times")()
         if isinstance(fsrs_profile, dict):
             _merge_profile_times(fsrs7_profile_times, fsrs_profile)
-            _merge_profile_times(script_profile_times, fsrs_profile, prefix="fsrs7/")
     return weights
 
 

@@ -71,12 +71,14 @@ class Trainer:
         self.batch_size = getattr(self.model, "batch_size", batch_size)
         self.betas = getattr(self.model, "betas", (0.9, 0.999))
         self.max_seq_len = max_seq_len
+        # Stage-2/full-training settings (fallback to legacy single-stage attrs).
         self.n_epoch = getattr(self.model, "n_epoch_full", self.model.n_epoch)
         self.n_epoch_initial = getattr(self.model, "n_epoch_initial", 0)
         self.lr_full = getattr(self.model, "lr_full", self.model.lr)
         self.lr_initial = getattr(self.model, "lr_initial", self.lr_full)
 
         # Build datasets
+        # Keep filtered df for optional Stage-1 subset selection.
         self.filtered_train_df = self.model.filter_training_data(train_set)
         self.build_dataset(self.filtered_train_df, test_set)
 
@@ -101,8 +103,6 @@ class Trainer:
         scheduler: torch.optim.lr_scheduler.CosineAnnealingLR,
         n_epoch: int,
     ) -> None:
-        if len(data_loader) == 0:
-            return
         epoch_len = len(data_loader.dataset.y_train)
         for _ in range(n_epoch):
             for batch in data_loader:

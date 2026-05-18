@@ -87,11 +87,11 @@ class FSRS7(FSRS6):
 
     n_epoch_initial: int = 8
     n_epoch_full: int = 8
-    n_epoch: int = n_epoch_full
+    n_epoch: int = 8  # legacy single-stage attr; Trainer prefers n_epoch_full
     batch_size: int = 1024
     lr_initial: float = 2e-2
     lr_full: float = 2e-2
-    lr: float = lr_full
+    lr: float = 2e-2  # legacy single-stage attr; Trainer prefers lr_full
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
@@ -142,6 +142,7 @@ class FSRS7(FSRS6):
         self.clipper = FSRS7ParameterClipper(config)
         self._initial_training_stage = False
         initial_stage_grad_mask = torch.zeros_like(self.w.data)
+        # Stage-1 only updates S0 (w[0:4]) and forgetting curve params (w[-8:]).
         initial_stage_grad_mask[:4] = 1
         initial_stage_grad_mask[-8:] = 1
         self.register_buffer("_initial_stage_grad_mask", initial_stage_grad_mask)
@@ -153,6 +154,7 @@ class FSRS7(FSRS6):
         return train_set[train_set["i"] <= 2].copy()
 
     def apply_gradient_constraints(self):
+        super().apply_gradient_constraints()
         if self._initial_training_stage and self.w.grad is not None:
             self.w.grad.mul_(self._initial_stage_grad_mask)
 

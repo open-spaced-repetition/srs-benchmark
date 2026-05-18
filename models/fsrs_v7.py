@@ -2,6 +2,7 @@ from typing import List, Union
 import torch
 from torch import nn, Tensor
 from typing import Optional
+from collections import defaultdict
 from models.fsrs_v6 import FSRS6, FSRS6ParameterClipper
 import torch.nn.functional as F
 from torch.nn import Sigmoid
@@ -136,6 +137,13 @@ class FSRS7(FSRS6):
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS7ParameterClipper(config)
+        self.profile_times: dict[str, float] = defaultdict(float)
+
+    def _add_profile_time(self, key: str, elapsed_seconds: float) -> None:
+        self.profile_times[key] += elapsed_seconds
+
+    def get_profile_times(self) -> dict[str, float]:
+        return dict(self.profile_times)
 
     def batch_process(
         self,
@@ -144,7 +152,7 @@ class FSRS7(FSRS6):
         seq_lens: Tensor,
         real_batch_size: int,
     ) -> dict[str, Tensor]:
-        # start = time.perf_counter_ns()
+        start_batch = time.perf_counter()
 
         outputs, _ = self.forward(sequences)
         stabilities, difficulties = outputs[
@@ -171,7 +179,7 @@ class FSRS7(FSRS6):
             "difficulties": difficulties,
         }
 
-        # start_2 = time.perf_counter_ns()
+        penalty_start = time.perf_counter()
         if self.config.sched_penalties:
             sched_penalty_1, sched_penalty_2 = fsrs7_interval_growth_penalty(
                 self.w,
@@ -233,10 +241,10 @@ class FSRS7(FSRS6):
             + PENALTY_W_2 * sched_penalty_2
             + PENALTY_W_L2 * L2_penalty
         ) * real_batch_size
-        # end = time.perf_counter_ns()
-        # total = end - start
-        # penalty_only = end - start_2
-        # print(f'batch_process took {total/1_000_000:.2f} ms, calculating penalty took {penalty_only/1_000_000:.2f} ms')
+        self._add_profile_time(
+            "batch_process/penalty_calculation", time.perf_counter() - penalty_start
+        )
+        self._add_profile_time("batch_process/total", time.perf_counter() - start_batch)
         return output
 
     # pyrefly: ignore[bad-override]
@@ -594,9 +602,10 @@ class FSRS7(FSRS6):
         return result
 
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
-        # start = time.perf_counter()
+        init_start = time.perf_counter()
         # Create binned intervals if using --secs
         # With FSRS-7 --secs should always be used
+        prep_start = time.perf_counter()
         if self.config.use_secs_intervals:
             train_set_copy = train_set.copy()
             train_set_copy["delta_t_binned"] = self.bin_interval(
@@ -612,6 +621,10 @@ class FSRS7(FSRS6):
             .groupby(by=group_by_cols, group_keys=False)
             .agg({"y": ["mean", "count"]})
             .reset_index()
+        )
+        self._add_profile_time(
+            "initialize_parameters/data_prep_and_groupby",
+            time.perf_counter() - prep_start,
         )
 
         average_recall = train_set["y"].mean()
@@ -736,9 +749,15 @@ class FSRS7(FSRS6):
         candidates = []  # List of (loss, param_set, rating_stability)
 
         # Evaluate initial parameter sets
+        candidate_eval_start = time.perf_counter()
         for param_set in initial_forgetting_curve_params:
             total_loss, rating_stability = evaluate_param_set(param_set)
             candidates.append((total_loss, param_set.copy(), rating_stability.copy()))
+        self._add_profile_time(
+            "initialize_parameters/evaluate_parameter_candidates",
+            time.perf_counter() - candidate_eval_start,
+        )
+        finalize_start = time.perf_counter()
 
         # Sort candidates by loss (best first)
         candidates.sort(key=lambda x: x[0])
@@ -796,9 +815,13 @@ class FSRS7(FSRS6):
             self.w.data[-8:] = Tensor(best_forgetting_curve_params)
 
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
-
-        # end = time.perf_counter()
-        # print(f'Pretrain took {end - start:.2f} seconds, {(end - start) * 1000:.0f} milliseconds')
+        self._add_profile_time(
+            "initialize_parameters/finalize_parameters",
+            time.perf_counter() - finalize_start,
+        )
+        self._add_profile_time(
+            "initialize_parameters/total", time.perf_counter() - init_start
+        )
 
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """

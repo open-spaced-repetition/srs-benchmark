@@ -57,12 +57,14 @@ tqdm.pandas()
 # Per-process accumulators used to aggregate timed sections within each process.
 # With ProcessPoolExecutor(spawn), worker mutations stay in worker memory; we aggregate
 # timings in the parent via per-call deltas returned from `process` (no shared-memory
-# cross-process writes to these dicts).
+# cross-process writes to these dicts). Each worker has isolated copies.
 script_profile_times: dict[str, float] = defaultdict(float)
 fsrs7_profile_times: dict[str, float] = defaultdict(float)
 
 
 class ProcessRunResult(NamedTuple):
+    """Result payload returned by `process` for one user."""
+
     stats: dict[str, Any]
     raw: Optional[dict]
     script_profile_delta: dict[str, float]
@@ -72,24 +74,28 @@ class ProcessRunResult(NamedTuple):
 def _merge_profile_times(
     target: dict[str, float], source: dict[str, float], prefix: str = ""
 ) -> None:
+    """Merge timing entries from source into target, optionally prefixing keys."""
     for key, value in source.items():
         merged_key = f"{prefix}{key}" if prefix else key
         target[merged_key] += value
 
 
 def _snapshot_profile_times(source: dict[str, float]) -> dict[str, float]:
+    """Return a snapshot copy of timing entries."""
     return dict(source)
 
 
 def _profile_deltas(
     before: dict[str, float], after: dict[str, float]
 ) -> dict[str, float]:
+    """Return per-key timing deltas between two snapshots."""
     keys = set(before) | set(after)
     return {key: after.get(key, 0.0) - before.get(key, 0.0) for key in keys}
 
 
 @contextmanager
 def _profile_block(profile: dict[str, float], key: str):
+    """Measure a block and accumulate elapsed seconds into profile[key]."""
     start = time.perf_counter()
     try:
         yield
@@ -100,6 +106,7 @@ def _profile_block(profile: dict[str, float], key: str):
 def _plot_stacked_profile(
     profile: dict[str, float], title: str, output_path: Path
 ) -> bool:
+    """Write a stacked bar timing plot and return whether a plot was created."""
     positive_profile = {k: v for k, v in profile.items() if v > 0}
     if not positive_profile:
         return False
@@ -121,18 +128,19 @@ def _plot_stacked_profile(
 
 def _write_profiling_plots(
     script_profile_totals: dict[str, float],
-    fsrs_profile_totals: dict[str, float],
+    fsrs7_profile_totals: dict[str, float],
     script_plot_path: Path,
     fsrs_plot_path: Path,
     message_prefix: str = "",
 ) -> None:
+    """Write both script and FSRS-7 timing plots and print status messages."""
     script_plot_created = _plot_stacked_profile(
         script_profile_totals,
         "script.py timing breakdown",
         script_plot_path,
     )
     fsrs_plot_created = _plot_stacked_profile(
-        fsrs_profile_totals,
+        fsrs7_profile_totals,
         "FSRS-7 timing breakdown",
         fsrs_plot_path,
     )
@@ -714,7 +722,7 @@ if __name__ == "__main__":
                 )
 
     script_profile_totals: dict[str, float] = defaultdict(float)
-    fsrs_profile_totals: dict[str, float] = defaultdict(float)
+    fsrs7_profile_totals: dict[str, float] = defaultdict(float)
     completed_users = 0
     profiling_dir = Path("result/profiling")
     script_plot_path = (
@@ -750,7 +758,7 @@ if __name__ == "__main__":
                         continue
                     stats, raw, child_script_profile, child_fsrs_profile = result
                     _merge_profile_times(script_profile_totals, child_script_profile)
-                    _merge_profile_times(fsrs_profile_totals, child_fsrs_profile)
+                    _merge_profile_times(fsrs7_profile_totals, child_fsrs_profile)
                     with open(result_file, "a", encoding="utf-8", newline="\n") as f:
                         f.write(json.dumps(stats, ensure_ascii=False) + "\n")
                     if raw:
@@ -764,7 +772,7 @@ if __name__ == "__main__":
                 if completed_users % 50 == 0:
                     _write_profiling_plots(
                         script_profile_totals,
-                        fsrs_profile_totals,
+                        fsrs7_profile_totals,
                         script_plot_path,
                         fsrs_plot_path,
                         message_prefix=f"[checkpoint {completed_users} users]",
@@ -781,7 +789,7 @@ if __name__ == "__main__":
     )
     _write_profiling_plots(
         script_profile_totals,
-        fsrs_profile_totals,
+        fsrs7_profile_totals,
         script_plot_path,
         fsrs_plot_path,
     )

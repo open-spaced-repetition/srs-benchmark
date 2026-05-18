@@ -140,6 +140,7 @@ class FSRS7(FSRS6):
         self.profile_times: dict[str, float] = defaultdict(float)
 
     def _add_profile_time(self, key: str, elapsed_seconds: float) -> None:
+        """Accumulate elapsed profiling time under a named key."""
         self.profile_times[key] += elapsed_seconds
 
     def get_profile_times(self) -> dict[str, float]:

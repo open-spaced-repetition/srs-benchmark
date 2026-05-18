@@ -23,6 +23,7 @@ from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
 PENALTY_W_1 = 0.5
 PENALTY_W_2 = 0.0015
 PENALTY_W_L2 = 0.5
+NUMERICAL_EPSILON = 1e-12
 
 
 class _FSRS7ForgettingCurveFn(Function):
@@ -108,12 +109,12 @@ class _FSRS7ForgettingCurveFn(Function):
             retention,
         ) = ctx.saved_tensors
 
-        s_safe = s.clamp_min(1e-12)
-        base1_safe = base1.clamp_min(1e-12)
-        base2_safe = base2.clamp_min(1e-12)
-        inner1_safe = inner1.clamp_min(1e-12)
-        inner2_safe = inner2.clamp_min(1e-12)
-        weight_sum_safe = weight_sum.clamp_min(1e-12)
+        s_safe = s.clamp_min(NUMERICAL_EPSILON)
+        base1_safe = base1.clamp_min(NUMERICAL_EPSILON)
+        base2_safe = base2.clamp_min(NUMERICAL_EPSILON)
+        inner1_safe = inner1.clamp_min(NUMERICAL_EPSILON)
+        inner2_safe = inner2.clamp_min(NUMERICAL_EPSILON)
+        weight_sum_safe = weight_sum.clamp_min(NUMERICAL_EPSILON)
 
         dy_dR1 = weight1 / weight_sum_safe
         dy_dR2 = weight2 / weight_sum_safe
@@ -169,6 +170,10 @@ class _FSRS7ForgettingCurveFn(Function):
         grad_swp2 = grad_output * (dy_dw2 * dw2_dswp2)
 
         def _sum_to_shape(g: Tensor, ref: Tensor) -> Tensor:
+            """
+            Reduce a broadcasted gradient tensor `g` to exactly match `ref.shape`.
+            This mirrors autograd's sum-reduction semantics for broadcasted params.
+            """
             if g.shape == ref.shape:
                 return g
             target_shape = ref.shape

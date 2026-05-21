@@ -60,10 +60,9 @@ class GRU(BaseModel):
                 nn.init.orthogonal_(param.data)
             elif "weight_hh" in name:  # Hidden-to-hidden weights
                 nn.init.orthogonal_(param.data)
-            elif "bias_ih" in name:  # Biases
-                start_index = len(param.data) // 4
-                end_index = len(param.data) // 2
-                param.data[start_index:end_index].fill_(1.0)
+            elif "bias_ih" in name:
+                # GRU gate order is reset, update, new; initialize update gate bias.
+                param.data[self.n_hidden : 2 * self.n_hidden].fill_(1.0)
 
         self.w_fc = nn.Linear(self.n_hidden, self.n_curves)
         self.s_fc = nn.Linear(self.n_hidden, self.n_curves)

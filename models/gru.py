@@ -20,7 +20,6 @@ class GRU(BaseModel):
     This model uses:
     - same-day reviews as features
     - fractional intervals
-    - optional duration of each review as an input feature (enable with --duration)
     - its own version of --recency
 
     Pretraining: python reptile_trainer_gru.py --algo GRU --short --secs --processes 1
@@ -37,10 +36,7 @@ class GRU(BaseModel):
         self.register_buffer(
             "input_std", torch.tensor(1.0) if input_std is None else input_std
         )
-        # self.use_duration_feature = config.lstm_use_duration
-        self.use_duration_feature = False
-        num_main_inputs = 1 + (1 if self.use_duration_feature else 0)
-        self.n_input = num_main_inputs + 4  # rating is expanded to 4 dims
+        self.n_input = 5  # rating is expanded to 4 dims
         self.n_hidden = 7
         self.n_curves = 2
 
@@ -96,14 +92,7 @@ class GRU(BaseModel):
         x_features = x_lni[..., :-1]
 
         x_delay = torch.log(1e-5 + x_features[..., :1])
-        if self.use_duration_feature:
-            x_duration = torch.log(
-                torch.clamp(x_features[..., 1:2], min=100, max=60000)
-            )
-            x_main = torch.cat([x_delay, x_duration], dim=-1)
-        else:
-            x_main = x_delay
-
+        x_main = x_delay
         x_main = (x_main - self.input_mean) / self.input_std
 
         x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))

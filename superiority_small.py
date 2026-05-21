@@ -145,8 +145,9 @@ if __name__ == "__main__":
     models[index_LogReg] = "Logistic Regression\nrecency"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
+    title_suffix = "With same-day reviews" if args.same_day else "No same-day reviews"
     ax.set_title(
-        "Percent of collections where algorithm A (row) outperforms algorithm B (column)",
+        f"Percent of collections where algorithm A (row) outperforms algorithm B (column)\n{title_suffix}",
         fontsize=22,
         pad=10,
     )

@@ -25,7 +25,10 @@ jobs:
         run: |
           uv sync --dev
 
-      - uses: facebook/pyrefly@v1.0.0
+      - name: tyck
+        run: |
+          uv add pyrefly --dev
+          uv run pyrefly check
 
       # Update output format to enable automatic inline annotations.
       - name: Run Ruff

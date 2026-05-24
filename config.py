@@ -40,6 +40,7 @@ ModelName = Literal[
     "MOVING-AVG",
     "90%",
     "LogisticRegression",
+    "FSRS-7-LR-Ensemble",
 ]
 
 
@@ -61,6 +62,13 @@ def create_parser():
         type=int,
         default=None,
         help="maximum user ID to process (inclusive)",
+    )
+
+    parser.add_argument(
+        "--min-user-id",
+        type=int,
+        default=None,
+        help="minimum user ID to process (inclusive)",
     )
 
     parser.add_argument(
@@ -206,6 +214,7 @@ class Config:
         self.default_params: bool = args.default
         self.model_name: ModelName = args.algo
         self.max_user_id: Optional[int] = args.max_user_id
+        self.min_user_id: Optional[int] = args.min_user_id
         self.use_secs_intervals: bool = args.secs
         self.lstm_use_duration: bool = args.duration
         self.no_test_same_day: bool = args.no_test_same_day

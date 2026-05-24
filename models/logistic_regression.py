@@ -48,6 +48,7 @@ def create_features(df):
     32. [first_rating > 1] * log(1 + cumulative non-same-day fails)
     33. [first_rating > 1] * log(1 + cumulative same-day count)
     34. [first_rating > 1] * log(1 + cumulative non-same-day count)
+    35. (1 - has_passed) * log(1 + cumulative same-day fails)
     """
     df = df.copy()
     g = df.groupby("card_id", sort=False)
@@ -167,6 +168,7 @@ def create_features(df):
             (first_r > 1) * np.log1p(num_nsd_fail),
             (first_r > 1) * np.log1p(num_same_day),
             (first_r > 1) * np.log1p(num_non_same_day),
+            (1.0 - has_passed) * np.log1p(num_same_day_fail),
         ],
         axis=1,
     )
@@ -245,6 +247,7 @@ class LogisticRegression(BaseModel):
                 -0.3521,
                 -0.1613,
                 -0.1758,
+                0.0,
             ]
         )
         self.register_buffer("mean", mean)
@@ -284,6 +287,7 @@ class LogisticRegression(BaseModel):
                 0.1913,
                 0.1372,
                 0.0783,
+                0.5,
             ]
         )
         self.register_buffer("std", std)

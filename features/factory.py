@@ -1,4 +1,5 @@
 from features.logistic_regression_engineer import LogisticRegressionEngineer
+from features.fsrs7_lr_ensemble_engineer import FSRS7LREnsembleEngineer
 
 from .base import BaseFeatureEngineer
 from .fsrs_engineer import FSRSFeatureEngineer
@@ -41,6 +42,7 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
     "90%": FSRSFeatureEngineer,
     # Specialized models
     "LogisticRegression": LogisticRegressionEngineer,
+    "FSRS-7-LR-Ensemble": FSRS7LREnsembleEngineer,
     "LSTM": LSTMFeatureEngineer,
     "GRU-P": GRUPFeatureEngineer,
     "HLR": HLRFeatureEngineer,

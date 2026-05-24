@@ -24,6 +24,7 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
     "RNN": RNN,
     "GRU": RNN,  # GRU uses the RNN class definition as per original script
     "LogisticRegression": LogisticRegression,
+    "FSRS-7-LR-Ensemble": FSRS7LREnsemble,
     "LSTM": LSTM,
     "GRU-P": GRU_P,
     "Transformer": Transformer,
@@ -119,6 +120,7 @@ def create_model(
         instance = model_cls(**constructor_kwargs)  # type: ignore
     elif model_name in [
         "LogisticRegression",
+        "FSRS-7-LR-Ensemble",
     ]:
         constructor_kwargs["state_dict"] = model_params  # type: ignore
         instance = model_cls(**constructor_kwargs)  # type: ignore

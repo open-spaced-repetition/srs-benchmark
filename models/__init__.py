@@ -22,6 +22,7 @@ from .nn_17 import NN_17
 from .sm2_trainable import SM2
 from .anki import Anki
 from .constant import ConstantModel
+from .fsrs7_lr_ensemble import FSRS7LREnsemble
 
 # Import Protocol for type checking
 from .trainable import TrainableModel
@@ -51,5 +52,6 @@ __all__ = [
     "SM2",
     "Anki",
     "ConstantModel",
+    "FSRS7LREnsemble",
     "TrainableModel",  # Protocol for type checking
 ]

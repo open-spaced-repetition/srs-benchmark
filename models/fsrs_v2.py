@@ -1,12 +1,12 @@
 from typing import List, Optional
 import torch
 from torch import nn, Tensor
-from models.fsrs_v1 import FSRS1, FSRS1ParameterClipper
+from models.fsrs import FSRS, FSRSParameterClipper
 
 from config import Config
 
 
-class FSRS2ParameterClipper(FSRS1ParameterClipper):
+class FSRS2ParameterClipper(FSRSParameterClipper):
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -27,7 +27,7 @@ class FSRS2ParameterClipper(FSRS1ParameterClipper):
             module.w.data = w
 
 
-class FSRS2(FSRS1):
+class FSRS2(FSRS):
     # 14 params
     init_w = [1, 1, 1, -1, -1, 0.2, 3, -0.8, -0.2, 1.3, 2.6, -0.2, 0.6, 1.5]
     clipper = FSRS2ParameterClipper()
@@ -35,6 +35,17 @@ class FSRS2(FSRS1):
     def __init__(self, config: Config, w: List[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def forgetting_curve(self, t, s):
+        return 0.9 ** (t / s)
+
+    def benchmark_state(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
 
     def stability_after_success(
         self, state: Tensor, new_d: Tensor, r: Tensor
@@ -48,7 +59,7 @@ class FSRS2(FSRS1):
         )
         return new_s
 
-    def stability_after_failure(  # type: ignore[override]
+    def stability_after_failure(
         self, state: Tensor, new_d: Tensor, r: Tensor
     ) -> Tensor:
         new_s = (

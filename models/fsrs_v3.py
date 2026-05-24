@@ -1,12 +1,12 @@
-from typing import List
+from typing import List, Optional
 import torch
 from torch import nn, Tensor
-from models.fsrs_v2 import FSRS2, FSRS2ParameterClipper
+from models.fsrs import FSRS, FSRSParameterClipper
 
 from config import Config
 
 
-class FSRS3ParameterClipper(FSRS2ParameterClipper):
+class FSRS3ParameterClipper(FSRSParameterClipper):
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -26,7 +26,7 @@ class FSRS3ParameterClipper(FSRS2ParameterClipper):
             module.w.data = w
 
 
-class FSRS3(FSRS2):
+class FSRS3(FSRS):
     # 13 params
     init_w = [
         0.9605,
@@ -49,6 +49,34 @@ class FSRS3(FSRS2):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
+    def forgetting_curve(self, t, s):
+        return 0.9 ** (t / s)
+
+    def benchmark_state(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )
+
+    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+        return self.w[5] * init + (1 - self.w[5]) * current
+
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
     def stability_after_success(
         self, state: Tensor, new_d: Tensor, r: Tensor
     ) -> Tensor:
@@ -61,7 +89,7 @@ class FSRS3(FSRS2):
         )
         return new_s
 
-    def stability_after_failure(  # type: ignore[override]
+    def stability_after_failure(
         self, state: Tensor, new_d: Tensor, r: Tensor
     ) -> Tensor:
         new_s = (

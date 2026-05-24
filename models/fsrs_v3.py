@@ -1,12 +1,12 @@
 from typing import List, Optional
 import torch
 from torch import nn, Tensor
-from models.fsrs import FSRS, FSRSParameterClipper
+import pandas as pd
 
 from config import Config
 
 
-class FSRS3ParameterClipper(FSRSParameterClipper):
+class FSRS3ParameterClipper:
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -26,7 +26,7 @@ class FSRS3ParameterClipper(FSRSParameterClipper):
             module.w.data = w
 
 
-class FSRS3(FSRS):
+class FSRS3(nn.Module):
     # 13 params
     init_w = [
         0.9605,
@@ -44,38 +44,39 @@ class FSRS3(FSRS):
         1.0721,
     ]
     clipper = FSRS3ParameterClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super().__init__(config)
+        super().__init__()
+        self.config = config
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def get_optimizer(
+        self, lr: float, wd: float, betas: tuple = (0.9, 0.999)
+    ) -> torch.optim.Optimizer:
+        return torch.optim.Adam(self.parameters(), lr=lr, betas=betas)
+
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
+        pass
+
+    def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        return train_set
+
+    def set_hyperparameters(self, lr: float, wd: float, n_epoch: int) -> None:
+        self.lr = lr
+        self.wd = wd
+        self.n_epoch = n_epoch
+
+    def apply_gradient_constraints(self):
+        pass
+
+    def apply_parameter_clipper(self):
+        self.apply(self.clipper)
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
-
-    def benchmark_state(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
-
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
-        return self.w[5] * init + (1 - self.w[5]) * current
-
-    def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
-    ) -> tuple[Tensor, Tensor]:
-        """
-        :param inputs: shape[seq_len, batch_size, 2]
-        """
-        if state is None:
-            state = torch.zeros((inputs.shape[1], 2))
-        outputs = []
-        for X in inputs:
-            state = self.step(X, state)
-            outputs.append(state)
-        return torch.stack(outputs), state
 
     def stability_after_success(
         self, state: Tensor, new_d: Tensor, r: Tensor
@@ -99,6 +100,9 @@ class FSRS3(FSRS):
             * torch.exp((1 - r) * self.w[12])
         )
         return new_s
+
+    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+        return self.w[5] * init + (1 - self.w[5]) * current
 
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
@@ -124,3 +128,44 @@ class FSRS3(FSRS):
             )
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d], dim=1)
+
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def batch_process(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities, difficulties, *_ = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=self.config.device),
+        ].transpose(0, 1)
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {
+            "retentions": retentions,
+            "stabilities": stabilities,
+            "difficulties": difficulties,
+        }
+
+    def benchmark_state(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )

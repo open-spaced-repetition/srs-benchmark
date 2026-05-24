@@ -2,7 +2,6 @@ from typing import List, Union
 import torch
 from torch import nn, Tensor
 from typing import Optional
-from models.fsrs_v6 import FSRS6, FSRS6ParameterClipper
 import torch.nn.functional as F
 from torch.nn import Sigmoid
 import pandas as pd
@@ -23,7 +22,10 @@ PENALTY_W_2 = 0.0015
 PENALTY_W_L2 = 0.5
 
 
-class FSRS7ParameterClipper(FSRS6ParameterClipper):
+class FSRS7ParameterClipper:
+    def __init__(self, config: Config):
+        self.config = config
+
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -71,7 +73,7 @@ class FSRS7ParameterClipper(FSRS6ParameterClipper):
             module.w.data = w
 
 
-class FSRS7(FSRS6):
+class FSRS7(nn.Module):
     """
     README entries and the corresponding flags
     Without same-day reviews:
@@ -88,6 +90,7 @@ class FSRS7(FSRS6):
     n_epoch: int = 8
     batch_size: int = 1024
     lr: float = 2e-2
+    wd: float = 1e-5
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
@@ -129,13 +132,34 @@ class FSRS7(FSRS6):
         0.3862,
     ]
 
+
     def __init__(self, config: Config, w: Optional[List[float]] = None):
-        super().__init__(config)
+        super().__init__()
+        self.config = config
         if w is None:
             w = self.init_w
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS7ParameterClipper(config)
+
+    def get_optimizer(
+        self, lr: float, wd: float, betas: tuple = (0.9, 0.999)
+    ) -> torch.optim.Optimizer:
+        return torch.optim.Adam(self.parameters(), lr=lr, betas=betas)
+
+    def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        return train_set
+
+    def set_hyperparameters(self, lr: float, wd: float, n_epoch: int) -> None:
+        self.lr = lr
+        self.wd = wd
+        self.n_epoch = n_epoch
+
+    def apply_gradient_constraints(self):
+        pass
+
+    def apply_parameter_clipper(self):
+        self.apply(self.clipper)
 
     def batch_process(
         self,
@@ -800,6 +824,20 @@ class FSRS7(FSRS6):
         # end = time.perf_counter()
         # print(f'Pretrain took {end - start:.2f} seconds, {(end - start) * 1000:.0f} milliseconds')
 
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
@@ -845,3 +883,11 @@ class FSRS7(FSRS6):
 
         new_s = new_s.clamp(self.config.s_min, 36500)
         return torch.stack([new_s, new_d], dim=1)
+
+    def benchmark_state(self):
+        return list(
+            map(
+                lambda x: round(float(x), 4),
+                dict(self.named_parameters())["w"].data,
+            )
+        )

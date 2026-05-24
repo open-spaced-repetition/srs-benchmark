@@ -1,13 +1,12 @@
-from typing import List
+from typing import List, Optional
 import torch
 from torch import nn, Tensor
-from typing import Optional
+import pandas as pd
 
 from config import Config
-from models.fsrs import FSRS, FSRSParameterClipper
 
 
-class FSRS1ParameterClipper(FSRSParameterClipper):
+class FSRS1ParameterClipper:
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -21,14 +20,40 @@ class FSRS1ParameterClipper(FSRSParameterClipper):
             module.w.data = w
 
 
-class FSRS1(FSRS):
+class FSRS1(nn.Module):
     # 7 params
     init_w = [2, 5, 3, -0.7, -0.2, 1, -0.3]
     clipper = FSRS1ParameterClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super().__init__(config)
+        super().__init__()
+        self.config = config
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def get_optimizer(
+        self, lr: float, wd: float, betas: tuple = (0.9, 0.999)
+    ) -> torch.optim.Optimizer:
+        return torch.optim.Adam(self.parameters(), lr=lr, betas=betas)
+
+    def initialize_parameters(self, train_set: pd.DataFrame) -> None:
+        pass
+
+    def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
+        return train_set
+
+    def set_hyperparameters(self, lr: float, wd: float, n_epoch: int) -> None:
+        self.lr = lr
+        self.wd = wd
+        self.n_epoch = n_epoch
+
+    def apply_gradient_constraints(self):
+        pass
+
+    def apply_parameter_clipper(self):
+        self.apply(self.clipper)
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
@@ -86,6 +111,25 @@ class FSRS1(FSRS):
             state = self.step(X, state)
             outputs.append(state)
         return torch.stack(outputs), state
+
+    def batch_process(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities, difficulties, *_ = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=self.config.device),
+        ].transpose(0, 1)
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {
+            "retentions": retentions,
+            "stabilities": stabilities,
+            "difficulties": difficulties,
+        }
 
     def benchmark_state(self):
         return list(

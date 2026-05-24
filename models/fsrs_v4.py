@@ -1,7 +1,6 @@
 from typing import List, Optional
 import torch
 from torch import nn, Tensor
-from models.fsrs import FSRS, FSRSParameterClipper
 from config import Config
 import pandas as pd
 from tqdm.auto import tqdm  # type: ignore
@@ -9,7 +8,7 @@ import numpy as np
 from scipy.optimize import minimize  # type: ignore
 
 
-class FSRS4ParameterClipper(FSRSParameterClipper):
+class FSRS4ParameterClipper:
     def __call__(self, module):
         if hasattr(module, "w"):
             w = module.w.data
@@ -29,7 +28,7 @@ class FSRS4ParameterClipper(FSRSParameterClipper):
             module.w.data = w
 
 
-class FSRS4(FSRS):
+class FSRS4(nn.Module):
     # 17 params
     init_w = [
         0.4,
@@ -51,20 +50,37 @@ class FSRS4(FSRS):
         2.61,
     ]
     clipper = FSRS4ParameterClipper()
+    lr: float = 4e-2
+    wd: float = 1e-5
+    n_epoch: int = 5
 
     def __init__(self, config: Config, w: List[float] = init_w):
-        super().__init__(config)
+        super().__init__()
+        self.config = config
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
+    def get_optimizer(
+        self, lr: float, wd: float, betas: tuple = (0.9, 0.999)
+    ) -> torch.optim.Optimizer:
+        return torch.optim.Adam(self.parameters(), lr=lr, betas=betas)
 
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
         """FSRS4 only trains on data where i > 2"""
         return train_set[train_set["i"] > 2]
+
+    def set_hyperparameters(self, lr: float, wd: float, n_epoch: int) -> None:
+        self.lr = lr
+        self.wd = wd
+        self.n_epoch = n_epoch
 
     def apply_gradient_constraints(self):
         """Don't train the first 4 parameters (initial stability)"""
         for param in self.parameters():
             if param.grad is not None and param.grad.shape[0] >= 4:
                 param.grad[:4] = torch.zeros(4)
+
+    def apply_parameter_clipper(self):
+        self.apply(self.clipper)
 
     def forgetting_curve(self, t, s):
         return (1 + t / (9 * s)) ** -1
@@ -85,7 +101,7 @@ class FSRS4(FSRS):
         )
         return new_s
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
+    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:
         new_s = (
             self.w[11]
             * torch.pow(state[:, 1], -self.w[12])
@@ -125,6 +141,39 @@ class FSRS4(FSRS):
 
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[7] * init + (1 - self.w[7]) * current
+
+    def forward(
+        self, inputs: Tensor, state: Optional[Tensor] = None
+    ) -> tuple[Tensor, Tensor]:
+        """
+        :param inputs: shape[seq_len, batch_size, 2]
+        """
+        if state is None:
+            state = torch.zeros((inputs.shape[1], 2))
+        outputs = []
+        for X in inputs:
+            state = self.step(X, state)
+            outputs.append(state)
+        return torch.stack(outputs), state
+
+    def batch_process(
+        self,
+        sequences: Tensor,
+        delta_ts: Tensor,
+        seq_lens: Tensor,
+        real_batch_size: int,
+    ) -> dict[str, Tensor]:
+        outputs, _ = self.forward(sequences)
+        stabilities, difficulties, *_ = outputs[
+            seq_lens - 1,
+            torch.arange(real_batch_size, device=self.config.device),
+        ].transpose(0, 1)
+        retentions = self.forgetting_curve(delta_ts, stabilities)
+        return {
+            "retentions": retentions,
+            "stabilities": stabilities,
+            "difficulties": difficulties,
+        }
 
     def benchmark_state(self):
         return list(

@@ -55,6 +55,7 @@ if __name__ == "__main__":
     models = [
         "RWKV-P",
         "RWKV",
+        "GRU-short-secs-equalize_test_with_non_secs",
         "LSTM-short-secs-duration-equalize_test_with_non_secs",
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
         "FSRS-6-short-recency",
@@ -138,6 +139,7 @@ if __name__ == "__main__":
         if model_name.startswith("FSRS"):
             models[idx] = model_name.replace("-short", "")
     index_lstm = models.index("LSTM-short-secs-duration-equalize_test_with_non_secs")
+    index_gru = models.index("GRU-short-secs-equalize_test_with_non_secs")
     index_logistic_regression = models.index(
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs"
     )
@@ -145,6 +147,7 @@ if __name__ == "__main__":
     index_Ebisu_v2 = models.index("Ebisu-v2")
     index_FSRS_6_recency = models.index("FSRS-6-recency")
     models[index_lstm] = "LSTM"
+    models[index_gru] = "GRU"
     models[index_logistic_regression] = "LogisticRegression"
     models[index_v4] = "FSRS v4"
     models[index_Ebisu_v2] = "Ebisu v2"

@@ -8,7 +8,6 @@ from script import Trainer
 from config import create_parser, Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from models.fsrs_v6 import FSRS6
-from models.gru_p import GRU_P
 from models.rnn import RNN
 from models.transformer import Transformer
 from models.nn_17 import NN_17
@@ -32,11 +31,8 @@ if __name__ == "__main__":
     lr = 4e-2
     wd = 1e-4
     batch_size = 65536
-    if config.model_name == "GRU":
+    if config.model_name == "RNN":
         model = RNN(config)
-        model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
-    elif config.model_name == "GRU-P":
-        model = GRU_P(config)
         model.set_hyperparameters(lr=lr, wd=wd, n_epoch=n_epoch)
     elif config.model_name == "Transformer":
         model = Transformer(config)

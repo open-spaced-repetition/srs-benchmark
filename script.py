@@ -15,7 +15,6 @@ from tqdm.auto import tqdm  # type: ignore
 import warnings
 from models.model_factory import create_model
 from models.trainable import TrainableModel
-from reptile_trainer import get_inner_opt, finetune
 import multiprocessing as mp
 import pyarrow.parquet as pq  # type: ignore
 from config import create_parser, Config
@@ -227,6 +226,13 @@ def _configure_process_device(device_id: Optional[int]) -> None:
             reptile_trainer.DEVICE = config.device
         except Exception:
             pass
+    elif config.model_name == "GRU":
+        try:
+            import reptile_trainer_gru
+
+            reptile_trainer_gru.DEVICE = config.device
+        except Exception:
+            pass
 
 
 def _is_inadequate_training_data_error(exc: Exception) -> bool:
@@ -277,6 +283,26 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         return get_model_state(model)
 
     if config.model_name == "LSTM":
+        from reptile_trainer import get_inner_opt, finetune
+
+        model = model.to(config.device)
+        inner_opt = get_inner_opt(
+            model.parameters(),
+            path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
+        )
+        trained_model = finetune(
+            train_df,
+            model,
+            inner_opt.state_dict(),
+        )
+        weights = copy.deepcopy(get_model_state(trained_model))
+        del trained_model, inner_opt
+        if config.device.type == "mps":
+            torch.mps.empty_cache()
+        return weights
+    elif config.model_name == "GRU":
+        from reptile_trainer_gru import get_inner_opt, finetune
+
         model = model.to(config.device)
         inner_opt = get_inner_opt(
             model.parameters(),

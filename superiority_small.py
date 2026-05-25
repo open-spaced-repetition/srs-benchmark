@@ -19,6 +19,7 @@ if __name__ == "__main__":
             "RWKV-P-short-secs",
             "RWKV-short-secs",
             "LSTM-short-secs-duration",
+            "GRU-short-secs-duration",
             "LogisticRegression-short-secs-recency",
             "FSRS-7-short-secs-recency",
             "MOVING-AVG-short-secs",

@@ -35,8 +35,8 @@ if __name__ == "__main__":
         models = [
             "RWKV-P",
             "RWKV",
-            "LSTM-short-secs-duration-equalize_test_with_non_secs",
             "GRU-short-secs-equalize_test_with_non_secs",
+            "LSTM-short-secs-duration-equalize_test_with_non_secs",
             "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
             "FSRS-7-short-secs-recency-equalize_test_with_non_secs",
             "FSRS-6-short",

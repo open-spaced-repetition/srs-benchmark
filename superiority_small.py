@@ -19,6 +19,7 @@ if __name__ == "__main__":
             "RWKV-P-short-secs",
             "RWKV-short-secs",
             "LSTM-short-secs-duration",
+            "GRU-short-secs",
             "LogisticRegression-short-secs-recency",
             "FSRS-7-short-secs-recency",
             "MOVING-AVG-short-secs",
@@ -34,6 +35,7 @@ if __name__ == "__main__":
         models = [
             "RWKV-P",
             "RWKV",
+            "GRU-short-secs-equalize_test_with_non_secs",
             "LSTM-short-secs-duration-equalize_test_with_non_secs",
             "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
             "FSRS-7-short-secs-recency-equalize_test_with_non_secs",

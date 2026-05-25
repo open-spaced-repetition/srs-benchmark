@@ -68,6 +68,7 @@ if __name__ == "__main__":
     models = [
         "RWKV-P",
         "RWKV",
+        "GRU-short-secs-equalize_test_with_non_secs",
         "LSTM-short-secs-duration-equalize_test_with_non_secs",
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
         "FSRS-rs-short",
@@ -86,7 +87,6 @@ if __name__ == "__main__":
         "DASH",
         "DASH[MCM]",
         "DASH[ACT-R]",
-        "GRU",
         "AVG",
         "FSRSv3",
         "ACT-R",
@@ -193,6 +193,7 @@ if __name__ == "__main__":
         if model_name.startswith("FSRS"):
             models[idx] = model_name.replace("-short", "")
     index_lstm = models.index("LSTM-short-secs-duration-equalize_test_with_non_secs")
+    index_gru = models.index("GRU-short-secs-equalize_test_with_non_secs")
     index_logistic_regression = models.index(
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs"
     )
@@ -204,6 +205,7 @@ if __name__ == "__main__":
     index_v1 = models.index("FSRSv1")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_lstm] = "LSTM"
+    models[index_gru] = "GRU"
     models[index_logistic_regression] = "LogisticRegression"
     models[index_6_default] = "FSRS-6\ndef. param."
     models[index_6_S0] = "FSRS-6 S0"

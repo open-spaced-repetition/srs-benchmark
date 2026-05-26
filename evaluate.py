@@ -119,7 +119,12 @@ if __name__ == "__main__":
             ("MOVING-AVG", 0, "---"),
             (
                 "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
-                34,
+                35,
+                "IL, FIL, G, SR",
+            ),
+            (
+                "FSRS-7-LR-Ensemble-short-secs-equalize_test_with_non_secs",
+                72,
                 "IL, FIL, G, SR",
             ),
             ("FSRS-7-short-secs-recency-equalize_test_with_non_secs", 35, "FIL, G, SR"),
@@ -168,7 +173,7 @@ if __name__ == "__main__":
             ("RWKV-short-secs", 2762884, "[Yes](#features-note)"),
             ("LSTM-short-secs-duration", 8869, "FIL, G, SR, AT"),
             ("GRU-short-secs", 503, "FIL, G, SR"),
-            ("LogisticRegression-short-secs-recency", 34, "IL, FIL, G, SR"),
+            ("LogisticRegression-short-secs-recency", 35, "IL, FIL, G, SR"),
             ("FSRS-7-short-secs-recency", 35, "FIL, G, SR"),
             ("FSRS-7-short-secs", 35, "FIL, G, SR"),
             ("FSRS-7-sched_penalties-short-secs", 35, "FIL, G, SR"),

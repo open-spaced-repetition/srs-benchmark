@@ -24,6 +24,7 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
     "RNN": RNN,
     "GRU": GRU,
     "LogisticRegression": LogisticRegression,
+    "FSRS-7-LR-Ensemble": FSRS7LREnsemble,
     "LSTM": LSTM,
     "Transformer": Transformer,
     "NN-17": NN_17,
@@ -117,6 +118,7 @@ def create_model(
         instance = model_cls(**constructor_kwargs)  # type: ignore
     elif model_name in [
         "LogisticRegression",
+        "FSRS-7-LR-Ensemble",
     ]:
         constructor_kwargs["state_dict"] = model_params  # type: ignore
         instance = model_cls(**constructor_kwargs)  # type: ignore

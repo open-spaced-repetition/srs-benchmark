@@ -89,6 +89,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--fast", action="store_true")
     parser.add_argument("--secs", action="store_true")
+    parser.add_argument(
+        "--models",
+        nargs="+",
+        help="Optional result file names to evaluate, without the .jsonl suffix.",
+    )
+    parser.add_argument(
+        "--max-user-id",
+        type=int,
+        default=None,
+        help="Only include users with id <= this value.",
+    )
     args = parser.parse_args()
 
     # IL = interval lengths
@@ -200,6 +211,24 @@ if __name__ == "__main__":
             ("RMSE-BINS-EXPLOIT-short-secs", 0, "FIL, G, SR"),
         ]
     )
+    if args.models:
+        models = [(model, None, None) for model in args.models]
+
+    result_sets = []
+    for model, _, _ in models:
+        result_file = pathlib.Path(f"./result/{model}.jsonl")
+        if not result_file.exists():
+            continue
+        with open(result_file, "r") as f:
+            data = [json.loads(x) for x in f.readlines()]
+        if args.max_user_id is not None:
+            data = [result for result in data if result["user"] <= args.max_user_id]
+        if data:
+            result_sets.append({result["user"] for result in data})
+    if result_sets:
+        cli_common_set = set.intersection(*result_sets)
+        common_set = common_set & cli_common_set if common_set else cli_common_set
+
     if args.fast:
         for model, n_param, features in models:
             print(f"Model: {model}")
@@ -211,6 +240,8 @@ if __name__ == "__main__":
                 continue
             with open(result_file, "r") as f:
                 data = [json.loads(x) for x in f.readlines()]
+            if args.max_user_id is not None:
+                data = [result for result in data if result["user"] <= args.max_user_id]
             for result in data:
                 if common_set and result["user"] not in common_set:
                     continue
@@ -274,6 +305,12 @@ if __name__ == "__main__":
                     continue
                 with open(result_file, "r") as f:
                     data = [json.loads(x) for x in f.readlines()]
+                if args.max_user_id is not None:
+                    data = [
+                        result
+                        for result in data
+                        if result["user"] <= args.max_user_id
+                    ]
                 for result in data:
                     if common_set and result["user"] not in common_set:
                         continue

@@ -14,6 +14,7 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
     "FSRS-5": FSRS5,
     "FSRS-6": FSRS6,
     "FSRS-7": FSRS7,
+    "FSRS-7-ordinal": FSRS7Ordinal,
     "HLR": HLR,
     "ACT-R": ACT_R,
     "DASH": DASH,

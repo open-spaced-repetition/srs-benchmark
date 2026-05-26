@@ -307,9 +307,7 @@ if __name__ == "__main__":
                     data = [json.loads(x) for x in f.readlines()]
                 if args.max_user_id is not None:
                     data = [
-                        result
-                        for result in data
-                        if result["user"] <= args.max_user_id
+                        result for result in data if result["user"] <= args.max_user_id
                     ]
                 for result in data:
                     if common_set and result["user"] not in common_set:

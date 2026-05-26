@@ -319,6 +319,8 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
             torch.mps.empty_cache()
         return weights
     elif config.model_name in ["LogisticRegression", "FSRS-7-LR-Ensemble"]:
+        if config.model_name == "FSRS-7-LR-Ensemble":
+            cast(Any, model).Trainer = Trainer
         return cast(Any, model).optimize(train_df)
 
     trainer = Trainer(
@@ -494,8 +496,6 @@ def process(
     )
     if config.model_name in ["LogisticRegression", "FSRS-7-LR-Ensemble"] and model is not None:
         cast(Any, model).log(stats)
-    import gc
-    gc.collect()
     return stats, raw
 
 
@@ -523,8 +523,6 @@ if __name__ == "__main__":
         user_id_value = user_id.as_py()
         # Add the filter here
         if config.max_user_id is not None and user_id_value > config.max_user_id:
-            continue
-        if config.min_user_id is not None and user_id_value < config.min_user_id:
             continue
         if user_id_value in processed_user:
             continue

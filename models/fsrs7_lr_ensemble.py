@@ -23,6 +23,7 @@ class FSRS7LREnsemble(BaseModel):
     Separate weights are learned for same-day and non-same-day reviews.
     """
 
+    Trainer: Any = None
     PRIOR = np.array([0.4, 0.4])
 
     def __init__(self, config: Config, state_dict: Optional[Dict[str, Any]] = None):
@@ -83,19 +84,11 @@ class FSRS7LREnsemble(BaseModel):
 
     # ── training ─────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _trainer_cls():
-        import sys
-
-        for module_name in ("__main__", "__mp_main__", "script"):
-            module = sys.modules.get(module_name)
-            if module is not None and hasattr(module, "Trainer"):
-                return getattr(module, "Trainer")
-        raise RuntimeError("Trainer is not available in the current process")
-
     def _train_fsrs(self, df: pd.DataFrame):
+        if self.Trainer is None:
+            raise RuntimeError("Trainer must be registered before optimizing the ensemble")
         fsrs_model = FSRS7(config=self.fsrs_config)
-        trainer = self._trainer_cls()(
+        trainer = self.Trainer(
             model=fsrs_model,
             train_set=df,
             test_set=None,
@@ -182,7 +175,7 @@ class FSRS7LREnsemble(BaseModel):
 
         logit_fsrs = self._to_logits(np.array(fsrs_ret))
         logit_lr = self._to_logits(np.array(lr_ret))
-        is_same_day = (df["delta_t_int"].values == 0).astype(np.float64)
+        is_same_day = df["delta_t_int"].values == 0
 
         logit_ens = self._ensemble_logits(logit_fsrs, logit_lr, is_same_day)
         preds = self._sigmoid(logit_ens)

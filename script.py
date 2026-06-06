@@ -2,6 +2,7 @@ import copy
 import json
 import sys
 import os
+import time
 import pandas as pd
 import numpy as np
 from typing import Optional, Any, cast
@@ -526,7 +527,17 @@ if __name__ == "__main__":
             continue
         unprocessed_users.append(user_id_value)
 
-    unprocessed_users.sort()
+    # LPT (longest-processing-time-first) scheduling: process the largest users
+    # first so a worker doesn't get stuck on a 1M-review user while others idle.
+    # Bit-for-bit safe: processing order never affects any per-user result (FSRS/DASH/HLR
+    # shuffle via a private BatchLoader generator, independent of order), and
+    # sort_jsonl() re-sorts the final result file by user id. user_order.jsonl holds the
+    # user ids in descending review-count order, one per line (size verified
+    # config-independent).
+    with open(Path(__file__).parent / "user_order.jsonl", encoding="utf-8") as f:
+        _user_ids_by_size_desc = [int(line) for line in f if line.strip()]
+    _lpt_rank = {u: i for i, u in enumerate(_user_ids_by_size_desc)}
+    unprocessed_users.sort(key=lambda u: _lpt_rank.get(u, len(_user_ids_by_size_desc)))
 
     cuda_device_ids = None
     if config.cuda_device_ids:
@@ -546,6 +557,10 @@ if __name__ == "__main__":
                     "Warning: --processes exceeds --gpus; multiple workers will share GPUs."
                 )
 
+    # Speedup-timing instrumentation (gated by SRSB_TIMING env). __MAKESPAN__ is the
+    # wall time of the parallel compute block (per-user work + scheduling, incl. LPT).
+    # stderr-only; never touches outputs -> bit-for-bit correctness-neutral.
+    _srsb_t0 = time.perf_counter() if os.environ.get("SRSB_TIMING") == "1" else None
     with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
         futures = [
             executor.submit(
@@ -558,7 +573,14 @@ if __name__ == "__main__":
             for idx, user_id in enumerate(unprocessed_users)
         ]
         for future in (
-            pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
+            pbar := tqdm(
+                as_completed(futures),
+                total=len(futures),
+                smoothing=0.03,
+                # Disable the progress bar when output isn't a real terminal
+                # (e.g. captured/redirected) so the \r-driven bar doesn't flood logs.
+                disable=not sys.stderr.isatty(),
+            )
         ):
             try:
                 result, error = future.result()
@@ -574,6 +596,13 @@ if __name__ == "__main__":
                     pbar.set_description(f"Processed {stats['user']}")
             except Exception as e:
                 tqdm.write(str(e))
+
+    if _srsb_t0 is not None:
+        print(
+            f"__MAKESPAN__ {time.perf_counter() - _srsb_t0:.6f}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     sort_jsonl(result_file)
     if config.save_raw_output:

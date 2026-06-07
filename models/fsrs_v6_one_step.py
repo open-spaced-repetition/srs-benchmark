@@ -95,6 +95,7 @@ class FSRS_one_step(BaseModel):
                 new_s = self.stability_after_success(last_s, new_d, r, rating)
 
             return new_s, new_d
+
     @override
     def forward(self, inputs):
         last_s = None
@@ -246,6 +247,7 @@ class FSRS_one_step(BaseModel):
         self.w[15] = max(0, min(self.w[15], 1))
         self.w[16] = max(1, min(self.w[16], 6))
         self.w[20] = max(0.1, min(self.w[20], 0.8))
+
     @override
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         S0_dataset_group = (

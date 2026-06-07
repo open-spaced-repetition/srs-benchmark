@@ -93,12 +93,15 @@ class FSRS5(FSRS4dot5):
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS5ParameterClipper(config)
+
     @override
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
         return train_set
+
     @override
     def apply_gradient_constraints(self):
         pass
+
     @override
     def batch_process(
         self,
@@ -145,6 +148,7 @@ class FSRS5(FSRS4dot5):
         new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
         new_d = self.mean_reversion(self.init_d(4), new_d)
         return new_d
+
     @override
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """

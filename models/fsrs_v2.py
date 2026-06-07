@@ -36,6 +36,7 @@ class FSRS2(FSRS1):
     def __init__(self, config: Config, w: List[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
+
     @override
     def stability_after_success(
         self, state: Tensor, new_d: Tensor, r: Tensor
@@ -62,6 +63,7 @@ class FSRS2(FSRS1):
 
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[5] * init + (1 - self.w[5]) * current
+
     @override
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
@@ -87,6 +89,7 @@ class FSRS2(FSRS1):
             )
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d], dim=1)
+
     @override
     def forward(
         self, inputs: Tensor, state: Optional[Tensor] = None

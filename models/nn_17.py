@@ -42,6 +42,7 @@ def exp_activ(input):
 class ExpActivation(nn.Module):
     def __init__(self):
         super().__init__()  # init the base class
+
     @override
     def forward(self, input):
         return exp_activ(input)
@@ -121,6 +122,7 @@ class NN_17(BaseModel):
                 )
             except FileNotFoundError:
                 pass
+
     @override
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2), device=self.config.device)

@@ -1,3 +1,4 @@
+from typing import override
 from typing import List
 import torch
 from torch import nn, Tensor
@@ -122,10 +123,10 @@ class FSRS4(FSRS3):
             new_d = new_d.clamp(1, 10)
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d], dim=1)
-
+    @override
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[7] * init + (1 - self.w[7]) * current
-
+    @override
     def benchmark_state(self):
         return list(
             map(
@@ -133,7 +134,7 @@ class FSRS4(FSRS3):
                 dict(self.named_parameters())["w"].data,
             )
         )
-
+    @override
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         S0_dataset_group = (
             train_set[train_set["i"] == 2]

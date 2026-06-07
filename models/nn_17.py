@@ -1,3 +1,4 @@
+from typing import override
 import torch
 from torch import nn, Tensor
 from config import Config
@@ -41,7 +42,7 @@ def exp_activ(input):
 class ExpActivation(nn.Module):
     def __init__(self):
         super().__init__()  # init the base class
-
+    @override
     def forward(self, input):
         return exp_activ(input)
 
@@ -120,7 +121,7 @@ class NN_17(BaseModel):
                 )
             except FileNotFoundError:
                 pass
-
+    @override
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2), device=self.config.device)
         outputs = []
@@ -153,7 +154,7 @@ class NN_17(BaseModel):
         ).squeeze(1)
         return {"retentions": retentions, "stabilities": stabilities}
 
-    def step(self, X, state):
+    def step(self, X: Tensor, state: Tensor):
         """
         :param input: shape[batch_size, 3]
             input[:,0] is elapsed time

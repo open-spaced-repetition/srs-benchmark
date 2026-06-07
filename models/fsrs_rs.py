@@ -28,7 +28,7 @@ def convert_to_items(df: pd.DataFrame, config: Config):
             "fsrs-rs-python is not installed. Please install it to use FSRS-rs models."
         )
 
-    def accumulate(group):
+    def accumulate(group: pd.DataFrame):
         items = []
         for _, row in group.iterrows():
             t_history = [max(0, int(t)) for t in row["t_history"].split(",")] + [

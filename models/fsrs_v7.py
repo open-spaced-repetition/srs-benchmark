@@ -137,6 +137,51 @@ class FSRS7(FSRS6):
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS7ParameterClipper(config)
 
+        # Loop-invariant constants hoisted out of the per-batch / per-step hot path
+        # (speed-only; bit-identical — same values, same ops). The originals rebuilt
+        # these tensors on every batch_process / stability_after_review call.
+        self._l2_sigma = torch.tensor(
+            [
+                9999.0,
+                9999.0,
+                9999.0,
+                9999.0,
+                0.523,
+                0.2528,
+                0.4329,
+                0.2966,
+                0.2139,
+                0.2889,
+                0.1862,
+                0.0829,
+                0.175,
+                0.3812,
+                0.3013,
+                0.9104,
+                0.3234,
+                0.2448,
+                0.3273,
+                0.1842,
+                0.1542,
+                0.1735,
+                0.4608,
+                0.311,
+                0.864,
+                0.4053,
+                0.162,
+                0.0418,
+                0.2596,
+                0.0798,
+                0.0682,
+                0.1282,
+                0.1397,
+                0.1407,
+                0.1489,
+            ]
+        ).to(self.config.device)
+        self._zero_penalty = torch.zeros([], device=self.config.device)
+        self._w_base = torch.tensor([7, 16], device=self.config.device)
+
     def batch_process(
         self,
         sequences: Tensor,
@@ -181,49 +226,10 @@ class FSRS7(FSRS6):
                 target_drs=[0.99],  # for the second penalty
             )
         else:
-            sched_penalty_1 = torch.zeros([], device=self.config.device)
-            sched_penalty_2 = torch.zeros([], device=self.config.device)
-        sigma = torch.tensor(
-            [
-                9999.0,
-                9999.0,
-                9999.0,
-                9999.0,
-                0.523,
-                0.2528,
-                0.4329,
-                0.2966,
-                0.2139,
-                0.2889,
-                0.1862,
-                0.0829,
-                0.175,
-                0.3812,
-                0.3013,
-                0.9104,
-                0.3234,
-                0.2448,
-                0.3273,
-                0.1842,
-                0.1542,
-                0.1735,
-                0.4608,
-                0.311,
-                0.864,
-                0.4053,
-                0.162,
-                0.0418,
-                0.2596,
-                0.0798,
-                0.0682,
-                0.1282,
-                0.1397,
-                0.1407,
-                0.1489,
-            ]
-        ).to(self.config.device)
+            sched_penalty_1 = self._zero_penalty
+            sched_penalty_2 = self._zero_penalty
         L2_penalty = torch.sum(
-            torch.square(self.w - self.init_w_tensor) / torch.square(sigma)
+            torch.square(self.w - self.init_w_tensor) / torch.square(self._l2_sigma)
         )
         # sched_penalty_1 penalizes huge interval growth for non-same-day reviews
         # sched_penalty_2 penalizes short (<10 minutes) intervals at 99% DR
@@ -284,8 +290,8 @@ class FSRS7(FSRS6):
         success = rating > 1
 
         # Stack weights for both long-term (base=7) and short-term (base=16)
-        # Shape: [2] for each parameter
-        w_base = torch.tensor([7, 16], device=w.device)
+        # Shape: [2] for each parameter (w_base hoisted to __init__: constant indices)
+        w_base = self._w_base
 
         w_sinc_base = w[w_base]  # w[7], w[16]
         w_sinc_s_exp = w[w_base + 1]  # w[8], w[17]

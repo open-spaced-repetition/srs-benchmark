@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
 import torch
 import torch.nn as nn
 from torch import Tensor

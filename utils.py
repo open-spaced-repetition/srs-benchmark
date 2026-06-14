@@ -229,7 +229,10 @@ def save_evaluation_file(user_id, df, config: Config):
 
 
 def batch_process_wrapper(
-    model: "TrainableModel", batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
+    model: "TrainableModel",
+    batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
+    | tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor],
+    include_extra_training_loss: bool = True,
 ) -> dict[str, Tensor]:
     """
     Wrapper function for batch processing of model predictions.
@@ -241,11 +244,28 @@ def batch_process_wrapper(
     Returns:
         Dictionary containing model outputs including labels and weights
     """
-    sequences, delta_ts, labels, seq_lens, weights = batch
+    current_ratings = None
+    if len(batch) == 5:
+        sequences, delta_ts, labels, seq_lens, weights = batch
+    elif len(batch) == 6:
+        sequences, delta_ts, labels, seq_lens, weights, current_ratings = batch
+    else:
+        raise ValueError(f"Unexpected batch size: {len(batch)}")
+
     real_batch_size = seq_lens.shape[0]
     result = {"labels": labels, "weights": weights}
+    if current_ratings is not None:
+        result["ratings"] = current_ratings
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
+    if (
+        include_extra_training_loss
+        and current_ratings is not None
+        and hasattr(model, "compute_extra_training_loss")
+    ):
+        result["extra_training_loss"] = cast(Any, model).compute_extra_training_loss(
+            result
+        )
     return result
 
 

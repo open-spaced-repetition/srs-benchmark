@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 from torch import nn
+from torch.nn.utils.rnn import pad_sequence
 from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 from tqdm.auto import tqdm  # type: ignore
 import warnings
@@ -52,6 +53,90 @@ torch.manual_seed(config.seed)
 tqdm.pandas()
 
 
+class BatchDatasetWithRatings:
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        batch_size: int = 0,
+        sort_by_length: bool = True,
+        max_seq_len: int = 64,
+        device: str | torch.device = "cpu",
+    ):
+        if dataframe.empty:
+            raise ValueError("Training data is inadequate.")
+
+        dataframe = dataframe.copy()
+        dataframe["seq_len"] = dataframe["tensor"].map(len)
+        dataframe = dataframe[dataframe["seq_len"] <= max_seq_len]
+        if sort_by_length:
+            dataframe = dataframe.sort_values(by="seq_len")
+        del dataframe["seq_len"]
+
+        self.x_train = pad_sequence(
+            dataframe["tensor"].to_list(), batch_first=True, padding_value=0
+        )
+        self.t_train = torch.tensor(dataframe["delta_t"].values, dtype=torch.float)
+        self.y_train = torch.tensor(dataframe["y"].values, dtype=torch.float)
+        self.r_train = torch.tensor(dataframe["rating"].values, dtype=torch.long)
+        self.seq_len = torch.tensor(
+            dataframe["tensor"].map(len).values, dtype=torch.long
+        )
+        if "weights" in dataframe.columns:
+            self.weights = torch.tensor(dataframe["weights"].values, dtype=torch.float)
+        else:
+            self.weights = torch.ones(len(dataframe), dtype=torch.float)
+
+        length = len(dataframe)
+        batch_num, remainder = divmod(length, max(1, batch_size))
+        self.batch_num = batch_num + 1 if remainder > 0 else batch_num
+        self.batches = [None] * self.batch_num
+        if batch_size > 0:
+            for i in range(self.batch_num):
+                start_index = i * batch_size
+                end_index = min((i + 1) * batch_size, length)
+                sequences = self.x_train[start_index:end_index]
+                seq_lens = self.seq_len[start_index:end_index]
+                max_batch_seq_len = max(seq_lens)
+                sequences_truncated = sequences[:, :max_batch_seq_len]
+                self.batches[i] = (
+                    sequences_truncated.transpose(0, 1).to(device),
+                    self.t_train[start_index:end_index].to(device),
+                    self.y_train[start_index:end_index].to(device),
+                    seq_lens.to(device),
+                    self.weights[start_index:end_index].to(device),
+                    self.r_train[start_index:end_index].to(device),
+                )
+
+    def __getitem__(self, idx):
+        return self.batches[idx]
+
+    def __len__(self):
+        return self.batch_num
+
+
+def _batch_dataset_for_model(
+    model: TrainableModel,
+    dataframe: pd.DataFrame,
+    batch_size: int,
+    max_seq_len: int,
+    shuffle_sort: bool = True,
+):
+    if getattr(model, "uses_current_rating_targets", False):
+        return BatchDatasetWithRatings(
+            dataframe.copy(),
+            batch_size,
+            sort_by_length=shuffle_sort,
+            max_seq_len=max_seq_len,
+            device=config.device,
+        )
+    return BatchDataset(
+        dataframe.copy(),
+        batch_size,
+        sort_by_length=shuffle_sort,
+        max_seq_len=max_seq_len,
+    )
+
+
 class Trainer:
     optimizer: torch.optim.Optimizer
     test_set: Optional[BatchDataset]
@@ -91,10 +176,11 @@ class Trainer:
         self.loss_fn = nn.BCELoss(reduction="none")
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
-        self.train_set = BatchDataset(
-            train_set.copy(),
+        self.train_set = _batch_dataset_for_model(
+            self.model,
+            train_set,
             self.batch_size,
-            max_seq_len=self.max_seq_len,
+            self.max_seq_len,
         )
         self.train_data_loader = BatchLoader(self.train_set)
 
@@ -102,10 +188,11 @@ class Trainer:
             self.test_set = None
             self.test_data_loader = None
         else:
-            self.test_set = BatchDataset(
-                test_set.copy(),
-                batch_size=self.batch_size,
-                max_seq_len=self.max_seq_len,
+            self.test_set = _batch_dataset_for_model(
+                self.model,
+                test_set,
+                self.batch_size,
+                self.max_seq_len,
             )
             self.test_data_loader = BatchLoader(self.test_set, shuffle=False)
 
@@ -128,6 +215,8 @@ class Trainer:
                     self.loss_fn(result["retentions"], result["labels"])
                     * result["weights"]
                 ).sum()
+                if "extra_training_loss" in result:
+                    loss += result["extra_training_loss"]
                 if "penalty" in result:
                     loss += result["penalty"] / epoch_len
                 loss.backward()
@@ -164,7 +253,9 @@ class Trainer:
                 total = 0
                 epoch_len = len(data_loader.dataset.y_train)
                 for batch in data_loader:
-                    result = batch_process_wrapper(self.model, batch)
+                    result = batch_process_wrapper(
+                        self.model, batch, include_extra_training_loss=False
+                    )
                     loss += (
                         (
                             self.loss_fn(result["retentions"], result["labels"])

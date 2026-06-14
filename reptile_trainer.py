@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch import Tensor
 from pathlib import Path
 from config import create_parser, Config
-from fsrs_optimizer import (  # type: ignore
+from fsrs_optimizer import (
     BatchDataset,
     BatchLoader,
     DevicePrefetchLoader,
@@ -151,7 +151,7 @@ def compute_data_loss(
     )
 
 
-def compute_df_loss(model, df):
+def compute_df_loss(model, df: pd.DataFrame):
     df_batchdataset = BatchDataset(
         df.copy(),
         BATCH_SIZE,
@@ -356,7 +356,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
 
 
 def evaluate(
-    df_list,
+    df_list: list[pd.DataFrame],
     model,
     inner_opt_state,
     name,

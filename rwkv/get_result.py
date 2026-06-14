@@ -16,7 +16,7 @@ from rwkv.data_fetcher import DataFetcher
 from rwkv.model.srs_model import SrsRWKV, extract_p
 from rwkv.parse_toml import parse_toml
 from rwkv.prepare_batch import prepare_data
-from rwkv.utils import load_tensor, save_tensor  # type: ignore
+from rwkv.utils import load_tensor, save_tensor
 
 FETCH_AHEAD = 20
 

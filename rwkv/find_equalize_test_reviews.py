@@ -6,7 +6,7 @@ from config import Config, create_parser
 from utils import get_bin
 from features import create_features
 import pandas as pd
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
 import lmdb
 
 from rwkv.parse_toml import parse_toml

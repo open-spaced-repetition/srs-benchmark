@@ -8,7 +8,7 @@ the standard trainable model pattern.
 import pandas as pd
 import numpy as np
 from typing import Optional, cast
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
 from models.fsrs_v6 import FSRS6
 from models.fsrs_v6_one_step import FSRS_one_step
 from models.rmse_bins_exploit import RMSEBinsExploit

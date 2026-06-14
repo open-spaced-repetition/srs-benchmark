@@ -3,7 +3,7 @@ from typing import Optional, List
 import pandas as pd
 from config import Config
 from utils import cum_concat
-from fsrs_optimizer import remove_outliers, remove_non_continuous_rows  # type: ignore
+from fsrs_optimizer import remove_outliers, remove_non_continuous_rows
 
 # Per-card cumulative history. Nested three deep: outer = cards, middle = reviews within a
 # card, inner = the cumulative prefix of (numpy) interval/rating values up to that review.

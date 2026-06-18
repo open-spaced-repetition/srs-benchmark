@@ -21,12 +21,23 @@ from models.trainable import (
 if TYPE_CHECKING:
     from models.trainable import TrainableModel
 
+import os as _os
+import sys as _sys
+import time as _time
+
+# Speedup-timing instrumentation switch. When SRSB_TIMING=1, catch_exceptions emits
+# the per-user wall time to stderr (__USERTIME__). It only prints — never touches any
+# computed value or output file — so it is bit-for-bit correctness-neutral and off by
+# default for normal benchmark runs.
+_SRSB_TIMING = _os.environ.get("SRSB_TIMING") == "1"
+
 
 def catch_exceptions(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
+        _t0 = _time.perf_counter() if _SRSB_TIMING else None
         try:
-            return func(*args, **kwargs), None
+            ret = (func(*args, **kwargs), None)
         except Exception:
             # Try to extract user_id from function arguments
             user_id = None
@@ -41,7 +52,14 @@ def catch_exceptions(func):
             if user_id is not None:
                 error_msg = f"User {user_id}:\n{error_msg}"
 
-            return None, error_msg
+            ret = (None, error_msg)
+        if _t0 is not None:
+            print(
+                f"__USERTIME__ {_time.perf_counter() - _t0:.6f}",
+                file=_sys.stderr,
+                flush=True,
+            )
+        return ret
 
     return wrapper
 
@@ -54,22 +72,37 @@ def mean_bias_error(y, p):
     return np.mean(np.array(p) - np.array(y))
 
 
+def _binned_via_lut(series, fn):
+    """Apply an elementwise binning function via a per-unique-value lookup table.
+
+    The bin inputs (elapsed_days, i, rmse_bins_lapse) are integer-valued with few
+    distinct values, so memoizing the *identical* scalar lambda over `series.unique()`
+    gives bit-for-bit identical results to a per-row `.map(fn)` while evaluating the
+    transcendental math only once per distinct value instead of once per row.
+    """
+    lut = {v: fn(v) for v in series.unique()}
+    return series.map(lut)
+
+
 def rmse_matrix(df):
     tmp = df.copy()
-    tmp["delta_t"] = tmp["elapsed_days"].map(
+    tmp["delta_t"] = _binned_via_lut(
+        tmp["elapsed_days"],
         lambda x: round(
             2.48 * np.power(3.62, np.floor(np.log(max(x, 1e-6)) / np.log(3.62))), 2
-        )
+        ),
     )
-    tmp["i"] = tmp["i"].map(
-        lambda x: round(1.99 * np.power(1.89, np.floor(np.log(x) / np.log(1.89))), 0)
+    tmp["i"] = _binned_via_lut(
+        tmp["i"],
+        lambda x: round(1.99 * np.power(1.89, np.floor(np.log(x) / np.log(1.89))), 0),
     )
-    tmp["rmse_bins_lapse"] = tmp["rmse_bins_lapse"].map(
+    tmp["rmse_bins_lapse"] = _binned_via_lut(
+        tmp["rmse_bins_lapse"],
         lambda x: (
             round(1.65 * np.power(1.73, np.floor(np.log(x) / np.log(1.73))), 0)
             if x != 0
             else 0
-        )
+        ),
     )
     if "weights" not in tmp.columns:
         tmp["weights"] = 1

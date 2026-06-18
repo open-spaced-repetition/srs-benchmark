@@ -329,5 +329,17 @@ Run `uv run script.py --help` for the full list. Common options include:
 To pretrain LSTM on multiple users, run:
 
 ```bash
-uv run pretrain.py --algo LSTM
+uv run reptile_trainer.py --algo LSTM
+```
+
+To tune the LSTM Reptile finetuning hyperparameters, run:
+
+```bash
+uv run reptile_optuna.py --algo LSTM
+```
+
+`pretrain.py` is used for models that support direct pooled pretraining, such as `FSRS-6`, `RNN`, `Transformer`, and `NN-17`:
+
+```bash
+uv run pretrain.py --algo FSRS-6
 ```

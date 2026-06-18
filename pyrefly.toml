@@ -1,3 +1,2 @@
-tensor-shapes = true
 search-path = ["tensor_shapes/fixtures"]
 check-unannotated-defs = false

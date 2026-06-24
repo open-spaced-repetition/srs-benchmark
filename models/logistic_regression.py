@@ -12,7 +12,7 @@ def transform_elapsed_days_real_np(x):
     return (np.log(x + 1e-5) + 1.3) / 5
 
 
-def create_features(df):
+def create_features(df: pd.DataFrame):
     """
     1. log(t)
     2. [Rating == 2] × log(t)

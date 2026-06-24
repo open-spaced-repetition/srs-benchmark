@@ -126,11 +126,11 @@ def scale_day_offset_diff(x):
     return np.log(np.log(np.e + x))
 
 
-def base_transform_elapsed_days(df):
+def base_transform_elapsed_days(df: pd.DataFrame):
     return df.assign(scaled_elapsed_days=scale_elapsed_days(df["elapsed_days"]))
 
 
-def base_transform_elapsed_days_cumulative(df):
+def base_transform_elapsed_days_cumulative(df: pd.DataFrame):
     return df.assign(
         scaled_elapsed_days_cumulative=scale_elapsed_days_cumulative(
             df["elapsed_days_cumulative"]
@@ -138,13 +138,13 @@ def base_transform_elapsed_days_cumulative(df):
     )
 
 
-def base_transform_elapsed_seconds(df):
+def base_transform_elapsed_seconds(df: pd.DataFrame):
     return df.assign(
         scaled_elapsed_seconds=scale_elapsed_seconds(df["elapsed_seconds"])
     )
 
 
-def base_transform_elapsed_seconds_cumulative(df):
+def base_transform_elapsed_seconds_cumulative(df: pd.DataFrame):
     return df.assign(
         scaled_elapsed_seconds_cumulative=scale_elapsed_seconds_cumulative(
             df["elapsed_seconds_cumulative"]
@@ -152,33 +152,33 @@ def base_transform_elapsed_seconds_cumulative(df):
     )
 
 
-def base_transform_duration(df):
+def base_transform_duration(df: pd.DataFrame):
     return df.assign(scaled_duration=scale_duration(df["duration"]))
 
 
-def base_transform_diff_new_cards(df):
+def base_transform_diff_new_cards(df: pd.DataFrame):
     return df.assign(diff_new_cards=scale_diff_new_cards(df["diff_new_cards"]))
 
 
-def base_transform_diff_reviews(df):
+def base_transform_diff_reviews(df: pd.DataFrame):
     return df.assign(diff_reviews=scale_diff_reviews(df["diff_reviews"]))
 
 
-def base_transform_cum_new_cards_today(df):
+def base_transform_cum_new_cards_today(df: pd.DataFrame):
     return df.assign(
         cum_new_cards_today=scale_cum_new_cards_today(df["cum_new_cards_today"])
     )
 
 
-def base_transform_cum_reviews_today(df):
+def base_transform_cum_reviews_today(df: pd.DataFrame):
     return df.assign(cum_reviews_today=scale_cum_reviews_today(df["cum_reviews_today"]))
 
 
-def base_transform_state(df):
+def base_transform_state(df: pd.DataFrame):
     return df.assign(scaled_state=scale_state(df["state"]))
 
 
-def base_transform_day_offset_diff(df):
+def base_transform_day_offset_diff(df: pd.DataFrame):
     return df.assign(day_offset_diff=scale_day_offset_diff(df["day_offset_diff"]))
 
 
@@ -336,7 +336,7 @@ class RWKVSample:
     skips: torch.Tensor
 
 
-def add_queries(section_df, equalize_review_ths):
+def add_queries(section_df: pd.DataFrame, equalize_review_ths):
     section_df["skip"] = False
     # Selectively keep certain columns, zero out the remaining columns to avoid leakage
     # The kept and rejected columns are written explicitly here so that additions and removals of columns in the future must be deliberately checked here

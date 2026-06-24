@@ -75,7 +75,7 @@ def create_features(df: pd.DataFrame):
     r_clipped = np.clip(r.astype(np.int32) - 2, 0, 2)
     rating_onehot = np.zeros((len(df), 3), dtype=np.float32)
     rating_onehot[np.arange(len(df)), r_clipped] = 1.0
-    rating_onehot *= (r > 1).astype(np.float32)[:, None] # type: ignore
+    rating_onehot *= (r > 1).astype(np.float32)[:, None]  # type: ignore
 
     # --- first_rating per group ---
     df["_r"] = r
@@ -83,7 +83,7 @@ def create_features(df: pd.DataFrame):
     first_r_clipped = np.clip(first_r.astype(np.int32) - 2, 0, 2)
     first_rating_onehot = np.zeros((len(df), 3), dtype=np.float32)
     first_rating_onehot[np.arange(len(df)), first_r_clipped] = 1.0
-    first_rating_onehot *= (first_r > 1).astype(np.float32)[:, None] # type: ignore
+    first_rating_onehot *= (first_r > 1).astype(np.float32)[:, None]  # type: ignore
 
     # --- cumsum counts (group-aware) ---
     df["_same_day"] = same_day
@@ -294,7 +294,7 @@ class LogisticRegression(BaseModel):
 
     @property
     def coefficients(self):
-        return self.coef_res * self.std + self.mean # type: ignore
+        return self.coef_res * self.std + self.mean  # type: ignore
 
     def optimize(self, df: pd.DataFrame):
         xrange = np.linspace(0, 1, len(df))

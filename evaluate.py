@@ -1,7 +1,7 @@
 import pathlib
 import json
 import numpy as np
-import scipy  # type: ignore
+import scipy
 import math
 import argparse
 

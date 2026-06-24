@@ -1,4 +1,4 @@
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
 import torch
 from config import create_parser, Config
 from reptile_trainer import (

@@ -1,7 +1,7 @@
 import copy
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
 from .factory import create_feature_engineer
 from config import Config
 

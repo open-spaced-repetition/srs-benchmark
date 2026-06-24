@@ -46,7 +46,7 @@
 
 import os
 from pathlib import Path
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
 import torch
 from config import create_parser, Config
 from reptile_trainer import (
@@ -67,7 +67,7 @@ from reptile_trainer import (
     adapt_on_data,
     compute_df_loss,
 )
-from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
+from fsrs_optimizer import BatchDataset, BatchLoader
 import pandas as pd
 import copy
 import optuna  # type: ignore

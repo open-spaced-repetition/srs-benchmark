@@ -1,12 +1,12 @@
 import os
 import pandas as pd
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
 import torch
 import torch.nn as nn
 from torch import Tensor
 from pathlib import Path
 from config import create_parser, Config
-from fsrs_optimizer import (  # type: ignore
+from fsrs_optimizer import (
     BatchDataset,
     BatchLoader,
     DevicePrefetchLoader,
@@ -151,13 +151,13 @@ def compute_data_loss(
     )
 
 
-def compute_df_loss(model, df):
+def compute_df_loss(model, df: pd.DataFrame):
     df_batchdataset = BatchDataset(
         df.copy(),
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
-        device=DEVICE,
+        device=DEVICE,  # type: ignore
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
     total = 0.0
@@ -356,7 +356,7 @@ def finetune(df, model, inner_opt_state, finetune_params=DEFAULT_FINETUNE_PARAMS
 
 
 def evaluate(
-    df_list,
+    df_list: list[pd.DataFrame],
     model,
     inner_opt_state,
     name,
@@ -393,7 +393,7 @@ def evaluate(
             with torch.no_grad():
                 finetuned_model.eval()
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
-                test_loss += test_split_loss.item()
+                test_loss += test_split_loss.item()  # type: ignore
                 test_n += len(test_set)
 
         avg_test_loss = test_loss / test_n

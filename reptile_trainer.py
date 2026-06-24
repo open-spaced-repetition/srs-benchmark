@@ -157,7 +157,7 @@ def compute_df_loss(model, df: pd.DataFrame):
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
-        device=DEVICE, # type: ignore 
+        device=DEVICE,  # type: ignore
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
     total = 0.0
@@ -393,7 +393,7 @@ def evaluate(
             with torch.no_grad():
                 finetuned_model.eval()
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
-                test_loss += test_split_loss.item() # type: ignore
+                test_loss += test_split_loss.item()  # type: ignore
                 test_n += len(test_set)
 
         avg_test_loss = test_loss / test_n

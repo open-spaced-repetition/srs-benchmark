@@ -54,36 +54,36 @@ def create_features(df: pd.DataFrame):
 
     df["feat_elapsed_real"] = g["delta_t_secs"].shift(1).fillna(0)
     df["feat_elapsed_int"] = g["delta_t_int"].shift(1).fillna(0)
-    r = df["feature_rating"].values
+    r = df["feature_rating"]
 
     # --- scalars ---
-    same_day = (df["feat_elapsed_int"].values == 0).astype(np.float32)
+    same_day = (df["feat_elapsed_int"] == 0).astype(np.float32)
     success = (r > 1).astype(np.float32)
     fail = (r == 1).astype(np.float32)
     is_hard = (r == 2).astype(np.float32)
     better_than_hard = (r > 2).astype(np.float32)
-    label_int = df["delta_t_int"].fillna(0).values
-    label_real = df["delta_t_secs"].fillna(0).values
+    label_int = df["delta_t_int"].fillna(0)
+    label_real = df["delta_t_secs"].fillna(0)
     label_is_same_day = (label_int == 0).astype(np.float32)
 
     # --- is_first_review: first row in each group ---
     is_first = np.zeros(len(df), dtype=np.float32)
-    is_first[g.cumcount().values == 0] = 1.0
+    is_first[g.cumcount() == 0] = 1.0
     not_first = 1.0 - is_first
 
     # --- one-hot for current rating (classes 0,1,2 = ratings 2,3,4) ---
     r_clipped = np.clip(r.astype(np.int32) - 2, 0, 2)
     rating_onehot = np.zeros((len(df), 3), dtype=np.float32)
     rating_onehot[np.arange(len(df)), r_clipped] = 1.0
-    rating_onehot *= (r > 1).astype(np.float32)[:, None]
+    rating_onehot *= (r > 1).astype(np.float32)[:, None] # type: ignore
 
     # --- first_rating per group ---
     df["_r"] = r
-    first_r = g["_r"].transform("first").values.astype(np.float32)
+    first_r = g["_r"].transform("first").astype(np.float32)
     first_r_clipped = np.clip(first_r.astype(np.int32) - 2, 0, 2)
     first_rating_onehot = np.zeros((len(df), 3), dtype=np.float32)
     first_rating_onehot[np.arange(len(df)), first_r_clipped] = 1.0
-    first_rating_onehot *= (first_r > 1).astype(np.float32)[:, None]
+    first_rating_onehot *= (first_r > 1).astype(np.float32)[:, None] # type: ignore
 
     # --- cumsum counts (group-aware) ---
     df["_same_day"] = same_day
@@ -94,30 +94,30 @@ def create_features(df: pd.DataFrame):
     df["_nsd_pass"] = (1 - same_day) * not_first * success
     df["_pass"] = success
 
-    num_same_day_fail = g["_sd_fail"].cumsum().values
-    num_nsd_fail = g["_nsd_fail"].cumsum().values
-    num_same_day_pass = g["_sd_pass"].cumsum().values
-    num_nsd_pass = g["_nsd_pass"].cumsum().values
-    num_pass = g["_pass"].cumsum().values
-    num_same_day = g["_same_day"].cumsum().values
-    num_non_same_day = g["_non_same_day"].cumsum().values
+    num_same_day_fail = g["_sd_fail"].cumsum()
+    num_nsd_fail = g["_nsd_fail"].cumsum()
+    num_same_day_pass = g["_sd_pass"].cumsum()
+    num_nsd_pass = g["_nsd_pass"].cumsum()
+    num_pass = g["_pass"].cumsum()
+    num_same_day = g["_same_day"].cumsum()
+    num_non_same_day = g["_non_same_day"].cumsum()
     has_passed = (num_pass > 0).astype(np.float32)
 
     # --- time / time_since_first_or_lapse ---
-    df["_elapsed_real"] = df["feat_elapsed_real"].values
-    times = g["_elapsed_real"].cumsum().values.astype(np.float32)
+    df["_elapsed_real"] = df["feat_elapsed_real"]
+    times = g["_elapsed_real"].cumsum().astype(np.float32)
 
     # first_or_lapse_time: equals `times` at first review or on a fail, else 0
     fl_mask = (is_first.astype(bool)) | (success == 0)
     first_or_lapse_time = np.where(fl_mask, times, 0.0)
     df["_flt"] = first_or_lapse_time
     # cummax per group
-    running_max_flt = g["_flt"].cummax().values.astype(np.float32)
+    running_max_flt = g["_flt"].cummax().astype(np.float32)
     time_since_first_or_lapse = times - running_max_flt
 
     # --- transformed scalars ---
     t_elapsed_real = transform_elapsed_days_real_np(
-        df["feat_elapsed_real"].values.astype(np.float32)
+        df["feat_elapsed_real"].astype(np.float32)
     )
     t_label_real = transform_elapsed_days_real_np(label_real.astype(np.float32))
     t_time_since_lapse = transform_elapsed_days_real_np(time_since_first_or_lapse)
@@ -294,9 +294,9 @@ class LogisticRegression(BaseModel):
 
     @property
     def coefficients(self):
-        return self.coef_res * self.std + self.mean
+        return self.coef_res * self.std + self.mean # type: ignore
 
-    def optimize(self, df):
+    def optimize(self, df: pd.DataFrame):
         xrange = np.linspace(0, 1, len(df))
         df["weights"] = 0.1 + 0.9 * np.power(xrange, 4)
         x_all = df.loc[:, df.columns.str.startswith("feat_")]
@@ -338,7 +338,7 @@ class LogisticRegression(BaseModel):
         return self.state_dict()
 
     @torch.inference_mode()
-    def predict(self, df):
+    def predict(self, df: pd.DataFrame):
         df = df.copy()
         x = df.loc[:, df.columns.str.startswith("feat_")]
         x = torch.tensor(np.array(x), dtype=torch.float)

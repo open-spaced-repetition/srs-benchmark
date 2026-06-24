@@ -11,13 +11,13 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import torch
 from torch import nn
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
-from tqdm.auto import tqdm  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
+from tqdm.auto import tqdm
 import warnings
 from models.model_factory import create_model
 from models.trainable import TrainableModel
 import multiprocessing as mp
-import pyarrow.parquet as pq  # type: ignore
+import pyarrow.parquet as pq
 from config import create_parser, Config
 from utils import (
     catch_exceptions,
@@ -45,7 +45,7 @@ config = Config(args)
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
 
-from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
+from fsrs_optimizer import BatchDataset, BatchLoader
 
 warnings.filterwarnings("ignore", category=UserWarning)
 torch.manual_seed(config.seed)

@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
 import time
-from scipy.optimize import minimize  # type: ignore
+from scipy.optimize import minimize
 
 from config import Config
 

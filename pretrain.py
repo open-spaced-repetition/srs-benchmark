@@ -1,5 +1,5 @@
 import pandas as pd
-from tqdm import tqdm  # type: ignore
+from tqdm import tqdm
 import torch
 from features import create_features
 from models.base import BaseModel

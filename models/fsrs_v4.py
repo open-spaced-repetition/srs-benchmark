@@ -6,7 +6,7 @@ from config import Config
 import pandas as pd
 from tqdm.auto import tqdm  # type: ignore
 import numpy as np
-from scipy.optimize import minimize  # type: ignore
+from scipy.optimize import minimize
 
 
 class FSRS4ParameterClipper(FSRS3ParameterClipper):

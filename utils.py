@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import traceback
 import torch
+import pandas as pd
 from torch import Tensor
 from pathlib import Path
 from sklearn.metrics import root_mean_squared_error  # type: ignore
@@ -72,7 +73,7 @@ def mean_bias_error(y, p):
     return np.mean(np.array(p) - np.array(y))
 
 
-def _binned_via_lut(series, fn):
+def _binned_via_lut(series: pd.Series, fn):
     """Apply an elementwise binning function via a per-unique-value lookup table.
 
     The bin inputs (elapsed_days, i, rmse_bins_lapse) are integer-valued with few
@@ -84,7 +85,7 @@ def _binned_via_lut(series, fn):
     return series.map(lut)
 
 
-def rmse_matrix(df):
+def rmse_matrix(df: pd.DataFrame):
     tmp = df.copy()
     tmp["delta_t"] = _binned_via_lut(
         tmp["elapsed_days"],

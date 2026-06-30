@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 from torch import nn, Tensor
 from typing import List
@@ -30,7 +32,9 @@ class SM2(BaseModel):
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.clipper = SM2ParameterClipper(config)
 
-    def forward(self, inputs):
+    def forward[SeqLen, BatchSize](
+        self, inputs: Tensor[SeqLen, BatchSize, 2]
+    ) -> tuple[Tensor[SeqLen, BatchSize, 3], Tensor[BatchSize, 3]]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -42,11 +46,11 @@ class SM2(BaseModel):
             outputs.append(state)
         return torch.stack(outputs), state
 
-    def batch_process(
+    def batch_process[SeqLen, BatchSize](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[SeqLen, BatchSize, 2],
+        delta_ts: Tensor[BatchSize],
+        seq_lens: Tensor[BatchSize],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
@@ -58,7 +62,9 @@ class SM2(BaseModel):
         retentions = self.forgetting_curve(delta_ts, stabilities)
         return {"retentions": retentions, "stabilities": stabilities}
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize](
+        self, X: Tensor[BatchSize, 2], state: Tensor[BatchSize, 3]
+    ) -> Tensor[BatchSize, 3]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 3], state[:,0] is ivl, state[:,1] is ef, state[:,2] is reps

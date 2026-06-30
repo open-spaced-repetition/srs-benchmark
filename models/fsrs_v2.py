@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import override
 from typing import List, Optional
 import torch
@@ -50,9 +52,12 @@ class FSRS2(FSRS1):
         )
         return new_s
 
-    def stability_after_failure(  # type: ignore[override]
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_failure[BatchSize](  # type: ignore[override]
+        self,
+        state: Tensor[BatchSize, 2],
+        new_d: Tensor[BatchSize],
+        r: Tensor[BatchSize],
+    ) -> Tensor[BatchSize]:
         new_s = (
             self.w[10]
             * torch.pow(new_d, self.w[11])
@@ -61,7 +66,9 @@ class FSRS2(FSRS1):
         )
         return new_s
 
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+    def mean_reversion[BatchSize](
+        self, init: Tensor | float, current: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:
         return self.w[5] * init + (1 - self.w[5]) * current
 
     @override

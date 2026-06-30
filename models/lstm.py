@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import torch
 from torch import nn, Tensor
 
@@ -42,6 +44,9 @@ class LSTM(BaseModel):
     Just like with the GRU models, this model was trained on 100 users of the same dataset that it is tested on.
     The effect on the resulting metrics is minor, but future work should be done to remove this influence.
     """
+
+    input_mean: Tensor
+    input_std: Tensor
 
     def __init__(
         self,
@@ -136,7 +141,13 @@ class LSTM(BaseModel):
         self.register_buffer("input_mean", mean_i)
         self.register_buffer("input_std", std_i)
 
-    def forward(self, x_lni, hx=None):
+    def forward[SeqLen, BatchSize, InputDims](
+        self, x_lni: Tensor[SeqLen, BatchSize, InputDims], hx=None
+    ) -> tuple[
+        Tensor[SeqLen, BatchSize, 3],
+        Tensor[SeqLen, BatchSize, 3],
+        Tensor[SeqLen, BatchSize, 3],
+    ]:
         x_rating = x_lni[..., -1:]
         x_features = x_lni[..., :-1]
 
@@ -163,11 +174,11 @@ class LSTM(BaseModel):
         d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
         return w_lnh, s_lnh, d_lnh
 
-    def batch_process(
+    def batch_process[SeqLen, BatchSize, InputDims](
         self,
-        sequences: Tensor,
-        delta_n: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[SeqLen, BatchSize, InputDims],
+        delta_n: Tensor[BatchSize],
+        seq_lens: Tensor[BatchSize],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         w_lnh, s_lnh, d_lnh = self.forward(sequences)

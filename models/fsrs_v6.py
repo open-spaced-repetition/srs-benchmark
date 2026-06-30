@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List
 import torch
 from torch import nn, Tensor
@@ -93,11 +95,11 @@ class FSRS6(FSRS5):
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS6ParameterClipper(config)
 
-    def batch_process(
+    def batch_process[SeqLen, BatchSize](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[SeqLen, BatchSize, 2],
+        delta_ts: Tensor[BatchSize],
+        seq_lens: Tensor[BatchSize],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
@@ -125,14 +127,18 @@ class FSRS6(FSRS5):
         factor = 0.9 ** (1 / decay) - 1
         return (1 + factor * t / s) ** decay
 
-    def stability_short_term(self, state: Tensor, rating: Tensor) -> Tensor:
+    def stability_short_term[BatchSize](
+        self, state: Tensor[BatchSize, 2], rating: Tensor[BatchSize]
+    ) -> Tensor[BatchSize]:
         sinc = torch.exp(self.w[17] * (rating - 3 + self.w[18])) * torch.pow(
             state[:, 0], -self.w[19]
         )
         new_s = state[:, 0] * torch.where(rating >= 2, sinc.clamp(min=1), sinc)
         return new_s
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize](
+        self, X: Tensor[BatchSize, 2], state: Tensor[BatchSize, 2]
+    ) -> Tensor[BatchSize, 2]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty

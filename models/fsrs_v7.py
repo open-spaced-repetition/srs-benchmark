@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import assert_never
 from typing import override
 from typing import List, Union
 import torch

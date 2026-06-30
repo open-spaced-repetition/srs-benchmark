@@ -39,6 +39,7 @@ class HLR(BaseModel):
         return 0.5 ** (t / s)
 
     def benchmark_state(self):
+        assert self.fc.bias
         return (
             self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
         )

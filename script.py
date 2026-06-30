@@ -319,7 +319,9 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         if config.device.type == "mps":
             torch.mps.empty_cache()
         return weights
-    elif config.model_name == "LogisticRegression":
+    elif config.model_name in ["LogisticRegression", "FSRS-7-LR-Ensemble"]:
+        if config.model_name == "FSRS-7-LR-Ensemble":
+            cast(Any, model).Trainer = Trainer
         return cast(Any, model).optimize(train_df)
 
     trainer = Trainer(
@@ -463,7 +465,7 @@ def process(
         for partition in testset["partition"].unique():
             partition_testset = testset[testset["partition"] == partition].copy()
             weights = w.get(partition, None)
-            if config.model_name == "LogisticRegression":
+            if config.model_name in ["LogisticRegression", "FSRS-7-LR-Ensemble"]:
                 model = create_model(config, weights)
                 retentions = cast(Any, model).predict(partition_testset)
                 partition_testset["p"] = retentions
@@ -493,7 +495,7 @@ def process(
     stats, raw = evaluate(
         y, p, save_tmp_df, config.get_evaluation_file_name(), user_id, config, w_list
     )
-    if config.model_name == "LogisticRegression" and model is not None:
+    if config.model_name in ["LogisticRegression", "FSRS-7-LR-Ensemble"] and model is not None:
         cast(Any, model).log(stats)
     return stats, raw
 

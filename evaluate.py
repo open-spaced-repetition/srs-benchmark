@@ -122,6 +122,11 @@ if __name__ == "__main__":
                 34,
                 "IL, FIL, G, SR",
             ),
+            (
+                "FSRS-7-LR-Ensemble-short-secs-equalize_test_with_non_secs",
+                71,
+                "IL, FIL, G, SR",
+            ),
             ("FSRS-7-short-secs-recency-equalize_test_with_non_secs", 35, "FIL, G, SR"),
             ("FSRS-7-short-secs-equalize_test_with_non_secs", 35, "FIL, G, SR"),
             (

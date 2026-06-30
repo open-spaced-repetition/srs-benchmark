@@ -39,6 +39,7 @@ ModelName = Literal[
     "MOVING-AVG",
     "90%",
     "LogisticRegression",
+    "FSRS-7-LR-Ensemble",
 ]
 
 

@@ -1,3 +1,4 @@
+from typing import override
 from typing import List, Optional
 import torch
 from torch import nn, Tensor
@@ -36,6 +37,7 @@ class FSRS2(FSRS1):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
+    @override
     def stability_after_success(
         self, state: Tensor, new_d: Tensor, r: Tensor
     ) -> Tensor:
@@ -62,6 +64,7 @@ class FSRS2(FSRS1):
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[5] * init + (1 - self.w[5]) * current
 
+    @override
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
@@ -87,6 +90,7 @@ class FSRS2(FSRS1):
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d], dim=1)
 
+    @override
     def forward(
         self, inputs: Tensor, state: Optional[Tensor] = None
     ) -> tuple[Tensor, Tensor]:

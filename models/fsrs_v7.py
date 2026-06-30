@@ -1,3 +1,4 @@
+from typing import override
 from typing import List, Union
 import torch
 from torch import nn, Tensor
@@ -245,6 +246,7 @@ class FSRS7(FSRS6):
         # print(f'batch_process took {total/1_000_000:.2f} ms, calculating penalty took {penalty_only/1_000_000:.2f} ms')
         return output
 
+    @override
     # pyrefly: ignore[bad-override]
     def forgetting_curve(
         self,
@@ -346,16 +348,20 @@ class FSRS7(FSRS6):
     def transition_function(self, delta_t: Tensor) -> Tensor:
         return 1 - self.w[26] * torch.exp(-self.w[25] * delta_t)
 
+    @override
     def init_d(self, rating: Union[int, Tensor]) -> Tensor:
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
+    @override
     def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
         return delta_d * (10 - old_d) / 9
 
+    @override
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return 0.01 * init + 0.99 * current
 
+    @override
     def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
         delta_d = -self.w[6] * (rating - 3)
         new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
@@ -599,6 +605,7 @@ class FSRS7(FSRS6):
 
         return result
 
+    @override
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         # start = time.perf_counter()
         # Create binned intervals if using --secs
@@ -806,6 +813,7 @@ class FSRS7(FSRS6):
         # end = time.perf_counter()
         # print(f'Pretrain took {end - start:.2f} seconds, {(end - start) * 1000:.0f} milliseconds')
 
+    @override
     def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating

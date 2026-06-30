@@ -1,3 +1,4 @@
+from typing import override
 from typing import List
 import torch
 from torch import Tensor
@@ -81,6 +82,7 @@ class FSRS4dot5(FSRS4):
         # Call parent constructor with the selected weights
         super().__init__(config, w)
 
+    @override
     def forgetting_curve(self, t, s):
         """Override forgetting curve with FSRS4.5 formula"""
         return (1 + self.factor * t / s) ** self.decay

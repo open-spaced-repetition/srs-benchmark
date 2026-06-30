@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import override
 from typing import List, Union
 import pandas as pd
 import torch
@@ -95,13 +96,16 @@ class FSRS5(FSRS4dot5):
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS5ParameterClipper(config)
 
+    @override
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
         return train_set
 
+    @override
     def apply_gradient_constraints(self):
         pass
 
-    def batch_process[SeqLen, BatchSize](
+    @override
+    def batch_process(
         self,
         sequences: Tensor[SeqLen, BatchSize, 2],
         delta_ts: Tensor[BatchSize],
@@ -155,9 +159,8 @@ class FSRS5(FSRS4dot5):
         new_d = self.mean_reversion(self.init_d(4), new_d)
         return new_d
 
-    def step[BatchSize](
-        self, X: Tensor[BatchSize, 2], state: Tensor[BatchSize, 2]
-    ) -> Tensor[BatchSize, 2]:
+    @override
+    def step(self, X: Tensor, state: Tensor) -> Tensor:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty

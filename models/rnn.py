@@ -49,7 +49,7 @@ class RNN(BaseModel):
         self,
         x: Tensor[[SeqLen, BatchSize, 2]],
         hx=None,
-    ) -> tuple[Tensor[[SeqLen, BatchSize, 1]], Tensor]:
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 1]], Tensor[[1, BatchSize, 2]]]:
         x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x))
         return output, h
@@ -60,7 +60,7 @@ class RNN(BaseModel):
         delta_ts: Tensor[[BatchSize]],
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs, _ = self.forward(sequences)
         stabilities = outputs[
             seq_lens - 1,

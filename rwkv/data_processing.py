@@ -8,6 +8,7 @@ import lmdb
 import numpy as np
 import pandas as pd
 import torch
+from shape_extensions import IntVar
 from tqdm import tqdm
 
 from rwkv.config import RWKV_SUBMODULES
@@ -317,28 +318,28 @@ def get_rwkv_data(data_path, user_id, equalize_review_ths=None):
 
 
 @dataclass
-class ModuleData:
+class ModuleData[SeqLen: IntVar]:
     split_len: np.ndarray
     split_B: np.ndarray
-    from_perm: torch.Tensor
-    to_perm: torch.Tensor  # the inverse of from_perm
+    from_perm: torch.Tensor[[SeqLen]]
+    to_perm: torch.Tensor[[SeqLen]]  # the inverse of from_perm
 
 
 @dataclass
-class RWKVSample:
+class RWKVSample[SeqLen: IntVar, CardFeatureCount: IntVar]:
     user_id: int
     start_th: int
     end_th: int
     length: int
-    card_features: torch.Tensor
-    ids: dict[str, torch.Tensor]
-    modules: dict[str, ModuleData]
-    global_labels: torch.Tensor
-    review_ths: torch.Tensor
-    label_review_ths: torch.Tensor
-    day_offsets: torch.Tensor
-    day_offsets_first: torch.Tensor
-    skips: torch.Tensor
+    card_features: torch.Tensor[[SeqLen, CardFeatureCount]]
+    ids: dict[str, torch.Tensor[[SeqLen]]]
+    modules: dict[str, ModuleData[SeqLen]]
+    global_labels: torch.Tensor[[SeqLen, 7]]
+    review_ths: torch.Tensor[[SeqLen]]
+    label_review_ths: torch.Tensor[[SeqLen]]
+    day_offsets: torch.Tensor[[SeqLen]]
+    day_offsets_first: torch.Tensor[[SeqLen]]
+    skips: torch.Tensor[[SeqLen]]
 
 
 def add_queries(section_df: pd.DataFrame, equalize_review_ths):

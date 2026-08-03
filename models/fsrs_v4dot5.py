@@ -1,6 +1,7 @@
 from typing import Optional, override
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor
 
 from config import Config
@@ -86,7 +87,9 @@ class FSRS4dot5(FSRS4):
         """Override forgetting curve with FSRS4.5 formula"""
         return (1 + self.factor * t / s) ** self.decay
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
+    def stability_after_failure[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], r: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:  # type: ignore[override]
         """Override to add minimum constraint"""
         new_s = (
             self.w[11]

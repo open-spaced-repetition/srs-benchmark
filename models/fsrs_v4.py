@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 from scipy.optimize import minimize
+from shape_extensions import IntVar
 from torch import Tensor, nn
 from tqdm.auto import tqdm  # type: ignore
 
@@ -73,9 +74,12 @@ class FSRS4(FSRS3):
     def forgetting_curve(self, t, s):
         return (1 + t / (9 * s)) ** -1
 
-    def stability_after_success(  # type: ignore[override]
-        self, state: Tensor, r: Tensor, rating: Tensor
-    ) -> Tensor:
+    def stability_after_success[BatchSize: IntVar](  # type: ignore[override]
+        self,
+        state: Tensor[[BatchSize, 2]],
+        r: Tensor[[BatchSize]],
+        rating: Tensor[[BatchSize]],
+    ) -> Tensor[[BatchSize]]:
         # pyrefly: ignore [bad-argument-type]
         hard_penalty = torch.where(rating == 2, self.w[15], 1)
         # pyrefly: ignore [bad-argument-type]
@@ -91,7 +95,10 @@ class FSRS4(FSRS3):
         )
         return new_s
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
+    # pyrefly: ignore [bad-override]
+    def stability_after_failure[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], r: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:  # type: ignore[override]
         new_s = (
             self.w[11]
             * torch.pow(state[:, 1], -self.w[12])
@@ -100,7 +107,9 @@ class FSRS4(FSRS3):
         )
         return new_s
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
@@ -132,7 +141,9 @@ class FSRS4(FSRS3):
 
     @override
     # pyrefly: ignore [bad-override]
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+    def mean_reversion[BatchSize: IntVar](
+        self, init: Tensor[[]], current: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return self.w[7] * init + (1 - self.w[7]) * current
 
     @override

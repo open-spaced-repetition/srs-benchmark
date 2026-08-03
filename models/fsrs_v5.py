@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, Optional, Union, override
+from typing import ClassVar, Optional, Union, overload, override
 
 import pandas as pd
 import torch
@@ -111,8 +111,10 @@ class FSRS5(FSRS4dot5):
         delta_ts: Tensor[[BatchSize]],
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
-        output = super().batch_process(sequences, delta_ts, seq_lens, real_batch_size)
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[]]]:
+        output: dict[str, Tensor[[BatchSize]] | Tensor[[]]] = super().batch_process(
+            sequences, delta_ts, seq_lens, real_batch_size
+        )
         output["penalty"] = (
             torch.sum(
                 torch.square(self.w - self.init_w_tensor)  # pyrefly: ignore [missing-attribute]
@@ -142,7 +144,17 @@ class FSRS5(FSRS4dot5):
         new_s = state[:, 0] * torch.exp(self.w[17] * (rating - 3 + self.w[18]))
         return new_s
 
-    def init_d[BatchSize: IntVar](self, rating: int | Tensor[[BatchSize]]) -> Tensor:
+    @overload
+    def init_d(self, rating: int) -> Tensor[[]]: ...
+
+    @overload
+    def init_d[BatchSize: IntVar](
+        self, rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]: ...
+
+    def init_d[BatchSize: IntVar](
+        self, rating: int | Tensor[[BatchSize]]
+    ) -> Tensor[[]] | Tensor[[BatchSize]]:
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
@@ -160,7 +172,9 @@ class FSRS5(FSRS4dot5):
         return new_d
 
     @override
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty

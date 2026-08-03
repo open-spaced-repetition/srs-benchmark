@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterator, Mapping
+from collections.abc import Callable, Hashable, Iterator, Mapping
 from typing import Any, Protocol, Self, Union
 
 import pandas as pd
@@ -17,7 +17,7 @@ type PartitionedModelState = dict[Hashable, ModelState]
 type TrainingState = ModelState | PartitionedModelState
 
 
-class TrainableModel(Protocol):
+class TrainableModel[InputDims: IntVar, OutputDims: IntVar](Protocol):
     """
     Protocol for trainable models that depend on nn.Module.
 
@@ -56,13 +56,19 @@ class TrainableModel(Protocol):
         """
         ...
 
-    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
+    def batch_process[
+        SeqLen: IntVar,
+        BatchSize: IntVar,
+    ](
         self,
-        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        sequences: Tensor[[SeqLen, BatchSize, InputDims]],
         delta_ts: Tensor[[BatchSize]],
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> Mapping[
+        str,
+        Tensor[[]] | Tensor[[BatchSize]] | Tensor[[BatchSize, OutputDims]],
+    ]:
         """
         Core batch processing method for model inference.
 
@@ -113,9 +119,7 @@ class TrainableModel(Protocol):
         """Return model parameters for optimization."""
         ...
 
-    def forward(self, *args, **kwargs) -> tuple[Tensor | None, ...] | Tensor:
-        """Forward pass of the neural network."""
-        ...
+    forward: Callable[..., Any]
 
     def load_state_dict(
         self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False

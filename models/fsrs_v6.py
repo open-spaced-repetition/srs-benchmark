@@ -102,14 +102,14 @@ class FSRS6(FSRS5):
         delta_ts: Tensor[[BatchSize]],
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[]]]:
         outputs, _ = self.forward(sequences)
         stabilities, difficulties = outputs[
             seq_lens - 1,
             torch.arange(real_batch_size, device=self.config.device),
         ].transpose(0, 1)
         retentions = self.forgetting_curve(delta_ts, stabilities, -self.w[20])
-        output = {
+        output: dict[str, Tensor[[BatchSize]] | Tensor[[]]] = {
             "retentions": retentions,
             "stabilities": stabilities,
             "difficulties": difficulties,

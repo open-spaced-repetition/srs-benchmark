@@ -14,6 +14,7 @@ from fsrs_optimizer import (
     DevicePrefetchLoader,
 )
 from multiprocess import Pool  # type: ignore
+from shape_extensions import IntVar
 from sklearn.model_selection import TimeSeriesSplit
 from torch import Tensor, nn
 
@@ -133,14 +134,23 @@ def print_grad_norm(model):
     print(torch.cat(grads).norm())
 
 
-def compute_data_loss(
-    model: TrainableModel,
-    batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor],
+def compute_data_loss[SeqLen: IntVar, BatchSize: IntVar, InputDims: IntVar](
+    model: TrainableModel[InputDims, int],
+    batch: tuple[
+        Tensor[[SeqLen, BatchSize, InputDims]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+    ],
     batch_size_exp=1.0,
 ):
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
-    result = {"labels": labels, "weights": weights}
+    result: dict[str, Tensor[[]] | Tensor[[BatchSize]] | Tensor[[BatchSize, int]]] = {
+        "labels": labels,
+        "weights": weights,
+    }
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     loss_fn = nn.BCELoss(reduction="none")

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import time
-from typing import ClassVar, Optional, Union, assert_never, override
+from typing import ClassVar, Optional, Union, assert_never, overload, override
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
 from scipy.optimize import minimize
+from shape_extensions import IntVar
 from torch import Tensor, nn
 from torch.nn import Sigmoid
 from tqdm.auto import tqdm
@@ -183,13 +184,13 @@ class FSRS7(FSRS6):
         self._zero_penalty = torch.zeros([], device=self.config.device)
         self._w_base = torch.tensor([7, 16], device=self.config.device)
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[]]]:
         # start = time.perf_counter_ns()
 
         outputs, _ = self.forward(sequences)
@@ -211,7 +212,7 @@ class FSRS7(FSRS6):
             self.w[-1],
         ).clamp(0.0001, 0.9999)
 
-        output = {
+        output: dict[str, Tensor[[BatchSize]] | Tensor[[]]] = {
             "retentions": retentions,
             "stabilities": stabilities,
             "difficulties": difficulties,
@@ -278,9 +279,12 @@ class FSRS7(FSRS6):
 
         return (weight1 * R1 + weight2 * R2) / (weight1 + weight2)
 
-    def stability_after_review(
-        self, state: Tensor, r: Tensor, rating: Tensor
-    ) -> tuple[Tensor, Tensor]:
+    def stability_after_review[BatchSize: IntVar](
+        self,
+        state: Tensor[[BatchSize, 2]],
+        r: Tensor[[BatchSize]],
+        rating: Tensor[[BatchSize]],
+    ) -> tuple[Tensor[[BatchSize]], Tensor[[BatchSize]]]:
         """
         Calculate both long-term and short-term stability in one pass.
         Returns (new_s_long_term, new_s_short_term)
@@ -346,24 +350,42 @@ class FSRS7(FSRS6):
 
         return new_s_both[:, 0], new_s_both[:, 1]
 
-    def transition_function(self, delta_t: Tensor) -> Tensor:
+    def transition_function[BatchSize: IntVar](
+        self, delta_t: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return 1 - self.w[26] * torch.exp(-self.w[25] * delta_t)
 
+    @overload
+    def init_d(self, rating: int) -> Tensor[[]]: ...
+
+    @overload
+    def init_d[BatchSize: IntVar](
+        self, rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]: ...
+
     @override
-    def init_d(self, rating: int | Tensor) -> Tensor:
+    def init_d[BatchSize: IntVar](
+        self, rating: int | Tensor[[BatchSize]]
+    ) -> Tensor[[]] | Tensor[[BatchSize]]:
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
     @override
-    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+    def linear_damping[BatchSize: IntVar](
+        self, delta_d: Tensor[[BatchSize]], old_d: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return delta_d * (10 - old_d) / 9
 
     @override
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+    def mean_reversion[BatchSize: IntVar](
+        self, init: Tensor[[]], current: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return 0.01 * init + 0.99 * current
 
     @override
-    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
+    def next_d[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         delta_d = -self.w[6] * (rating - 3)
         new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
         new_d = self.mean_reversion(self.init_d(4), new_d)
@@ -817,7 +839,9 @@ class FSRS7(FSRS6):
         # print(f'Pretrain took {end - start:.2f} seconds, {(end - start) * 1000:.0f} milliseconds')
 
     @override
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty

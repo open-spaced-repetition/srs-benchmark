@@ -27,7 +27,7 @@ class RNNWrapper(nn.Module):
         return outputs
 
 
-class LSTM(BaseModel):
+class LSTM[NormalizationDims: IntVar](BaseModel):
     """
     This model is trained with reptile_trainer.py, and was run with the flags
     ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
@@ -46,15 +46,15 @@ class LSTM(BaseModel):
     The effect on the resulting metrics is minor, but future work should be done to remove this influence.
     """
 
-    input_mean: Tensor
-    input_std: Tensor
+    input_mean: Tensor[[]] | Tensor[[NormalizationDims]]
+    input_std: Tensor[[]] | Tensor[[NormalizationDims]]
 
     def __init__(
         self,
         config: Config,
         state_dict=None,
-        input_mean: Tensor | None = None,
-        input_std: Tensor | None = None,
+        input_mean: Tensor[[]] | Tensor[[NormalizationDims]] | None = None,
+        input_std: Tensor[[]] | Tensor[[NormalizationDims]] | None = None,
     ):
         super().__init__(config)
         if input_mean is None:
@@ -188,7 +188,7 @@ class LSTM(BaseModel):
         delta_n: Tensor[[BatchSize]],
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[BatchSize, 3]]]:
         w_lnh, s_lnh, d_lnh = self.forward(sequences)
         (_, n, h) = w_lnh.shape
         delta_nh = delta_n.unsqueeze(-1).expand(n, h)

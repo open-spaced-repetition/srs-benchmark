@@ -1,4 +1,5 @@
 import torch
+from shape_extensions import IntVar
 from torch import Tensor
 
 from config import Config
@@ -22,16 +23,18 @@ class FSRS(BaseModel):
     def forgetting_curve(self, t, s):
         raise NotImplementedError("Forgetting curve not implemented")
 
-    def forward(self, inputs: Tensor) -> tuple[Tensor, Tensor]:
+    def forward[SeqLen: IntVar, BatchSize: IntVar, StateSize: IntVar](
+        self, inputs: Tensor[[SeqLen, BatchSize, 2]]
+    ) -> tuple[Tensor[[SeqLen, BatchSize, StateSize]], Tensor[[BatchSize, StateSize]]]:
         raise NotImplementedError("Forward pass not implemented")
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[]]]:
         outputs, _ = self.forward(sequences)
         stabilities, difficulties, *_ = outputs[
             seq_lens - 1,

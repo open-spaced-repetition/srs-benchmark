@@ -55,7 +55,7 @@ class SM2(BaseModel):
         delta_ts: Tensor[[BatchSize]],
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs, _ = self.forward(sequences)
         stabilities = outputs[
             seq_lens - 1,

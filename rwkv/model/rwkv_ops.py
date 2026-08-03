@@ -1,12 +1,17 @@
 from typing import Any
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor
 
 
 class RWKV7_WKV(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, *inputs: Tensor):
+    def forward[BatchSize: IntVar, SeqLen: IntVar, HeadCount: IntVar, HeadSize: IntVar](
+        ctx,
+        *inputs: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]]
+        | Tensor[[BatchSize, SeqLen]],
+    ) -> Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]]:
         r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT = inputs
         assert all(
             # pyrefly: ignore [missing-attribute]
@@ -57,7 +62,15 @@ class RWKV7_WKV(torch.autograd.Function):
             # return reference_rwkv7(r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK)
 
     @staticmethod
-    def backward(ctx: Any, *grad_outputs: Tensor):
+    def backward[
+        BatchSize: IntVar,
+        SeqLen: IntVar,
+        HeadCount: IntVar,
+        HeadSize: IntVar,
+    ](
+        ctx: Any,
+        *grad_outputs: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    ):
         grad_BTHK = grad_outputs[0]
         (
             r_BTHK,
@@ -119,16 +132,28 @@ class RWKV7_WKV(torch.autograd.Function):
 
 
 # Unused reference code for backpropagation for RWKV-7 wkv.
-def reference_backward(
-    r_BTHK: Tensor,
-    k_BTHK: Tensor,
-    v_BTHK: Tensor,
-    w_BTHK: Tensor,
-    a_BTHK: Tensor,
-    k_deformed_BTHK: Tensor,
+def reference_backward[
+    BatchSize: IntVar,
+    SeqLen: IntVar,
+    HeadCount: IntVar,
+    HeadSize: IntVar,
+](
+    r_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    v_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    w_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    a_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_deformed_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
     state_checkpoints,
-    grad_BTHK: Tensor,
-):
+    grad_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+) -> tuple[
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+]:
     B, T, H, K = r_BTHK.shape
 
     with torch.no_grad():
@@ -217,15 +242,18 @@ def reference_backward(
     )
 
 
-def single_timestep(
-    r_BHK: Tensor,
-    k_BHK: Tensor,
-    v_BHK: Tensor,
-    w_BHK: Tensor,
-    a_BHK: Tensor,
-    k_deformed_BHK: Tensor,
-    state_BHKK: Tensor,
-):
+def single_timestep[BatchSize: IntVar, HeadCount: IntVar, HeadSize: IntVar](
+    r_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    k_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    v_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    w_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    a_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    k_deformed_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    state_BHKK: Tensor[[BatchSize, HeadCount, HeadSize, HeadSize]],
+) -> tuple[
+    Tensor[[BatchSize, HeadCount, HeadSize]],
+    Tensor[[BatchSize, HeadCount, HeadSize, HeadSize]],
+]:
     r_BHK1 = r_BHK.unsqueeze(-1)
     k_BHK1 = k_BHK.unsqueeze(-1)
     v_BHK1 = v_BHK.unsqueeze(-1)
@@ -247,15 +275,20 @@ def single_timestep(
     return out_BHK1.squeeze(-1), state_BHKK
 
 
-def reference_rwkv7(
-    r_BTHK: Tensor,
-    k_BTHK: Tensor,
-    v_BTHK: Tensor,
-    w_BTHK: Tensor,
-    a_BTHK: Tensor,
-    k_deformed_BTHK: Tensor,
-    skip_BT: Tensor,
-):
+def reference_rwkv7[
+    BatchSize: IntVar,
+    SeqLen: IntVar,
+    HeadCount: IntVar,
+    HeadSize: IntVar,
+](
+    r_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    v_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    w_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    a_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_deformed_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    skip_BT: Tensor[[BatchSize, SeqLen]],
+) -> Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]]:
     out_dtype = k_BTHK.dtype
     r_BTHK = r_BTHK.float()
     k_BTHK = k_BTHK.float()

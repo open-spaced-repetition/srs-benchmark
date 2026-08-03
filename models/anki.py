@@ -139,7 +139,7 @@ class Anki(BaseModel):
         delta_ts: Tensor[[BatchSize]],
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs, _ = self.forward(sequences)
         intervals = outputs[
             seq_lens - 1,

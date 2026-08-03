@@ -49,8 +49,7 @@ class RNN(BaseModel):
         self,
         x: Tensor[[SeqLen, BatchSize, 2]],
         hx=None,
-        # pyrefly: ignore [bad-specialization, invalid-annotation, not-a-type]
-    ) -> tuple[Tensor[SeqLen, BatchSize, 1], Tensor]:
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 1]], Tensor]:
         x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x))
         return output, h

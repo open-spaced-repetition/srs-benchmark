@@ -121,8 +121,7 @@ class Anki(BaseModel):
         self,
         inputs: Tensor[[SeqLen, BatchSize, 2]],
         state: Tensor[[BatchSize, 2]] | None = None,
-        # pyrefly: ignore [bad-specialization, invalid-annotation, not-a-type]
-    ) -> tuple[Tensor[SeqLen, BatchSize, 2], Tensor[[BatchSize, 2]]]:
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 2]], Tensor[[BatchSize, 2]]]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """

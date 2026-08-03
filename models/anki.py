@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from typing import ClassVar, Optional
+
 import torch
-from torch import nn, Tensor
-from typing import List, Optional
+from shape_extensions import IntVar
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel, BaseParameterClipper
 
@@ -27,7 +30,7 @@ class AnkiParameterClipper(BaseParameterClipper):
 
 class Anki(BaseModel):
     # 7 params
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         1,  # graduating interval
         4,  # easy interval
         2.5,  # starting ease
@@ -38,7 +41,7 @@ class Anki(BaseModel):
     ]
     clipper = AnkiParameterClipper()
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
@@ -68,9 +71,9 @@ class Anki(BaseModel):
             ),
         )
 
-    def step[BatchSize](
-        self, X: Tensor[BatchSize, 2], state: Tensor[BatchSize, 2]
-    ) -> Tensor[BatchSize, 2]:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is interval, state[:,1] is ease
@@ -113,11 +116,11 @@ class Anki(BaseModel):
         )
         return torch.stack([new_ivl, new_ease], dim=1)
 
-    def forward[SeqLen, BatchSize](
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        inputs: Tensor[SeqLen, BatchSize, 2],
-        state: Optional[Tensor[BatchSize, 2]] = None,
-    ) -> tuple[Tensor[SeqLen, BatchSize, 2], Tensor[BatchSize, 2]]:
+        inputs: Tensor[[SeqLen, BatchSize, 2]],
+        state: Tensor[[BatchSize, 2]] | None = None,
+    ) -> tuple[Tensor[SeqLen, BatchSize, 2], Tensor[[BatchSize, 2]]]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -129,11 +132,11 @@ class Anki(BaseModel):
             outputs.append(state)
         return torch.stack(outputs), state
 
-    def batch_process[SeqLen, BatchSize](
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor[SeqLen, BatchSize, 2],
-        delta_ts: Tensor[BatchSize],
-        seq_lens: Tensor[BatchSize],
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
@@ -146,9 +149,4 @@ class Anki(BaseModel):
         return {"retentions": retentions, "intervals": intervals}
 
     def benchmark_state(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
+        return [round(float(x), 4) for x in dict(self.named_parameters())["w"].data]

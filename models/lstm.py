@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
@@ -52,10 +52,14 @@ class LSTM(BaseModel):
         self,
         config: Config,
         state_dict=None,
-        input_mean=torch.tensor(0.0),
-        input_std=torch.tensor(1.0),
+        input_mean: Tensor | None = None,
+        input_std: Tensor | None = None,
     ):
         super().__init__(config)
+        if input_mean is None:
+            input_mean = torch.tensor(0.0)
+        if input_std is None:
+            input_std = torch.tensor(1.0)
         self.register_buffer("input_mean", input_mean)
         self.register_buffer("input_std", input_std)
         self.use_duration_feature = config.lstm_use_duration
@@ -110,9 +114,7 @@ class LSTM(BaseModel):
         )
 
         for name, param in self.named_parameters():
-            if "weight_ih" in name:  # Input-to-hidden weights
-                nn.init.orthogonal_(param.data)
-            elif "weight_hh" in name:  # Hidden-to-hidden weights
+            if "weight_ih" in name or "weight_hh" in name:  # Input-to-hidden weights
                 nn.init.orthogonal_(param.data)
             elif "bias_ih" in name:  # Biases
                 start_index = len(param.data) // 4
@@ -177,8 +179,8 @@ class LSTM(BaseModel):
     def batch_process[SeqLen, BatchSize, InputDims](
         self,
         sequences: Tensor[SeqLen, BatchSize, InputDims],
-        delta_n: Tensor[BatchSize],
-        seq_lens: Tensor[BatchSize],
+        delta_n: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         w_lnh, s_lnh, d_lnh = self.forward(sequences)

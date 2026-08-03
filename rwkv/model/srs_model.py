@@ -1,15 +1,14 @@
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
+import torch
+
+from rwkv.architecture import AnkiRWKVConfig
 from rwkv.config import RWKV_SUBMODULES
 from rwkv.data_processing import RWKVSample
 from rwkv.model.rwkv_model import RWKV7
-import torch
-from typing import NamedTuple
-
-from rwkv.architecture import AnkiRWKVConfig
-
 
 # def __nop(ob):
 #     return ob
@@ -302,11 +301,11 @@ class SrsRWKV(ModuleType):
         curve_probs = torch.sigmoid(curve_logits)
 
         out_p_probs = torch.softmax(out_p_logits, dim=-1)
-        out_p_again, out_p_1, out_p_2, out_p_3 = out_p_probs.unbind(dim=-1)
+        out_p_again, _out_p_1, _out_p_2, _out_p_3 = out_p_probs.unbind(dim=-1)
         out_p_binary = torch.clamp(1.0 - out_p_again, min=1e-5, max=1.0 - 1e-5)
 
         if torch.isnan(curve_probs).any():
-            raise Exception("nan")
+            raise RuntimeError("Model produced NaN curve probabilities")
         w_loss = torch.nn.functional.kl_div(
             input=out_w_log_p,
             target=torch.ones_like(out_w) / self.num_curves,
@@ -527,7 +526,7 @@ def greedy_splits(
                     freqs[l] = 0
                 freqs[l] += b
 
-        lens = list(reversed(sorted(freqs.keys())))
+        lens = sorted(freqs.keys(), reverse=True)
         splits = []
         l = 0
         while l < len(lens):

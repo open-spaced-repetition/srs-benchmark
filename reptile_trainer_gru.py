@@ -1,22 +1,23 @@
-import pandas as pd
-from sklearn.model_selection import TimeSeriesSplit
-import torch
-import torch.nn as nn
-from torch import Tensor
+import copy
+import time
+from itertools import chain
 from pathlib import Path
-from config import create_parser, Config
+
+import numpy as np
+import pandas as pd
+import torch
 from fsrs_optimizer import (
     BatchDataset,
     BatchLoader,
     DevicePrefetchLoader,
 )
 from multiprocess import Pool  # type: ignore
-import copy
-import numpy as np
-from models.trainable import TrainableModel
-import time
-from itertools import chain
+from sklearn.model_selection import TimeSeriesSplit
+from torch import Tensor, nn
+
+from config import Config, create_parser
 from features import create_features
+from models.trainable import TrainableModel
 
 BATCH_SIZE = 8192
 BATCH_SIZE_EXP = 1.0
@@ -249,7 +250,6 @@ def finetune_adapt(
         target_device=DEVICE,
     )
     for step in range(inner_steps):
-        batch_count = 0
         for batch in device_loader:
             inner_opt.zero_grad()
             batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
@@ -262,8 +262,6 @@ def finetune_adapt(
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
             inner_opt.step()
-            batch_count += 1
-
         inner_scheduler.step()
 
     if inner_loss is None:

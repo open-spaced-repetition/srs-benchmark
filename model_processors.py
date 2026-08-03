@@ -5,24 +5,26 @@ This module contains processing functions for models that don't follow
 the standard trainable model pattern.
 """
 
-import pandas as pd
-import numpy as np
 from typing import Optional, cast
+
+import numpy as np
+import pandas as pd
 from sklearn.model_selection import TimeSeriesSplit
+
+from config import Config
+from models.ebisu import Ebisu
+from models.fsrs_rs import FSRSRsBackend
 from models.fsrs_v6 import FSRS6
 from models.fsrs_v6_one_step import FSRS_one_step
 from models.rmse_bins_exploit import RMSEBinsExploit
 from models.sm2 import sm2
-from models.ebisu import Ebisu
-from models.fsrs_rs import FSRSRsBackend
 from models.trainable import TrainableModel
-from utils import get_bin, save_evaluation_file, evaluate, Collection
-from config import Config
+from utils import Collection, evaluate, get_bin, save_evaluation_file
 
 
 def process_untrainable(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, Optional[dict]]:
+) -> tuple[dict, dict | None]:
     """Process untrainable models (SM2, Ebisu-v2)."""
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
@@ -61,7 +63,7 @@ def process_untrainable(
 
 def baseline(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, Optional[dict]]:
+) -> tuple[dict, dict | None]:
     """Process AVG baseline model."""
     testsets = []
     avg_ps = []
@@ -88,7 +90,7 @@ def baseline(
 
 def rmse_bins_exploit(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, Optional[dict]]:
+) -> tuple[dict, dict | None]:
     """Process RMSE-BINS-EXPLOIT model."""
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     save_tmp = []
@@ -119,7 +121,7 @@ def rmse_bins_exploit(
 
 def moving_avg(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, Optional[dict]]:
+) -> tuple[dict, dict | None]:
     """Process MOVING-AVG model."""
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     save_tmp = []
@@ -160,7 +162,7 @@ def moving_avg(
 
 def process_fsrs_rs(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, Optional[dict]]:
+) -> tuple[dict, dict | None]:
     """Process FSRS-rs (Rust-based FSRS implementation)."""
     w_list = []
     testsets = []
@@ -216,7 +218,7 @@ def process_fsrs_rs(
                         print("Skipping - Inadequate data")
                 else:
                     print(f"User: {user_id}")
-                    raise e
+                    raise
                 # Use default parameters on error
                 partition_weights[partition] = FSRS6.init_w
 
@@ -256,7 +258,7 @@ def process_fsrs_rs(
 
 def fsrs_one_step(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, Optional[dict]]:
+) -> tuple[dict, dict | None]:
     """Process FSRS-6-one-step model."""
     w_list = []
     testsets = []

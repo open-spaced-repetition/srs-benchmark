@@ -1,9 +1,10 @@
-from typing import List
+from typing import ClassVar
+
 import torch
-from torch import nn, Tensor
-from models.fsrs_v2 import FSRS2, FSRS2ParameterClipper
+from torch import Tensor, nn
 
 from config import Config
+from models.fsrs_v2 import FSRS2, FSRS2ParameterClipper
 
 
 class FSRS3ParameterClipper(FSRS2ParameterClipper):
@@ -28,7 +29,7 @@ class FSRS3ParameterClipper(FSRS2ParameterClipper):
 
 class FSRS3(FSRS2):
     # 13 params
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.9605,
         1.7234,
         4.8527,
@@ -45,7 +46,7 @@ class FSRS3(FSRS2):
     ]
     clipper = FSRS3ParameterClipper()
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 

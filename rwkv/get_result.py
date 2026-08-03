@@ -4,13 +4,15 @@ This script takes a trained model and a list of users and produces a result file
 
 import json
 import multiprocessing
-from pathlib import Path
 import traceback
+from pathlib import Path
+
 import lmdb
 import numpy as np
 import pandas as pd
-from sklearn.metrics import log_loss, roc_auc_score, root_mean_squared_error
 import torch
+from sklearn.metrics import log_loss, roc_auc_score, root_mean_squared_error
+
 from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.data_fetcher import DataFetcher
 from rwkv.model.srs_model import SrsRWKV, extract_p
@@ -69,14 +71,14 @@ def get_stats(
 
     try:
         auc = round(roc_auc_score(y_true=gather_y, y_score=gather_pred), 6)
-    except Exception:
+    except ValueError:
         auc = None
     if auc is not None and np.isnan(auc):
         auc = None
 
     rows = []
-    for bin in bin_pred.keys():
-        for y, pred in zip(bin_y[bin], bin_pred[bin]):
+    for bin, predictions in bin_pred.items():
+        for y, pred in zip(bin_y[bin], predictions):
             rows.append([bin, y, pred, 1])
     assert len(rows) == len(equalize_review_ths)
 
@@ -129,7 +131,7 @@ def get_test_keys_batch(config, users):
                 continue
 
             batches = json.loads(user_batches_raw)
-            keys[user_id] = list(map(lambda x: (user_id, x[0], x[1], x[2]), batches))
+            keys[user_id] = [(user_id, x[0], x[1], x[2]) for x in batches]
     dataset.close()
     return keys
 
@@ -252,7 +254,7 @@ def run(
             # print(ahead_raw["s"])
             # print(imm_raw["p_all"])
 
-            def write(data, filter_set, path):
+            def write(data, filter_set, path, user_id=user_id):
                 if user_id not in filter_set:
                     with open(path, "a") as f:
                         f.write(json.dumps(data, ensure_ascii=False) + "\n")
@@ -271,7 +273,8 @@ def run(
 
 
 def sort_jsonl(file):
-    data = list(map(lambda x: json.loads(x), open(file).readlines()))
+    with file.open("r", encoding="utf-8") as jsonl_file:
+        data = [json.loads(x) for x in jsonl_file]
     data.sort(key=lambda x: x["user"])
     with file.open("w", encoding="utf-8") as jsonl_file:
         for json_data in data:
@@ -292,7 +295,7 @@ def main(config):
     def fetch(path):
         if path.exists():
             data = sort_jsonl(path)
-            result = set(map(lambda x: x["user"], data))
+            result = {x["user"] for x in data}
             assert len(data) == len(result)
         else:
             result = set()
@@ -359,7 +362,7 @@ def main(config):
                 path_imm_result,
                 path_imm_raw,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 -- process boundary must always clean up workers
             traceback.print_exc()
         finally:
             for process in prepare_processes:

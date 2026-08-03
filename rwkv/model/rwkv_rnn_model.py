@@ -1,8 +1,10 @@
-from typing import Optional, Tuple
+import copy
+from typing import Optional
+
+import torch
+
 from rwkv.model.rwkv_model import LoraMLP, LoraSimple, RWKV7Config
 from rwkv.model.rwkv_ops import single_timestep
-import torch
-import copy
 
 # RWKV-7 formulated as an RNN for inference.
 # For the first iteration just pass a None for the state parameter.
@@ -53,9 +55,8 @@ class RWKV7RNNLayer(ModuleType):
         self,
         in_BC,
         v0_BC,
-        state: Optional[
-            Tuple[Optional[Tuple[torch.Tensor, torch.Tensor]], Optional[torch.Tensor]]
-        ],
+        state: tuple[tuple[torch.Tensor, torch.Tensor] | None, torch.Tensor | None]
+        | None,
     ):
         if state is None:
             state = None, None
@@ -85,7 +86,7 @@ class RWKV7RNNChannelMixer(ModuleType):
         self.W_k = torch.nn.Linear(config.d_model, k_dim, bias=False)
         self.W_v = torch.nn.Linear(k_dim, config.d_model, bias=False)
 
-    def forward(self, in_BC, state: Optional[torch.Tensor]):
+    def forward(self, in_BC, state: torch.Tensor | None):
         x_shift_B1C = state
         assert len(in_BC.shape) == 2
         assert self.lerp_k.dtype == in_BC.dtype
@@ -148,7 +149,7 @@ class RWKV7RNNTimeMixer(ModuleType):
             config.n_heads, config.d_model, eps=64e-5
         )
 
-    def forward(self, in_BC, v0_BC, state: Optional[Tuple[torch.Tensor, torch.Tensor]]):
+    def forward(self, in_BC, v0_BC, state: tuple[torch.Tensor, torch.Tensor] | None):
         B, C = in_BC.shape
         H, K = self.H, self.K
 

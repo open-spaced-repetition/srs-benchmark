@@ -1,9 +1,9 @@
-from typing import Any, Dict, Union, List, Optional, cast
+from typing import Any, Optional, Union, cast
+
 import torch
+
 from config import Config, ModelName
-
 from models import *
-
 
 MODEL_REGISTRY: dict[ModelName, Any] = {
     "FSRSv1": FSRS1,
@@ -42,7 +42,7 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
 
 def create_model(
     config: Config,
-    model_params: Optional[Union[List[float], Dict[str, torch.Tensor], float]] = None,
+    model_params: list[float] | dict[str, torch.Tensor] | float | None = None,
 ) -> TrainableModel:
     """
     Creates and returns an instance of the specified model.

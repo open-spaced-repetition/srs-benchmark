@@ -1,22 +1,19 @@
 from __future__ import annotations
 
-from typing import assert_never
-from typing import override
-from typing import List, Union
-import torch
-from torch import nn, Tensor
-from typing import Optional
-from models.fsrs_v6 import FSRS6, FSRS6ParameterClipper
-import torch.nn.functional as F
-from torch.nn import Sigmoid
-import pandas as pd
-import numpy as np
-from tqdm.auto import tqdm
 import time
+from typing import ClassVar, Optional, Union, assert_never, override
+
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn.functional as F
 from scipy.optimize import minimize
+from torch import Tensor, nn
+from torch.nn import Sigmoid
+from tqdm.auto import tqdm
 
 from config import Config
-
+from models.fsrs_v6 import FSRS6, FSRS6ParameterClipper
 from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
 
 # scheduling penalty 1 penalizes huge interval growth for non-same-day reviews, makes log loss worse
@@ -95,7 +92,7 @@ class FSRS7(FSRS6):
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.041,
         2.4175,
         4.1283,
@@ -133,7 +130,7 @@ class FSRS7(FSRS6):
         0.3862,
     ]
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: list[float] | None = None):
         super().__init__(config)
         if w is None:
             w = self.init_w
@@ -352,7 +349,7 @@ class FSRS7(FSRS6):
         return 1 - self.w[26] * torch.exp(-self.w[25] * delta_t)
 
     @override
-    def init_d(self, rating: Union[int, Tensor]) -> Tensor:
+    def init_d(self, rating: int | Tensor) -> Tensor:
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
@@ -663,8 +660,13 @@ class FSRS7(FSRS6):
 
                 init_s0 = r_s0_default[first_rating]
 
-                def loss(stability):
-                    assert first_rating in ["1", "2", "3", "4"]
+                def loss(
+                    stability,
+                    delta_t=delta_t,
+                    recall=recall,
+                    count=count,
+                    init_s0=init_s0,
+                ):
                     y_pred = self.forgetting_curve(
                         delta_t,
                         stability,
@@ -709,22 +711,21 @@ class FSRS7(FSRS6):
                 if (
                     small_rating in current_rating_stability
                     and big_rating in current_rating_stability
+                ) and (
+                    current_rating_stability[small_rating]
+                    > current_rating_stability[big_rating]
                 ):
                     if (
-                        current_rating_stability[small_rating]
-                        > current_rating_stability[big_rating]
+                        current_rating_count[small_rating]
+                        > current_rating_count[big_rating]
                     ):
-                        if (
-                            current_rating_count[small_rating]
-                            > current_rating_count[big_rating]
-                        ):
-                            current_rating_stability[big_rating] = (
-                                current_rating_stability[small_rating]
-                            )
-                        else:
-                            current_rating_stability[small_rating] = (
-                                current_rating_stability[big_rating]
-                            )
+                        current_rating_stability[big_rating] = current_rating_stability[
+                            small_rating
+                        ]
+                    else:
+                        current_rating_stability[small_rating] = (
+                            current_rating_stability[big_rating]
+                        )
 
             return total_loss, current_rating_stability
 
@@ -777,17 +778,15 @@ class FSRS7(FSRS6):
             case 0:
                 initial_stabilities = list(r_s0_default.values())
             case 1:
-                rating = list(rating_stability.keys())[0]
+                rating = next(iter(rating_stability.keys()))
                 factor = rating_stability[rating] / r_s0_default[str(rating)]
-                initial_stabilities = list(
-                    map(lambda x: x * factor, r_s0_default.values())
-                )
+                initial_stabilities = [x * factor for x in r_s0_default.values()]
             case 2 | 3:
                 filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
-                if any([np.isnan(x) for x in filled.values()]) or any(
-                    [np.isinf(x) for x in filled.values()]
+                if any(np.isnan(x) for x in filled.values()) or any(
+                    np.isinf(x) for x in filled.values()
                 ):
-                    raise Exception("NaN/inf in S0 interpolation")
+                    raise ValueError("NaN/inf in S0 interpolation")
                 initial_stabilities = [filled[r] for r in [1, 2, 3, 4]]
             case 4:
                 initial_stabilities = [
@@ -795,16 +794,14 @@ class FSRS7(FSRS6):
                     for item in sorted(rating_stability.items(), key=lambda x: x[0])
                 ]
             case _:
-                raise Exception("impossible")
+                raise RuntimeError("Unexpected number of rating stabilities")
 
         # Update initial stabilities (w[0:4])
         self.w.data[0:4] = Tensor(
-            list(
-                map(
-                    lambda x: max(min(self.config.init_s_max, x), self.config.s_min),
-                    initial_stabilities,
-                )
-            )
+            [
+                max(min(self.config.init_s_max, x), self.config.s_min)
+                for x in initial_stabilities
+            ]
         )
 
         # Update forgetting curve parameters with the best found parameters

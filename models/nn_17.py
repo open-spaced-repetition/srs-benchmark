@@ -1,6 +1,8 @@
-from typing import override
+from typing import ClassVar, override
+
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel, BaseParameterClipper
 
@@ -50,9 +52,9 @@ class ExpActivation(nn.Module):
 
 class NN_17(BaseModel):
     # 39 params
-    init_s = [1, 2.5, 4.5, 10]
-    init_d = [1, 0.72, 0.07, 0.05]
-    w = [1.26, 0.0, 0.67]
+    init_s: ClassVar[list[float]] = [1, 2.5, 4.5, 10]
+    init_d: ClassVar[list[float]] = [1, 0.72, 0.07, 0.05]
+    w: ClassVar[list[float]] = [1.26, 0.0, 0.67]
 
     def __init__(self, config: Config, state_dict=None) -> None:
         super().__init__(config)

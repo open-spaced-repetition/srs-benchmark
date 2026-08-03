@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import List
+from typing import ClassVar, Optional
+
 import torch
-from torch import nn, Tensor
-from typing import Optional
-from models.fsrs_v5 import FSRS5, FSRS5ParameterClipper
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
+from models.fsrs_v5 import FSRS5, FSRS5ParameterClipper
 
 
 class FSRS6ParameterClipper(FSRS5ParameterClipper):
@@ -38,7 +39,7 @@ class FSRS6ParameterClipper(FSRS5ParameterClipper):
 
 
 class FSRS6(FSRS5):
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.212,
         1.2931,
         2.3065,
@@ -87,7 +88,7 @@ class FSRS6(FSRS5):
         ]
     )
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: list[float] | None = None):
         super().__init__(config)
         if w is None:
             w = self.init_w
@@ -95,11 +96,11 @@ class FSRS6(FSRS5):
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS6ParameterClipper(config)
 
-    def batch_process[SeqLen, BatchSize](
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor[SeqLen, BatchSize, 2],
-        delta_ts: Tensor[BatchSize],
-        seq_lens: Tensor[BatchSize],
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)
@@ -127,18 +128,18 @@ class FSRS6(FSRS5):
         factor = 0.9 ** (1 / decay) - 1
         return (1 + factor * t / s) ** decay
 
-    def stability_short_term[BatchSize](
-        self, state: Tensor[BatchSize, 2], rating: Tensor[BatchSize]
-    ) -> Tensor[BatchSize]:
+    def stability_short_term[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         sinc = torch.exp(self.w[17] * (rating - 3 + self.w[18])) * torch.pow(
             state[:, 0], -self.w[19]
         )
         new_s = state[:, 0] * torch.where(rating >= 2, sinc.clamp(min=1), sinc)
         return new_s
 
-    def step[BatchSize](
-        self, X: Tensor[BatchSize, 2], state: Tensor[BatchSize, 2]
-    ) -> Tensor[BatchSize, 2]:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty

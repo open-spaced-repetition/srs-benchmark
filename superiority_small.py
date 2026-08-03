@@ -1,12 +1,13 @@
+import argparse
 import json
 import math
 import pathlib
 import warnings
+
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 import pandas as pd
-import argparse
+from matplotlib.colors import LinearSegmentedColormap
 
 warnings.filterwarnings("ignore")
 
@@ -59,7 +60,7 @@ if __name__ == "__main__":
         if not result_file.exists():
             continue
         with open(result_file, "r") as f:
-            data = [json.loads(x) for x in f.readlines()]
+            data = [json.loads(x) for x in f]
 
         for result in data:
             logloss = result["metrics"]["LogLoss"]
@@ -85,9 +86,7 @@ if __name__ == "__main__":
     percentages = np.full((n, n), -1.0)
     for i in range(n):
         for j in range(n):
-            if i == j:  # diagonal
-                pass
-            elif percentages[i, j] > 0:  # we already calculated this one
+            if i == j or percentages[i, j] > 0:  # diagonal
                 pass
             else:
                 df1 = df[f"{models[i]}, LogLoss"]
@@ -153,7 +152,7 @@ if __name__ == "__main__":
     )
 
     def rgb2hex(list):
-        return f"#{int(round(list[0])):02x}{int(round(list[1])):02x}{int(round(list[2])):02x}"
+        return f"#{round(list[0]):02x}{round(list[1]):02x}{round(list[2]):02x}"
 
     start_color = [255, 0, 0]
     end_color = [45, 180, 0]

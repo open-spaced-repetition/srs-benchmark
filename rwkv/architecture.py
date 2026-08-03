@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+
 from rwkv.model.rwkv_model import RWKV7Config
 
 N_HEADS = 4

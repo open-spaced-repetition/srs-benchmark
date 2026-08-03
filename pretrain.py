@@ -1,16 +1,18 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import pandas as pd
-from tqdm import tqdm
 import torch
+from tqdm import tqdm
+
+from config import Config, create_parser
 from features import create_features
 from models.base import BaseModel
-from models.trainable import TrainableModel
-from script import Trainer
-from config import create_parser, Config
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from models.fsrs_v6 import FSRS6
-from models.rnn import RNN
-from models.transformer import Transformer
 from models.nn_17 import NN_17
+from models.rnn import RNN
+from models.trainable import TrainableModel
+from models.transformer import Transformer
+from script import Trainer
 
 parser = create_parser()
 args, _ = parser.parse_known_args()

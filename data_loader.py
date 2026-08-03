@@ -1,6 +1,11 @@
 import pandas as pd
+
 from config import Config
 from features import create_features
+
+
+class InsufficientUserDataError(ValueError):
+    """Raised when a user has too few reviews to run the benchmark."""
 
 
 class UserDataLoader:
@@ -40,7 +45,7 @@ class UserDataLoader:
             pd.DataFrame: Processed dataset with features
 
         Raises:
-            Exception: If there is not enough data for the user
+            InsufficientUserDataError: If there is not enough data for the user
         """
         # Load revlogs
         df_revlogs = pd.read_parquet(
@@ -51,7 +56,7 @@ class UserDataLoader:
         dataset = create_features(df_revlogs, config=self.config)
 
         if dataset.shape[0] < 6:
-            raise Exception(f"{user_id} does not have enough data.")
+            raise InsufficientUserDataError(f"{user_id} does not have enough data.")
 
         # Handle partitions if needed
         if self.config.partitions != "none":

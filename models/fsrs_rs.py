@@ -5,8 +5,12 @@ This module provides utilities to work with the fsrs-rs (Rust-based FSRS impleme
 within the benchmark framework.
 """
 
-from typing import List, Optional
+import functools
+import operator
+from typing import Optional
+
 import pandas as pd
+
 from config import Config
 
 
@@ -48,7 +52,8 @@ def convert_to_items(df: pd.DataFrame, config: Config):
             )
         return items
 
-    result_list: list[FSRSItem] = sum(
+    result_list: list[FSRSItem] = functools.reduce(
+        operator.iadd,
         df.sort_values(by=["card_id", "review_th"])
         .groupby("card_id")[
             ["review_th", "t_history", "r_history", "delta_t", "rating"]
@@ -57,7 +62,7 @@ def convert_to_items(df: pd.DataFrame, config: Config):
         .tolist(),
         [],
     )
-    result_list = list(map(lambda x: x[1], sorted(result_list, key=lambda x: x[0])))
+    result_list = [x[1] for x in sorted(result_list, key=lambda x: x[0])]
 
     return result_list
 
@@ -82,7 +87,7 @@ class FSRSRsBackend:
         self.config = config
         self.backend = FSRS(parameters=[])
 
-    def train(self, train_set: pd.DataFrame) -> List[float]:
+    def train(self, train_set: pd.DataFrame) -> list[float]:
         """
         Train FSRS-rs model on training data.
 
@@ -93,14 +98,12 @@ class FSRSRsBackend:
             List[float]: Trained FSRS parameters (weights)
         """
         train_set_items = convert_to_items(train_set, self.config)
-        weights = list(
-            map(lambda x: round(x, 4), self.backend.benchmark(train_set_items))
-        )
+        weights = [round(x, 4) for x in self.backend.benchmark(train_set_items)]
         return weights
 
     def predict(
-        self, testset: pd.DataFrame, weights: List[float]
-    ) -> tuple[List[float], List[float], pd.DataFrame]:
+        self, testset: pd.DataFrame, weights: list[float]
+    ) -> tuple[list[float], list[float], pd.DataFrame]:
         """
         Make predictions using FSRS-rs model.
 

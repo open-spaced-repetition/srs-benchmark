@@ -1,13 +1,15 @@
+from typing import ClassVar, Optional
+
 import torch
-from torch import nn, Tensor
-from typing import List, Optional
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel
 
 
 class DASH(BaseModel):
     # 9 params
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.2024,
         0.5967,
         0.1255,
@@ -19,7 +21,7 @@ class DASH(BaseModel):
         0.787,
     ]
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: list[float] | None = None):
         super().__init__(config)
         self.fc = nn.Linear(8, 1)
         self.sigmoid = nn.Sigmoid()

@@ -2,6 +2,7 @@ import json
 import math
 import pathlib
 import warnings
+
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -80,7 +81,7 @@ if __name__ == "__main__":
         if not result_file.exists():
             continue
         with open(result_file, "r") as f:
-            data = [json.loads(x) for x in f.readlines()]
+            data = [json.loads(x) for x in f]
         for result in data:
             logloss.append(result["metrics"]["LogLoss"])
             RMSE.append(result["metrics"]["RMSE(bins)"])

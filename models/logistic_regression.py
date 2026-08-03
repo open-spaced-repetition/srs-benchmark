@@ -1,11 +1,12 @@
+import time
+
 import numpy as np
+import pandas as pd
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
-import pandas as pd
-import time
 
 
 def transform_elapsed_days_real_np(x):
@@ -201,7 +202,7 @@ def create_features(df: pd.DataFrame):
 
 class LogisticRegression(BaseModel):
     n_epoch = 10
-    batch_size = int(2**11)
+    batch_size = 2**11
     lr: float = 2e-1
     betas: tuple = (0.0, 0.85)
     adam_eps = 1e-8

@@ -1,5 +1,5 @@
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
@@ -56,9 +56,7 @@ class GRU(BaseModel):
         )
 
         for name, param in self.named_parameters():
-            if "weight_ih" in name:  # Input-to-hidden weights
-                nn.init.orthogonal_(param.data)
-            elif "weight_hh" in name:  # Hidden-to-hidden weights
+            if "weight_ih" in name or "weight_hh" in name:  # Input-to-hidden weights
                 nn.init.orthogonal_(param.data)
             elif "bias_ih" in name:
                 # GRU gate order is reset, update, new; initialize update gate bias.

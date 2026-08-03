@@ -1,5 +1,6 @@
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
+
 import torch
 
 from rwkv.model.rwkv_ops import RWKV7_WKV, reference_rwkv7

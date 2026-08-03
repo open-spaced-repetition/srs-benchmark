@@ -4,11 +4,12 @@ Script to visualize the distribution of metrics for each model.
 Generates distribution plots for each metric and saves them to plots/<metric_name>/<model_name>.png
 """
 
-import json
 import argparse
-import numpy as np
-import matplotlib.pyplot as plt
+import json
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def plot_metric_distribution(
@@ -54,7 +55,7 @@ def plot_metric_distribution(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Create figure
-    fig, ax = plt.subplots(figsize=(10, 6))
+    _fig, ax = plt.subplots(figsize=(10, 6))
 
     # Calculate statistics
     mean = float(np.average(filtered_values, weights=filtered_sizes))
@@ -80,7 +81,7 @@ def plot_metric_distribution(
         std = 0.0
 
     # Create histogram
-    counts, bins, patches = ax.hist(
+    _counts, _bins, _patches = ax.hist(
         filtered_values,
         bins=50,
         weights=filtered_sizes if sizes else None,
@@ -132,7 +133,7 @@ def plot_metric_distribution(
         transform=ax.transAxes,
         fontsize=10,
         verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+        bbox={"boxstyle": "round", "facecolor": "wheat", "alpha": 0.8},
     )
 
     # Set x-axis limits if provided (skip for LogLoss to allow automatic scaling)
@@ -189,7 +190,7 @@ def collect_model_data(
                     sizes.append(data["size"])
                 else:
                     sizes.append(1)
-    except Exception as e:
+    except (AttributeError, json.JSONDecodeError, KeyError, OSError, TypeError) as e:
         print(f"Error reading {result_file}: {e}")
         return model_name, {}, []
 
@@ -208,7 +209,7 @@ def calculate_metric_ranges(
     ranges: dict[str, tuple[float, float] | None] = {}
     for metric in metrics:
         all_values = []
-        for model_name, values_dict in all_model_data.items():
+        for values_dict in all_model_data.values():
             values = values_dict.get(metric, [])
             valid_values = [
                 v
@@ -346,7 +347,7 @@ def main():
             if values_dict:
                 all_model_data[model_name] = values_dict
                 all_model_sizes[model_name] = sizes
-        except Exception as e:
+        except (AttributeError, KeyError, OSError, TypeError, ValueError) as e:
             print(f"Error reading {result_file.name}: {e}")
             continue
 
@@ -372,18 +373,18 @@ def main():
     print("\nGenerating plots...")
 
     # Second pass: generate plots with consistent x-axis ranges
-    for model_name in all_model_data.keys():
+    for model_name, values_dict in all_model_data.items():
         try:
             process_model(
                 model_name,
-                all_model_data[model_name],
+                values_dict,
                 all_model_sizes[model_name],
                 args.metrics,
                 use_weights=args.weights,
                 metric_ranges=metric_ranges,
                 output_dir=Path(args.output_dir),
             )
-        except Exception as e:
+        except (KeyError, OSError, RuntimeError, TypeError, ValueError) as e:
             print(f"Error processing {model_name}: {e}")
             continue
 

@@ -1,6 +1,7 @@
 import pandas as pd
 
 from models import logistic_regression
+
 from .base import BaseFeatureEngineer
 
 

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import cast, Union
+from typing import Union, cast
+
 import torch
-from torch import nn, Tensor
+from shape_extensions import IntVar
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel
 
@@ -40,18 +43,18 @@ class RNN(BaseModel):
             except FileNotFoundError:
                 pass
 
-    def forward[SeqLen, BatchSize](
-        self, x: Tensor[SeqLen, BatchSize, 2], hx=None
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
+        self, x: Tensor[[SeqLen, BatchSize, 2]], hx=None
     ) -> tuple[Tensor[SeqLen, BatchSize, 1], Tensor]:
         x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x))
         return output, h
 
-    def batch_process[SeqLen, BatchSize](
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor[SeqLen, BatchSize, 2],
-        delta_ts: Tensor[BatchSize],
-        seq_lens: Tensor[BatchSize],
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         outputs, _ = self.forward(sequences)

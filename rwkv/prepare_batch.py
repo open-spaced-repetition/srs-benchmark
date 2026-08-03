@@ -1,7 +1,10 @@
 import math
+
 import lmdb
 import numpy as np
 import torch
+
+from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.config import (
     DAY_OFFSET_ENCODE_PERIODS,
     ID_ENCODE_DIMS,
@@ -10,7 +13,6 @@ from rwkv.config import (
 )
 from rwkv.data_processing import ModuleData, RWKVSample
 from rwkv.model.srs_model import PreparedBatch
-from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.utils import load_tensor
 
 
@@ -153,7 +155,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                     for module_data_i, (data_split_B, data_split_len) in enumerate(
                         zip(module_data.split_B, module_data.split_len)
                     ):
-                        if l < data_split_len and data_split_len <= r:
+                        if l < data_split_len <= r:
                             from_slice = module_data.from_perm[
                                 boundaries[module_data_i] : boundaries[
                                     module_data_i + 1
@@ -233,7 +235,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
             )
 
         padded_labels = torch.stack(
-            list(map(lambda data: pad_labels(data.global_labels), data_list))
+            [pad_labels(data.global_labels) for data in data_list]
         )
 
         def pad_review_ths(labels):
@@ -242,7 +244,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
             )
 
         padded_label_review_th = torch.stack(
-            list(map(lambda data: pad_review_ths(data.label_review_ths), data_list))
+            [pad_review_ths(data.label_review_ths) for data in data_list]
         )
         return PreparedBatch(
             num_data=len(data_list),
@@ -281,7 +283,7 @@ def greedy_splits(
                     freqs[l] = 0
                 freqs[l] += b
 
-        lens = list(reversed(sorted(freqs.keys())))
+        lens = sorted(freqs.keys(), reverse=True)
         splits = []
         l = 0
         while l < len(lens):
@@ -411,26 +413,28 @@ def prepare_data_train_test(
 ):
     train_env = lmdb.open(train_lmdb_path, map_size=train_lmdb_size)
     all_env = lmdb.open(all_lmdb_path, map_size=all_lmdb_size)
-    with train_env.begin(write=False) as train_txn:
-        with all_env.begin(write=False) as all_txn:
-            while True:
-                task = task_queue.get()
-                if task is None:
-                    return
+    with (
+        train_env.begin(write=False) as train_txn,
+        all_env.begin(write=False) as all_txn,
+    ):
+        while True:
+            task = task_queue.get()
+            if task is None:
+                return
 
-                group_i, group = task
-                if "train" in group_i:
-                    result = prepare(
-                        [get_data(train_txn, key, device="cpu") for key in group],
-                        target_len=target_len,
-                        seed=fixed_seed,
-                    )
-                elif "validate" in group_i:
-                    result = prepare(
-                        [get_data(all_txn, key, device="cpu") for key in group],
-                        target_len=800000,
-                        seed=fixed_seed,
-                    )
-                else:
-                    raise ValueError("No key.")
-                batch_queue.put((group_i, result))
+            group_i, group = task
+            if "train" in group_i:
+                result = prepare(
+                    [get_data(train_txn, key, device="cpu") for key in group],
+                    target_len=target_len,
+                    seed=fixed_seed,
+                )
+            elif "validate" in group_i:
+                result = prepare(
+                    [get_data(all_txn, key, device="cpu") for key in group],
+                    target_len=800000,
+                    seed=fixed_seed,
+                )
+            else:
+                raise ValueError("No key.")
+            batch_queue.put((group_i, result))

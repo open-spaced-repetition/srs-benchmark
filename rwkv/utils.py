@@ -1,6 +1,7 @@
-from io import BytesIO
-import torch
 from collections import deque
+from io import BytesIO
+
+import torch
 
 
 def copy_downcast(master_model, model, dtype):

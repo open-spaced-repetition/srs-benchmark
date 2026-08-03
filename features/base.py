@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional
+
 import pandas as pd
+from fsrs_optimizer import remove_non_continuous_rows, remove_outliers
+
 from config import Config
 from utils import cum_concat
-from fsrs_optimizer import remove_outliers, remove_non_continuous_rows
 
 # Per-card cumulative history. Nested three deep: outer = cards, middle = reviews within a
 # card, inner = the cumulative prefix of (numpy) interval/rating values up to that review.
@@ -53,8 +55,8 @@ class BaseFeatureEngineer(ABC):
         self.config = config
         # History lists computed once in _compute_histories and reused by
         # get_history_lists (set per user, since a fresh engineer is created per user).
-        self._cached_t_history_list: Optional[HistoryLists] = None
-        self._cached_r_history_list: Optional[HistoryLists] = None
+        self._cached_t_history_list: HistoryLists | None = None
+        self._cached_r_history_list: HistoryLists | None = None
 
     def create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -139,7 +141,7 @@ class BaseFeatureEngineer(ABC):
         t_history_non_secs_list = _cumulative_lists_by_card(df, "delta_t")
 
         # Calculate time history (seconds)
-        t_history_secs_list: Optional[HistoryLists] = None
+        t_history_secs_list: HistoryLists | None = None
         if self.config.use_secs_intervals:
             t_history_secs_list = _cumulative_lists_by_card(df, "delta_t_secs")
 
@@ -180,7 +182,7 @@ class BaseFeatureEngineer(ABC):
 
     def _compute_last_rating(
         self, t_history_list: HistoryLists, r_history_list: HistoryLists
-    ) -> List[int]:
+    ) -> list[int]:
         """
         Calculate the previous rating for each review
         """
@@ -201,7 +203,7 @@ class BaseFeatureEngineer(ABC):
         self,
         df: pd.DataFrame,
         t_history_non_secs_list: HistoryLists,
-        t_history_secs_list: Optional[HistoryLists] = None,
+        t_history_secs_list: HistoryLists | None = None,
     ) -> pd.DataFrame:
         """
         Set time history string fields
@@ -245,7 +247,6 @@ class BaseFeatureEngineer(ABC):
         Returns:
             Dataframe with model-specific features added
         """
-        pass
 
     def _common_postprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         """

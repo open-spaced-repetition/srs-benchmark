@@ -53,7 +53,9 @@ Integration in batch_process
 """
 
 from __future__ import annotations
+
 import math
+
 import torch
 
 # ── physical constants ────────────────────────────────────────────────────────
@@ -147,14 +149,23 @@ def _interval_differentiable(
         on w from earlier stability updates, giving the correct total gradient.
     """
     # ── Phase 1: Newton in log(t) — pure Python scalars, no autograd ─────────
+    # pyrefly: ignore [bad-argument-type]
     s_f = float(s.detach())
+    # pyrefly: ignore [bad-argument-type]
     d1 = float(-w[-8])
+    # pyrefly: ignore [bad-argument-type]
     d2 = float(-w[-7])
+    # pyrefly: ignore [bad-argument-type]
     b1 = float(w[-6])
+    # pyrefly: ignore [bad-argument-type]
     b2 = float(w[-5])
+    # pyrefly: ignore [bad-argument-type]
     bw1f = float(w[-4])
+    # pyrefly: ignore [bad-argument-type]
     bw2f = float(w[-3])
+    # pyrefly: ignore [bad-argument-type]
     sw1f = float(w[-2])
+    # pyrefly: ignore [bad-argument-type]
     sw2f = float(w[-1])
 
     c1f = b1 ** (1.0 / d1) - 1.0
@@ -181,6 +192,7 @@ def _interval_differentiable(
 
     t_star_f = max(_MIN_T, min(math.exp(u_f), _MAX_T))
     # create a plain tensor on the same device/dtype as w, no grad
+    # pyrefly: ignore [missing-attribute]
     t_star = w.new_tensor(t_star_f)
 
     # ── Phase 2: IFT lift — one step with grad ────────────────────────────────
@@ -278,7 +290,7 @@ def fsrs7_interval_growth_penalty(
     n_reviews=10,
     target_dr=0.90,
     n_newton=4,
-    target_drs=[0.95, 0.96, 0.97, 0.98, 0.99],
+    target_drs=None,
 ):
     """
     Returns (penalty_1, penalty_2).
@@ -286,11 +298,20 @@ def fsrs7_interval_growth_penalty(
     penalty_1 – squared max interval-growth ratio for ≥1 d intervals at target_dr.
     penalty_2 – mean short-interval penalty for sub-1 d intervals at DR 95–99 %.
     """
+    if target_drs is None:
+        target_drs = [0.95, 0.96, 0.97, 0.98, 0.99]
     try:
         p1 = _fsrs7_interval_growth_penalty_impl(
             w, n_reviews=n_reviews, target_dr=target_dr, n_newton=n_newton
         )
-    except Exception as e1:
+    except (
+        IndexError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        ZeroDivisionError,
+    ) as e1:
         print(f"Error when calculating penalty 1: {e1}")
         p1 = w.new_zeros(())
     if not torch.isfinite(p1):
@@ -300,7 +321,14 @@ def fsrs7_interval_growth_penalty(
         p2 = _fsrs7_short_interval_penalty_impl(
             w, n_reviews=n_reviews, n_newton=n_newton, target_drs=target_drs
         )
-    except Exception as e2:
+    except (
+        IndexError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        ZeroDivisionError,
+    ) as e2:
         print(f"Error when calculating penalty 2: {e2}")
         p2 = w.new_zeros(())
     if not torch.isfinite(p2):

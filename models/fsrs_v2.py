@@ -1,10 +1,13 @@
-from typing import override
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import ClassVar, Optional, override
+
 import torch
-from torch import nn, Tensor
-from models.fsrs_v1 import FSRS1, FSRS1ParameterClipper
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
+from models.fsrs_v1 import FSRS1, FSRS1ParameterClipper
 
 
 class FSRS2ParameterClipper(FSRS1ParameterClipper):
@@ -30,10 +33,25 @@ class FSRS2ParameterClipper(FSRS1ParameterClipper):
 
 class FSRS2(FSRS1):
     # 14 params
-    init_w = [1, 1, 1, -1, -1, 0.2, 3, -0.8, -0.2, 1.3, 2.6, -0.2, 0.6, 1.5]
+    init_w: ClassVar[list[float]] = [
+        1,
+        1,
+        1,
+        -1,
+        -1,
+        0.2,
+        3,
+        -0.8,
+        -0.2,
+        1.3,
+        2.6,
+        -0.2,
+        0.6,
+        1.5,
+    ]
     clipper = FSRS2ParameterClipper()
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
@@ -50,9 +68,12 @@ class FSRS2(FSRS1):
         )
         return new_s
 
-    def stability_after_failure(  # type: ignore[override]
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_failure[BatchSize: IntVar](  # type: ignore[override]
+        self,
+        state: Tensor[[BatchSize, 2]],
+        new_d: Tensor[[BatchSize]],
+        r: Tensor[[BatchSize]],
+    ) -> Tensor[[BatchSize]]:
         new_s = (
             self.w[10]
             * torch.pow(new_d, self.w[11])
@@ -61,7 +82,9 @@ class FSRS2(FSRS1):
         )
         return new_s
 
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+    def mean_reversion[BatchSize: IntVar](
+        self, init: Tensor | float, current: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return self.w[5] * init + (1 - self.w[5]) * current
 
     @override
@@ -92,7 +115,7 @@ class FSRS2(FSRS1):
 
     @override
     def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
+        self, inputs: Tensor, state: Tensor | None = None
     ) -> tuple[Tensor, Tensor]:
         """
         :param inputs: shape[seq_len, batch_size, 2]

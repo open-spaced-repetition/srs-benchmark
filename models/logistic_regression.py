@@ -1,11 +1,12 @@
+import time
+
 import numpy as np
+import pandas as pd
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
-import pandas as pd
-import time
 
 
 def transform_elapsed_days_real_np(x):
@@ -201,7 +202,7 @@ def create_features(df: pd.DataFrame):
 
 class LogisticRegression(BaseModel):
     n_epoch = 10
-    batch_size = int(2**11)
+    batch_size = 2**11
     lr: float = 2e-1
     betas: tuple = (0.0, 0.85)
     adam_eps = 1e-8
@@ -300,8 +301,11 @@ class LogisticRegression(BaseModel):
         xrange = np.linspace(0, 1, len(df))
         df["weights"] = 0.1 + 0.9 * np.power(xrange, 4)
         x_all = df.loc[:, df.columns.str.startswith("feat_")]
+        # pyrefly: ignore [missing-attribute]
         x_all = torch.tensor(np.array(x_all), dtype=torch.float)
+        # pyrefly: ignore [missing-attribute]
         y_all = torch.tensor(np.array(df["y"]), dtype=torch.float)
+        # pyrefly: ignore [missing-attribute]
         weights_all = torch.tensor(np.array(df["weights"]), dtype=torch.float)
         B = x_all.size(0)
 
@@ -316,10 +320,14 @@ class LogisticRegression(BaseModel):
         steps_per_epoch = (B + self.batch_size - 1) // self.batch_size
         total_steps = self.n_epoch * steps_per_epoch
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=total_steps, eta_min=0
+            # pyrefly: ignore [bad-argument-type]
+            optimizer,
+            T_max=total_steps,
+            eta_min=0,
         )
 
         for _ in range(self.n_epoch):
+            # pyrefly: ignore [missing-attribute]
             perm = torch.randperm(B)
             for i in range(0, B, self.batch_size):
                 idx = perm[i : i + self.batch_size]
@@ -337,10 +345,12 @@ class LogisticRegression(BaseModel):
                 scheduler.step()
         return self.state_dict()
 
+    # pyrefly: ignore [missing-attribute]
     @torch.inference_mode()
     def predict(self, df: pd.DataFrame):
         df = df.copy()
         x = df.loc[:, df.columns.str.startswith("feat_")]
+        # pyrefly: ignore [missing-attribute]
         x = torch.tensor(np.array(x), dtype=torch.float)
         logits_bl = torch.mv(x, self.coefficients)
         return torch.sigmoid(logits_bl)

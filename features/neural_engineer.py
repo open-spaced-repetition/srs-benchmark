@@ -1,8 +1,9 @@
-from typing import Any, List, cast
+from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import torch
-import numpy as np
+
 from .base import BaseFeatureEngineer
 
 
@@ -80,7 +81,7 @@ class NN17FeatureEngineer(BaseFeatureEngineer):
 
         return df
 
-    def _r_history_to_l_history(self, r_history: List) -> List[int]:
+    def _r_history_to_l_history(self, r_history: list) -> list[int]:
         """
         Convert rating history to lapse history (cumulative failure count)
 

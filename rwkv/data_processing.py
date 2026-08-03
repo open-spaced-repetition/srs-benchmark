@@ -1,14 +1,15 @@
-from dataclasses import dataclass
 import json
 import multiprocessing
+import random
+from dataclasses import dataclass
 from io import BytesIO
-from tqdm import tqdm
 
 import lmdb
 import numpy as np
-import torch
 import pandas as pd
-import random
+import torch
+from tqdm import tqdm
+
 from rwkv.config import RWKV_SUBMODULES
 from rwkv.parse_toml import parse_toml
 from rwkv.utils import save_tensor
@@ -182,17 +183,21 @@ def base_transform_day_offset_diff(df: pd.DataFrame):
     return df.assign(day_offset_diff=scale_day_offset_diff(df["day_offset_diff"]))
 
 
-def add_segment_features(df, equalize_review_ths=[]):
+def add_segment_features(df, equalize_review_ths=None):
     """
     Adds features that depend on the specific segment that we have in mind.
     """
+    if equalize_review_ths is None:
+        equalize_review_ths = []
     df["day_offset"] = df["day_offset"] - df["day_offset"].min()
     df["day_offset_first"] = df.groupby("card_id")["day_offset"].transform("first")
     df["day_of_week"] = ((df["day_offset"] % 7) - 3) / 3
     return df
 
 
-def get_rwkv_data(data_path, user_id, equalize_review_ths=[]):
+def get_rwkv_data(data_path, user_id, equalize_review_ths=None):
+    if equalize_review_ths is None:
+        equalize_review_ths = []
     df = pd.read_parquet(data_path / "revlogs" / f"{user_id=}")
     df_len = len(df)
     df["user_id"] = user_id
@@ -435,7 +440,7 @@ def add_queries(section_df: pd.DataFrame, equalize_review_ths):
             by=["review_th", "skip"], ascending=[True, False]
         ).reset_index(drop=True)
 
-    section_df["index"] = range(0, len(section_df))
+    section_df["index"] = range(len(section_df))
     assert (
         section_df["label_rating"].min() >= 1 and section_df["label_rating"].max() <= 4
     )
@@ -472,7 +477,7 @@ def create_sample(
         # keep track of their locations within section_df
         map_len_to_locs_list = {}
 
-        for submodule_i, group_df in submodule_dfs.items():
+        for group_df in submodule_dfs.values():
             key = len(group_df)
             if key not in map_len_to_locs_list:
                 map_len_to_locs_list[key] = []
@@ -667,7 +672,7 @@ def save_job(lmdb_path, lmdb_size, writer_queue):
             save_tensor(txn, day_offsets_key, rwkv_sample.day_offsets)
             save_tensor(txn, day_offsets_first_key, rwkv_sample.day_offsets_first)
             save_tensor(txn, skips_key, rwkv_sample.skips)
-            txn.put(f"{rwkv_sample.user_id}_done".encode(), "true".encode())
+            txn.put(f"{rwkv_sample.user_id}_done".encode(), b"true")
 
             user_keys.append(key)
             txn.put(batches_key.encode(), json.dumps(user_keys).encode())

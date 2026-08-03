@@ -1,15 +1,20 @@
-from typing import Any, Hashable, Iterator, Mapping, Protocol, TypeAlias, Union
-from typing_extensions import Self
-import torch
-from torch import Tensor
+from __future__ import annotations
+
+from collections.abc import Hashable, Iterator, Mapping
+from typing import Any, Protocol, Self, Union
+
 import pandas as pd
+import torch
+from shape_extensions import IntVar
+from torch import Tensor
+
 from config import Config
 
-ParameterList: TypeAlias = list[float]
-TorchStateDict: TypeAlias = Mapping[str, Any]
-ModelState: TypeAlias = ParameterList | TorchStateDict
-PartitionedModelState: TypeAlias = dict[Hashable, ModelState]
-TrainingState: TypeAlias = ModelState | PartitionedModelState
+type ParameterList = list[float]
+type TorchStateDict = Mapping[str, Any]
+type ModelState = ParameterList | TorchStateDict
+type PartitionedModelState = dict[Hashable, ModelState]
+type TrainingState = ModelState | PartitionedModelState
 
 
 class TrainableModel(Protocol):
@@ -51,11 +56,11 @@ class TrainableModel(Protocol):
         """
         ...
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
     ) -> dict[str, Tensor]:
         """
@@ -108,7 +113,7 @@ class TrainableModel(Protocol):
         """Return model parameters for optimization."""
         ...
 
-    def forward(self, *args, **kwargs) -> Union[tuple[Tensor, ...], Tensor]:
+    def forward(self, *args, **kwargs) -> tuple[Tensor | None, ...] | Tensor:
         """Forward pass of the neural network."""
         ...
 

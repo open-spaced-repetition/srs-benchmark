@@ -1,9 +1,12 @@
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
-import torch
-from torch import nn, Tensor
 import pandas as pd
+import torch
+from torch import Tensor, nn
+
 from config import Config
+
 from .trainable import ModelState
 
 
@@ -56,4 +59,5 @@ class BaseModel(nn.Module):
         strict: bool = True,
         assign: bool = False,
     ) -> Any:
+        # pyrefly: ignore [bad-argument-type]
         return super().load_state_dict(state_dict, strict=strict, assign=assign)

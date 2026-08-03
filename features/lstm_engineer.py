@@ -1,9 +1,10 @@
+from itertools import accumulate
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import torch
-import numpy as np
-from itertools import accumulate
+
 from .base import BaseFeatureEngineer
 
 

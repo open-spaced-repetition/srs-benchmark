@@ -44,36 +44,39 @@
 # moment-estimates when the betas match; a mismatch forces a cold-start and
 # wastes the curvature information built up during meta-training.
 
+import copy
 import os
+import pickle
+import random
+from functools import partial
 from pathlib import Path
-from sklearn.model_selection import TimeSeriesSplit
+
+import optuna  # type: ignore
+import pandas as pd
 import torch
-from config import create_parser, Config
+from fsrs_optimizer import BatchDataset, BatchLoader
+from multiprocess import Pool  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
+
+from config import Config, create_parser
 from reptile_trainer import (
+    BATCH_SIZE,
     DEFAULT_FINETUNE_PARAMS,
     DEFAULT_TRAIN_ADAPT_PARAMS,
-    OUTER_STEPS,
-    WARMUP_STEPS,
-    OUTER_LR_START,
+    DEVICE,
+    MAX_SEQ_LEN,
     OUTER_ADAM_BETA1,
     OUTER_ADAM_BETA2,
+    OUTER_LR_START,
+    OUTER_STEPS,
     OUTER_WEIGHT_DECAY,
-    BATCH_SIZE,
-    MAX_SEQ_LEN,
-    DEVICE,
+    WARMUP_STEPS,
+    adapt_on_data,
+    compute_df_loss,
     finetune,
     get_inner_opt,
     get_params_flattened,
-    adapt_on_data,
-    compute_df_loss,
 )
-from fsrs_optimizer import BatchDataset, BatchLoader
-import pandas as pd
-import copy
-import optuna  # type: ignore
-from functools import partial
-import random
-from multiprocess import Pool  # type: ignore
 
 optuna_nonce = random.randint(0, 100000000)
 
@@ -111,6 +114,7 @@ def _save_checkpoint(
     """
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
+    # pyrefly: ignore [missing-attribute]
     torch.save(
         {
             "outer_it": outer_it,
@@ -137,10 +141,19 @@ def _find_resumable_checkpoint(trial_params: dict):
         return None, None
     for candidate in sorted(CHECKPOINT_DIR.glob("trial_*.pt")):
         try:
+            # pyrefly: ignore [missing-attribute]
             ckpt = torch.load(candidate, weights_only=False)
             if ckpt.get("trial_params") == trial_params:
                 return candidate, ckpt
-        except Exception:
+        except (
+            EOFError,
+            OSError,
+            pickle.UnpicklingError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as error:
+            print(f"Could not read checkpoint {candidate.name}: {error}")
             continue
     return None, None
 
@@ -446,7 +459,14 @@ def main():
                     )
                     study.enqueue_trial(params)
                     already_enqueued_params.append(params)
-            except Exception as e:
+            except (
+                EOFError,
+                OSError,
+                pickle.UnpicklingError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ) as e:
                 print(f"Could not read checkpoint {candidate.name}: {e}")
 
     # ── Baseline trial ──────────────────────────────────────────────────────

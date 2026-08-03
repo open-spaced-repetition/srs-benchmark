@@ -1,9 +1,10 @@
-import pathlib
+import argparse
 import json
+import math
+import pathlib
+
 import numpy as np
 import scipy
-import math
-import argparse
 
 
 def sigdig(value: float, CI: float):
@@ -53,7 +54,7 @@ def confidence_interval(values, sizes):
         method="BCa",
         random_state=42,
     )
-    low = list(CI_99_bootstrap.confidence_interval)[0]
+    low = next(iter(CI_99_bootstrap.confidence_interval))
     high = list(CI_99_bootstrap.confidence_interval)[1]
     return (high - low) / 2
 
@@ -83,7 +84,7 @@ if __name__ == "__main__":
     dev_file = pathlib.Path(f"./result/{dev_mode_name}.jsonl")
     if dev_file.exists():
         with open(dev_file, "r") as f:
-            common_set = set([json.loads(x)["user"] for x in f.readlines()])
+            common_set = {json.loads(x)["user"] for x in f}
     else:
         common_set = set()
     parser = argparse.ArgumentParser()
@@ -210,7 +211,7 @@ if __name__ == "__main__":
             if not result_file.exists():
                 continue
             with open(result_file, "r") as f:
-                data = [json.loads(x) for x in f.readlines()]
+                data = [json.loads(x) for x in f]
             for result in data:
                 if common_set and result["user"] not in common_set:
                     continue
@@ -273,7 +274,7 @@ if __name__ == "__main__":
                 if not result_file.exists():
                     continue
                 with open(result_file, "r") as f:
-                    data = [json.loads(x) for x in f.readlines()]
+                    data = [json.loads(x) for x in f]
                 for result in data:
                     if common_set and result["user"] not in common_set:
                         continue

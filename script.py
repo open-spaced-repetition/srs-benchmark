@@ -1,41 +1,43 @@
 import copy
 import json
-import sys
-import os
-import time
-import pandas as pd
-import numpy as np
-from typing import Optional, Any, cast
-from pathlib import Path
-import matplotlib.pyplot as plt
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import torch
-from torch import nn
-from sklearn.model_selection import TimeSeriesSplit
-from tqdm.auto import tqdm
-import warnings
-from models.model_factory import create_model
-from models.trainable import TrainableModel
 import multiprocessing as mp
+import os
+import sys
+import time
+import warnings
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+from typing import Any, Optional, cast
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pyarrow.parquet as pq
-from config import create_parser, Config
-from utils import (
-    catch_exceptions,
-    save_evaluation_file,
-    evaluate,
-    batch_process_wrapper,
-    sort_jsonl,
-    Collection,
-    get_model_state,
-)
+import torch
+from sklearn.model_selection import TimeSeriesSplit
+from torch import nn
+from tqdm.auto import tqdm
+
+from config import Config, create_parser
 from data_loader import UserDataLoader
 from model_processors import (
-    process_untrainable,
     baseline,
-    rmse_bins_exploit,
+    fsrs_one_step,
     moving_avg,
     process_fsrs_rs,
-    fsrs_one_step,
+    process_untrainable,
+    rmse_bins_exploit,
+)
+from models.model_factory import create_model
+from models.trainable import TrainableModel
+from utils import (
+    Collection,
+    batch_process_wrapper,
+    catch_exceptions,
+    evaluate,
+    get_model_state,
+    save_evaluation_file,
+    sort_jsonl,
 )
 
 parser = create_parser()
@@ -48,20 +50,21 @@ if config.dev_mode:
 from fsrs_optimizer import BatchDataset, BatchLoader
 
 warnings.filterwarnings("ignore", category=UserWarning)
+# pyrefly: ignore [missing-attribute]
 torch.manual_seed(config.seed)
 tqdm.pandas()
 
 
 class Trainer:
     optimizer: torch.optim.Optimizer
-    test_set: Optional[BatchDataset]
-    test_data_loader: Optional[BatchLoader]
+    test_set: BatchDataset | None
+    test_data_loader: BatchLoader | None
 
     def __init__(
         self,
         model: TrainableModel,
         train_set: pd.DataFrame,
-        test_set: Optional[pd.DataFrame],
+        test_set: pd.DataFrame | None,
         batch_size: int = 256,
         max_seq_len: int = 64,
     ) -> None:
@@ -83,14 +86,16 @@ class Trainer:
 
         # Setup scheduler
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=self.train_data_loader.batch_nums * self.n_epoch
+            # pyrefly: ignore [bad-argument-type]
+            self.optimizer,
+            T_max=self.train_data_loader.batch_nums * self.n_epoch,
         )
 
         self.avg_train_losses: list[float] = []
         self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
-    def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
+    def build_dataset(self, train_set: pd.DataFrame, test_set: pd.DataFrame | None):
         self.train_set = BatchDataset(
             train_set.copy(),
             self.batch_size,
@@ -206,11 +211,12 @@ class Trainer:
         return fig
 
 
-def _configure_process_device(device_id: Optional[int]) -> None:
+def _configure_process_device(device_id: int | None) -> None:
     if device_id is None:
         return
     if not torch.cuda.is_available():
         return
+    # pyrefly: ignore [missing-attribute]
     if config.device.type != "cuda":
         return
     device_count = torch.cuda.device_count()
@@ -225,14 +231,14 @@ def _configure_process_device(device_id: Optional[int]) -> None:
             import reptile_trainer
 
             reptile_trainer.DEVICE = config.device
-        except Exception:
+        except ImportError:
             pass
     elif config.model_name == "GRU":
         try:
             import reptile_trainer_gru
 
             reptile_trainer_gru.DEVICE = config.device
-        except Exception:
+        except ImportError:
             pass
 
 
@@ -284,7 +290,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         return get_model_state(model)
 
     if config.model_name == "LSTM":
-        from reptile_trainer import get_inner_opt, finetune
+        from reptile_trainer import finetune, get_inner_opt
 
         model = model.to(config.device)
         inner_opt = get_inner_opt(
@@ -298,11 +304,12 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         )
         weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt
+        # pyrefly: ignore [missing-attribute]
         if config.device.type == "mps":
             torch.mps.empty_cache()
         return weights
     elif config.model_name == "GRU":
-        from reptile_trainer_gru import get_inner_opt, finetune
+        from reptile_trainer_gru import finetune, get_inner_opt
 
         model = model.to(config.device)
         inner_opt = get_inner_opt(
@@ -316,6 +323,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         )
         weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt
+        # pyrefly: ignore [missing-attribute]
         if config.device.type == "mps":
             torch.mps.empty_cache()
         return weights
@@ -334,9 +342,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
 
 
 @catch_exceptions
-def process(
-    user_id: int, device_id: Optional[int] = None
-) -> tuple[dict, Optional[dict]]:
+def process(user_id: int, device_id: int | None = None) -> tuple[dict, dict | None]:
     """Main processing function for all models."""
     plt.close("all")
     _configure_process_device(device_id)
@@ -406,7 +412,7 @@ def process(
                     user_level_weights = None
                 else:
                     print(f"User: {user_id}")
-                    raise e
+                    raise
 
         partition_weights = {}
 
@@ -447,7 +453,7 @@ def process(
                         )
                 else:
                     print(f"User: {user_id}")
-                    raise e
+                    raise
 
         w_list.append(partition_weights)
 
@@ -511,7 +517,7 @@ if __name__ == "__main__":
     raw_file = Path(f"raw/{config.get_evaluation_file_name()}.jsonl")
     if result_file.exists():
         data = sort_jsonl(result_file)
-        processed_user = set(map(lambda x: x["user"], data))
+        processed_user = {x["user"] for x in data}
     else:
         processed_user = set()
 
@@ -541,6 +547,7 @@ if __name__ == "__main__":
 
     cuda_device_ids = None
     if config.cuda_device_ids:
+        # pyrefly: ignore [missing-attribute]
         if config.device.type != "cuda":
             print("Warning: --gpus ignored because CUDA is not enabled for this model.")
         else:
@@ -594,7 +601,7 @@ if __name__ == "__main__":
                         with open(raw_file, "a", encoding="utf-8", newline="\n") as f:
                             f.write(json.dumps(raw, ensure_ascii=False) + "\n")
                     pbar.set_description(f"Processed {stats['user']}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- report failures from worker futures
                 tqdm.write(str(e))
 
     if _srsb_t0 is not None:

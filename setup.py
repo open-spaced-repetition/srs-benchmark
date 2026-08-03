@@ -1,13 +1,13 @@
-import os
-import torch
 import glob
-from setuptools import find_packages, setup  # type: ignore
+import os
 
+import torch
+from setuptools import find_packages, setup  # type: ignore
 from torch.utils.cpp_extension import (
+    CUDA_HOME,
+    BuildExtension,
     CppExtension,
     CUDAExtension,
-    BuildExtension,
-    CUDA_HOME,
 )
 
 

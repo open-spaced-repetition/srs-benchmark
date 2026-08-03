@@ -1,13 +1,16 @@
-from typing import override
-from typing import List
-import torch
-from torch import nn, Tensor
-from models.fsrs_v3 import FSRS3, FSRS3ParameterClipper
-from config import Config
-import pandas as pd
-from tqdm.auto import tqdm  # type: ignore
+from __future__ import annotations
+
+from typing import ClassVar, override
+
 import numpy as np
+import pandas as pd
+import torch
 from scipy.optimize import minimize
+from torch import Tensor, nn
+from tqdm.auto import tqdm  # type: ignore
+
+from config import Config
+from models.fsrs_v3 import FSRS3, FSRS3ParameterClipper
 
 
 class FSRS4ParameterClipper(FSRS3ParameterClipper):
@@ -32,7 +35,7 @@ class FSRS4ParameterClipper(FSRS3ParameterClipper):
 
 class FSRS4(FSRS3):
     # 17 params
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.4,
         0.9,
         2.3,
@@ -53,7 +56,7 @@ class FSRS4(FSRS3):
     ]
     clipper = FSRS4ParameterClipper()
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
@@ -73,7 +76,9 @@ class FSRS4(FSRS3):
     def stability_after_success(  # type: ignore[override]
         self, state: Tensor, r: Tensor, rating: Tensor
     ) -> Tensor:
+        # pyrefly: ignore [bad-argument-type]
         hard_penalty = torch.where(rating == 2, self.w[15], 1)
+        # pyrefly: ignore [bad-argument-type]
         easy_bonus = torch.where(rating == 4, self.w[16], 1)
         new_s = state[:, 0] * (
             1
@@ -104,6 +109,7 @@ class FSRS4(FSRS3):
         if torch.equal(state, torch.zeros_like(state)):
             keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
             new_s = torch.ones_like(state[:, 0], device=self.config.device)
@@ -125,17 +131,13 @@ class FSRS4(FSRS3):
         return torch.stack([new_s, new_d], dim=1)
 
     @override
+    # pyrefly: ignore [bad-override]
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[7] * init + (1 - self.w[7]) * current
 
     @override
     def benchmark_state(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
+        return [round(float(x), 4) for x in dict(self.named_parameters())["w"].data]
 
     @override
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
@@ -169,7 +171,13 @@ class FSRS4(FSRS3):
 
             init_s0 = r_s0_default[first_rating]
 
-            def loss(stability):
+            def loss(
+                stability,
+                delta_t=delta_t,
+                recall=recall,
+                count=count,
+                init_s0=init_s0,
+            ):
                 y_pred = self.forgetting_curve(delta_t, stability)
                 logloss = sum(
                     -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
@@ -201,14 +209,17 @@ class FSRS4(FSRS3):
             (2, 4),
             (1, 4),
         ):
-            if small_rating in rating_stability and big_rating in rating_stability:
+            if (
+                small_rating in rating_stability
+                and big_rating in rating_stability
+                and rating_stability[small_rating] > rating_stability[big_rating]
+            ):
                 # if rating_count[small_rating] > 300 and rating_count[big_rating] > 300:
                 #     continue
-                if rating_stability[small_rating] > rating_stability[big_rating]:
-                    if rating_count[small_rating] > rating_count[big_rating]:
-                        rating_stability[big_rating] = rating_stability[small_rating]
-                    else:
-                        rating_stability[small_rating] = rating_stability[big_rating]
+                if rating_count[small_rating] > rating_count[big_rating]:
+                    rating_stability[big_rating] = rating_stability[small_rating]
+                else:
+                    rating_stability[small_rating] = rating_stability[big_rating]
 
         w1 = 0.41
         w2 = 0.54
@@ -217,9 +228,9 @@ class FSRS4(FSRS3):
         if len(rating_stability) == 0:
             initial_stabilities = list(r_s0_default.values())
         elif len(rating_stability) == 1:
-            rating = list(rating_stability.keys())[0]
+            rating = next(iter(rating_stability.keys()))
             factor = rating_stability[rating] / r_s0_default[str(rating)]
-            initial_stabilities = list(map(lambda x: x * factor, r_s0_default.values()))
+            initial_stabilities = [x * factor for x in r_s0_default.values()]
         elif len(rating_stability) == 2:
             if 1 not in rating_stability and 2 not in rating_stability:
                 rating_stability[2] = np.power(
@@ -291,11 +302,10 @@ class FSRS4(FSRS3):
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         self.w.data[0:4] = Tensor(
-            list(
-                map(
-                    lambda x: max(min(self.config.init_s_max, x), self.config.s_min),
-                    initial_stabilities,
-                )
-            )
+            # pyrefly: ignore [bad-argument-count]
+            [
+                max(min(self.config.init_s_max, x), self.config.s_min)
+                for x in initial_stabilities
+            ]
         )
         self.init_w_tensor = self.w.data.clone().to(self.config.device)

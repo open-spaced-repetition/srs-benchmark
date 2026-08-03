@@ -1,5 +1,6 @@
 import torch
 from torch import Tensor
+
 from config import Config
 from models.base import BaseModel, BaseParameterClipper
 
@@ -20,6 +21,9 @@ class FSRS(BaseModel):
 
     def forgetting_curve(self, t, s):
         raise NotImplementedError("Forgetting curve not implemented")
+
+    def forward(self, inputs: Tensor) -> tuple[Tensor, Tensor]:
+        raise NotImplementedError("Forward pass not implemented")
 
     def batch_process(
         self,
@@ -43,9 +47,6 @@ class FSRS(BaseModel):
     def benchmark_state(self):
         """Override to use precision based on config.use_secs_intervals"""
         precision = 6 if self.config.use_secs_intervals else 4
-        return list(
-            map(
-                lambda x: round(float(x), precision),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
+        return [
+            round(float(x), precision) for x in dict(self.named_parameters())["w"].data
+        ]

@@ -47,8 +47,7 @@ class Transformer(BaseModel):
     def forward[SeqLen: IntVar, BatchSize: IntVar](
         self,
         src: Tensor[[SeqLen, BatchSize, 2]],
-        # pyrefly: ignore [bad-specialization, invalid-annotation, not-a-type]
-    ) -> tuple[Tensor[SeqLen, BatchSize, 1], None]:
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 1]], None]:
         tgt = torch.zeros(1, src.shape[1], self.n_input).to(device=self.config.device)
         output = self.transformer(src, tgt)
         output = self.fc(output)

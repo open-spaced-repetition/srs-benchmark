@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor, nn
 
 from config import Config
@@ -144,19 +145,14 @@ class LSTM(BaseModel):
         self.register_buffer("input_mean", mean_i)
         self.register_buffer("input_std", std_i)
 
-    def forward[SeqLen, BatchSize, InputDims](
-        # pyrefly: ignore [bad-specialization]
+    def forward[SeqLen: IntVar, BatchSize: IntVar, InputDims: IntVar](
         self,
-        # pyrefly: ignore [bad-specialization]
-        x_lni: Tensor[SeqLen, BatchSize, InputDims],
+        x_lni: Tensor[[SeqLen, BatchSize, InputDims]],
         hx=None,
     ) -> tuple[
-        # pyrefly: ignore [bad-specialization, not-a-type]
-        Tensor[SeqLen, BatchSize, 3],
-        # pyrefly: ignore [bad-specialization, not-a-type]
-        Tensor[SeqLen, BatchSize, 3],
-        # pyrefly: ignore [bad-specialization, not-a-type]
-        Tensor[SeqLen, BatchSize, 3],
+        Tensor[[SeqLen, BatchSize, 3]],
+        Tensor[[SeqLen, BatchSize, 3]],
+        Tensor[[SeqLen, BatchSize, 3]],
     ]:
         x_rating = x_lni[..., -1:]
         x_features = x_lni[..., :-1]
@@ -186,13 +182,10 @@ class LSTM(BaseModel):
         # pyrefly: ignore [bad-return]
         return w_lnh, s_lnh, d_lnh
 
-    def batch_process[SeqLen, BatchSize, InputDims](
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar, InputDims: IntVar](
         self,
-        # pyrefly: ignore [bad-specialization]
-        sequences: Tensor[SeqLen, BatchSize, InputDims],
-        # pyrefly: ignore [invalid-annotation]
+        sequences: Tensor[[SeqLen, BatchSize, InputDims]],
         delta_n: Tensor[[BatchSize]],
-        # pyrefly: ignore [invalid-annotation]
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
     ) -> dict[str, Tensor]:

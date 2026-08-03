@@ -13,7 +13,6 @@ BaseFeatureEngineer (Abstract Base Class)
 ├── DashFeatureEngineer      # DASH time window features
 ├── DashMCMFeatureEngineer   # DASH with decay
 ├── DashACTRFeatureEngineer  # DASH with ACT-R features
-├── GRUPFeatureEngineer      # GRU-P with shifted intervals
 ├── HLRFeatureEngineer       # HLR with success/failure counts
 ├── ACTRFeatureEngineer      # ACT-R activation features
 ├── NN17FeatureEngineer      # NN-17 with lapse history
@@ -201,7 +200,7 @@ def test_fsrs_feature_engineer():
     engineer = create_feature_engineer(config)
     df = create_test_dataframe()
     result = engineer.create_features(df)
-    assert 'tensor' in result.columns
+    assert "tensor" in result.columns
     # Add more assertions
 ```
 

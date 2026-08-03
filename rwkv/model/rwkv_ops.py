@@ -1,14 +1,20 @@
 from typing import Any
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor
 
 
 class RWKV7_WKV(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, *inputs: Tensor):
+    def forward[BatchSize: IntVar, SeqLen: IntVar, HeadCount: IntVar, HeadSize: IntVar](
+        ctx,
+        *inputs: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]]
+        | Tensor[[BatchSize, SeqLen]],
+    ) -> Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]]:
         r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT = inputs
         assert all(
+            # pyrefly: ignore [missing-attribute]
             i.is_contiguous()
             for i in [r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT]
         )
@@ -19,6 +25,7 @@ class RWKV7_WKV(torch.autograd.Function):
         assert all(
             i.dtype == dtype for i in [r_BTHK, k_BTHK, v_BTHK, a_BTHK, k_deformed_BTHK]
         )
+        # pyrefly: ignore [missing-attribute]
         if r_BTHK.is_cuda:
             if r_BTHK.dtype == torch.bfloat16:
                 out, state_checkpoints = (
@@ -26,10 +33,12 @@ class RWKV7_WKV(torch.autograd.Function):
                         r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT
                     )
                 )
+            # pyrefly: ignore [missing-attribute]
             elif r_BTHK.dtype == torch.float:
                 out, state_checkpoints = torch.ops.rwkv.rwkv7_wkv_forward_float.default(
                     r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT
                 )
+            # pyrefly: ignore [missing-attribute]
             elif r_BTHK.dtype == torch.half:
                 out, state_checkpoints = torch.ops.rwkv.rwkv7_wkv_forward_half.default(
                     r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK, skip_BT
@@ -53,7 +62,15 @@ class RWKV7_WKV(torch.autograd.Function):
             # return reference_rwkv7(r_BTHK, k_BTHK, v_BTHK, w_BTHK, a_BTHK, k_deformed_BTHK)
 
     @staticmethod
-    def backward(ctx: Any, *grad_outputs: Tensor):
+    def backward[
+        BatchSize: IntVar,
+        SeqLen: IntVar,
+        HeadCount: IntVar,
+        HeadSize: IntVar,
+    ](
+        ctx: Any,
+        *grad_outputs: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    ):
         grad_BTHK = grad_outputs[0]
         (
             r_BTHK,
@@ -79,6 +96,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     grad_BTHK,
                 )
             )
+        # pyrefly: ignore [missing-attribute]
         elif r_BTHK.dtype == torch.float:
             r_grad, k_grad, v_grad, w_grad, a_grad, k_deformed_grad = (
                 torch.ops.rwkv.rwkv7_wkv_backward_float.default(
@@ -93,6 +111,7 @@ class RWKV7_WKV(torch.autograd.Function):
                     grad_BTHK,
                 )
             )
+        # pyrefly: ignore [missing-attribute]
         elif r_BTHK.dtype == torch.half:
             r_grad, k_grad, v_grad, w_grad, a_grad, k_deformed_grad = (
                 torch.ops.rwkv.rwkv7_wkv_backward_half.default(
@@ -113,16 +132,28 @@ class RWKV7_WKV(torch.autograd.Function):
 
 
 # Unused reference code for backpropagation for RWKV-7 wkv.
-def reference_backward(
-    r_BTHK: Tensor,
-    k_BTHK: Tensor,
-    v_BTHK: Tensor,
-    w_BTHK: Tensor,
-    a_BTHK: Tensor,
-    k_deformed_BTHK: Tensor,
+def reference_backward[
+    BatchSize: IntVar,
+    SeqLen: IntVar,
+    HeadCount: IntVar,
+    HeadSize: IntVar,
+](
+    r_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    v_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    w_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    a_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_deformed_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
     state_checkpoints,
-    grad_BTHK: Tensor,
-):
+    grad_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+) -> tuple[
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+]:
     B, T, H, K = r_BTHK.shape
 
     with torch.no_grad():
@@ -153,10 +184,13 @@ def reference_backward(
         a_BTHK1 = a_BTHK.unsqueeze(-1)
         k_deformed_BTHK1 = k_deformed_BTHK.unsqueeze(-1)
         # r_grad_BTHK1 = k_BTHK1 @ v_BTHK1.mT @ grad_BTHK1
+        # pyrefly: ignore [missing-attribute]
         r_grad_BTHK1 = states_BTHKK.mT @ grad_BTHK1
         r_grad_BTHK = r_grad_BTHK1.squeeze(-1)
 
+        # pyrefly: ignore [missing-attribute]
         dS_BTHKK = grad_BTHK1 @ r_BTHK1.mT
+        # pyrefly: ignore [missing-attribute]
         scale_BTHKK = w_diag_BTHKK - k_deformed_BTHK1 @ (a_BTHK1 * k_deformed_BTHK1).mT
         v_grad_BTHK = torch.empty_like(r_grad_BTHK)
         k_grad_BTHK = torch.empty_like(r_grad_BTHK)
@@ -165,11 +199,13 @@ def reference_backward(
         k_deformed_grad_BTHK = torch.empty_like(r_grad_BTHK)
         for t in reversed(range(T)):
             v_grad_BTHK[:, t] = (dS_BTHKK[:, t] @ k_BTHK1[:, t]).squeeze(-1)
+            # pyrefly: ignore [missing-attribute]
             k_grad_BTHK[:, t] = (dS_BTHKK[:, t].mT @ v_BTHK1[:, t]).squeeze(-1)
 
             # derivative wrt diag(w) - k_def a k_def^T
             if t > 0:
                 # We can avoid a full matrix multiply by going back to the definition
+                # pyrefly: ignore [missing-attribute]
                 grad_decay_remove_BHKK = states_BTHKK[:, t - 1].mT @ dS_BTHKK[:, t]
 
                 a_grad_BTHK[:, t] = -(
@@ -192,6 +228,7 @@ def reference_backward(
             # find the contribution to the t-1's S gradient
             dS_t_BHKK = dS_BTHKK[:, t]
             if t > 0:
+                # pyrefly: ignore [missing-attribute]
                 bonus_dS_BHKK = dS_t_BHKK @ scale_BTHKK[:, t].mT
                 dS_BTHKK[:, t - 1] += bonus_dS_BHKK
 
@@ -205,15 +242,18 @@ def reference_backward(
     )
 
 
-def single_timestep(
-    r_BHK: Tensor,
-    k_BHK: Tensor,
-    v_BHK: Tensor,
-    w_BHK: Tensor,
-    a_BHK: Tensor,
-    k_deformed_BHK: Tensor,
-    state_BHKK: Tensor,
-):
+def single_timestep[BatchSize: IntVar, HeadCount: IntVar, HeadSize: IntVar](
+    r_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    k_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    v_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    w_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    a_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    k_deformed_BHK: Tensor[[BatchSize, HeadCount, HeadSize]],
+    state_BHKK: Tensor[[BatchSize, HeadCount, HeadSize, HeadSize]],
+) -> tuple[
+    Tensor[[BatchSize, HeadCount, HeadSize]],
+    Tensor[[BatchSize, HeadCount, HeadSize, HeadSize]],
+]:
     r_BHK1 = r_BHK.unsqueeze(-1)
     k_BHK1 = k_BHK.unsqueeze(-1)
     v_BHK1 = v_BHK.unsqueeze(-1)
@@ -223,9 +263,11 @@ def single_timestep(
 
     # Uses broadcasting. Remember that each column in vk_skate gets its own decay.
     state_BHKK = (
+        # pyrefly: ignore [missing-attribute]
         state_BHKK * w_BHK1.mT
-        - state_BHKK @ k_deformed_BHK1 @ (a_BHK1 * k_deformed_BHK1).mT
+        - state_BHKK @ k_deformed_BHK1 @ (a_BHK1 * k_deformed_BHK1).mT  # pyrefly: ignore [missing-attribute]
     )
+    # pyrefly: ignore [missing-attribute]
     state_BHKK = state_BHKK + (v_BHK1 @ k_BHK1.mT)
 
     # Now we have a new updated S. We evaluate it at r and return the output.
@@ -233,15 +275,20 @@ def single_timestep(
     return out_BHK1.squeeze(-1), state_BHKK
 
 
-def reference_rwkv7(
-    r_BTHK: Tensor,
-    k_BTHK: Tensor,
-    v_BTHK: Tensor,
-    w_BTHK: Tensor,
-    a_BTHK: Tensor,
-    k_deformed_BTHK: Tensor,
-    skip_BT: Tensor,
-):
+def reference_rwkv7[
+    BatchSize: IntVar,
+    SeqLen: IntVar,
+    HeadCount: IntVar,
+    HeadSize: IntVar,
+](
+    r_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    v_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    w_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    a_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    k_deformed_BTHK: Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]],
+    skip_BT: Tensor[[BatchSize, SeqLen]],
+) -> Tensor[[BatchSize, SeqLen, HeadCount, HeadSize]]:
     out_dtype = k_BTHK.dtype
     r_BTHK = r_BTHK.float()
     k_BTHK = k_BTHK.float()

@@ -4,13 +4,14 @@ import argparse
 import itertools
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from shape_extensions import IntVar
 
 from config import Config, load_config
 from models.act_r import ACT_R
@@ -19,7 +20,6 @@ from models.fsrs_v6 import FSRS6
 from models.hlr import HLR
 from models.lstm import LSTM
 from models.model_factory import create_model
-
 
 SUPPORTED_MODELS = (
     "FSRSv1",
@@ -71,7 +71,7 @@ def compute_dash_features(
     rating_history: Sequence[int],
     interval_history: Sequence[float],
     enable_decay: bool = False,
-) -> List[float]:
+) -> list[float]:
     if not rating_history:
         return [0.0] * 8
     if len(interval_history) != len(rating_history):
@@ -98,7 +98,7 @@ def compute_dash_features(
     return features.tolist()
 
 
-def compute_hlr_features(success_count: int, failure_count: int) -> torch.Tensor:
+def compute_hlr_features(success_count: int, failure_count: int) -> torch.Tensor[[2]]:
     features = torch.tensor(
         [
             math.sqrt(float(success_count)),
@@ -259,7 +259,7 @@ def flags_from_base_name(model_name: str, base_name: str) -> list[str]:
 
 def load_parameters_from_result(
     path: Path, user_id: int, partition_key: str
-) -> List[float]:
+) -> list[float]:
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             record = json.loads(line)
@@ -285,6 +285,7 @@ def load_parameters_from_result(
 
 
 def load_state_dict(path: Path) -> dict:
+    # pyrefly: ignore [missing-attribute]
     state = torch.load(path, weights_only=False, map_location="cpu")
     if not isinstance(state, dict):
         for key in ("state_dict", "model_state_dict", "model"):
@@ -314,7 +315,7 @@ def instantiate_model(model_name: str, config, model_params: ModelParams):
 
 def validate_inputs(
     args: argparse.Namespace,
-) -> Tuple[List[int], List[float], List[float]]:
+) -> tuple[list[int], list[float], list[float]]:
     ratings = list(args.ratings)
     elapses = list(args.elapses)
     if len(ratings) != len(elapses):
@@ -323,7 +324,7 @@ def validate_inputs(
         raise ValueError("Provide at least one rating.")
     if abs(elapses[0]) > 1e-6:
         raise ValueError("The first elapsed value must be zero.")
-    durations: List[float] = []
+    durations: list[float] = []
     if args.durations:
         if len(args.durations) != len(ratings):
             raise ValueError("durations must have the same length as ratings.")
@@ -331,14 +332,14 @@ def validate_inputs(
     return ratings, elapses, durations
 
 
-def build_sequence_tensor(
+def build_sequence_tensor[SeqLen: IntVar, InputDims: IntVar](
     model_name: str,
     args: argparse.Namespace,
     config,
     elapses: Sequence[float],
     durations: Sequence[float],
     ratings: Sequence[int],
-) -> torch.Tensor:
+) -> torch.Tensor[[SeqLen, 1, InputDims]]:
     if model_name == "LSTM":
         if config.lstm_use_duration:
             if not durations:
@@ -368,7 +369,7 @@ def build_snapshots(
     elapses: Sequence[float],
     durations: Sequence[float],
     ratings: Sequence[int],
-) -> List[Snapshot]:
+) -> list[Snapshot]:
     if is_dash_model(model_name):
         return build_dash_snapshots(model_name, ratings, elapses)
     if model_name == "HLR":
@@ -378,7 +379,7 @@ def build_snapshots(
     sequence = build_sequence_tensor(
         model_name, args, config, elapses, durations, ratings
     )
-    states: List[object] = []
+    states: list[object] = []
 
     if model_name == "LSTM":
         with torch.no_grad():
@@ -398,7 +399,7 @@ def build_snapshots(
         state_tensor = state_tensor[:, 0, :].detach().cpu()
         states = state_tensor[:, 0].tolist()
 
-    snapshots: List[Snapshot] = []
+    snapshots: list[Snapshot] = []
     current_time = 0.0
     for idx, (rating, delta, state) in enumerate(zip(ratings, elapses, states)):
         if idx > 0:
@@ -418,12 +419,12 @@ def build_dash_snapshots(
     model_name: str,
     ratings: Sequence[int],
     elapses: Sequence[float],
-) -> List[Snapshot]:
+) -> list[Snapshot]:
     enable_decay = "MCM" in model_name
-    snapshots: List[Snapshot] = []
+    snapshots: list[Snapshot] = []
     current_time = 0.0
-    history_ratings: List[int] = []
-    history_elapses: List[float] = []
+    history_ratings: list[int] = []
+    history_elapses: list[float] = []
     for idx, (rating, delta) in enumerate(zip(ratings, elapses)):
         delta = float(delta)
         if idx == 0:
@@ -455,10 +456,10 @@ def build_hlr_snapshots(
     config,
     ratings: Sequence[int],
     elapses: Sequence[float],
-) -> List[Snapshot]:
+) -> list[Snapshot]:
     successes = 0
     failures = 0
-    snapshots: List[Snapshot] = []
+    snapshots: list[Snapshot] = []
     current_time = 0.0
     for idx, (rating, delta) in enumerate(zip(ratings, elapses)):
         delta = float(delta)
@@ -488,9 +489,9 @@ def build_hlr_snapshots(
 def build_actr_snapshots(
     ratings: Sequence[int],
     elapses: Sequence[float],
-) -> List[Snapshot]:
-    snapshots: List[Snapshot] = []
-    abs_times: List[float] = []
+) -> list[Snapshot]:
+    snapshots: list[Snapshot] = []
+    abs_times: list[float] = []
     current_time = 0.0
     for idx, (rating, delta) in enumerate(zip(ratings, elapses)):
         delta = float(delta)
@@ -514,7 +515,13 @@ def predict_retention(model, config, state: object, elapsed: float) -> float:
     if isinstance(model, LSTM):
         w, s, d = state  # type: ignore[misc]
         t = torch.full(
-            (w.shape[0],), float(elapsed), dtype=torch.float32, device=config.device
+            # pyrefly: ignore [unexpected-keyword]
+            (w.shape[0],),
+            float(elapsed),
+            # pyrefly: ignore [unexpected-keyword]
+            dtype=torch.float32,
+            # pyrefly: ignore [unexpected-keyword]
+            device=config.device,
         )
         value = model.forgetting_curve(
             t, w.to(config.device), s.to(config.device), d.to(config.device)
@@ -531,7 +538,7 @@ def predict_retention(model, config, state: object, elapsed: float) -> float:
     if isinstance(model, ACT_R):
         if not isinstance(state, dict) or state.get("type") != "actr":
             raise ValueError("Invalid ACT-R state for prediction.")
-        times: List[float] = state.get("times", [])
+        times: list[float] = state.get("times", [])
         if not times:
             times = [0.0]
         last_time = times[-1]
@@ -546,8 +553,8 @@ def predict_retention(model, config, state: object, elapsed: float) -> float:
     if isinstance(model, DASH):
         if not isinstance(state, dict) or state.get("type") != "dash":
             raise ValueError("Invalid DASH state for prediction.")
-        ratings_hist: List[int] = state["ratings"]
-        elapses_hist: List[float] = state["elapses"]
+        ratings_hist: list[int] = state["ratings"]
+        elapses_hist: list[float] = state["elapses"]
         enable_decay = bool(state.get("enable_decay", False))
         interval_history = elapses_hist[1:].copy()
         interval_history.append(float(elapsed))
@@ -631,7 +638,7 @@ def plot_model_curves(args: argparse.Namespace, bundles: Sequence[ModelPlotBundl
             ]
             xs = [start + x for x in xs_local]
             label = display_name if not label_used else None
-            (line,) = plt.plot(xs, ys, label=label, color=color)
+            (_line,) = plt.plot(xs, ys, label=label, color=color)
             if not label_used and label is not None:
                 label_used = True
 

@@ -1,6 +1,11 @@
 import pandas as pd
+
 from config import Config
 from features import create_features
+
+
+class InsufficientUserDataError(ValueError):
+    """Raised when a user has too few reviews to run the benchmark."""
 
 
 class UserDataLoader:
@@ -9,6 +14,25 @@ class UserDataLoader:
     def __init__(self, config: Config):
         self.config = config
         self.data_path = config.data_path
+
+    def _read_user_partition(self, kind: str, user_id: int) -> pd.DataFrame:
+        """Read one user's cards/decks from the direct hive-partition path.
+
+        Equivalent to ``read_parquet(kind, filters=[("user_id", "=", uid)])`` followed
+        by dropping the ``user_id`` column, but avoids pyarrow re-discovering all ~3000
+        partitions on every call (~700 ms -> ~3 ms). The partition path encodes
+        ``user_id``, so it is absent from the returned columns either way. Users with no
+        partition directory (e.g. revlogs but no cards) fall back to the filtered read,
+        which yields the same empty frame.
+        """
+        path = self.data_path / kind / f"user_id={user_id}"
+        if path.exists():
+            df = pd.read_parquet(path)
+            if "user_id" in df.columns:
+                df = df.drop(columns=["user_id"])
+            return df
+        df = pd.read_parquet(self.data_path / kind, filters=[("user_id", "=", user_id)])
+        return df.drop(columns=["user_id"])
 
     def load_user_data(self, user_id: int) -> pd.DataFrame:
         """
@@ -21,7 +45,7 @@ class UserDataLoader:
             pd.DataFrame: Processed dataset with features
 
         Raises:
-            Exception: If there is not enough data for the user
+            InsufficientUserDataError: If there is not enough data for the user
         """
         # Load revlogs
         df_revlogs = pd.read_parquet(
@@ -32,20 +56,13 @@ class UserDataLoader:
         dataset = create_features(df_revlogs, config=self.config)
 
         if dataset.shape[0] < 6:
-            raise Exception(f"{user_id} does not have enough data.")
+            raise InsufficientUserDataError(f"{user_id} does not have enough data.")
 
         # Handle partitions if needed
         if self.config.partitions != "none":
             # Load cards and decks
-            df_cards = pd.read_parquet(
-                self.data_path / "cards", filters=[("user_id", "=", user_id)]
-            )
-            df_cards.drop(columns=["user_id"], inplace=True)
-
-            df_decks = pd.read_parquet(
-                self.data_path / "decks", filters=[("user_id", "=", user_id)]
-            )
-            df_decks.drop(columns=["user_id"], inplace=True)
+            df_cards = self._read_user_partition("cards", user_id)
+            df_decks = self._read_user_partition("decks", user_id)
 
             # Merge all data
             dataset = dataset.merge(df_cards, on="card_id", how="left").merge(

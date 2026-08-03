@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import torch
-from torch import nn, Tensor
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
@@ -24,7 +27,7 @@ class RNNWrapper(nn.Module):
         return outputs
 
 
-class LSTM(BaseModel):
+class LSTM[NormalizationDims: IntVar](BaseModel):
     """
     This model is trained with reptile_trainer.py, and was run with the flags
     ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
@@ -43,14 +46,21 @@ class LSTM(BaseModel):
     The effect on the resulting metrics is minor, but future work should be done to remove this influence.
     """
 
+    input_mean: Tensor[[]] | Tensor[[NormalizationDims]]
+    input_std: Tensor[[]] | Tensor[[NormalizationDims]]
+
     def __init__(
         self,
         config: Config,
         state_dict=None,
-        input_mean=torch.tensor(0.0),
-        input_std=torch.tensor(1.0),
+        input_mean: Tensor[[]] | Tensor[[NormalizationDims]] | None = None,
+        input_std: Tensor[[]] | Tensor[[NormalizationDims]] | None = None,
     ):
         super().__init__(config)
+        if input_mean is None:
+            input_mean = torch.tensor(0.0)
+        if input_std is None:
+            input_std = torch.tensor(1.0)
         self.register_buffer("input_mean", input_mean)
         self.register_buffer("input_std", input_std)
         self.use_duration_feature = config.lstm_use_duration
@@ -105,9 +115,7 @@ class LSTM(BaseModel):
         )
 
         for name, param in self.named_parameters():
-            if "weight_ih" in name:  # Input-to-hidden weights
-                nn.init.orthogonal_(param.data)
-            elif "weight_hh" in name:  # Hidden-to-hidden weights
+            if "weight_ih" in name or "weight_hh" in name:  # Input-to-hidden weights
                 nn.init.orthogonal_(param.data)
             elif "bias_ih" in name:  # Biases
                 start_index = len(param.data) // 4
@@ -123,6 +131,7 @@ class LSTM(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -136,7 +145,15 @@ class LSTM(BaseModel):
         self.register_buffer("input_mean", mean_i)
         self.register_buffer("input_std", std_i)
 
-    def forward(self, x_lni, hx=None):
+    def forward[SeqLen: IntVar, BatchSize: IntVar, InputDims: IntVar](
+        self,
+        x_lni: Tensor[[SeqLen, BatchSize, InputDims]],
+        hx=None,
+    ) -> tuple[
+        Tensor[[SeqLen, BatchSize, 3]],
+        Tensor[[SeqLen, BatchSize, 3]],
+        Tensor[[SeqLen, BatchSize, 3]],
+    ]:
         x_rating = x_lni[..., -1:]
         x_features = x_lni[..., :-1]
 
@@ -152,6 +169,7 @@ class LSTM(BaseModel):
         x_main = (x_main - self.input_mean) / self.input_std
 
         x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))
+        # pyrefly: ignore [missing-attribute]
         x_rating = torch.nn.functional.one_hot(
             x_rating.squeeze(-1).long() - 1, num_classes=4
         ).float()
@@ -161,15 +179,16 @@ class LSTM(BaseModel):
         w_lnh = torch.nn.functional.softmax(self.w_fc(x_lnh), dim=-1)
         s_lnh = torch.exp(torch.clamp(self.s_fc(x_lnh), min=-25, max=25))
         d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
+        # pyrefly: ignore [bad-return]
         return w_lnh, s_lnh, d_lnh
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar, InputDims: IntVar](
         self,
-        sequences: Tensor,
-        delta_n: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, InputDims]],
+        delta_n: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[BatchSize, 3]]]:
         w_lnh, s_lnh, d_lnh = self.forward(sequences)
         (_, n, h) = w_lnh.shape
         delta_nh = delta_n.unsqueeze(-1).expand(n, h)

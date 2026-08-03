@@ -1,8 +1,8 @@
 import argparse
-from pathlib import Path
-import tomli
 from argparse import Namespace
+from pathlib import Path
 
+import tomli
 import torch
 
 

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import torch
-from torch import nn, Tensor
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
@@ -16,6 +19,7 @@ class Transformer(BaseModel):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
+        # pyrefly: ignore [missing-attribute]
         self.transformer = nn.Transformer(
             d_model=self.n_input,
             nhead=self.n_input,
@@ -30,6 +34,7 @@ class Transformer(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -39,20 +44,23 @@ class Transformer(BaseModel):
             except FileNotFoundError:
                 pass
 
-    def forward(self, src):
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
+        self,
+        src: Tensor[[SeqLen, BatchSize, 2]],
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 1]], None]:
         tgt = torch.zeros(1, src.shape[1], self.n_input).to(device=self.config.device)
         output = self.transformer(src, tgt)
         output = self.fc(output)
         output = torch.exp(output).repeat(src.shape[0], 1, 1)
         return output, None
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs, _ = self.forward(sequences)
         stabilities = outputs[
             seq_lens - 1,

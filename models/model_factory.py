@@ -1,9 +1,10 @@
-from typing import Any, Dict, Union, List, Optional, cast
+from typing import Any, Optional, Union, cast
+
 import torch
+from shape_extensions import IntVar
+
 from config import Config, ModelName
-
 from models import *
-
 
 MODEL_REGISTRY: dict[ModelName, Any] = {
     "FSRSv1": FSRS1,
@@ -22,10 +23,9 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
     "SM2-trainable": SM2,
     "Anki": Anki,
     "RNN": RNN,
-    "GRU": RNN,  # GRU uses the RNN class definition as per original script
+    "GRU": GRU,
     "LogisticRegression": LogisticRegression,
     "LSTM": LSTM,
-    "GRU-P": GRU_P,
     "Transformer": Transformer,
     "NN-17": NN_17,
     "90%": ConstantModel,
@@ -41,9 +41,17 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
 # - "FSRS-6-one-step"
 
 
-def create_model(
+def create_model[ParamRows: IntVar, ParamCols: IntVar](
     config: Config,
-    model_params: Optional[Union[List[float], Dict[str, torch.Tensor], float]] = None,
+    model_params: list[float]
+    | dict[
+        str,
+        torch.Tensor[[]]
+        | torch.Tensor[[ParamRows]]
+        | torch.Tensor[[ParamRows, ParamCols]],
+    ]
+    | float
+    | None = None,
 ) -> TrainableModel:
     """
     Creates and returns an instance of the specified model.
@@ -104,7 +112,6 @@ def create_model(
         "RNN",
         "GRU",
         "LSTM",
-        "GRU-P",
         "Transformer",
         "NN-17",
     ]:  # Neural nets

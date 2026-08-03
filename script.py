@@ -1,41 +1,43 @@
 import copy
 import json
-import sys
-import os
-import pandas as pd
-import numpy as np
-from typing import Optional, Any, cast
-from pathlib import Path
-import matplotlib.pyplot as plt
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import torch
-from torch import nn
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
-from tqdm.auto import tqdm  # type: ignore
-import warnings
-from models.model_factory import create_model
-from models.trainable import TrainableModel
-from reptile_trainer import get_inner_opt, finetune
 import multiprocessing as mp
-import pyarrow.parquet as pq  # type: ignore
-from config import create_parser, Config
-from utils import (
-    catch_exceptions,
-    save_evaluation_file,
-    evaluate,
-    batch_process_wrapper,
-    sort_jsonl,
-    Collection,
-    get_model_state,
-)
+import os
+import sys
+import time
+import warnings
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+from typing import Any, Optional, cast
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+import torch
+from sklearn.model_selection import TimeSeriesSplit
+from torch import nn
+from tqdm.auto import tqdm
+
+from config import Config, create_parser
 from data_loader import UserDataLoader
 from model_processors import (
-    process_untrainable,
     baseline,
-    rmse_bins_exploit,
+    fsrs_one_step,
     moving_avg,
     process_fsrs_rs,
-    fsrs_one_step,
+    process_untrainable,
+    rmse_bins_exploit,
+)
+from models.model_factory import create_model
+from models.trainable import TrainableModel
+from utils import (
+    Collection,
+    batch_process_wrapper,
+    catch_exceptions,
+    evaluate,
+    get_model_state,
+    save_evaluation_file,
+    sort_jsonl,
 )
 
 parser = create_parser()
@@ -45,23 +47,24 @@ config = Config(args)
 if config.dev_mode:
     sys.path.insert(0, os.path.abspath(config.fsrs_optimizer_module_path))
 
-from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
+from fsrs_optimizer import BatchDataset, BatchLoader
 
 warnings.filterwarnings("ignore", category=UserWarning)
+# pyrefly: ignore [missing-attribute]
 torch.manual_seed(config.seed)
 tqdm.pandas()
 
 
 class Trainer:
     optimizer: torch.optim.Optimizer
-    test_set: Optional[BatchDataset]
-    test_data_loader: Optional[BatchLoader]
+    test_set: BatchDataset | None
+    test_data_loader: BatchLoader | None
 
     def __init__(
         self,
         model: TrainableModel,
         train_set: pd.DataFrame,
-        test_set: Optional[pd.DataFrame],
+        test_set: pd.DataFrame | None,
         batch_size: int = 256,
         max_seq_len: int = 64,
     ) -> None:
@@ -83,14 +86,16 @@ class Trainer:
 
         # Setup scheduler
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=self.train_data_loader.batch_nums * self.n_epoch
+            # pyrefly: ignore [bad-argument-type]
+            self.optimizer,
+            T_max=self.train_data_loader.batch_nums * self.n_epoch,
         )
 
         self.avg_train_losses: list[float] = []
         self.avg_eval_losses: list[float] = []
         self.loss_fn = nn.BCELoss(reduction="none")
 
-    def build_dataset(self, train_set: pd.DataFrame, test_set: Optional[pd.DataFrame]):
+    def build_dataset(self, train_set: pd.DataFrame, test_set: pd.DataFrame | None):
         self.train_set = BatchDataset(
             train_set.copy(),
             self.batch_size,
@@ -206,11 +211,12 @@ class Trainer:
         return fig
 
 
-def _configure_process_device(device_id: Optional[int]) -> None:
+def _configure_process_device(device_id: int | None) -> None:
     if device_id is None:
         return
     if not torch.cuda.is_available():
         return
+    # pyrefly: ignore [missing-attribute]
     if config.device.type != "cuda":
         return
     device_count = torch.cuda.device_count()
@@ -225,7 +231,14 @@ def _configure_process_device(device_id: Optional[int]) -> None:
             import reptile_trainer
 
             reptile_trainer.DEVICE = config.device
-        except Exception:
+        except ImportError:
+            pass
+    elif config.model_name == "GRU":
+        try:
+            import reptile_trainer_gru
+
+            reptile_trainer_gru.DEVICE = config.device
+        except ImportError:
             pass
 
 
@@ -277,6 +290,8 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         return get_model_state(model)
 
     if config.model_name == "LSTM":
+        from reptile_trainer import finetune, get_inner_opt
+
         model = model.to(config.device)
         inner_opt = get_inner_opt(
             model.parameters(),
@@ -289,6 +304,26 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         )
         weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt
+        # pyrefly: ignore [missing-attribute]
+        if config.device.type == "mps":
+            torch.mps.empty_cache()
+        return weights
+    elif config.model_name == "GRU":
+        from reptile_trainer_gru import finetune, get_inner_opt
+
+        model = model.to(config.device)
+        inner_opt = get_inner_opt(
+            model.parameters(),
+            path=f"./pretrain/{config.get_optimizer_file_name()}_pretrain.pth",
+        )
+        trained_model = finetune(
+            train_df,
+            model,
+            inner_opt.state_dict(),
+        )
+        weights = copy.deepcopy(get_model_state(trained_model))
+        del trained_model, inner_opt
+        # pyrefly: ignore [missing-attribute]
         if config.device.type == "mps":
             torch.mps.empty_cache()
         return weights
@@ -307,9 +342,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
 
 
 @catch_exceptions
-def process(
-    user_id: int, device_id: Optional[int] = None
-) -> tuple[dict, Optional[dict]]:
+def process(user_id: int, device_id: int | None = None) -> tuple[dict, dict | None]:
     """Main processing function for all models."""
     plt.close("all")
     _configure_process_device(device_id)
@@ -379,7 +412,7 @@ def process(
                     user_level_weights = None
                 else:
                     print(f"User: {user_id}")
-                    raise e
+                    raise
 
         partition_weights = {}
 
@@ -420,7 +453,7 @@ def process(
                         )
                 else:
                     print(f"User: {user_id}")
-                    raise e
+                    raise
 
         w_list.append(partition_weights)
 
@@ -484,7 +517,7 @@ if __name__ == "__main__":
     raw_file = Path(f"raw/{config.get_evaluation_file_name()}.jsonl")
     if result_file.exists():
         data = sort_jsonl(result_file)
-        processed_user = set(map(lambda x: x["user"], data))
+        processed_user = {x["user"] for x in data}
     else:
         processed_user = set()
 
@@ -500,10 +533,21 @@ if __name__ == "__main__":
             continue
         unprocessed_users.append(user_id_value)
 
-    unprocessed_users.sort()
+    # LPT (longest-processing-time-first) scheduling: process the largest users
+    # first so a worker doesn't get stuck on a 1M-review user while others idle.
+    # Bit-for-bit safe: processing order never affects any per-user result (FSRS/DASH/HLR
+    # shuffle via a private BatchLoader generator, independent of order), and
+    # sort_jsonl() re-sorts the final result file by user id. user_order.jsonl holds the
+    # user ids in descending review-count order, one per line (size verified
+    # config-independent).
+    with open(Path(__file__).parent / "user_order.jsonl", encoding="utf-8") as f:
+        _user_ids_by_size_desc = [int(line) for line in f if line.strip()]
+    _lpt_rank = {u: i for i, u in enumerate(_user_ids_by_size_desc)}
+    unprocessed_users.sort(key=lambda u: _lpt_rank.get(u, len(_user_ids_by_size_desc)))
 
     cuda_device_ids = None
     if config.cuda_device_ids:
+        # pyrefly: ignore [missing-attribute]
         if config.device.type != "cuda":
             print("Warning: --gpus ignored because CUDA is not enabled for this model.")
         else:
@@ -520,6 +564,10 @@ if __name__ == "__main__":
                     "Warning: --processes exceeds --gpus; multiple workers will share GPUs."
                 )
 
+    # Speedup-timing instrumentation (gated by SRSB_TIMING env). __MAKESPAN__ is the
+    # wall time of the parallel compute block (per-user work + scheduling, incl. LPT).
+    # stderr-only; never touches outputs -> bit-for-bit correctness-neutral.
+    _srsb_t0 = time.perf_counter() if os.environ.get("SRSB_TIMING") == "1" else None
     with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
         futures = [
             executor.submit(
@@ -532,7 +580,14 @@ if __name__ == "__main__":
             for idx, user_id in enumerate(unprocessed_users)
         ]
         for future in (
-            pbar := tqdm(as_completed(futures), total=len(futures), smoothing=0.03)
+            pbar := tqdm(
+                as_completed(futures),
+                total=len(futures),
+                smoothing=0.03,
+                # Disable the progress bar when output isn't a real terminal
+                # (e.g. captured/redirected) so the \r-driven bar doesn't flood logs.
+                disable=not sys.stderr.isatty(),
+            )
         ):
             try:
                 result, error = future.result()
@@ -546,8 +601,15 @@ if __name__ == "__main__":
                         with open(raw_file, "a", encoding="utf-8", newline="\n") as f:
                             f.write(json.dumps(raw, ensure_ascii=False) + "\n")
                     pbar.set_description(f"Processed {stats['user']}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- report failures from worker futures
                 tqdm.write(str(e))
+
+    if _srsb_t0 is not None:
+        print(
+            f"__MAKESPAN__ {time.perf_counter() - _srsb_t0:.6f}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     sort_jsonl(result_file)
     if config.save_raw_output:

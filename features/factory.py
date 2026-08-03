@@ -1,27 +1,26 @@
+from typing import get_args
+
+from config import Config, ModelName
 from features.logistic_regression_engineer import LogisticRegressionEngineer
 
 from .base import BaseFeatureEngineer
+from .dash_engineer import (
+    DashACTRFeatureEngineer,
+    DashFeatureEngineer,
+    DashMCMFeatureEngineer,
+)
 from .fsrs_engineer import FSRSFeatureEngineer
 from .fsrs_one_step_engineer import FSRSOneStepFeatureEngineer
 from .lstm_engineer import LSTMFeatureEngineer
-from .dash_engineer import (
-    DashFeatureEngineer,
-    DashMCMFeatureEngineer,
-    DashACTRFeatureEngineer,
-)
+from .memory_engineer import EbisuFeatureEngineer, SM2FeatureEngineer
 from .neural_engineer import (
-    GRUPFeatureEngineer,
-    HLRFeatureEngineer,
     ACTRFeatureEngineer,
+    HLRFeatureEngineer,
     NN17FeatureEngineer,
 )
-from .memory_engineer import SM2FeatureEngineer, EbisuFeatureEngineer
 from .simple_engineer import AVGFeatureEngineer, RMSEBinsExploitFeatureEngineer
-from config import Config, ModelName
-from typing import Type, get_args
 
-
-FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
+FEATURE_ENGINEER_REGISTRY: dict[ModelName, type[BaseFeatureEngineer]] = {
     # FSRS family and similar models that use standard tensor format
     "FSRSv1": FSRSFeatureEngineer,
     "FSRSv2": FSRSFeatureEngineer,
@@ -34,15 +33,14 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, Type[BaseFeatureEngineer]] = {
     "FSRS-rs": FSRSFeatureEngineer,
     "FSRS-6-one-step": FSRSOneStepFeatureEngineer,
     "RNN": FSRSFeatureEngineer,
-    "GRU": FSRSFeatureEngineer,
     "Transformer": FSRSFeatureEngineer,
     "SM2-trainable": FSRSFeatureEngineer,
     "Anki": FSRSFeatureEngineer,
     "90%": FSRSFeatureEngineer,
     # Specialized models
     "LogisticRegression": LogisticRegressionEngineer,
+    "GRU": LSTMFeatureEngineer,
     "LSTM": LSTMFeatureEngineer,
-    "GRU-P": GRUPFeatureEngineer,
     "HLR": HLRFeatureEngineer,
     "ACT-R": ACTRFeatureEngineer,
     "NN-17": NN17FeatureEngineer,

@@ -1,7 +1,8 @@
-from typing import List
+from typing import ClassVar, Optional
+
 import torch
-from torch import nn, Tensor
-from typing import Optional
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
 from models.fsrs import FSRS, FSRSParameterClipper
@@ -23,19 +24,22 @@ class FSRS1ParameterClipper(FSRSParameterClipper):
 
 class FSRS1(FSRS):
     # 7 params
-    init_w = [2, 5, 3, -0.7, -0.2, 1, -0.3]
+    init_w: ClassVar[list[float]] = [2, 5, 3, -0.7, -0.2, 1, -0.3]
     clipper = FSRS1ParameterClipper()
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
 
-    def stability_after_success(
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_success[BatchSize: IntVar](
+        self,
+        state: Tensor[[BatchSize, 3]],
+        new_d: Tensor[[BatchSize]],
+        r: Tensor[[BatchSize]],
+    ) -> Tensor[[BatchSize]]:
         new_s = state[:, 0] * (
             1
             + torch.exp(self.w[2])
@@ -45,11 +49,15 @@ class FSRS1(FSRS):
         )
         return new_s
 
-    def stability_after_failure(self, lapses: Tensor) -> Tensor:
+    def stability_after_failure[BatchSize: IntVar](
+        self, lapses: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         new_s = self.w[0] * torch.exp(self.w[6] * lapses)
         return new_s
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 3]]
+    ) -> Tensor[[BatchSize, 3]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 3], state[:,0] is stability, state[:,1] is difficulty, state[:,2] is the number of lapses
@@ -57,11 +65,13 @@ class FSRS1(FSRS):
         """
         if torch.equal(state, torch.zeros_like(state)):
             # first learn, init memory states
+            # pyrefly: ignore [bad-argument-type]
             new_s = self.w[0] * 0.25 * torch.pow(2, X[:, 1] - 1)
             new_d = self.w[1] - X[:, 1] + 3
             new_l = torch.relu(2 - X[:, 1])
         else:
             r = self.forgetting_curve(X[:, 0], state[:, 0])
+            # pyrefly: ignore [bad-argument-type]
             new_d = torch.relu(state[:, 1] + r - 0.25 * torch.pow(2, X[:, 1] - 1) + 0.1)
             condition = X[:, 1] > 1
             new_s = torch.where(
@@ -73,9 +83,12 @@ class FSRS1(FSRS):
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d, new_l], dim=1)
 
-    def forward(
-        self, inputs: Tensor, state: Optional[Tensor] = None
-    ) -> tuple[Tensor, Tensor]:
+    # pyrefly: ignore [bad-override]
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
+        self,
+        inputs: Tensor[[SeqLen, BatchSize, 2]],
+        state: Tensor[[BatchSize, 3]] | None = None,
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 3]], Tensor[[BatchSize, 3]]]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """
@@ -88,9 +101,4 @@ class FSRS1(FSRS):
         return torch.stack(outputs), state
 
     def benchmark_state(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
+        return [round(float(x), 4) for x in dict(self.named_parameters())["w"].data]

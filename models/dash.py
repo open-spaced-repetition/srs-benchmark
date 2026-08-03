@@ -1,13 +1,16 @@
+from typing import ClassVar, Optional
+
 import torch
-from torch import nn, Tensor
-from typing import List, Optional
+from shape_extensions import IntVar
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel
 
 
 class DASH(BaseModel):
     # 9 params
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.2024,
         0.5967,
         0.1255,
@@ -19,7 +22,7 @@ class DASH(BaseModel):
         0.787,
     ]
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: list[float] | None = None):
         super().__init__(config)
         self.fc = nn.Linear(8, 1)
         self.sigmoid = nn.Sigmoid()
@@ -63,13 +66,13 @@ class DASH(BaseModel):
         x = self.sigmoid(x)
         return x
 
-    def batch_process(
+    def batch_process[FeatureCount: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[FeatureCount, BatchSize]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs = self.forward(sequences.transpose(0, 1))
         return {"retentions": outputs.squeeze(1)}
 

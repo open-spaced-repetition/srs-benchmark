@@ -1,30 +1,10 @@
-from typing import Any, List, cast
+from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import torch
-import numpy as np
+
 from .base import BaseFeatureEngineer
-
-
-class GRUPFeatureEngineer(BaseFeatureEngineer):
-    """
-    Feature engineer for GRU-P model
-    Uses time intervals starting from second review and ratings up to previous review
-    """
-
-    def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Create GRU-P features: (time_intervals[1:], ratings[:-1])
-        """
-        t_history_list, r_history_list = self.get_history_lists(df)
-
-        cast(Any, df)["tensor"] = [
-            torch.tensor((t_item[1:], r_item[:-1]), dtype=torch.float32).transpose(0, 1)
-            for t_sublist, r_sublist in zip(t_history_list, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-
-        return df
 
 
 class HLRFeatureEngineer(BaseFeatureEngineer):
@@ -101,7 +81,7 @@ class NN17FeatureEngineer(BaseFeatureEngineer):
 
         return df
 
-    def _r_history_to_l_history(self, r_history: List) -> List[int]:
+    def _r_history_to_l_history(self, r_history: list) -> list[int]:
         """
         Convert rating history to lapse history (cumulative failure count)
 

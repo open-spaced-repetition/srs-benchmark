@@ -1,5 +1,9 @@
+from typing import ClassVar, override
+
 import torch
-from torch import nn, Tensor
+from shape_extensions import IntTuple, IntVar
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel, BaseParameterClipper
 
@@ -42,15 +46,16 @@ class ExpActivation(nn.Module):
     def __init__(self):
         super().__init__()  # init the base class
 
+    @override
     def forward(self, input):
         return exp_activ(input)
 
 
 class NN_17(BaseModel):
     # 39 params
-    init_s = [1, 2.5, 4.5, 10]
-    init_d = [1, 0.72, 0.07, 0.05]
-    w = [1.26, 0.0, 0.67]
+    init_s: ClassVar[list[float]] = [1, 2.5, 4.5, 10]
+    init_d: ClassVar[list[float]] = [1, 0.72, 0.07, 0.05]
+    w: ClassVar[list[float]] = [1.26, 0.0, 0.67]
 
     def __init__(self, config: Config, state_dict=None) -> None:
         super().__init__(config)
@@ -112,6 +117,7 @@ class NN_17(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -121,6 +127,7 @@ class NN_17(BaseModel):
             except FileNotFoundError:
                 pass
 
+    @override
     def forward(self, inputs):
         state = torch.ones((inputs.shape[1], 2), device=self.config.device)
         outputs = []
@@ -129,13 +136,13 @@ class NN_17(BaseModel):
             outputs.append(state)
         return torch.stack(outputs), state
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 3]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs, _ = self.forward(sequences)
         stabilities = outputs[
             seq_lens - 1,
@@ -153,7 +160,9 @@ class NN_17(BaseModel):
         ).squeeze(1)
         return {"retentions": retentions, "stabilities": stabilities}
 
-    def step(self, X, state):
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 3]], state: Tensor[[BatchSize, 2]]
+    ):
         """
         :param input: shape[batch_size, 3]
             input[:,0] is elapsed time
@@ -172,6 +181,7 @@ class NN_17(BaseModel):
             # first review
             keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             new_s = torch.zeros_like(state[:, 0])
             new_s[index[0]] = self.S0[index[1]]
@@ -226,9 +236,11 @@ class NN_17(BaseModel):
         next_state = torch.concat([new_s, new_d], dim=1)
         return next_state
 
-    def forgetting_curve(self, t, s):
+    def forgetting_curve[Shape: IntTuple](self, t: Tensor[Shape], s: Tensor[Shape]):
         return 0.9 ** (t / s)
 
-    def inverse_forgetting_curve(self, r: Tensor, t: Tensor) -> Tensor:
+    def inverse_forgetting_curve[Shape: IntTuple](
+        self, r: Tensor[Shape], t: Tensor[Shape]
+    ):
         log_09 = -0.10536051565782628
         return log_09 / torch.log(r) * t

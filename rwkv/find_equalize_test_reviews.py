@@ -1,16 +1,17 @@
-import psutil
 from multiprocessing import Pool
-import torch
-from tqdm import tqdm
-from config import Config, create_parser
-from utils import get_bin
-from features import create_features
-import pandas as pd
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
-import lmdb
 
+import lmdb
+import pandas as pd
+import psutil
+import torch
+from sklearn.model_selection import TimeSeriesSplit
+from tqdm import tqdm
+
+from config import Config, create_parser
+from features import create_features
 from rwkv.parse_toml import parse_toml
 from rwkv.utils import save_tensor
+from utils import get_bin
 
 rwkv_config = parse_toml()
 lmdb_env = None
@@ -104,7 +105,7 @@ def set_low_priority():
         else:
             # POSIX: nice level 19 is the lowest priority
             p.nice(19)
-    except Exception as e:
+    except (OSError, ValueError, psutil.Error) as e:
         print(f"Failed to set priority: {e}")
 
 

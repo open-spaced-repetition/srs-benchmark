@@ -1,8 +1,11 @@
-from typing import List, Union
+from __future__ import annotations
+
+from typing import ClassVar, Optional, Union, overload, override
+
 import pandas as pd
 import torch
-from torch import nn, Tensor
-from typing import Optional
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
 from models.fsrs_v4dot5 import FSRS4dot5, FSRS4dot5ParameterClipper
@@ -39,7 +42,7 @@ class FSRS5ParameterClipper(FSRS4dot5ParameterClipper):
 
 
 class FSRS5(FSRS4dot5):
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.40255,
         1.18385,
         3.173,
@@ -85,7 +88,7 @@ class FSRS5(FSRS4dot5):
         ]
     )
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: list[float] | None = None):
         super().__init__(config)
         if w is None:
             w = self.init_w
@@ -93,31 +96,38 @@ class FSRS5(FSRS4dot5):
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
         self.clipper = FSRS5ParameterClipper(config)
 
+    @override
     def filter_training_data(self, train_set: pd.DataFrame) -> pd.DataFrame:
         return train_set
 
+    @override
     def apply_gradient_constraints(self):
         pass
 
-    def batch_process(
+    @override
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
-        output = super().batch_process(sequences, delta_ts, seq_lens, real_batch_size)
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[]]]:
+        output: dict[str, Tensor[[BatchSize]] | Tensor[[]]] = super().batch_process(
+            sequences, delta_ts, seq_lens, real_batch_size
+        )
         output["penalty"] = (
             torch.sum(
-                torch.square(self.w - self.init_w_tensor)
-                / torch.square(self.default_params_stddev_tensor)
+                torch.square(self.w - self.init_w_tensor)  # pyrefly: ignore [missing-attribute]
+                / torch.square(self.default_params_stddev_tensor)  # pyrefly: ignore [missing-attribute]
             )
             * real_batch_size
             * self.gamma
         )
         return output
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
+    def stability_after_failure[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], r: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:  # type: ignore[override]
         old_s = state[:, 0]
         new_s = (
             self.w[11]
@@ -128,24 +138,43 @@ class FSRS5(FSRS4dot5):
         new_minimum_s = old_s / torch.exp(self.w[17] * self.w[18])
         return torch.minimum(new_s, new_minimum_s)
 
-    def stability_short_term(self, state: Tensor, rating: Tensor) -> Tensor:
+    def stability_short_term[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         new_s = state[:, 0] * torch.exp(self.w[17] * (rating - 3 + self.w[18]))
         return new_s
 
-    def init_d(self, rating: Union[int, Tensor]) -> Tensor:
+    @overload
+    def init_d(self, rating: int) -> Tensor[[]]: ...
+
+    @overload
+    def init_d[BatchSize: IntVar](
+        self, rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]: ...
+
+    def init_d[BatchSize: IntVar](
+        self, rating: int | Tensor[[BatchSize]]
+    ) -> Tensor[[]] | Tensor[[BatchSize]]:
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
-    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+    def linear_damping[BatchSize: IntVar](
+        self, delta_d: Tensor[[BatchSize]], old_d: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return delta_d * (10 - old_d) / 9
 
-    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
+    def next_d[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         delta_d = -self.w[6] * (rating - 3)
         new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
         new_d = self.mean_reversion(self.init_d(4), new_d)
         return new_d
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    @override
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
@@ -154,6 +183,7 @@ class FSRS5(FSRS4dot5):
         if torch.equal(state, torch.zeros_like(state)):
             keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
             new_s = torch.ones_like(state[:, 0], device=self.config.device)

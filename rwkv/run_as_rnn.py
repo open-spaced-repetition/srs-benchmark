@@ -4,6 +4,9 @@ This script demonstrates RWKV run as an RNN.
 
 import numpy as np
 import pandas as pd
+import torch
+
+from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.config import (
     DAY_OFFSET_ENCODE_PERIODS,
     ID_ENCODE_DIMS,
@@ -26,10 +29,8 @@ from rwkv.data_processing import (
     scale_state,
 )
 from rwkv.get_result import get_benchmark_info, get_stats
-import torch
 from rwkv.model.srs_model_rnn import SrsRWKVRnn
 from rwkv.parse_toml import parse_toml
-from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 
 
 class RNNProcess:
@@ -338,6 +339,7 @@ class RNNProcess:
         return curve
 
 
+# pyrefly: ignore [missing-attribute]
 @torch.inference_mode()
 def run(data_path, model_path, label_db_path, label_db_size, user_id, verbose):
     """Runs the rnn version of rwkv to explicitly show information flow. Written to guard against possible data leakage.

@@ -1,15 +1,15 @@
-from pandas import Series
-from typing import List, Optional
 import math
-import pandas as pd
-from tqdm.auto import tqdm
+from typing import Optional, override
+
 import numpy as np
+import pandas as pd
+from fsrs_optimizer import DEFAULT_PARAMETER
+from pandas import Series
 from scipy.optimize import minimize
+from tqdm.auto import tqdm
 
 from config import Config
 from models.base import BaseModel
-from fsrs_optimizer import DEFAULT_PARAMETER
-
 
 S_MIN = 0.001
 
@@ -17,7 +17,7 @@ S_MIN = 0.001
 class FSRS_one_step(BaseModel):
     init_w = DEFAULT_PARAMETER
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = w.copy()
         self.lr = 1e-4
@@ -95,6 +95,7 @@ class FSRS_one_step(BaseModel):
 
             return new_s, new_d
 
+    @override
     def forward(self, inputs):
         last_s = None
         last_d = None
@@ -246,6 +247,7 @@ class FSRS_one_step(BaseModel):
         self.w[16] = max(1, min(self.w[16], 6))
         self.w[20] = max(0.1, min(self.w[20], 0.8))
 
+    @override
     def initialize_parameters(self, train_set: pd.DataFrame) -> None:
         S0_dataset_group = (
             train_set[train_set["i"] == 2]
@@ -277,7 +279,13 @@ class FSRS_one_step(BaseModel):
 
             init_s0 = r_s0_default[first_rating]
 
-            def loss(stability):
+            def loss(
+                stability,
+                delta_t=delta_t,
+                recall=recall,
+                count=count,
+                init_s0=init_s0,
+            ):
                 y_pred = self.forgetting_curve(delta_t, stability)
                 logloss = sum(
                     -(recall * np.log(y_pred) + (1 - recall) * np.log(1 - y_pred))
@@ -309,14 +317,17 @@ class FSRS_one_step(BaseModel):
             (2, 4),
             (1, 4),
         ):
-            if small_rating in rating_stability and big_rating in rating_stability:
+            if (
+                small_rating in rating_stability
+                and big_rating in rating_stability
+                and rating_stability[small_rating] > rating_stability[big_rating]
+            ):
                 # if rating_count[small_rating] > 300 and rating_count[big_rating] > 300:
                 #     continue
-                if rating_stability[small_rating] > rating_stability[big_rating]:
-                    if rating_count[small_rating] > rating_count[big_rating]:
-                        rating_stability[big_rating] = rating_stability[small_rating]
-                    else:
-                        rating_stability[small_rating] = rating_stability[big_rating]
+                if rating_count[small_rating] > rating_count[big_rating]:
+                    rating_stability[big_rating] = rating_stability[small_rating]
+                else:
+                    rating_stability[small_rating] = rating_stability[big_rating]
 
         w1 = 0.41
         w2 = 0.54
@@ -325,9 +336,9 @@ class FSRS_one_step(BaseModel):
         if len(rating_stability) == 0:
             raise ValueError("Not enough data for parameters initialization!")
         elif len(rating_stability) == 1:
-            rating = list(rating_stability.keys())[0]
+            rating = next(iter(rating_stability.keys()))
             factor = rating_stability[rating] / r_s0_default[str(rating)]
-            initial_stabilities = list(map(lambda x: x * factor, r_s0_default.values()))
+            initial_stabilities = [x * factor for x in r_s0_default.values()]
         elif len(rating_stability) == 2:
             if 1 not in rating_stability and 2 not in rating_stability:
                 rating_stability[2] = np.power(
@@ -398,9 +409,8 @@ class FSRS_one_step(BaseModel):
             initial_stabilities = [
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
-        self.w[0:4] = list(
-            map(
-                lambda x: max(min(self.config.init_s_max, x.item()), self.config.s_min),
-                initial_stabilities,
-            )
-        )
+        self.w[0:4] = [
+            # pyrefly: ignore [missing-attribute]
+            max(min(self.config.init_s_max, x.item()), self.config.s_min)
+            for x in initial_stabilities
+        ]

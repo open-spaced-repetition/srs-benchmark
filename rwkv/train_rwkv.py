@@ -1,22 +1,22 @@
 import json
 import math
 import multiprocessing
-from pathlib import Path
+import random
+import re
 import time
 import traceback
+from pathlib import Path
 
-import numpy as np
-from rwkv.data_fetcher import DataFetcher
 import lmdb
-import re
-import random
+import numpy as np
 import torch
 import wandb
 
+from rwkv.architecture import *
+from rwkv.data_fetcher import DataFetcher
+from rwkv.model.srs_model import SrsRWKV
 from rwkv.parse_toml import parse_toml
 from rwkv.prepare_batch import prepare_data_train_test
-from rwkv.model.srs_model import SrsRWKV
-from rwkv.architecture import *
 from rwkv.utils import (
     KeyValueAverage,
     get_number_of_trainable_parameters,
@@ -115,16 +115,27 @@ def log_model(log, model: SrsRWKV):
         log[f"{name}.data.std"] = param.std().item()
         log[f"{name}.data.min"] = param.min().item()
         log[f"{name}.data.max"] = param.max().item()
+        # pyrefly: ignore [missing-attribute]
         log[f"{name}.data.25th"] = torch.quantile(param, 0.25).item()
+        # pyrefly: ignore [missing-attribute]
         log[f"{name}.data.50th"] = torch.quantile(param, 0.50).item()
+        # pyrefly: ignore [missing-attribute]
         log[f"{name}.data.75th"] = torch.quantile(param, 0.75).item()
+        # pyrefly: ignore [missing-attribute]
         if param.grad is not None:
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.mean"] = param.grad.mean().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.std"] = param.grad.std().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.min"] = param.grad.min().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.max"] = param.grad.max().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.25th"] = torch.quantile(param.grad, 0.25).item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.50th"] = torch.quantile(param.grad, 0.50).item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.75th"] = torch.quantile(param.grad, 0.75).item()
 
 
@@ -191,7 +202,7 @@ def evaluate_on_user(user_id, batch, model: SrsRWKV):
     with torch.no_grad():
         stats = model.get_loss(batch)
         if stats is None:
-            raise Exception("Stats is none.")
+            raise RuntimeError("Model returned no evaluation statistics")
         print(
             f"{user_id} ahead_loss: {stats.ahead_equalize_avg.item():.3f} ({stats.ahead_raw_equalize_avg.item():.3f}), imm_loss: {stats.imm_binary_equalize_avg.item():.3f}, imm_n: {stats.imm_binary_equalize_n}"
         )
@@ -247,7 +258,7 @@ def validate(model, data_fetcher, all_db_keys, users, device):
             f"Mean ahead validation loss: {tot_ahead_loss / tot_ahead_n:.4f} ({tot_ahead_raw_loss / tot_ahead_n:.4f}), imm: {tot_imm_loss / tot_imm_n:.4f}, validation n: {tot_ahead_n}"
         )
         return tot_ahead_loss / tot_ahead_n, tot_imm_loss / tot_imm_n
-    except Exception as e:
+    except (KeyError, RuntimeError, TypeError, ValueError, ZeroDivisionError) as e:
         print("Exception in validate. RWKV-7 nan?")
         print(e)
         return None
@@ -440,7 +451,7 @@ def main_loop(config, task_queue, batch_queue):
     checkpoint_loss_n = 0
 
     step = config.STEP_OFFSET - 1
-    for epoch_i in range(0, int(1e9)):
+    for epoch_i in range(int(1e9)):
         if step > total_steps:
             break
 
@@ -480,7 +491,7 @@ def main_loop(config, task_queue, batch_queue):
             try:
                 stats = model.get_loss(prepared_batch)
                 if stats is None:
-                    raise Exception("Stats is none.")
+                    raise RuntimeError("Model returned no training statistics")
 
                 print(
                     f"{epoch_i} {group_i} {step}, all: {stats.average_loss.item():3f}, ahead: {stats.ahead_avg.item():.4f} ({stats.ahead_raw_avg.item():.4f}), imm: {stats.imm_avg.item():.3f}"
@@ -507,7 +518,7 @@ def main_loop(config, task_queue, batch_queue):
                 torch.nn.utils.clip_grad_norm_(master_model.parameters(), CLIP)
                 optimizer.step()
                 optimizer.zero_grad()
-            except Exception as e:
+            except (KeyError, RuntimeError, TypeError, ValueError) as e:
                 print("Exception caught. Nan from RWKV-7? Skipping batch.")
                 print(e)
                 log["train_nan"] = 1
@@ -575,7 +586,7 @@ def main(config):
 
         try:
             main_loop(config=config, task_queue=task_queue, batch_queue=batch_queue)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- top-level boundary must terminate workers
             traceback.print_exc()
         finally:
             for process in prepare_processes:

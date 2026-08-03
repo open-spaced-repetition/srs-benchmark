@@ -1,9 +1,12 @@
 import copy
-import pandas as pd
+
 import numpy as np
-from sklearn.model_selection import TimeSeriesSplit  # type: ignore
-from .factory import create_feature_engineer
+import pandas as pd
+from sklearn.model_selection import TimeSeriesSplit
+
 from config import Config
+
+from .factory import create_feature_engineer
 
 
 def create_features(df: pd.DataFrame, config: Config) -> pd.DataFrame:

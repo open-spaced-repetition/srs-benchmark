@@ -111,6 +111,7 @@ class Anki(BaseModel):
                 ),
             )
         new_ease = new_ease.clamp(1.3, 5.5)
+        # pyrefly: ignore [missing-attribute]
         new_ivl = torch.max(nn.functional.leaky_relu(new_ivl - 1) + 1, new_ivl).clamp(
             self.config.s_min, self.config.s_max
         )
@@ -120,6 +121,7 @@ class Anki(BaseModel):
         self,
         inputs: Tensor[[SeqLen, BatchSize, 2]],
         state: Tensor[[BatchSize, 2]] | None = None,
+        # pyrefly: ignore [bad-specialization, invalid-annotation, not-a-type]
     ) -> tuple[Tensor[SeqLen, BatchSize, 2], Tensor[[BatchSize, 2]]]:
         """
         :param inputs: shape[seq_len, batch_size, 2]

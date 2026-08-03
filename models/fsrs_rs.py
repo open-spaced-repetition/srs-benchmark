@@ -62,6 +62,7 @@ def convert_to_items(df: pd.DataFrame, config: Config):
         .tolist(),
         [],
     )
+    # pyrefly: ignore [bad-index]
     result_list = [x[1] for x in sorted(result_list, key=lambda x: x[0])]
 
     return result_list

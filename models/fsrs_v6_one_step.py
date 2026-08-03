@@ -410,6 +410,7 @@ class FSRS_one_step(BaseModel):
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         self.w[0:4] = [
+            # pyrefly: ignore [missing-attribute]
             max(min(self.config.init_s_max, x.item()), self.config.s_min)
             for x in initial_stabilities
         ]

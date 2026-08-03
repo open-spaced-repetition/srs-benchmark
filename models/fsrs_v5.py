@@ -115,8 +115,8 @@ class FSRS5(FSRS4dot5):
         output = super().batch_process(sequences, delta_ts, seq_lens, real_batch_size)
         output["penalty"] = (
             torch.sum(
-                torch.square(self.w - self.init_w_tensor)
-                / torch.square(self.default_params_stddev_tensor)
+                torch.square(self.w - self.init_w_tensor)  # pyrefly: ignore [missing-attribute]
+                / torch.square(self.default_params_stddev_tensor)  # pyrefly: ignore [missing-attribute]
             )
             * real_batch_size
             * self.gamma
@@ -169,6 +169,7 @@ class FSRS5(FSRS4dot5):
         if torch.equal(state, torch.zeros_like(state)):
             keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
             new_s = torch.ones_like(state[:, 0], device=self.config.device)

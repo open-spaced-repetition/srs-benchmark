@@ -18,6 +18,7 @@ from rwkv.utils import load_tensor
 
 def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> PreparedBatch:
     if seed is not None:
+        # pyrefly: ignore [missing-attribute]
         torch.manual_seed(seed)
 
     with torch.no_grad():
@@ -177,6 +178,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                             skip = torch.index_select(
                                 data.skips, dim=0, index=from_slice
                             ).view(data_split_B, data_split_len)
+                            # pyrefly: ignore [missing-attribute]
                             skip_arr = skip.numpy()
                             time_shift_select = np.zeros((data_split_B, data_split_len))
                             assert (skip_arr[0] == False).any(), (
@@ -212,6 +214,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                                 data_split_B, data_split_len
                             ):
                                 for x in seq_unpadded:
+                                    # pyrefly: ignore [unsupported-operation]
                                     next_locs_list[data_i][x] = all_offset
                                     all_offset += 1
 

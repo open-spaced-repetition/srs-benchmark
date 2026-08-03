@@ -149,14 +149,23 @@ def _interval_differentiable(
         on w from earlier stability updates, giving the correct total gradient.
     """
     # ── Phase 1: Newton in log(t) — pure Python scalars, no autograd ─────────
+    # pyrefly: ignore [bad-argument-type]
     s_f = float(s.detach())
+    # pyrefly: ignore [bad-argument-type]
     d1 = float(-w[-8])
+    # pyrefly: ignore [bad-argument-type]
     d2 = float(-w[-7])
+    # pyrefly: ignore [bad-argument-type]
     b1 = float(w[-6])
+    # pyrefly: ignore [bad-argument-type]
     b2 = float(w[-5])
+    # pyrefly: ignore [bad-argument-type]
     bw1f = float(w[-4])
+    # pyrefly: ignore [bad-argument-type]
     bw2f = float(w[-3])
+    # pyrefly: ignore [bad-argument-type]
     sw1f = float(w[-2])
+    # pyrefly: ignore [bad-argument-type]
     sw2f = float(w[-1])
 
     c1f = b1 ** (1.0 / d1) - 1.0
@@ -183,6 +192,7 @@ def _interval_differentiable(
 
     t_star_f = max(_MIN_T, min(math.exp(u_f), _MAX_T))
     # create a plain tensor on the same device/dtype as w, no grad
+    # pyrefly: ignore [missing-attribute]
     t_star = w.new_tensor(t_star_f)
 
     # ── Phase 2: IFT lift — one step with grad ────────────────────────────────

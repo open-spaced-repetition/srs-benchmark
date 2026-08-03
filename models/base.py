@@ -59,4 +59,5 @@ class BaseModel(nn.Module):
         strict: bool = True,
         assign: bool = False,
     ) -> Any:
+        # pyrefly: ignore [bad-argument-type]
         return super().load_state_dict(state_dict, strict=strict, assign=assign)

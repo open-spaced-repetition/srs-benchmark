@@ -76,7 +76,9 @@ class FSRS4(FSRS3):
     def stability_after_success(  # type: ignore[override]
         self, state: Tensor, r: Tensor, rating: Tensor
     ) -> Tensor:
+        # pyrefly: ignore [bad-argument-type]
         hard_penalty = torch.where(rating == 2, self.w[15], 1)
+        # pyrefly: ignore [bad-argument-type]
         easy_bonus = torch.where(rating == 4, self.w[16], 1)
         new_s = state[:, 0] * (
             1
@@ -107,6 +109,7 @@ class FSRS4(FSRS3):
         if torch.equal(state, torch.zeros_like(state)):
             keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
             new_s = torch.ones_like(state[:, 0], device=self.config.device)
@@ -128,6 +131,7 @@ class FSRS4(FSRS3):
         return torch.stack([new_s, new_d], dim=1)
 
     @override
+    # pyrefly: ignore [bad-override]
     def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
         return self.w[7] * init + (1 - self.w[7]) * current
 
@@ -298,6 +302,7 @@ class FSRS4(FSRS3):
                 item[1] for item in sorted(rating_stability.items(), key=lambda x: x[0])
             ]
         self.w.data[0:4] = Tensor(
+            # pyrefly: ignore [bad-argument-count]
             [
                 max(min(self.config.init_s_max, x), self.config.s_min)
                 for x in initial_stabilities

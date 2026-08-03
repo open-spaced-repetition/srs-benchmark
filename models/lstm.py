@@ -130,6 +130,7 @@ class LSTM(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -144,10 +145,17 @@ class LSTM(BaseModel):
         self.register_buffer("input_std", std_i)
 
     def forward[SeqLen, BatchSize, InputDims](
-        self, x_lni: Tensor[SeqLen, BatchSize, InputDims], hx=None
+        # pyrefly: ignore [bad-specialization]
+        self,
+        # pyrefly: ignore [bad-specialization]
+        x_lni: Tensor[SeqLen, BatchSize, InputDims],
+        hx=None,
     ) -> tuple[
+        # pyrefly: ignore [bad-specialization, not-a-type]
         Tensor[SeqLen, BatchSize, 3],
+        # pyrefly: ignore [bad-specialization, not-a-type]
         Tensor[SeqLen, BatchSize, 3],
+        # pyrefly: ignore [bad-specialization, not-a-type]
         Tensor[SeqLen, BatchSize, 3],
     ]:
         x_rating = x_lni[..., -1:]
@@ -165,6 +173,7 @@ class LSTM(BaseModel):
         x_main = (x_main - self.input_mean) / self.input_std
 
         x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))
+        # pyrefly: ignore [missing-attribute]
         x_rating = torch.nn.functional.one_hot(
             x_rating.squeeze(-1).long() - 1, num_classes=4
         ).float()
@@ -174,12 +183,16 @@ class LSTM(BaseModel):
         w_lnh = torch.nn.functional.softmax(self.w_fc(x_lnh), dim=-1)
         s_lnh = torch.exp(torch.clamp(self.s_fc(x_lnh), min=-25, max=25))
         d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
+        # pyrefly: ignore [bad-return]
         return w_lnh, s_lnh, d_lnh
 
     def batch_process[SeqLen, BatchSize, InputDims](
         self,
+        # pyrefly: ignore [bad-specialization]
         sequences: Tensor[SeqLen, BatchSize, InputDims],
+        # pyrefly: ignore [invalid-annotation]
         delta_n: Tensor[[BatchSize]],
+        # pyrefly: ignore [invalid-annotation]
         seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
     ) -> dict[str, Tensor]:

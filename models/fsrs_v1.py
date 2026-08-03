@@ -57,11 +57,13 @@ class FSRS1(FSRS):
         """
         if torch.equal(state, torch.zeros_like(state)):
             # first learn, init memory states
+            # pyrefly: ignore [bad-argument-type]
             new_s = self.w[0] * 0.25 * torch.pow(2, X[:, 1] - 1)
             new_d = self.w[1] - X[:, 1] + 3
             new_l = torch.relu(2 - X[:, 1])
         else:
             r = self.forgetting_curve(X[:, 0], state[:, 0])
+            # pyrefly: ignore [bad-argument-type]
             new_d = torch.relu(state[:, 1] + r - 0.25 * torch.pow(2, X[:, 1] - 1) + 0.1)
             condition = X[:, 1] > 1
             new_s = torch.where(

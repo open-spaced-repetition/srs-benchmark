@@ -86,6 +86,7 @@ if __name__ == "__main__":
     )
     parameters = trainer.train()
     print(parameters)
+    # pyrefly: ignore [missing-attribute]
     torch.save(
         parameters, f"./pretrain/{config.get_evaluation_file_name()}_pretrain.pth"
     )

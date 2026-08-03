@@ -115,16 +115,27 @@ def log_model(log, model: SrsRWKV):
         log[f"{name}.data.std"] = param.std().item()
         log[f"{name}.data.min"] = param.min().item()
         log[f"{name}.data.max"] = param.max().item()
+        # pyrefly: ignore [missing-attribute]
         log[f"{name}.data.25th"] = torch.quantile(param, 0.25).item()
+        # pyrefly: ignore [missing-attribute]
         log[f"{name}.data.50th"] = torch.quantile(param, 0.50).item()
+        # pyrefly: ignore [missing-attribute]
         log[f"{name}.data.75th"] = torch.quantile(param, 0.75).item()
+        # pyrefly: ignore [missing-attribute]
         if param.grad is not None:
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.mean"] = param.grad.mean().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.std"] = param.grad.std().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.min"] = param.grad.min().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.max"] = param.grad.max().item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.25th"] = torch.quantile(param.grad, 0.25).item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.50th"] = torch.quantile(param.grad, 0.50).item()
+            # pyrefly: ignore [missing-attribute]
             log[f"{name}.grad.75th"] = torch.quantile(param.grad, 0.75).item()
 
 

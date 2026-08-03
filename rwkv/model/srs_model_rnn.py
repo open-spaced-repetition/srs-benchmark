@@ -149,6 +149,7 @@ class SrsRWKVRnn(ModuleType):
             next_global_state,
         )
 
+    # pyrefly: ignore [missing-attribute]
     @torch.inference_mode()
     def run(self, df, dtype, device):
         print(

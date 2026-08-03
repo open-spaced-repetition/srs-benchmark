@@ -230,6 +230,7 @@ class FSRS7(FSRS6):
             sched_penalty_1 = self._zero_penalty
             sched_penalty_2 = self._zero_penalty
         L2_penalty = torch.sum(
+            # pyrefly: ignore [missing-attribute]
             torch.square(self.w - self.init_w_tensor) / torch.square(self._l2_sigma)
         )
         # sched_penalty_1 penalizes huge interval growth for non-same-day reviews
@@ -798,6 +799,7 @@ class FSRS7(FSRS6):
 
         # Update initial stabilities (w[0:4])
         self.w.data[0:4] = Tensor(
+            # pyrefly: ignore [bad-argument-count]
             [
                 max(min(self.config.init_s_max, x), self.config.s_min)
                 for x in initial_stabilities
@@ -806,6 +808,7 @@ class FSRS7(FSRS6):
 
         # Update forgetting curve parameters with the best found parameters
         if best_forgetting_curve_params is not None:
+            # pyrefly: ignore [bad-argument-count]
             self.w.data[-8:] = Tensor(best_forgetting_curve_params)
 
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
@@ -823,6 +826,7 @@ class FSRS7(FSRS6):
         if torch.equal(state, torch.zeros_like(state)):
             keys = torch.tensor([1, 2, 3, 4], device=X.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
             new_s = torch.ones_like(state[:, 0], device=X.device)

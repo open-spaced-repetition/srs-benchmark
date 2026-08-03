@@ -19,6 +19,7 @@ class Transformer(BaseModel):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
+        # pyrefly: ignore [missing-attribute]
         self.transformer = nn.Transformer(
             d_model=self.n_input,
             nhead=self.n_input,
@@ -33,6 +34,7 @@ class Transformer(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -43,7 +45,9 @@ class Transformer(BaseModel):
                 pass
 
     def forward[SeqLen: IntVar, BatchSize: IntVar](
-        self, src: Tensor[[SeqLen, BatchSize, 2]]
+        self,
+        src: Tensor[[SeqLen, BatchSize, 2]],
+        # pyrefly: ignore [bad-specialization, invalid-annotation, not-a-type]
     ) -> tuple[Tensor[SeqLen, BatchSize, 1], None]:
         tgt = torch.zeros(1, src.shape[1], self.n_input).to(device=self.config.device)
         output = self.transformer(src, tgt)

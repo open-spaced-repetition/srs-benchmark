@@ -114,6 +114,7 @@ def _save_checkpoint(
     """
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
+    # pyrefly: ignore [missing-attribute]
     torch.save(
         {
             "outer_it": outer_it,
@@ -140,6 +141,7 @@ def _find_resumable_checkpoint(trial_params: dict):
         return None, None
     for candidate in sorted(CHECKPOINT_DIR.glob("trial_*.pt")):
         try:
+            # pyrefly: ignore [missing-attribute]
             ckpt = torch.load(candidate, weights_only=False)
             if ckpt.get("trial_params") == trial_params:
                 return candidate, ckpt

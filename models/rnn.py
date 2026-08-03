@@ -21,6 +21,7 @@ class RNN(BaseModel):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
+        # pyrefly: ignore [missing-attribute]
         self.rnn = nn.RNN(
             input_size=self.n_input,
             hidden_size=self.n_hidden,
@@ -34,6 +35,7 @@ class RNN(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -44,7 +46,10 @@ class RNN(BaseModel):
                 pass
 
     def forward[SeqLen: IntVar, BatchSize: IntVar](
-        self, x: Tensor[[SeqLen, BatchSize, 2]], hx=None
+        self,
+        x: Tensor[[SeqLen, BatchSize, 2]],
+        hx=None,
+        # pyrefly: ignore [bad-specialization, invalid-annotation, not-a-type]
     ) -> tuple[Tensor[SeqLen, BatchSize, 1], Tensor]:
         x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x))

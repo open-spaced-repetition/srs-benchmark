@@ -50,6 +50,7 @@ if config.dev_mode:
 from fsrs_optimizer import BatchDataset, BatchLoader
 
 warnings.filterwarnings("ignore", category=UserWarning)
+# pyrefly: ignore [missing-attribute]
 torch.manual_seed(config.seed)
 tqdm.pandas()
 
@@ -85,7 +86,9 @@ class Trainer:
 
         # Setup scheduler
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            self.optimizer, T_max=self.train_data_loader.batch_nums * self.n_epoch
+            # pyrefly: ignore [bad-argument-type]
+            self.optimizer,
+            T_max=self.train_data_loader.batch_nums * self.n_epoch,
         )
 
         self.avg_train_losses: list[float] = []
@@ -213,6 +216,7 @@ def _configure_process_device(device_id: int | None) -> None:
         return
     if not torch.cuda.is_available():
         return
+    # pyrefly: ignore [missing-attribute]
     if config.device.type != "cuda":
         return
     device_count = torch.cuda.device_count()
@@ -300,6 +304,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         )
         weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt
+        # pyrefly: ignore [missing-attribute]
         if config.device.type == "mps":
             torch.mps.empty_cache()
         return weights
@@ -318,6 +323,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         )
         weights = copy.deepcopy(get_model_state(trained_model))
         del trained_model, inner_opt
+        # pyrefly: ignore [missing-attribute]
         if config.device.type == "mps":
             torch.mps.empty_cache()
         return weights
@@ -541,6 +547,7 @@ if __name__ == "__main__":
 
     cuda_device_ids = None
     if config.cuda_device_ids:
+        # pyrefly: ignore [missing-attribute]
         if config.device.type != "cuda":
             print("Warning: --gpus ignored because CUDA is not enabled for this model.")
         else:

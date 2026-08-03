@@ -71,6 +71,7 @@ class GRU(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,

@@ -339,6 +339,7 @@ class RNNProcess:
         return curve
 
 
+# pyrefly: ignore [missing-attribute]
 @torch.inference_mode()
 def run(data_path, model_path, label_db_path, label_db_size, user_id, verbose):
     """Runs the rnn version of rwkv to explicitly show information flow. Written to guard against possible data leakage.

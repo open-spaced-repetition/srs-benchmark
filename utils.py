@@ -447,6 +447,7 @@ def result_parameters(
 
 def save_model_state(state: TrainingState, file_name: str, user_id: int) -> None:
     Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
+    # pyrefly: ignore [missing-attribute]
     torch.save(state, f"weights/{file_name}/{user_id}.pth")
 
 

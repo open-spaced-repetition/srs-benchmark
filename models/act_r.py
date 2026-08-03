@@ -40,11 +40,14 @@ class ACT_R(BaseModel):
         """
         :param inputs: shape[seq_len, batch_size, 1]
         """
+        # pyrefly: ignore [missing-attribute, unexpected-keyword]
         m = torch.zeros_like(sp, dtype=torch.float)
+        # pyrefly: ignore [missing-attribute]
         m[0] = -torch.inf
         for i in range(1, len(sp)):
             act = torch.log(
                 torch.sum(
+                    # pyrefly: ignore [missing-attribute]
                     ((sp[i] - sp[0:i]) * 86400 * self.w[4]).clamp_min(1)
                     ** (-(self.w[1] * torch.exp(m[0:i]) + self.w[0])),
                     dim=0,

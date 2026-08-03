@@ -116,6 +116,7 @@ class NN_17(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -177,6 +178,7 @@ class NN_17(BaseModel):
             # first review
             keys = torch.tensor([1, 2, 3, 4], device=self.config.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             new_s = torch.zeros_like(state[:, 0])
             new_s[index[0]] = self.S0[index[1]]

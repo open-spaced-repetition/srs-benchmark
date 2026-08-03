@@ -233,6 +233,7 @@ class Config:
 
         # PyTorch threading settings
         self.torch_num_threads: int = args.torch_num_threads
+        # pyrefly: ignore [missing-attribute]
         torch.set_num_threads(self.torch_num_threads)
         # if hasattr(torch, "set_num_interop_threads"):
         #     torch.set_num_interop_threads(args.torch_num_interop_threads)

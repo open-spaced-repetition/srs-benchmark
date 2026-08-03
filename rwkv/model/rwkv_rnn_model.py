@@ -97,7 +97,9 @@ class RWKV7RNNChannelMixer(ModuleType):
             x_shift_B1C = x_B1C
 
         x_layer_norm_B1C = x_B1C
+        # pyrefly: ignore [bad-argument-type]
         k_B1K = self.W_k(torch.lerp(x_B1C, x_shift_B1C, self.lerp_k))
+        # pyrefly: ignore [missing-attribute]
         o_B1C = self.W_v(torch.square(torch.nn.functional.relu(k_B1K)))
 
         return (in_B1C + o_B1C).squeeze(1), x_layer_norm_B1C
@@ -168,7 +170,11 @@ class RWKV7RNNTimeMixer(ModuleType):
             x_shift_B1C, state_B1HKK = state
 
         rkvdag_6B1C = torch.lerp(
-            x_B1C.unsqueeze(0), x_shift_B1C.unsqueeze(0), self.rkvdag_lerp
+            # pyrefly: ignore [bad-argument-type]
+            x_B1C.unsqueeze(0),
+            x_shift_B1C.unsqueeze(0),
+            # pyrefly: ignore [bad-argument-type]
+            self.rkvdag_lerp,
         )
         r_B1C, k_B1C, v_B1C, d_B1C, a_B1C, g_B1C, k_scale_B1C, v_scale_B1C = (
             rkvdag_6B1C.unbind(dim=0)
@@ -182,12 +188,16 @@ class RWKV7RNNTimeMixer(ModuleType):
             v_B1C = self.W_v(v_B1C)
             v0_BC = v_B1C.squeeze(1)
         else:
+            # pyrefly: ignore [no-access]
             v_lerp_B1C = torch.nn.functional.sigmoid(self.v_lora_simple(v_B1C))
+            # pyrefly: ignore [bad-argument-type]
             v_B1C = torch.lerp(self.W_v(v_B1C), v0_BC.unsqueeze(1), v_lerp_B1C)
 
+        # pyrefly: ignore [no-access]
         a_B1C = torch.nn.functional.sigmoid(self.a_lora_simple(a_B1C))
         g_B1C = self.lora_B_g(torch.nn.functional.sigmoid(self.lora_A_g(g_B1C)))
 
+        # pyrefly: ignore [no-access]
         _d_B1C = -0.5 - torch.nn.functional.softplus(-self.d_lora_mlp(d_B1C))
         w_B1C = torch.exp(-torch.exp(_d_B1C.float()))
 

@@ -284,6 +284,7 @@ def load_parameters_from_result(
 
 
 def load_state_dict(path: Path) -> dict:
+    # pyrefly: ignore [missing-attribute]
     state = torch.load(path, weights_only=False, map_location="cpu")
     if not isinstance(state, dict):
         for key in ("state_dict", "model_state_dict", "model"):
@@ -513,7 +514,13 @@ def predict_retention(model, config, state: object, elapsed: float) -> float:
     if isinstance(model, LSTM):
         w, s, d = state  # type: ignore[misc]
         t = torch.full(
-            (w.shape[0],), float(elapsed), dtype=torch.float32, device=config.device
+            # pyrefly: ignore [unexpected-keyword]
+            (w.shape[0],),
+            float(elapsed),
+            # pyrefly: ignore [unexpected-keyword]
+            dtype=torch.float32,
+            # pyrefly: ignore [unexpected-keyword]
+            device=config.device,
         )
         value = model.forgetting_curve(
             t, w.to(config.device), s.to(config.device), d.to(config.device)

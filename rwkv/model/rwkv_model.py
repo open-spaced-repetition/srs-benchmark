@@ -13,6 +13,7 @@ https://github.com/BlinkDL/RWKV-LM/blob/main/RWKV-v5/src/model.py#L766
 https://github.com/SmerkyG/RWKV_Explained/blob/main/rwkv7.py
 """
 
+# pyrefly: ignore [missing-attribute]
 torch.manual_seed(2025)
 
 
@@ -106,6 +107,7 @@ class RWKV7ChannelMixer(ModuleType):
         with torch.no_grad():
             ratio_1_to_almost_0 = 1.0 - (layer_id / config.total_layers)
             self.layer_norm = torch.nn.LayerNorm(config.d_model)
+            # pyrefly: ignore [missing-attribute]
             self.time_shift = torch.nn.ZeroPad2d((0, 0, 1, -1))
 
             channel_ratio = torch.ones(1, 1, config.d_model)
@@ -123,6 +125,7 @@ class RWKV7ChannelMixer(ModuleType):
             self.W_k.weight.data.uniform_(
                 -0.5 / (config.d_model**0.5), 0.5 / (config.d_model**0.5)
             )
+            # pyrefly: ignore [missing-attribute]
             self.W_v.weight.data.zero_()
 
             self.dropout = torch.nn.Dropout(p=config.dropout)
@@ -192,8 +195,10 @@ class LoraMLP(ModuleType):
                     decay_speed[i] = -7 + 5 * (i / (C - 1)) ** (
                         0.85 + 1.0 * ratio_0_to_1**0.5
                     )
+                # pyrefly: ignore [missing-attribute]
                 self.B_and_lamb.bias.copy_(decay_speed + 0.5)
             else:
+                # pyrefly: ignore [bad-argument-type]
                 torch.nn.init.zeros_(self.B_and_lamb.bias)
 
     @FunctionType
@@ -219,6 +224,7 @@ class RWKV7TimeMixer(ModuleType):
                 channel_ratio[0, 0, i] = i / C
 
             self.layer_norm = torch.nn.LayerNorm(config.d_model)
+            # pyrefly: ignore [missing-attribute]
             self.time_shift = torch.nn.ZeroPad2d((0, 0, 1, -1))
 
             self.rkvdag_lerp = torch.nn.Parameter(torch.empty(8, 1, 1, config.d_model))
@@ -262,13 +268,16 @@ class RWKV7TimeMixer(ModuleType):
             self.W_r.weight.data.uniform_(-0.5 / (C**0.5), 0.5 / (C**0.5))
             self.W_k.weight.data.uniform_(-0.05 / (C**0.5), 0.05 / (C**0.5))
             self.W_v.weight.data.uniform_(-0.5 / (C**0.5), 0.5 / (C**0.5))
+            # pyrefly: ignore [missing-attribute]
             self.W_o.weight.data.zero_()
 
             self.k_scale_linear = torch.nn.Linear(config.d_model, self.H, bias=True)
             self.v_scale_linear = torch.nn.Linear(config.d_model, self.H, bias=True)
             torch.nn.init.zeros_(self.k_scale_linear.weight)
+            # pyrefly: ignore [bad-argument-type]
             torch.nn.init.zeros_(self.k_scale_linear.bias)
             torch.nn.init.zeros_(self.v_scale_linear.weight)
+            # pyrefly: ignore [bad-argument-type]
             torch.nn.init.zeros_(self.v_scale_linear.bias)
 
             self.v_lora_simple = LoraSimple(

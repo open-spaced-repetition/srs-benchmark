@@ -3,6 +3,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 import torch
+from shape_extensions import IntVar
 
 from .base import BaseFeatureEngineer
 
@@ -118,7 +119,9 @@ class DashACTRFeatureEngineer(BaseFeatureEngineer):
 
         return df
 
-    def _dash_actr_features(self, r_history: list, t_history: list) -> torch.Tensor:
+    def _dash_actr_features[SeqLen: IntVar](
+        self, r_history: list, t_history: list
+    ) -> torch.Tensor[[SeqLen, 2]]:
         """
         Create ACT-R style features for DASH[ACT-R]
 

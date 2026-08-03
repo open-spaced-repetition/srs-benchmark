@@ -12,6 +12,7 @@ from fsrs_optimizer import (
     DevicePrefetchLoader,
 )
 from multiprocess import Pool  # type: ignore
+from shape_extensions import IntVar
 from sklearn.model_selection import TimeSeriesSplit
 from torch import Tensor, nn
 
@@ -138,9 +139,15 @@ def print_grad_norm(model):
 from utils import batch_process_wrapper
 
 
-def compute_data_loss(
-    model: TrainableModel,
-    batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor],
+def compute_data_loss[SeqLen: IntVar, BatchSize: IntVar, InputDims: IntVar](
+    model: TrainableModel[InputDims, int],
+    batch: tuple[
+        Tensor[[SeqLen, BatchSize, InputDims]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+    ],
     batch_size_exp=1.0,
 ):
     result = batch_process_wrapper(model, batch)

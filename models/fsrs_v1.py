@@ -1,6 +1,7 @@
 from typing import ClassVar, Optional
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor, nn
 
 from config import Config
@@ -33,9 +34,12 @@ class FSRS1(FSRS):
     def forgetting_curve(self, t, s):
         return 0.9 ** (t / s)
 
-    def stability_after_success(
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_success[BatchSize: IntVar](
+        self,
+        state: Tensor[[BatchSize, 3]],
+        new_d: Tensor[[BatchSize]],
+        r: Tensor[[BatchSize]],
+    ) -> Tensor[[BatchSize]]:
         new_s = state[:, 0] * (
             1
             + torch.exp(self.w[2])
@@ -45,11 +49,15 @@ class FSRS1(FSRS):
         )
         return new_s
 
-    def stability_after_failure(self, lapses: Tensor) -> Tensor:
+    def stability_after_failure[BatchSize: IntVar](
+        self, lapses: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         new_s = self.w[0] * torch.exp(self.w[6] * lapses)
         return new_s
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 3]]
+    ) -> Tensor[[BatchSize, 3]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 3], state[:,0] is stability, state[:,1] is difficulty, state[:,2] is the number of lapses
@@ -75,9 +83,12 @@ class FSRS1(FSRS):
         new_s = new_s.clamp(self.config.s_min, self.config.s_max)
         return torch.stack([new_s, new_d, new_l], dim=1)
 
-    def forward(
-        self, inputs: Tensor, state: Tensor | None = None
-    ) -> tuple[Tensor, Tensor]:
+    # pyrefly: ignore [bad-override]
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
+        self,
+        inputs: Tensor[[SeqLen, BatchSize, 2]],
+        state: Tensor[[BatchSize, 3]] | None = None,
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 3]], Tensor[[BatchSize, 3]]]:
         """
         :param inputs: shape[seq_len, batch_size, 2]
         """

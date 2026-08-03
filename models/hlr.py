@@ -1,6 +1,7 @@
 from typing import ClassVar
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor, nn
 
 from config import Config
@@ -24,13 +25,13 @@ class HLR(BaseModel):
         dp = self.fc(x)
         return 2**dp
 
-    def batch_process(
+    def batch_process[FeatureCount: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[FeatureCount, BatchSize]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs = self.forward(sequences.transpose(0, 1))
         stabilities = outputs.squeeze(1)
         retentions = self.forgetting_curve(delta_ts, stabilities)

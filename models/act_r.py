@@ -1,6 +1,7 @@
 from typing import ClassVar
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor, nn
 
 from config import Config
@@ -36,7 +37,9 @@ class ACT_R(BaseModel):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
-    def forward(self, sp: Tensor):
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
+        self, sp: Tensor[[SeqLen, BatchSize, 1]]
+    ) -> Tensor[[SeqLen, BatchSize, 1]]:
         """
         :param inputs: shape[seq_len, batch_size, 1]
         """
@@ -56,13 +59,13 @@ class ACT_R(BaseModel):
             m[i] = act
         return self.activation(m[1:])
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 1]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs = self.forward(sequences)
         return {
             "retentions": outputs[

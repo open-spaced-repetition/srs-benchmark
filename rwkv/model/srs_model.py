@@ -4,6 +4,7 @@ from typing import NamedTuple
 
 import numpy as np
 import torch
+from shape_extensions import IntVar
 
 from rwkv.architecture import AnkiRWKVConfig
 from rwkv.config import RWKV_SUBMODULES
@@ -21,43 +22,50 @@ ModuleType = torch.jit.ScriptModule
 FunctionType = torch.jit.script_method
 
 
-class SrsRWKVIterStatistics(NamedTuple):
-    average_loss: torch.Tensor
-    loss_tensor: torch.Tensor
-    w_loss_avg: torch.Tensor
-    ahead_logits_mag_loss_avg: torch.Tensor
-    ahead_logits_diff_loss_avg: torch.Tensor
-    ahead_avg: torch.Tensor
-    ahead_raw_avg: torch.Tensor
+class SrsRWKVIterStatistics[BatchSize: IntVar, SeqLen: IntVar, CurveCount: IntVar](
+    NamedTuple
+):
+    average_loss: torch.Tensor[[]]
+    loss_tensor: torch.Tensor[[BatchSize, SeqLen]]
+    w_loss_avg: torch.Tensor[[]]
+    ahead_logits_mag_loss_avg: torch.Tensor[[]]
+    ahead_logits_diff_loss_avg: torch.Tensor[[]]
+    ahead_avg: torch.Tensor[[]]
+    ahead_raw_avg: torch.Tensor[[]]
     ahead_n: int
-    ahead_equalize_avg: torch.Tensor
-    ahead_raw_equalize_avg: torch.Tensor
+    ahead_equalize_avg: torch.Tensor[[]]
+    ahead_raw_equalize_avg: torch.Tensor[[]]
     ahead_equalize_n: int
-    imm_avg: torch.Tensor
+    imm_avg: torch.Tensor[[]]
     imm_n: int
-    imm_binary_equalize_avg: torch.Tensor
+    imm_binary_equalize_avg: torch.Tensor[[]]
     imm_binary_equalize_n: int
-    p_curve: torch.Tensor
-    p_imm: torch.Tensor
-    p_imm_all: torch.Tensor
-    w: torch.Tensor
-    label_rating: torch.Tensor
-    label_elapsed_seconds: torch.Tensor
-    label_review_th: torch.Tensor
-    is_query: torch.Tensor
-    has_label: torch.Tensor
+    p_curve: torch.Tensor[[BatchSize, SeqLen]]
+    p_imm: torch.Tensor[[BatchSize, SeqLen]]
+    p_imm_all: torch.Tensor[[BatchSize, SeqLen, 4]]
+    w: torch.Tensor[[BatchSize, SeqLen, CurveCount]]
+    label_rating: torch.Tensor[[BatchSize, SeqLen]]
+    label_elapsed_seconds: torch.Tensor[[BatchSize, SeqLen, 1]]
+    label_review_th: torch.Tensor[[BatchSize, SeqLen]]
+    is_query: torch.Tensor[[BatchSize, SeqLen]]
+    has_label: torch.Tensor[[BatchSize, SeqLen]]
 
 
 @dataclass
-class PreparedBatch:
+class PreparedBatch[
+    TokenCount: IntVar,
+    GatherSize: IntVar,
+    BatchSize: IntVar,
+    SeqLen: IntVar,
+]:
     num_data: int
-    start: torch.Tensor
-    sub_gather: list[list[torch.Tensor]]
+    start: torch.Tensor[[TokenCount, 92]]
+    sub_gather: list[list[torch.Tensor[[GatherSize]]]]
     sub_gather_lens: list[list[int]]
-    time_shift_selects: list[list[torch.Tensor]]
-    skips: list[list[torch.Tensor]]
-    labels: torch.Tensor
-    label_review_th: torch.Tensor
+    time_shift_selects: list[list[torch.Tensor[[GatherSize]]]]
+    skips: list[list[torch.Tensor[[GatherSize]]]]
+    labels: torch.Tensor[[BatchSize, SeqLen, 7]]
+    label_review_th: torch.Tensor[[BatchSize, SeqLen]]
 
     def to(self, device):
         start = self.start.to(device)
@@ -205,13 +213,13 @@ class SrsRWKV(ModuleType):
         return res.squeeze(-1)
 
     @FunctionType
-    def forward_batch(
+    def forward_batch[TokenCount: IntVar, GatherSize: IntVar](
         self,
-        batch_start: torch.Tensor,
-        batch_sub_gather: list[list[torch.Tensor]],
+        batch_start: torch.Tensor[[TokenCount, 92]],
+        batch_sub_gather: list[list[torch.Tensor[[GatherSize]]]],
         batch_sub_gather_lens: list[list[int]],
-        batch_time_shift_selects: list[list[torch.Tensor]],
-        batch_skips: list[list[torch.Tensor]],
+        batch_time_shift_selects: list[list[torch.Tensor[[GatherSize]]]],
+        batch_skips: list[list[torch.Tensor[[GatherSize]]]],
         batch_num_data: int,
     ):
         x = self.features2card(batch_start)
@@ -258,16 +266,21 @@ class SrsRWKV(ModuleType):
         return output
 
     @FunctionType
-    def _get_loss(
+    def _get_loss[
+        TokenCount: IntVar,
+        GatherSize: IntVar,
+        BatchSize: IntVar,
+        SeqLen: IntVar,
+    ](
         self,
-        batch_start: torch.Tensor,
-        batch_sub_gather: list[list[torch.Tensor]],
+        batch_start: torch.Tensor[[TokenCount, 92]],
+        batch_sub_gather: list[list[torch.Tensor[[GatherSize]]]],
         batch_sub_gather_lens: list[list[int]],
-        batch_time_shift_selects: list[list[torch.Tensor]],
-        batch_skips: list[list[torch.Tensor]],
+        batch_time_shift_selects: list[list[torch.Tensor[[GatherSize]]]],
+        batch_skips: list[list[torch.Tensor[[GatherSize]]]],
         batch_num_data: int,
-        batch_labels: torch.Tensor,
-        batch_label_review_th: torch.Tensor,
+        batch_labels: torch.Tensor[[BatchSize, SeqLen, 7]],
+        batch_label_review_th: torch.Tensor[[BatchSize, SeqLen]],
     ):
         out_ahead_logits, out_w, out_w_log_p, out_p_logits = self.forward_batch(
             batch_start,
@@ -454,13 +467,13 @@ class SrsRWKV(ModuleType):
 
 
 @dataclass
-class AnkiRWKVDictStatistics:
+class AnkiRWKVDictStatistics[SeqLen: IntVar, CurveCount: IntVar]:
     ahead_ps: dict[int, float]
     imm_ps: dict[int, float]
     imm_ps_all: dict
     label_ratings: dict[int, float]
     label_elapsed_seconds: dict[int, float]
-    w: torch.Tensor
+    w: torch.Tensor[[SeqLen, CurveCount]]
 
 
 def extract_p(stats: SrsRWKVIterStatistics):
@@ -488,7 +501,7 @@ def extract_p(stats: SrsRWKVIterStatistics):
     p_imms = stats.p_imm.squeeze(0).cpu().numpy()
     # pyrefly: ignore [missing-attribute]
     p_imm_alls = stats.p_imm_all.squeeze(0).cpu().numpy()
-    ws = stats.w.squeeze(0).cpu()
+    ws = stats.w[0].cpu()
 
     for i in range(len(label_review_ths)):
         label_review_th = label_review_ths[i]

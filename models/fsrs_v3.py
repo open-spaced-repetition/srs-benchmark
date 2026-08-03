@@ -1,6 +1,7 @@
 from typing import ClassVar
 
 import torch
+from shape_extensions import IntVar
 from torch import Tensor, nn
 
 from config import Config
@@ -50,9 +51,12 @@ class FSRS3(FSRS2):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
-    def stability_after_success(
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_success[BatchSize: IntVar](
+        self,
+        state: Tensor[[BatchSize, 2]],
+        new_d: Tensor[[BatchSize]],
+        r: Tensor[[BatchSize]],
+    ) -> Tensor[[BatchSize]]:
         new_s = state[:, 0] * (
             1
             + torch.exp(self.w[6])
@@ -62,9 +66,12 @@ class FSRS3(FSRS2):
         )
         return new_s
 
-    def stability_after_failure(  # type: ignore[override]
-        self, state: Tensor, new_d: Tensor, r: Tensor
-    ) -> Tensor:
+    def stability_after_failure[BatchSize: IntVar](  # type: ignore[override]
+        self,
+        state: Tensor[[BatchSize, 2]],
+        new_d: Tensor[[BatchSize]],
+        r: Tensor[[BatchSize]],
+    ) -> Tensor[[BatchSize]]:
         new_s = (
             self.w[9]
             * torch.pow(new_d, self.w[10])
@@ -73,7 +80,9 @@ class FSRS3(FSRS2):
         )
         return new_s
 
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty

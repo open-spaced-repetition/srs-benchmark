@@ -1,4 +1,5 @@
 import torch
+from shape_extensions import IntVar
 from torch import Tensor
 
 from config import Config
@@ -17,11 +18,11 @@ class ConstantModel(BaseModel):
             1, 1
         )  # So that the optimizer gets a nonempty list
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         return {"retentions": torch.full((real_batch_size,), self.value)}

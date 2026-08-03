@@ -2,6 +2,7 @@ import copy
 from typing import Optional
 
 import torch
+from shape_extensions import IntVar
 
 from rwkv.model.rwkv_model import LoraMLP, LoraSimple, RWKV7Config
 from rwkv.model.rwkv_ops import single_timestep
@@ -51,11 +52,23 @@ class RWKV7RNNLayer(ModuleType):
         self.time_mixer = RWKV7RNNTimeMixer(config, layer_id)
         self.channel_mixer = RWKV7RNNChannelMixer(config, layer_id)
 
-    def forward(
+    def forward[
+        BatchSize: IntVar,
+        ModelDims: IntVar,
+        HeadCount: IntVar,
+        HeadSize: IntVar,
+    ](
         self,
         in_BC,
         v0_BC,
-        state: tuple[tuple[torch.Tensor, torch.Tensor] | None, torch.Tensor | None]
+        state: tuple[
+            tuple[
+                torch.Tensor[[BatchSize, 1, ModelDims]],
+                torch.Tensor[[BatchSize, 1, HeadCount, HeadSize, HeadSize]],
+            ]
+            | None,
+            torch.Tensor[[BatchSize, 1, ModelDims]] | None,
+        ]
         | None,
     ):
         if state is None:
@@ -86,7 +99,11 @@ class RWKV7RNNChannelMixer(ModuleType):
         self.W_k = torch.nn.Linear(config.d_model, k_dim, bias=False)
         self.W_v = torch.nn.Linear(k_dim, config.d_model, bias=False)
 
-    def forward(self, in_BC, state: torch.Tensor | None):
+    def forward[BatchSize: IntVar, ModelDims: IntVar](
+        self,
+        in_BC,
+        state: torch.Tensor[[BatchSize, 1, ModelDims]] | None,
+    ):
         x_shift_B1C = state
         assert len(in_BC.shape) == 2
         assert self.lerp_k.dtype == in_BC.dtype
@@ -151,7 +168,21 @@ class RWKV7RNNTimeMixer(ModuleType):
             config.n_heads, config.d_model, eps=64e-5
         )
 
-    def forward(self, in_BC, v0_BC, state: tuple[torch.Tensor, torch.Tensor] | None):
+    def forward[
+        BatchSize: IntVar,
+        ModelDims: IntVar,
+        HeadCount: IntVar,
+        HeadSize: IntVar,
+    ](
+        self,
+        in_BC,
+        v0_BC,
+        state: tuple[
+            torch.Tensor[[BatchSize, 1, ModelDims]],
+            torch.Tensor[[BatchSize, 1, HeadCount, HeadSize, HeadSize]],
+        ]
+        | None,
+    ):
         B, C = in_BC.shape
         H, K = self.H, self.K
 

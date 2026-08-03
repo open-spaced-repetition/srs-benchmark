@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from shape_extensions import IntVar
 
 from config import Config, load_config
 from models.act_r import ACT_R
@@ -97,7 +98,7 @@ def compute_dash_features(
     return features.tolist()
 
 
-def compute_hlr_features(success_count: int, failure_count: int) -> torch.Tensor:
+def compute_hlr_features(success_count: int, failure_count: int) -> torch.Tensor[[2]]:
     features = torch.tensor(
         [
             math.sqrt(float(success_count)),
@@ -331,14 +332,14 @@ def validate_inputs(
     return ratings, elapses, durations
 
 
-def build_sequence_tensor(
+def build_sequence_tensor[SeqLen: IntVar, InputDims: IntVar](
     model_name: str,
     args: argparse.Namespace,
     config,
     elapses: Sequence[float],
     durations: Sequence[float],
     ratings: Sequence[int],
-) -> torch.Tensor:
+) -> torch.Tensor[[SeqLen, 1, InputDims]]:
     if model_name == "LSTM":
         if config.lstm_use_duration:
             if not durations:

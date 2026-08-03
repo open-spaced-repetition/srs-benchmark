@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from shape_extensions import IntVar
 from sklearn.metrics import root_mean_squared_error  # type: ignore
 from torch import Tensor
 
@@ -241,9 +242,24 @@ def save_evaluation_file(user_id, df, config: Config):
         )
 
 
-def batch_process_wrapper(
-    model: "TrainableModel", batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
-) -> dict[str, Tensor]:
+def batch_process_wrapper[
+    SeqLen: IntVar,
+    BatchSize: IntVar,
+    InputDims: IntVar,
+    OutputDims: IntVar,
+](
+    model: "TrainableModel[InputDims, OutputDims]",
+    batch: tuple[
+        Tensor[[SeqLen, BatchSize, InputDims]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+    ],
+) -> dict[
+    str,
+    Tensor[[]] | Tensor[[BatchSize]] | Tensor[[BatchSize, OutputDims]],
+]:
     """
     Wrapper function for batch processing of model predictions.
 
@@ -256,7 +272,10 @@ def batch_process_wrapper(
     """
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
-    result = {"labels": labels, "weights": weights}
+    result: dict[
+        str,
+        Tensor[[]] | Tensor[[BatchSize]] | Tensor[[BatchSize, OutputDims]],
+    ] = {"labels": labels, "weights": weights}
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     return result

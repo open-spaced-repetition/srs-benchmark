@@ -145,7 +145,9 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                     split_B = data.modules[submodule_name].split_B
                     boundary_offset = 0
                     boundaries = []
-                    for s_l, s_b in zip(split_len, split_B):
+                    for s_l_raw, s_b_raw in zip(split_len, split_B):
+                        s_l = int(s_l_raw)
+                        s_b = int(s_b_raw)
                         boundaries.append(boundary_offset)
                         boundary_offset += s_l * s_b
 
@@ -153,9 +155,12 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                     assert boundary_offset == data.card_features.size(0)
 
                     module_data = data.modules[submodule_name]
-                    for module_data_i, (data_split_B, data_split_len) in enumerate(
-                        zip(module_data.split_B, module_data.split_len)
-                    ):
+                    for module_data_i, (
+                        data_split_B_raw,
+                        data_split_len_raw,
+                    ) in enumerate(zip(module_data.split_B, module_data.split_len)):
+                        data_split_B = int(data_split_B_raw)
+                        data_split_len = int(data_split_len_raw)
                         if l < data_split_len <= r:
                             from_slice = module_data.from_perm[
                                 boundaries[module_data_i] : boundaries[
@@ -281,7 +286,9 @@ def greedy_splits(
         freqs = {}
         for data in data_list:
             module_data = data.modules[submodule]
-            for l, b in zip(module_data.split_len, module_data.split_B):
+            for l_raw, b_raw in zip(module_data.split_len, module_data.split_B):
+                l = int(l_raw)
+                b = int(b_raw)
                 if l not in freqs:
                     freqs[l] = 0
                 freqs[l] += b

@@ -551,7 +551,9 @@ def greedy_splits(
         freqs = {}
         for data in data_list:
             module_data = data.modules[submodule]
-            for l, b in zip(module_data.split_len, module_data.split_B):
+            for l_raw, b_raw in zip(module_data.split_len, module_data.split_B):
+                l = int(l_raw)
+                b = int(b_raw)
                 if l not in freqs:
                     freqs[l] = 0
                 freqs[l] += b

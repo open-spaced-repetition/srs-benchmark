@@ -1424,12 +1424,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
-name = "pyrefly-shape-extensions"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/56/5a/ef911e82768bf08568c8559fdb8602dd55e681de5fdec1af9d6e5e04085c/pyrefly_shape_extensions-1.2.0.tar.gz", hash = "sha256:45d5dc674e46d1b93b308bff34a9dc12c3b3d0ecd89cd78ca1831cf0b202df1a", size = 5586, upload-time = "2026-08-01T02:00:02.002Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/3e/be7e66763aa5f1762191a5c0d0d1966b4c9ef99e035e8e77547f0ebba8c8/pyrefly_shape_extensions-1.2.0-py3-none-any.whl", hash = "sha256:29f0a122cec918d3fa19cb189a8c062b7bcfa65933ca5d500ddae321e9c3c5d9", size = 7550, upload-time = "2026-08-01T01:59:59.463Z" },
 ]
 
 [[package]]

@@ -1,23 +1,26 @@
 # type: ignore
 # You can pass arguments to this script as if it were script.py
-from statistics import mean
-import script
+import os
+import sys
 import timeit
+import tracemalloc
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from statistics import mean
+
+import numpy as np
 import pyarrow.parquet as pq
+import torch
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-import torch
-import os
-import numpy as np
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import tracemalloc
+
+import script
 
 # Config
 B_TIME = bool(
-    os.environ.get("B", False)
+    os.environ.get("B", "")
 )  # Runs process_wrapper_a and process_wrapper_b to compare
-N = int(os.environ.get("N", 50))  # Number of users to sample
-MEMORY = bool(os.environ.get("MEM", False))  # Significantly impacts run speed
+N = int(os.environ.get("N", "50"))  # Number of users to sample
+MEMORY = bool(os.environ.get("MEM", ""))  # Significantly impacts run speed
 
 # Graph Display Info
 A_NAME = "A"
@@ -68,7 +71,7 @@ def process_wrapper(uid: int):
     tracemalloc.stop()
     if err:
         print(err)
-        exit(-1)
+        sys.exit(-1)
     return result, time, memory
 
 
@@ -149,7 +152,7 @@ if __name__ == "__main__":
     print(f"total a_time for {N} users={total_a_time:.2f}s")
     if B_TIME:
         print(f"total b_time for {N} users={total_b_time:.2f}s")
-    print("")
+    print()
 
     print(
         f"Estimated total a_time ({script.PROCESSES} process)={estimate_time(total_a_time):.2f}s"
@@ -165,7 +168,7 @@ if __name__ == "__main__":
             f"Estimated total b_time for {USER_COUNT} users (one process)={estimate_time(total_b_time) / 60 / 60:.2f}h"
         )
 
-    print("")
+    print()
     print(f"{mean(a_losses)=:.5f}")
     if B_TIME:
         print(f"{mean(b_losses)=:.5f}")

@@ -1,6 +1,8 @@
+from typing import ClassVar
+
 import torch
-from torch import nn, Tensor
-from typing import List
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel, BaseParameterClipper
@@ -28,22 +30,27 @@ class ACT_R(BaseModel):
     s = 0.254893976981164  # noise
     tau = -0.704205679427144  # threshold
     h = 0.025  # interference scalar
-    init_w = [a, c, s, tau, h]
+    init_w: ClassVar[list[float]] = [a, c, s, tau, h]
     clipper = ACT_RParameterClipper()
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
 
-    def forward(self, sp: Tensor):
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
+        self, sp: Tensor[[SeqLen, BatchSize, 1]]
+    ) -> Tensor[[SeqLen, BatchSize, 1]]:
         """
         :param inputs: shape[seq_len, batch_size, 1]
         """
+        # pyrefly: ignore [missing-attribute, unexpected-keyword]
         m = torch.zeros_like(sp, dtype=torch.float)
+        # pyrefly: ignore [missing-attribute]
         m[0] = -torch.inf
         for i in range(1, len(sp)):
             act = torch.log(
                 torch.sum(
+                    # pyrefly: ignore [missing-attribute]
                     ((sp[i] - sp[0:i]) * 86400 * self.w[4]).clamp_min(1)
                     ** (-(self.w[1] * torch.exp(m[0:i]) + self.w[0])),
                     dim=0,
@@ -52,13 +59,13 @@ class ACT_R(BaseModel):
             m[i] = act
         return self.activation(m[1:])
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 1]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs = self.forward(sequences)
         return {
             "retentions": outputs[
@@ -72,9 +79,4 @@ class ACT_R(BaseModel):
         return 1 / (1 + torch.exp((self.w[3] - m) / self.w[2]))
 
     def benchmark_state(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
+        return [round(float(x), 4) for x in dict(self.named_parameters())["w"].data]

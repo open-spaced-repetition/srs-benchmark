@@ -1,5 +1,6 @@
 import torch
-from torch import nn, Tensor
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
@@ -56,9 +57,7 @@ class GRU(BaseModel):
         )
 
         for name, param in self.named_parameters():
-            if "weight_ih" in name:  # Input-to-hidden weights
-                nn.init.orthogonal_(param.data)
-            elif "weight_hh" in name:  # Hidden-to-hidden weights
+            if "weight_ih" in name or "weight_hh" in name:  # Input-to-hidden weights
                 nn.init.orthogonal_(param.data)
             elif "bias_ih" in name:
                 # GRU gate order is reset, update, new; initialize update gate bias.
@@ -73,6 +72,7 @@ class GRU(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -106,13 +106,13 @@ class GRU(BaseModel):
         d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
         return w_lnh, s_lnh, d_lnh
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_n: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_n: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[BatchSize, 2]]]:
         w_lnh, s_lnh, d_lnh = self.forward(sequences)
         (_, n, h) = w_lnh.shape
         delta_nh = delta_n.unsqueeze(-1).expand(n, h)

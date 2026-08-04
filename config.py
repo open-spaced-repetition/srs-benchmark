@@ -1,8 +1,9 @@
 import argparse
 import re
-import torch
 from pathlib import Path
-from typing import List, Optional, Literal, get_args
+from typing import Literal, Optional, get_args
+
+import torch
 
 ModelName = Literal[
     # FSRS family
@@ -166,7 +167,7 @@ def create_parser():
     return parser
 
 
-def _parse_cuda_devices(raw: Optional[str]) -> Optional[List[int]]:
+def _parse_cuda_devices(raw: str | None) -> list[int] | None:
     if raw is None:
         return None
     value = raw.strip()
@@ -179,7 +180,7 @@ def _parse_cuda_devices(raw: Optional[str]) -> Optional[List[int]]:
         return list(range(torch.cuda.device_count()))
 
     parts = [p for p in re.split(r"[,\s]+", value) if p]
-    device_ids: List[int] = []
+    device_ids: list[int] = []
     for part in parts:
         try:
             device_id = int(part)
@@ -204,7 +205,7 @@ class Config:
         self.dev_mode: bool = args.dev
         self.default_params: bool = args.default
         self.model_name: ModelName = args.algo
-        self.max_user_id: Optional[int] = args.max_user_id
+        self.max_user_id: int | None = args.max_user_id
         self.use_secs_intervals: bool = args.secs
         self.lstm_use_duration: bool = args.duration
         self.no_test_same_day: bool = args.no_test_same_day
@@ -222,7 +223,7 @@ class Config:
         self.data_path: Path = Path(args.data)
         self.use_recency_weighting: bool = args.recency
         self.train_equals_test: bool = args.train_equals_test
-        self.cuda_device_ids: Optional[List[int]] = _parse_cuda_devices(args.gpus)
+        self.cuda_device_ids: list[int] | None = _parse_cuda_devices(args.gpus)
 
         # Training/data parameters from parser (with defaults)
         self.n_splits: int = args.n_splits
@@ -232,6 +233,7 @@ class Config:
 
         # PyTorch threading settings
         self.torch_num_threads: int = args.torch_num_threads
+        # pyrefly: ignore [missing-attribute]
         torch.set_num_threads(self.torch_num_threads)
         # if hasattr(torch, "set_num_interop_threads"):
         #     torch.set_num_interop_threads(args.torch_num_interop_threads)
@@ -323,13 +325,13 @@ class Config:
         """Returns the base name for optimizer state files."""
         return self.base_file_name + self.optimizer_name_suffix
 
-    def get_lstm_tensor_feature_names(self) -> List[str]:
+    def get_lstm_tensor_feature_names(self) -> list[str]:
         """
         Returns the ordered feature names used to build LSTM tensors.
 
         Delta interval is always included, duration is optional, and rating is appended last.
         """
-        features: List[str] = ["delta_t_secs" if self.use_secs_intervals else "delta_t"]
+        features: list[str] = ["delta_t_secs" if self.use_secs_intervals else "delta_t"]
         if self.lstm_use_duration:
             features.append("duration")
         features.append("rating")
@@ -345,10 +347,10 @@ class Config:
         return f"Config({attrs})"
 
 
-_config_instance: Optional[Config] = None
+_config_instance: Config | None = None
 
 
-def load_config(custom_args_list: Optional[List[str]] = None) -> Config:
+def load_config(custom_args_list: list[str] | None = None) -> Config:
     """
     Parses command-line arguments (or custom arguments) and returns a singleton Config instance.
 

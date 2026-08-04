@@ -1,8 +1,10 @@
-from typing import Any, List, cast
+from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import torch
-import numpy as np
+from shape_extensions import IntVar
+
 from .base import BaseFeatureEngineer
 
 
@@ -30,7 +32,7 @@ class DashFeatureEngineer(BaseFeatureEngineer):
         return df
 
     def _dash_tw_features(
-        self, r_history: List, t_history: List, enable_decay: bool = False
+        self, r_history: list, t_history: list, enable_decay: bool = False
     ) -> np.ndarray:
         """
         Create DASH time window features
@@ -117,7 +119,9 @@ class DashACTRFeatureEngineer(BaseFeatureEngineer):
 
         return df
 
-    def _dash_actr_features(self, r_history: List, t_history: List) -> torch.Tensor:
+    def _dash_actr_features[SeqLen: IntVar](
+        self, r_history: list, t_history: list
+    ) -> torch.Tensor[[SeqLen, 2]]:
         """
         Create ACT-R style features for DASH[ACT-R]
 

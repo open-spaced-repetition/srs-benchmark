@@ -1,19 +1,20 @@
-from typing import override
-from typing import List, Union
-import torch
-from torch import nn, Tensor
-from typing import Optional
-from models.fsrs_v6 import FSRS6, FSRS6ParameterClipper
-import torch.nn.functional as F
-from torch.nn import Sigmoid
-import pandas as pd
-import numpy as np
-from tqdm.auto import tqdm
+from __future__ import annotations
+
 import time
+from typing import ClassVar, Optional, Union, assert_never, overload, override
+
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn.functional as F
 from scipy.optimize import minimize
+from shape_extensions import IntVar
+from torch import Tensor, nn
+from torch.nn import Sigmoid
+from tqdm.auto import tqdm
 
 from config import Config
-
+from models.fsrs_v6 import FSRS6, FSRS6ParameterClipper
 from models.fsrs_v7_interval_penalty import fsrs7_interval_growth_penalty
 
 # scheduling penalty 1 penalizes huge interval growth for non-same-day reviews, makes log loss worse
@@ -92,7 +93,7 @@ class FSRS7(FSRS6):
     betas: tuple = (0.8, 0.85)  # this is for Adam, default is (0.9, 0.999)
 
     # Obtained via multi-user optimization (1 gradient step per user)
-    init_w = [
+    init_w: ClassVar[list[float]] = [
         0.041,
         2.4175,
         4.1283,
@@ -130,7 +131,7 @@ class FSRS7(FSRS6):
         0.3862,
     ]
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: list[float] | None = None):
         super().__init__(config)
         if w is None:
             w = self.init_w
@@ -183,13 +184,13 @@ class FSRS7(FSRS6):
         self._zero_penalty = torch.zeros([], device=self.config.device)
         self._w_base = torch.tensor([7, 16], device=self.config.device)
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]] | Tensor[[]]]:
         # start = time.perf_counter_ns()
 
         outputs, _ = self.forward(sequences)
@@ -211,7 +212,7 @@ class FSRS7(FSRS6):
             self.w[-1],
         ).clamp(0.0001, 0.9999)
 
-        output = {
+        output: dict[str, Tensor[[BatchSize]] | Tensor[[]]] = {
             "retentions": retentions,
             "stabilities": stabilities,
             "difficulties": difficulties,
@@ -230,6 +231,7 @@ class FSRS7(FSRS6):
             sched_penalty_1 = self._zero_penalty
             sched_penalty_2 = self._zero_penalty
         L2_penalty = torch.sum(
+            # pyrefly: ignore [missing-attribute]
             torch.square(self.w - self.init_w_tensor) / torch.square(self._l2_sigma)
         )
         # sched_penalty_1 penalizes huge interval growth for non-same-day reviews
@@ -277,9 +279,12 @@ class FSRS7(FSRS6):
 
         return (weight1 * R1 + weight2 * R2) / (weight1 + weight2)
 
-    def stability_after_review(
-        self, state: Tensor, r: Tensor, rating: Tensor
-    ) -> tuple[Tensor, Tensor]:
+    def stability_after_review[BatchSize: IntVar](
+        self,
+        state: Tensor[[BatchSize, 2]],
+        r: Tensor[[BatchSize]],
+        rating: Tensor[[BatchSize]],
+    ) -> tuple[Tensor[[BatchSize]], Tensor[[BatchSize]]]:
         """
         Calculate both long-term and short-term stability in one pass.
         Returns (new_s_long_term, new_s_short_term)
@@ -345,24 +350,42 @@ class FSRS7(FSRS6):
 
         return new_s_both[:, 0], new_s_both[:, 1]
 
-    def transition_function(self, delta_t: Tensor) -> Tensor:
+    def transition_function[BatchSize: IntVar](
+        self, delta_t: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return 1 - self.w[26] * torch.exp(-self.w[25] * delta_t)
 
+    @overload
+    def init_d(self, rating: int) -> Tensor[[]]: ...
+
+    @overload
+    def init_d[BatchSize: IntVar](
+        self, rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]: ...
+
     @override
-    def init_d(self, rating: Union[int, Tensor]) -> Tensor:
+    def init_d[BatchSize: IntVar](
+        self, rating: int | Tensor[[BatchSize]]
+    ) -> Tensor[[]] | Tensor[[BatchSize]]:
         new_d = self.w[4] - torch.exp(self.w[5] * (rating - 1)) + 1
         return new_d
 
     @override
-    def linear_damping(self, delta_d: Tensor, old_d: Tensor) -> Tensor:
+    def linear_damping[BatchSize: IntVar](
+        self, delta_d: Tensor[[BatchSize]], old_d: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return delta_d * (10 - old_d) / 9
 
     @override
-    def mean_reversion(self, init: Tensor, current: Tensor) -> Tensor:
+    def mean_reversion[BatchSize: IntVar](
+        self, init: Tensor[[]], current: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         return 0.01 * init + 0.99 * current
 
     @override
-    def next_d(self, state: Tensor, rating: Tensor) -> Tensor:
+    def next_d[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], rating: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:
         delta_d = -self.w[6] * (rating - 3)
         new_d = state[:, 1] + self.linear_damping(delta_d, state[:, 1])
         new_d = self.mean_reversion(self.init_d(4), new_d)
@@ -660,8 +683,13 @@ class FSRS7(FSRS6):
 
                 init_s0 = r_s0_default[first_rating]
 
-                def loss(stability):
-                    assert first_rating in ["1", "2", "3", "4"]
+                def loss(
+                    stability,
+                    delta_t=delta_t,
+                    recall=recall,
+                    count=count,
+                    init_s0=init_s0,
+                ):
                     y_pred = self.forgetting_curve(
                         delta_t,
                         stability,
@@ -706,22 +734,21 @@ class FSRS7(FSRS6):
                 if (
                     small_rating in current_rating_stability
                     and big_rating in current_rating_stability
+                ) and (
+                    current_rating_stability[small_rating]
+                    > current_rating_stability[big_rating]
                 ):
                     if (
-                        current_rating_stability[small_rating]
-                        > current_rating_stability[big_rating]
+                        current_rating_count[small_rating]
+                        > current_rating_count[big_rating]
                     ):
-                        if (
-                            current_rating_count[small_rating]
-                            > current_rating_count[big_rating]
-                        ):
-                            current_rating_stability[big_rating] = (
-                                current_rating_stability[small_rating]
-                            )
-                        else:
-                            current_rating_stability[small_rating] = (
-                                current_rating_stability[big_rating]
-                            )
+                        current_rating_stability[big_rating] = current_rating_stability[
+                            small_rating
+                        ]
+                    else:
+                        current_rating_stability[small_rating] = (
+                            current_rating_stability[big_rating]
+                        )
 
             return total_loss, current_rating_stability
 
@@ -774,17 +801,15 @@ class FSRS7(FSRS6):
             case 0:
                 initial_stabilities = list(r_s0_default.values())
             case 1:
-                rating = list(rating_stability.keys())[0]
+                rating = next(iter(rating_stability.keys()))
                 factor = rating_stability[rating] / r_s0_default[str(rating)]
-                initial_stabilities = list(
-                    map(lambda x: x * factor, r_s0_default.values())
-                )
+                initial_stabilities = [x * factor for x in r_s0_default.values()]
             case 2 | 3:
                 filled = self.f_interpolate(a1, a2, a3, a4, rating_stability)
-                if any([np.isnan(x) for x in filled.values()]) or any(
-                    [np.isinf(x) for x in filled.values()]
+                if any(np.isnan(x) for x in filled.values()) or any(
+                    np.isinf(x) for x in filled.values()
                 ):
-                    raise Exception("NaN/inf in S0 interpolation")
+                    raise ValueError("NaN/inf in S0 interpolation")
                 initial_stabilities = [filled[r] for r in [1, 2, 3, 4]]
             case 4:
                 initial_stabilities = [
@@ -792,20 +817,20 @@ class FSRS7(FSRS6):
                     for item in sorted(rating_stability.items(), key=lambda x: x[0])
                 ]
             case _:
-                raise Exception("impossible")
+                raise RuntimeError("Unexpected number of rating stabilities")
 
         # Update initial stabilities (w[0:4])
         self.w.data[0:4] = Tensor(
-            list(
-                map(
-                    lambda x: max(min(self.config.init_s_max, x), self.config.s_min),
-                    initial_stabilities,
-                )
-            )
+            # pyrefly: ignore [bad-argument-count]
+            [
+                max(min(self.config.init_s_max, x), self.config.s_min)
+                for x in initial_stabilities
+            ]
         )
 
         # Update forgetting curve parameters with the best found parameters
         if best_forgetting_curve_params is not None:
+            # pyrefly: ignore [bad-argument-count]
             self.w.data[-8:] = Tensor(best_forgetting_curve_params)
 
         self.init_w_tensor = self.w.data.clone().to(self.config.device)
@@ -814,7 +839,9 @@ class FSRS7(FSRS6):
         # print(f'Pretrain took {end - start:.2f} seconds, {(end - start) * 1000:.0f} milliseconds')
 
     @override
-    def step(self, X: Tensor, state: Tensor) -> Tensor:
+    def step[BatchSize: IntVar](
+        self, X: Tensor[[BatchSize, 2]], state: Tensor[[BatchSize, 2]]
+    ) -> Tensor[[BatchSize, 2]]:
         """
         :param X: shape[batch_size, 2], X[:,0] is elapsed time, X[:,1] is rating
         :param state: shape[batch_size, 2], state[:,0] is stability, state[:,1] is difficulty
@@ -823,6 +850,7 @@ class FSRS7(FSRS6):
         if torch.equal(state, torch.zeros_like(state)):
             keys = torch.tensor([1, 2, 3, 4], device=X.device)
             keys = keys.view(1, -1).expand(X[:, 1].long().size(0), -1)
+            # pyrefly: ignore [missing-attribute]
             index = (X[:, 1].long().unsqueeze(1) == keys).nonzero(as_tuple=True)
             # first learn, init memory states
             new_s = torch.ones_like(state[:, 0], device=X.device)

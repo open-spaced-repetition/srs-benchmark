@@ -1,11 +1,11 @@
-from typing import override
-from typing import List
+from typing import Optional, override
+
 import torch
+from shape_extensions import IntVar
 from torch import Tensor
-from typing import Optional
-from models.fsrs_v4 import FSRS4, FSRS4ParameterClipper
 
 from config import Config
+from models.fsrs_v4 import FSRS4, FSRS4ParameterClipper
 
 
 class FSRS4dot5ParameterClipper(FSRS4ParameterClipper):
@@ -35,7 +35,7 @@ class FSRS4dot5(FSRS4):
     decay = -0.5
     factor = 0.9 ** (1 / decay) - 1
 
-    def __init__(self, config: Config, w: Optional[List[float]] = None):
+    def __init__(self, config: Config, w: list[float] | None = None):
         # Handle dynamic weight selection based on config
         if w is None:
             if not config.use_secs_intervals:
@@ -87,7 +87,9 @@ class FSRS4dot5(FSRS4):
         """Override forgetting curve with FSRS4.5 formula"""
         return (1 + self.factor * t / s) ** self.decay
 
-    def stability_after_failure(self, state: Tensor, r: Tensor) -> Tensor:  # type: ignore[override]
+    def stability_after_failure[BatchSize: IntVar](
+        self, state: Tensor[[BatchSize, 2]], r: Tensor[[BatchSize]]
+    ) -> Tensor[[BatchSize]]:  # type: ignore[override]
         """Override to add minimum constraint"""
         new_s = (
             self.w[11]

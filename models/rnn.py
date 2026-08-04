@@ -1,6 +1,11 @@
-from typing import cast, Union
+from __future__ import annotations
+
+from typing import Union, cast
+
 import torch
-from torch import nn, Tensor
+from shape_extensions import IntVar
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel
 
@@ -16,6 +21,7 @@ class RNN(BaseModel):
         self.n_hidden = 2
         self.n_out = 1
         self.n_layers = 1
+        # pyrefly: ignore [missing-attribute]
         self.rnn = nn.RNN(
             input_size=self.n_input,
             hidden_size=self.n_hidden,
@@ -29,6 +35,7 @@ class RNN(BaseModel):
         else:
             try:
                 self.load_state_dict(
+                    # pyrefly: ignore [missing-attribute]
                     torch.load(
                         f"./pretrain/{self.config.get_evaluation_file_name()}_pretrain.pth",
                         weights_only=True,
@@ -38,18 +45,22 @@ class RNN(BaseModel):
             except FileNotFoundError:
                 pass
 
-    def forward(self, x, hx=None):
+    def forward[SeqLen: IntVar, BatchSize: IntVar](
+        self,
+        x: Tensor[[SeqLen, BatchSize, 2]],
+        hx=None,
+    ) -> tuple[Tensor[[SeqLen, BatchSize, 1]], Tensor[[1, BatchSize, 2]]]:
         x, h = self.rnn(x, hx=hx)
         output = torch.exp(self.fc(x))
         return output, h
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs, _ = self.forward(sequences)
         stabilities = outputs[
             seq_lens - 1,

@@ -53,8 +53,11 @@ Integration in batch_process
 """
 
 from __future__ import annotations
+
 import math
+
 import torch
+from shape_extensions import IntVar
 
 # ── physical constants ────────────────────────────────────────────────────────
 _MIN_T = 1.0 / 86_400.0  # 1 second expressed in days
@@ -69,11 +72,11 @@ _INV_C = 1.0 / _SHORT_C  # = 144.0  (86 400 / 600)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _fc_R_and_dRdt(
-    t: torch.Tensor,
-    s: torch.Tensor,
-    w: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
+def _fc_R_and_dRdt[ParamCount: IntVar](
+    t: torch.Tensor[[]],
+    s: torch.Tensor[[]],
+    w: torch.Tensor[[ParamCount]],
+) -> tuple[torch.Tensor[[]], torch.Tensor[[]]]:
     decay1 = -w[-8]
     decay2 = -w[-7]
 
@@ -114,12 +117,12 @@ def _fc_R_and_dRdt(
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _interval_differentiable(
-    s: torch.Tensor,
-    w: torch.Tensor,
+def _interval_differentiable[ParamCount: IntVar](
+    s: torch.Tensor[[]],
+    w: torch.Tensor[[ParamCount]],
     target: float = 0.9,
     n_newton: int = 12,
-) -> torch.Tensor:
+) -> torch.Tensor[[]]:
     """
     Return t*  s.t.  R(t*, s, w) = target,  differentiably w.r.t. w and s.
 
@@ -147,14 +150,23 @@ def _interval_differentiable(
         on w from earlier stability updates, giving the correct total gradient.
     """
     # ── Phase 1: Newton in log(t) — pure Python scalars, no autograd ─────────
+    # pyrefly: ignore [bad-argument-type]
     s_f = float(s.detach())
+    # pyrefly: ignore [bad-argument-type]
     d1 = float(-w[-8])
+    # pyrefly: ignore [bad-argument-type]
     d2 = float(-w[-7])
+    # pyrefly: ignore [bad-argument-type]
     b1 = float(w[-6])
+    # pyrefly: ignore [bad-argument-type]
     b2 = float(w[-5])
+    # pyrefly: ignore [bad-argument-type]
     bw1f = float(w[-4])
+    # pyrefly: ignore [bad-argument-type]
     bw2f = float(w[-3])
+    # pyrefly: ignore [bad-argument-type]
     sw1f = float(w[-2])
+    # pyrefly: ignore [bad-argument-type]
     sw2f = float(w[-1])
 
     c1f = b1 ** (1.0 / d1) - 1.0
@@ -181,6 +193,7 @@ def _interval_differentiable(
 
     t_star_f = max(_MIN_T, min(math.exp(u_f), _MAX_T))
     # create a plain tensor on the same device/dtype as w, no grad
+    # pyrefly: ignore [missing-attribute]
     t_star = w.new_tensor(t_star_f)
 
     # ── Phase 2: IFT lift — one step with grad ────────────────────────────────
@@ -203,11 +216,15 @@ def _interval_differentiable(
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _init_d(w: torch.Tensor, rating: int) -> torch.Tensor:
+def _init_d[ParamCount: IntVar](
+    w: torch.Tensor[[ParamCount]], rating: int
+) -> torch.Tensor[[]]:
     return (w[4] - torch.exp(w[5] * (rating - 1)) + 1.0).clamp(1.0, 10.0)
 
 
-def _next_d_good(w: torch.Tensor, d: torch.Tensor) -> torch.Tensor:
+def _next_d_good[ParamCount: IntVar](
+    w: torch.Tensor[[ParamCount]], d: torch.Tensor[[]]
+) -> torch.Tensor[[]]:
     """
     Difficulty update for a Good (rating = 3) review.
     The rating-delta term is −w[6]·(3−3) = 0, so d only shifts via
@@ -217,12 +234,12 @@ def _next_d_good(w: torch.Tensor, d: torch.Tensor) -> torch.Tensor:
     return new_d.clamp(1.0, 10.0)
 
 
-def _s_fail_long(
-    w: torch.Tensor,
-    s: torch.Tensor,
-    d: torch.Tensor,
-    r: torch.Tensor,
-) -> torch.Tensor:
+def _s_fail_long[ParamCount: IntVar](
+    w: torch.Tensor[[ParamCount]],
+    s: torch.Tensor[[]],
+    d: torch.Tensor[[]],
+    r: torch.Tensor[[]],
+) -> torch.Tensor[[]]:
     raw = (
         w[10]
         * d.pow(-w[11])
@@ -232,12 +249,12 @@ def _s_fail_long(
     return torch.minimum(s, raw)
 
 
-def _s_fail_short(
-    w: torch.Tensor,
-    s: torch.Tensor,
-    d: torch.Tensor,
-    r: torch.Tensor,
-) -> torch.Tensor:
+def _s_fail_short[ParamCount: IntVar](
+    w: torch.Tensor[[ParamCount]],
+    s: torch.Tensor[[]],
+    d: torch.Tensor[[]],
+    r: torch.Tensor[[]],
+) -> torch.Tensor[[]]:
     raw = (
         w[19]
         * d.pow(-w[20])
@@ -278,7 +295,7 @@ def fsrs7_interval_growth_penalty(
     n_reviews=10,
     target_dr=0.90,
     n_newton=4,
-    target_drs=[0.95, 0.96, 0.97, 0.98, 0.99],
+    target_drs=None,
 ):
     """
     Returns (penalty_1, penalty_2).
@@ -286,11 +303,20 @@ def fsrs7_interval_growth_penalty(
     penalty_1 – squared max interval-growth ratio for ≥1 d intervals at target_dr.
     penalty_2 – mean short-interval penalty for sub-1 d intervals at DR 95–99 %.
     """
+    if target_drs is None:
+        target_drs = [0.95, 0.96, 0.97, 0.98, 0.99]
     try:
         p1 = _fsrs7_interval_growth_penalty_impl(
             w, n_reviews=n_reviews, target_dr=target_dr, n_newton=n_newton
         )
-    except Exception as e1:
+    except (
+        IndexError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        ZeroDivisionError,
+    ) as e1:
         print(f"Error when calculating penalty 1: {e1}")
         p1 = w.new_zeros(())
     if not torch.isfinite(p1):
@@ -300,7 +326,14 @@ def fsrs7_interval_growth_penalty(
         p2 = _fsrs7_short_interval_penalty_impl(
             w, n_reviews=n_reviews, n_newton=n_newton, target_drs=target_drs
         )
-    except Exception as e2:
+    except (
+        IndexError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        ZeroDivisionError,
+    ) as e2:
         print(f"Error when calculating penalty 2: {e2}")
         p2 = w.new_zeros(())
     if not torch.isfinite(p2):
@@ -311,9 +344,9 @@ def fsrs7_interval_growth_penalty(
 
 def _fsrs7_interval_growth_penalty_impl(w, *, n_reviews, target_dr, n_newton):
     """Original body of fsrs7_interval_growth_penalty goes here verbatim."""
-    s: torch.Tensor = w[2]
-    d: torch.Tensor = _init_d(w, 3)
-    intervals: list[torch.Tensor] = []
+    s: torch.Tensor[[]] = w[2]
+    d: torch.Tensor[[]] = _init_d(w, 3)
+    intervals: list[torch.Tensor[[]]] = []
     for _ in range(n_reviews):
         t = _interval_differentiable(s, w, target=target_dr, n_newton=n_newton)
         intervals.append(t)
@@ -340,12 +373,12 @@ def _fsrs7_short_interval_penalty_impl(w, *, n_reviews, n_newton, target_drs):
     Returns the mean across DR values that produced at least one sub-1d interval.
     Returns zero if no sub-1d intervals are found at any DR.
     """
-    penalties: list[torch.Tensor] = []
+    penalties: list[torch.Tensor[[]]] = []
 
     for target_dr in target_drs:
-        s: torch.Tensor = w[2]
-        d: torch.Tensor = _init_d(w, 3)
-        intervals: list[torch.Tensor] = []
+        s: torch.Tensor[[]] = w[2]
+        d: torch.Tensor[[]] = _init_d(w, 3)
+        intervals: list[torch.Tensor[[]]] = []
 
         for _ in range(n_reviews):
             t = _interval_differentiable(s, w, target=target_dr, n_newton=n_newton)

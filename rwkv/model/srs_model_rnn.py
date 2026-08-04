@@ -1,11 +1,12 @@
 import numpy as np
+import torch
+
 from rwkv.architecture import AnkiRWKVConfig
 from rwkv.data_processing import (
     CARD_FEATURE_COLUMNS,
 )
 from rwkv.model.rwkv_rnn_model import RWKV7RNN
 from rwkv.model.srs_model import is_excluded
-import torch
 
 # An RNN implementation of srs_model.
 
@@ -148,6 +149,7 @@ class SrsRWKVRnn(ModuleType):
             next_global_state,
         )
 
+    # pyrefly: ignore [missing-attribute]
     @torch.inference_mode()
     def run(self, df, dtype, device):
         print(
@@ -231,7 +233,7 @@ class SrsRWKVRnn(ModuleType):
                 if row["has_label"]:
                     if row["is_query"]:
                         out_p_probs = torch.softmax(out_p_logits, dim=-1)
-                        out_p_again, out_p_1, out_p_2, out_p_3 = out_p_probs.unbind(
+                        out_p_again, _out_p_1, _out_p_2, _out_p_3 = out_p_probs.unbind(
                             dim=-1
                         )
                         out_p_binary = torch.clamp(

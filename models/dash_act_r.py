@@ -1,6 +1,9 @@
+from typing import ClassVar
+
 import torch
-from torch import nn, Tensor
-from typing import List
+from shape_extensions import IntVar
+from torch import Tensor, nn
+
 from config import Config
 from models.base import BaseModel, BaseParameterClipper
 
@@ -19,10 +22,10 @@ class DASH_ACTRParameterClipper(BaseParameterClipper):
 
 class DASH_ACTR(BaseModel):
     # 5 params
-    init_w = [1.4164, 0.516, -0.0564, 1.9223, 1.0549]
+    init_w: ClassVar[list[float]] = [1.4164, 0.516, -0.0564, 1.9223, 1.0549]
     clipper = DASH_ACTRParameterClipper()
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.w = nn.Parameter(torch.tensor(w, dtype=torch.float32))
         self.sigmoid = nn.Sigmoid()
@@ -48,20 +51,15 @@ class DASH_ACTR(BaseModel):
         )
         return retentions
 
-    def batch_process(
+    def batch_process[SeqLen: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[SeqLen, BatchSize, 2]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs = self.forward(sequences)
         return {"retentions": outputs}
 
     def benchmark_state(self):
-        return list(
-            map(
-                lambda x: round(float(x), 4),
-                dict(self.named_parameters())["w"].data,
-            )
-        )
+        return [round(float(x), 4) for x in dict(self.named_parameters())["w"].data]

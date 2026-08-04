@@ -1,17 +1,19 @@
-from sklearn.model_selection import TimeSeriesSplit
+import random
+from functools import partial
+
+import optuna  # type: ignore
+import pandas as pd
 import torch
-from config import create_parser, Config
+from multiprocess import Pool  # type: ignore
+from sklearn.model_selection import TimeSeriesSplit
+
+from config import Config, create_parser
 from reptile_trainer import (
     DEFAULT_FINETUNE_PARAMS,
+    compute_df_loss,
     finetune,
     get_inner_opt,
-    compute_df_loss,
 )
-import pandas as pd
-import optuna  # type: ignore
-from functools import partial
-import random
-from multiprocess import Pool  # type: ignore
 
 optuna_nonce = random.randint(0, 100000000)
 
@@ -109,7 +111,7 @@ def objective(trial, df_list, model, inner_opt_state):
 
 def main():
     from features import create_features
-    from models import Transformer, LSTM
+    from models import LSTM, Transformer
 
     def process_user(user_id):
         print("Process:", user_id)

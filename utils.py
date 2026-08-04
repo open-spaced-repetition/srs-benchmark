@@ -1,16 +1,19 @@
 import json
-import numpy as np
-import matplotlib.pyplot as plt
 import traceback
-import torch
-import pandas as pd
-from torch import Tensor
-from pathlib import Path
-from sklearn.metrics import root_mean_squared_error  # type: ignore
 from functools import wraps
 from itertools import accumulate
 from numbers import Real
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import torch
+from shape_extensions import IntVar
+from sklearn.metrics import root_mean_squared_error  # type: ignore
+from torch import Tensor
+
 from config import Config
 from models.trainable import (
     ModelState,
@@ -39,7 +42,7 @@ def catch_exceptions(func):
         _t0 = _time.perf_counter() if _SRSB_TIMING else None
         try:
             ret = (func(*args, **kwargs), None)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- decorator converts any user failure to data
             # Try to extract user_id from function arguments
             user_id = None
             if args:
@@ -149,29 +152,39 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
 
     universal_metric_list = []
 
-    for algoA, algoB in pair_algo:
-        cross_comparison_group = cross_comparison_record.groupby(by=f"{algoA}_bin").agg(
-            {"y": ["mean"], f"{algoB}_B-W": ["mean"], f"R ({algoB})": ["mean", "count"]}
+    for bin_algorithm, evaluated_algorithm in pair_algo:
+        cross_comparison_group = cross_comparison_record.groupby(
+            by=f"{bin_algorithm}_bin"
+        ).agg(
+            {
+                "y": ["mean"],
+                f"{evaluated_algorithm}_B-W": ["mean"],
+                f"R ({evaluated_algorithm})": ["mean", "count"],
+            }
         )
         universal_metric = root_mean_squared_error(
             y_true=cross_comparison_group["y", "mean"],
-            y_pred=cross_comparison_group[f"R ({algoB})", "mean"],
-            sample_weight=cross_comparison_group[f"R ({algoB})", "count"],
+            y_pred=cross_comparison_group[f"R ({evaluated_algorithm})", "mean"],
+            sample_weight=cross_comparison_group[f"R ({evaluated_algorithm})", "count"],
         )
-        cross_comparison_group[f"R ({algoB})", "percent"] = (
-            cross_comparison_group[f"R ({algoB})", "count"]
-            / cross_comparison_group[f"R ({algoB})", "count"].sum()
+        cross_comparison_group[f"R ({evaluated_algorithm})", "percent"] = (
+            cross_comparison_group[f"R ({evaluated_algorithm})", "count"]
+            / cross_comparison_group[f"R ({evaluated_algorithm})", "count"].sum()
         )
         if graph:
             ax.scatter(
                 cross_comparison_group.index,
-                cross_comparison_group[f"{algoB}_B-W", "mean"],
-                s=cross_comparison_group[f"R ({algoB})", "percent"] * 1024,
+                cross_comparison_group[f"{evaluated_algorithm}_B-W", "mean"],
+                s=cross_comparison_group[f"R ({evaluated_algorithm})", "percent"]
+                * 1024,
                 alpha=0.5,
             )
             ax.plot(
-                cross_comparison_group[f"{algoB}_B-W", "mean"],
-                label=f"{algoB} by {algoA}, UM={universal_metric:.4f}",
+                cross_comparison_group[f"{evaluated_algorithm}_B-W", "mean"],
+                label=(
+                    f"{evaluated_algorithm} by {bin_algorithm}, "
+                    f"UM={universal_metric:.4f}"
+                ),
             )
         universal_metric_list.append(universal_metric)
     if graph:
@@ -229,9 +242,24 @@ def save_evaluation_file(user_id, df, config: Config):
         )
 
 
-def batch_process_wrapper(
-    model: "TrainableModel", batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor]
-) -> dict[str, Tensor]:
+def batch_process_wrapper[
+    SeqLen: IntVar,
+    BatchSize: IntVar,
+    InputDims: IntVar,
+    OutputDims: IntVar,
+](
+    model: "TrainableModel[InputDims, OutputDims]",
+    batch: tuple[
+        Tensor[[SeqLen, BatchSize, InputDims]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+    ],
+) -> dict[
+    str,
+    Tensor[[]] | Tensor[[BatchSize]] | Tensor[[BatchSize, OutputDims]],
+]:
     """
     Wrapper function for batch processing of model predictions.
 
@@ -244,7 +272,10 @@ def batch_process_wrapper(
     """
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
-    result = {"labels": labels, "weights": weights}
+    result: dict[
+        str,
+        Tensor[[]] | Tensor[[BatchSize]] | Tensor[[BatchSize, OutputDims]],
+    ] = {"labels": labels, "weights": weights}
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     return result
@@ -276,7 +307,11 @@ class Collection:
             Tuple of (retentions, stabilities, difficulties)
         """
         try:
-            from fsrs_optimizer import BatchDataset, BatchLoader, DevicePrefetchLoader  # type: ignore
+            from fsrs_optimizer import (  # type: ignore
+                BatchDataset,
+                BatchLoader,
+                DevicePrefetchLoader,
+            )
         except ImportError:
             raise ImportError(
                 "fsrs_optimizer is required for batch prediction. "
@@ -325,16 +360,17 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
         tuple: (stats dict, raw predictions dict or None)
     """
     import math
-    import torch
     from pathlib import Path
-    from sklearn.metrics import roc_auc_score, log_loss, precision_score, recall_score
-    from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
+
     import relplot
+    import torch
+    from sklearn.metrics import log_loss, precision_score, recall_score, roc_auc_score
+    from statsmodels.nonparametric.smoothers_lowess import lowess  # type: ignore
 
     if config.generate_plots:
         try:
-            from fsrs_optimizer import plot_brier, Optimizer  # type: ignore
             import matplotlib.pyplot as plt
+            from fsrs_optimizer import Optimizer, plot_brier  # type: ignore
 
             fig = plt.figure()
             plot_brier(p, y, ax=fig.add_subplot(111))
@@ -370,7 +406,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     recall_90 = recall_score(y, y_hat_90, zero_division=0)
     try:
         auc = round(roc_auc_score(y_true=y, y_score=p), 6)
-    except Exception:
+    except ValueError:
         auc = None
     stats = {
         "metrics": {
@@ -396,7 +432,7 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
     if config.save_raw_output:
         raw = {
             "user": int(user_id),
-            "p": list(map(lambda x: round(x, 4), p)),
+            "p": [round(x, 4) for x in p],
             "y": list(map(int, y)),
         }
     else:
@@ -430,11 +466,13 @@ def result_parameters(
 
 def save_model_state(state: TrainingState, file_name: str, user_id: int) -> None:
     Path(f"weights/{file_name}").mkdir(parents=True, exist_ok=True)
+    # pyrefly: ignore [missing-attribute]
     torch.save(state, f"weights/{file_name}/{user_id}.pth")
 
 
 def sort_jsonl(file):
-    data = list(map(lambda x: json.loads(x), open(file, encoding="utf-8").readlines()))
+    with file.open("r", encoding="utf-8") as jsonl_file:
+        data = [json.loads(x) for x in jsonl_file]
     data.sort(key=lambda x: x["user"])
     with file.open("w", encoding="utf-8", newline="\n") as jsonl_file:
         for json_data in data:

@@ -1,6 +1,8 @@
+from typing import ClassVar
+
 import torch
-from torch import nn, Tensor
-from typing import List
+from shape_extensions import IntVar
+from torch import Tensor, nn
 
 from config import Config
 from models.base import BaseModel
@@ -8,9 +10,9 @@ from models.base import BaseModel
 
 class HLR(BaseModel):
     # 3 params
-    init_w = [2.5819, -0.8674, 2.7245]
+    init_w: ClassVar[list[float]] = [2.5819, -0.8674, 2.7245]
 
-    def __init__(self, config: Config, w: List[float] = init_w):
+    def __init__(self, config: Config, w: list[float] = init_w):
         super().__init__(config)
         self.n_input = 2
         self.n_out = 1
@@ -23,13 +25,13 @@ class HLR(BaseModel):
         dp = self.fc(x)
         return 2**dp
 
-    def batch_process(
+    def batch_process[FeatureCount: IntVar, BatchSize: IntVar](
         self,
-        sequences: Tensor,
-        delta_ts: Tensor,
-        seq_lens: Tensor,
+        sequences: Tensor[[FeatureCount, BatchSize]],
+        delta_ts: Tensor[[BatchSize]],
+        seq_lens: Tensor[[BatchSize]],
         real_batch_size: int,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, Tensor[[BatchSize]]]:
         outputs = self.forward(sequences.transpose(0, 1))
         stabilities = outputs.squeeze(1)
         retentions = self.forgetting_curve(delta_ts, stabilities)
@@ -39,6 +41,7 @@ class HLR(BaseModel):
         return 0.5 ** (t / s)
 
     def benchmark_state(self):
+        assert self.fc.bias
         return (
             self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
         )

@@ -1,24 +1,26 @@
+import copy
 import os
-import pandas as pd
-from sklearn.model_selection import TimeSeriesSplit
-import torch
-import torch.nn as nn
-from torch import Tensor
+import time
+from itertools import chain
 from pathlib import Path
-from config import create_parser, Config
+
+import numpy as np
+import pandas as pd
+import torch
+import wandb
 from fsrs_optimizer import (
     BatchDataset,
     BatchLoader,
     DevicePrefetchLoader,
 )
 from multiprocess import Pool  # type: ignore
-import copy
-import numpy as np
-from models.trainable import TrainableModel
-import wandb
-import time
-from itertools import chain
+from shape_extensions import IntVar
+from sklearn.model_selection import TimeSeriesSplit
+from torch import Tensor, nn
+
+from config import Config, create_parser
 from features import create_features
+from models.trainable import TrainableModel
 
 BATCH_SIZE = 16384
 BATCH_SIZE_EXP = 1.0
@@ -132,14 +134,23 @@ def print_grad_norm(model):
     print(torch.cat(grads).norm())
 
 
-def compute_data_loss(
-    model: TrainableModel,
-    batch: tuple[Tensor, Tensor, Tensor, Tensor, Tensor],
+def compute_data_loss[SeqLen: IntVar, BatchSize: IntVar, InputDims: IntVar](
+    model: TrainableModel[InputDims, int],
+    batch: tuple[
+        Tensor[[SeqLen, BatchSize, InputDims]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+        Tensor[[BatchSize]],
+    ],
     batch_size_exp=1.0,
 ):
     sequences, delta_ts, labels, seq_lens, weights = batch
     real_batch_size = seq_lens.shape[0]
-    result = {"labels": labels, "weights": weights}
+    result: dict[str, Tensor[[]] | Tensor[[BatchSize]] | Tensor[[BatchSize, int]]] = {
+        "labels": labels,
+        "weights": weights,
+    }
     outputs = model.batch_process(sequences, delta_ts, seq_lens, real_batch_size)
     result.update(outputs)
     loss_fn = nn.BCELoss(reduction="none")
@@ -250,7 +261,6 @@ def finetune_adapt(
         target_device=DEVICE,
     )
     for step in range(inner_steps):
-        batch_count = 0
         for batch in device_loader:
             inner_opt.zero_grad()
             batch_inner_loss, inner_loss_scaled, _ = compute_data_loss(
@@ -263,8 +273,6 @@ def finetune_adapt(
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
             inner_opt.step()
-            batch_count += 1
-
         inner_scheduler.step()
 
     if inner_loss is None:
@@ -564,7 +572,7 @@ def process_user(user_id):
 
 
 def main():
-    from models import Transformer, LSTM
+    from models import LSTM, Transformer
 
     if MODEL_NAME == "Transformer":
         model = Transformer(config)

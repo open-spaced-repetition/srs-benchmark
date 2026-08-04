@@ -1,11 +1,21 @@
+import json
+import logging
+import os
+import pathlib
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
-import json
-import pathlib
 from KDEpy import FFTKDE  # type: ignore
+
 from config import create_parser
-import os
-import sys
+
+logger = logging.getLogger(__name__)
+
+
+class ChenRuleError(RuntimeError):
+    """Raised when Chen's bandwidth-selection rule cannot produce a result."""
+
 
 parser = create_parser()
 args, _ = parser.parse_known_args()
@@ -13,12 +23,10 @@ args, _ = parser.parse_known_args()
 DEV_MODE = args.dev
 if DEV_MODE:
     sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
-import logging
-
 try:
     from fsrs_optimizer import DEFAULT_PARAMETER  # type: ignore
-except Exception as e:
-    logging.exception("Failed to import fsrs_optimizer: %s", e)
+except Exception:
+    logger.exception("Failed to import fsrs_optimizer")
     DEFAULT_PARAMETER = []
 
 
@@ -61,7 +69,7 @@ def chen_rule(data, weights=None):
         h = ((4 * (2 + cv**2)) ** (1 / 5)) * scale * (n ** (-2 / 5))
         return h
     else:
-        raise Exception("Chen's rule failed")
+        raise ChenRuleError("Chen's rule failed")
 
 
 def mode_of_three(data):
@@ -133,7 +141,7 @@ def HRM(v):
         # Create N-1 intervals called I
         # each interval is of w width
         I = []
-        for j in range(0, N - 1):  # j = 1 to N-1, paper is 1 based index
+        for j in range(N - 1):  # j = 1 to N-1, paper is 1 based index
             I.append((v[j], v[j] + w))
         I = np.array(I)
 
@@ -156,10 +164,8 @@ def HRM(v):
         Vmax = v[0]
         for IJi in IJ:
             if (IJi[-1] - IJi[0]) == w_prime:
-                if IJi[0] < Vmin:
-                    Vmin = IJi[0]
-                if IJi[-1] > Vmax:
-                    Vmax = IJi[-1]
+                Vmin = min(Vmin, IJi[0])
+                Vmax = max(Vmax, IJi[-1])
 
         min_index = np.argmax(v == Vmin)
         v_back = v[::-1]
@@ -218,7 +224,7 @@ def best_mode(a, weights):
 if __name__ == "__main__":
     model = "FSRS-rs"
     with open(f"./result/{model}.jsonl", "r") as f:
-        data = [json.loads(x) for x in f.readlines()]
+        data = [json.loads(x) for x in f]
     weights_list = []
     sizes = []
     n_params = len(DEFAULT_PARAMETER)

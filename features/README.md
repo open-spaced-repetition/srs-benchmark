@@ -200,7 +200,7 @@ def test_fsrs_feature_engineer():
     engineer = create_feature_engineer(config)
     df = create_test_dataframe()
     result = engineer.create_features(df)
-    assert 'tensor' in result.columns
+    assert "tensor" in result.columns
     # Add more assertions
 ```
 

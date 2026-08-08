@@ -32,7 +32,7 @@ def _cumulative_lists_by_card(df: pd.DataFrame, col: str) -> HistoryLists:
     n = len(vals)
     start = 0
     for i in range(1, n + 1):
-        if i == n or card_ids[i] != card_ids[start]: # type: ignore
+        if i == n or card_ids[i] != card_ids[start]:  # type: ignore
             block = vals[start:i]
             out.append([block[: j + 1] for j in range(len(block))])
             start = i

@@ -288,10 +288,10 @@ class BaseFeatureEngineer(ABC):
         """
         Handle outliers and non-continuous rows
         """
-
+        # type: ignore
         filtered_dataset = (
             df[df["i"] == 2]
-            .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]  # type: ignore
+            .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
             .apply(remove_outliers)
         )
         if filtered_dataset.empty:

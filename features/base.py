@@ -290,7 +290,7 @@ class BaseFeatureEngineer(ABC):
         """
         # type: ignore
         filtered_dataset = (
-            df[df["i"] == 2]
+            df[df["i"] == 2]  # type: ignore
             .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]  # type: ignore
             .apply(remove_outliers)
         )

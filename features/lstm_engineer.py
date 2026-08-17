@@ -93,7 +93,7 @@ class LSTMFeatureEngineer(BaseFeatureEngineer):
 
         # Apply history creation grouped by card
         grouped = df.groupby("card_id", group_keys=False)
-        cast(Any, df)["tensor"] = grouped[df.columns.difference(["card_id"])].apply(
+        cast(Any, df)["tensor"] = grouped[df.columns.difference(["card_id"])].apply(  # type: ignore
             get_history
         )
 

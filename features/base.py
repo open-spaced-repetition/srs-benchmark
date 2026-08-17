@@ -32,7 +32,7 @@ def _cumulative_lists_by_card(df: pd.DataFrame, col: str) -> HistoryLists:
     n = len(vals)
     start = 0
     for i in range(1, n + 1):
-        if i == n or card_ids[i] != card_ids[start]:
+        if i == n or card_ids[i] != card_ids[start]:  # type: ignore
             block = vals[start:i]
             out.append([block[: j + 1] for j in range(len(block))])
             start = i
@@ -288,10 +288,10 @@ class BaseFeatureEngineer(ABC):
         """
         Handle outliers and non-continuous rows
         """
-
+        # type: ignore
         filtered_dataset = (
-            df[df["i"] == 2]
-            .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]
+            df[df["i"] == 2]  # type: ignore
+            .groupby(by=["first_rating"], as_index=False, group_keys=False)[df.columns]  # type: ignore
             .apply(remove_outliers)
         )
         if filtered_dataset.empty:
@@ -299,7 +299,7 @@ class BaseFeatureEngineer(ABC):
 
         df[df["i"] == 2] = filtered_dataset
         df.dropna(inplace=True)
-        df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(
+        df = df.groupby("card_id", as_index=False, group_keys=False)[df.columns].apply(  # type: ignore
             remove_non_continuous_rows
         )
         return df

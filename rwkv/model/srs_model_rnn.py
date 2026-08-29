@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from rwkv.architecture import AnkiRWKVConfig
 from rwkv.data_processing import (
@@ -133,7 +134,7 @@ class SrsRWKVRnn(ModuleType):
 
         x = self.prehead_dropout(self.prehead_norm(global_encoding))
         out_w_logits = self.w_linear(self.head_w(x).float())
-        out_w = torch.nn.functional.softmax(out_w_logits, dim=-1)
+        out_w = F.softmax(out_w_logits, dim=-1)
         out_ahead_logits = self.ahead_linear(self.head_ahead_logits(x).float())
 
         x_p = self.head_p(x).float()

@@ -3,6 +3,7 @@ import math
 import lmdb
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.config import (
@@ -87,9 +88,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
         ]
         start_tensor = torch.cat(
             [
-                torch.nn.functional.pad(
-                    card_features, (0, 0, 0, global_T - card_features.size(0))
-                )
+                F.pad(card_features, (0, 0, 0, global_T - card_features.size(0)))
                 for card_features in card_features_with_ids
             ],
             dim=0,
@@ -172,7 +171,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                             ).view(data_split_B, data_split_len)
 
                             # Maybe random instead of 0 padding to reduce collisions
-                            take_from = torch.nn.functional.pad(
+                            take_from = F.pad(
                                 take_from,
                                 (0, r - data_split_len),
                                 mode="constant",
@@ -196,14 +195,14 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
                                     if not skip_arr[b, t]:
                                         last = t
 
-                            skip = torch.nn.functional.pad(
+                            skip = F.pad(
                                 skip,
                                 (0, r - data_split_len),
                                 mode="constant",
                                 value=True,
                             )
                             skip_list.append(skip)
-                            time_shift_select = torch.nn.functional.pad(
+                            time_shift_select = F.pad(
                                 torch.tensor(
                                     time_shift_select,
                                     dtype=torch.int32,
@@ -238,7 +237,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
             sub_time_shift_gather.append(time_shift_gather)
 
         def pad_labels(labels):
-            return torch.nn.functional.pad(
+            return F.pad(
                 labels, (0, 0, 0, global_T - labels.size(0)), mode="constant", value=0
             )
 
@@ -247,7 +246,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
         )
 
         def pad_review_ths(labels):
-            return torch.nn.functional.pad(
+            return F.pad(
                 labels, (0, global_T - labels.size(0)), mode="constant", value=-1
             )
 

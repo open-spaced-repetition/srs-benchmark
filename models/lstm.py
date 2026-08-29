@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch
+import torch.nn.functional as F
 from shape_extensions import IntVar
 from torch import Tensor, nn
 
@@ -170,13 +171,11 @@ class LSTM[NormalizationDims: IntVar](BaseModel):
 
         x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))
         # pyrefly: ignore [missing-attribute]
-        x_rating = torch.nn.functional.one_hot(
-            x_rating.squeeze(-1).long() - 1, num_classes=4
-        ).float()
+        x_rating = F.one_hot(x_rating.squeeze(-1).long() - 1, num_classes=4).float()
         x = torch.cat([x_main, x_rating], dim=-1)
         x_lnh = self.process(x)
 
-        w_lnh = torch.nn.functional.softmax(self.w_fc(x_lnh), dim=-1)
+        w_lnh = F.softmax(self.w_fc(x_lnh), dim=-1)
         s_lnh = torch.exp(torch.clamp(self.s_fc(x_lnh), min=-25, max=25))
         d_lnh = torch.exp(torch.clamp(self.d_fc(x_lnh), min=-25, max=25))
         # pyrefly: ignore [bad-return]

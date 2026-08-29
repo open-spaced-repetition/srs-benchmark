@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 
 import torch
+import torch.nn.functional as F
 
 from rwkv.model.rwkv_ops import RWKV7_WKV, reference_rwkv7
 
@@ -139,7 +140,7 @@ class RWKV7ChannelMixer(ModuleType):
             index=time_shift_select_BT.unsqueeze(-1).expand(-1, -1, self.d_model),
         )
         k_BTK = self.W_k(torch.lerp(x_BTC, x_shift_BTC, self.lerp_k))
-        o_BTC = self.W_v(torch.square(torch.nn.functional.relu(k_BTK)))
+        o_BTC = self.W_v(torch.square(F.relu(k_BTK)))
         return in_BTC + self.dropout(o_BTC)
 
 
@@ -203,7 +204,7 @@ class LoraMLP(ModuleType):
 
     @FunctionType
     def forward(self, in_BTC):
-        return self.B_and_lamb(torch.nn.functional.tanh(self.A(in_BTC)))
+        return self.B_and_lamb(F.tanh(self.A(in_BTC)))
 
 
 class RWKV7TimeMixer(ModuleType):
@@ -334,27 +335,27 @@ class RWKV7TimeMixer(ModuleType):
         )
         r_BTC = self.W_r(r_BTC)
         k_BTC = self.W_k(k_BTC)
-        k_scale_BTH = torch.nn.functional.sigmoid(self.k_scale_linear(k_scale_BTC))
-        v_scale_BTH = torch.nn.functional.sigmoid(self.v_scale_linear(v_scale_BTC))
+        k_scale_BTH = F.sigmoid(self.k_scale_linear(k_scale_BTC))
+        v_scale_BTH = F.sigmoid(self.v_scale_linear(v_scale_BTC))
 
         if self.layer_id == 0:
             v_BTC = self.W_v(v_BTC)
             v0_BTC = v_BTC
         else:
-            v_lerp_BTC = torch.nn.functional.sigmoid(self.v_lora_simple(v_BTC))
+            v_lerp_BTC = F.sigmoid(self.v_lora_simple(v_BTC))
             v_BTC = torch.lerp(self.W_v(v_BTC), v0_BTC, v_lerp_BTC)
 
-        a_BTC = torch.nn.functional.sigmoid(self.a_lora_simple(a_BTC))
-        g_BTC = self.lora_B_g(torch.nn.functional.sigmoid(self.lora_A_g(g_BTC)))
+        a_BTC = F.sigmoid(self.a_lora_simple(a_BTC))
+        g_BTC = self.lora_B_g(F.sigmoid(self.lora_A_g(g_BTC)))
 
-        _d_BTC = -0.5 - torch.nn.functional.softplus(-self.d_lora_mlp(d_BTC))
+        _d_BTC = -0.5 - F.softplus(-self.d_lora_mlp(d_BTC))
         w_BTC = torch.exp(-torch.exp(_d_BTC.float()))
 
-        k_BTHK = k_scale_BTH.unsqueeze(-1) * torch.nn.functional.normalize(
+        k_BTHK = k_scale_BTH.unsqueeze(-1) * F.normalize(
             k_BTC.view(B, T, H, K), dim=-1, p=2.0
         )
         r_BTHK = r_BTC.view(B, T, H, K)
-        v_BTHK = v_scale_BTH.unsqueeze(-1) * torch.nn.functional.normalize(
+        v_BTHK = v_scale_BTH.unsqueeze(-1) * F.normalize(
             v_BTC.view(B, T, H, K), dim=-1, p=2.0
         )
         w_BTHK = w_BTC.view(B, T, H, K)

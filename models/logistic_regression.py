@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from torch import Tensor, nn
 
 from config import Config
@@ -336,7 +337,7 @@ class LogisticRegression(BaseModel):
                 y = y_all[idx]
                 weights = weights_all[idx]
                 logits_bl = torch.mv(x, self.coefficients)
-                loss = torch.nn.functional.binary_cross_entropy_with_logits(
+                loss = F.binary_cross_entropy_with_logits(
                     logits_bl, y, reduction="none"
                 )
                 optimizer.zero_grad()

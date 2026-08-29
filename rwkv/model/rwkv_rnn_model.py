@@ -2,6 +2,7 @@ import copy
 from typing import Optional
 
 import torch
+import torch.nn.functional as F
 from shape_extensions import IntVar
 
 from rwkv.model.rwkv_model import LoraMLP, LoraSimple, RWKV7Config
@@ -117,7 +118,7 @@ class RWKV7RNNChannelMixer(ModuleType):
         # pyrefly: ignore [bad-argument-type]
         k_B1K = self.W_k(torch.lerp(x_B1C, x_shift_B1C, self.lerp_k))
         # pyrefly: ignore [missing-attribute]
-        o_B1C = self.W_v(torch.square(torch.nn.functional.relu(k_B1K)))
+        o_B1C = self.W_v(torch.square(F.relu(k_B1K)))
 
         return (in_B1C + o_B1C).squeeze(1), x_layer_norm_B1C
 
@@ -212,31 +213,31 @@ class RWKV7RNNTimeMixer(ModuleType):
         )
         r_B1C = self.W_r(r_B1C)
         k_B1C = self.W_k(k_B1C)
-        k_scale_B1H = torch.nn.functional.sigmoid(self.k_scale_linear(k_scale_B1C))
-        v_scale_B1H = torch.nn.functional.sigmoid(self.v_scale_linear(v_scale_B1C))
+        k_scale_B1H = F.sigmoid(self.k_scale_linear(k_scale_B1C))
+        v_scale_B1H = F.sigmoid(self.v_scale_linear(v_scale_B1C))
 
         if self.layer_id == 0:
             v_B1C = self.W_v(v_B1C)
             v0_BC = v_B1C.squeeze(1)
         else:
             # pyrefly: ignore [no-access]
-            v_lerp_B1C = torch.nn.functional.sigmoid(self.v_lora_simple(v_B1C))
+            v_lerp_B1C = F.sigmoid(self.v_lora_simple(v_B1C))
             # pyrefly: ignore [bad-argument-type]
             v_B1C = torch.lerp(self.W_v(v_B1C), v0_BC.unsqueeze(1), v_lerp_B1C)
 
         # pyrefly: ignore [no-access]
-        a_B1C = torch.nn.functional.sigmoid(self.a_lora_simple(a_B1C))
-        g_B1C = self.lora_B_g(torch.nn.functional.sigmoid(self.lora_A_g(g_B1C)))
+        a_B1C = F.sigmoid(self.a_lora_simple(a_B1C))
+        g_B1C = self.lora_B_g(F.sigmoid(self.lora_A_g(g_B1C)))
 
         # pyrefly: ignore [no-access]
-        _d_B1C = -0.5 - torch.nn.functional.softplus(-self.d_lora_mlp(d_B1C))
+        _d_B1C = -0.5 - F.softplus(-self.d_lora_mlp(d_B1C))
         w_B1C = torch.exp(-torch.exp(_d_B1C.float()))
 
-        k_B1HK = k_scale_B1H.unsqueeze(-1) * torch.nn.functional.normalize(
+        k_B1HK = k_scale_B1H.unsqueeze(-1) * F.normalize(
             k_B1C.view(B, 1, H, K), dim=-1, p=2.0
         )
         r_B1HK = r_B1C.view(B, 1, H, K)
-        v_B1HK = v_scale_B1H.unsqueeze(-1) * torch.nn.functional.normalize(
+        v_B1HK = v_scale_B1H.unsqueeze(-1) * F.normalize(
             v_B1C.view(B, 1, H, K), dim=-1, p=2.0
         )
         w_B1HK = w_B1C.view(B, 1, H, K)

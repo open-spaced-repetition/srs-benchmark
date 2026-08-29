@@ -4,6 +4,7 @@ from typing import NamedTuple
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from shape_extensions import IntVar
 
 from rwkv.architecture import AnkiRWKVConfig
@@ -173,8 +174,8 @@ class SrsRWKV(ModuleType):
         x = self.prehead_dropout(self.prehead_norm(input))
 
         out_w_logits = self.w_linear(self.head_w(x).float())
-        out_w = torch.nn.functional.softmax(out_w_logits, dim=-1)
-        out_w_log_p = torch.nn.functional.log_softmax(out_w_logits, dim=-1)
+        out_w = F.softmax(out_w_logits, dim=-1)
+        out_w_log_p = F.log_softmax(out_w_logits, dim=-1)
         out_ahead_logits = self.ahead_linear(self.head_ahead_logits(x).float())
 
         x_p = self.head_p(x).float()
@@ -327,7 +328,7 @@ class SrsRWKV(ModuleType):
         if torch.isnan(curve_probs).any():
             raise RuntimeError("Model produced NaN curve probabilities")
         # pyrefly: ignore [missing-argument]
-        w_loss = torch.nn.functional.kl_div(
+        w_loss = F.kl_div(
             # pyrefly: ignore [unexpected-keyword]
             input=out_w_log_p,
             target=torch.ones_like(out_w) / self.num_curves,
@@ -339,22 +340,20 @@ class SrsRWKV(ModuleType):
         ahead_equalize_mask = ahead_mask * label_is_equalize
 
         immediate_equalize_mask = immediate_mask * label_is_equalize
-        curve_loss = torch.nn.functional.binary_cross_entropy_with_logits(
+        curve_loss = F.binary_cross_entropy_with_logits(
             curve_logits, label_y, reduction="none"
         )
-        curve_raw_loss = torch.nn.functional.binary_cross_entropy_with_logits(
+        curve_raw_loss = F.binary_cross_entropy_with_logits(
             curve_logits_raw, label_y, reduction="none"
         )
         NUM_LABELS = 4
         B, T = label_rating.shape
-        p_loss = torch.nn.functional.cross_entropy(
+        p_loss = F.cross_entropy(
             out_p_logits.view(-1, NUM_LABELS),
             label_rating.long().view(-1),
             reduction="none",
         ).view(B, T)
-        p_binary_loss = torch.nn.functional.binary_cross_entropy(
-            out_p_binary, label_y, reduction="none"
-        )
+        p_binary_loss = F.binary_cross_entropy(out_p_binary, label_y, reduction="none")
         ahead_avg = (curve_loss * ahead_mask).sum() / (1e-8 + ahead_mask.sum())
         AHEAD_SCALE = 0.5
         ahead_raw_avg = (curve_raw_loss * ahead_mask).sum() / (1e-8 + ahead_mask.sum())

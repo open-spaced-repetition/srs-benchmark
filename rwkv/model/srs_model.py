@@ -4,8 +4,9 @@ from typing import NamedTuple
 
 import numpy as np
 import torch
-from shape_extensions import IntVar
 import torch.nn.functional as F
+from shape_extensions import IntVar
+
 from rwkv.architecture import AnkiRWKVConfig
 from rwkv.config import RWKV_SUBMODULES
 from rwkv.data_processing import RWKVSample
@@ -352,9 +353,7 @@ class SrsRWKV(ModuleType):
             label_rating.long().view(-1),
             reduction="none",
         ).view(B, T)
-        p_binary_loss = F.binary_cross_entropy(
-            out_p_binary, label_y, reduction="none"
-        )
+        p_binary_loss = F.binary_cross_entropy(out_p_binary, label_y, reduction="none")
         ahead_avg = (curve_loss * ahead_mask).sum() / (1e-8 + ahead_mask.sum())
         AHEAD_SCALE = 0.5
         ahead_raw_avg = (curve_raw_loss * ahead_mask).sum() / (1e-8 + ahead_mask.sum())

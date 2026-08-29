@@ -2,8 +2,9 @@ import copy
 from typing import Optional
 
 import torch
-from shape_extensions import IntVar
 import torch.nn.functional as F
+from shape_extensions import IntVar
+
 from rwkv.model.rwkv_model import LoraMLP, LoraSimple, RWKV7Config
 from rwkv.model.rwkv_ops import single_timestep
 

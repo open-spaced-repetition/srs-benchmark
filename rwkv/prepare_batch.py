@@ -4,6 +4,7 @@ import lmdb
 import numpy as np
 import torch
 import torch.nn.functional as F
+
 from rwkv.architecture import DEFAULT_ANKI_RWKV_CONFIG
 from rwkv.config import (
     DAY_OFFSET_ENCODE_PERIODS,
@@ -87,9 +88,7 @@ def prepare(data_list: list[RWKVSample], target_len=None, seed=None) -> Prepared
         ]
         start_tensor = torch.cat(
             [
-                F.pad(
-                    card_features, (0, 0, 0, global_T - card_features.size(0))
-                )
+                F.pad(card_features, (0, 0, 0, global_T - card_features.size(0)))
                 for card_features in card_features_with_ids
             ],
             dim=0,

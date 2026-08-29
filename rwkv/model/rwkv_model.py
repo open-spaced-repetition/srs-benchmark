@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn.functional as F
+
 from rwkv.model.rwkv_ops import RWKV7_WKV, reference_rwkv7
 
 """

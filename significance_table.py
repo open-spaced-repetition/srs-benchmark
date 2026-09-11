@@ -13,6 +13,25 @@ from scipy import stats
 warnings.filterwarnings("ignore")
 
 
+def _sort_models_by_dominance(df, models):
+    """Order models so better algorithms come first, so the significant 'row beats column'
+    (green) cells land above the diagonal and 'row loses' (red) below it -- no manual
+    ordering. Ranks by Copeland score (how many opponents each model beats in >=50% of
+    collections, via the same per-collection LogLoss comparison). Exact for transitive
+    data; any leftover violation means a non-transitive cycle in the data."""
+    cols = [df[f"{m}, LogLoss"].to_numpy() for m in models]
+    k = len(models)
+    win = np.array(
+        [
+            [float(np.mean(cols[i] <= cols[j])) if i != j else 0.0 for j in range(k)]
+            for i in range(k)
+        ]
+    )
+    copeland = (win >= 0.5).sum(axis=1)
+    order = sorted(range(k), key=lambda i: (copeland[i], win[i].sum()), reverse=True)
+    return [models[i] for i in order]
+
+
 def wilcoxon_effect_size(x, y):
     """
     Calculate the effect size r for Wilcoxon signed-rank test
@@ -73,6 +92,7 @@ if __name__ == "__main__":
         "GRU-short-secs-equalize_test_with_non_secs",
         "LSTM-short-secs-duration-equalize_test_with_non_secs",
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
+        "FSRS-7-short-secs-recency-equalize_test_with_non_secs",
         "FSRS-rs-short",
         "FSRS-6-short-recency",
         "FSRS-6-short",
@@ -128,6 +148,7 @@ if __name__ == "__main__":
 
     # you have to run the commented out code above first
     df = pd.read_csv(csv_name)
+    models = _sort_models_by_dominance(df, models)
 
     n_collections = len(df)
     print(n_collections)
@@ -216,6 +237,10 @@ if __name__ == "__main__":
     models[index_v2] = "FSRS v2"
     models[index_v1] = "FSRS v1"
     models[index_Ebisu_v2] = "Ebisu v2"
+    index_rwkv_p = models.index("RWKV-P")
+    index_rwkv = models.index("RWKV")
+    models[index_rwkv_p] = "RWKV-Instant"
+    models[index_rwkv] = "RWKV-Curve"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

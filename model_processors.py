@@ -24,7 +24,7 @@ from utils import Collection, evaluate, get_bin, save_evaluation_file
 
 def process_untrainable(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, dict | None]:
+) -> tuple[dict, str | None]:
     """Process untrainable models (SM2, Ebisu-v2)."""
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
@@ -63,7 +63,7 @@ def process_untrainable(
 
 def baseline(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, dict | None]:
+) -> tuple[dict, str | None]:
     """Process AVG baseline model."""
     testsets = []
     avg_ps = []
@@ -90,7 +90,7 @@ def baseline(
 
 def rmse_bins_exploit(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, dict | None]:
+) -> tuple[dict, str | None]:
     """Process RMSE-BINS-EXPLOIT model."""
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     save_tmp = []
@@ -121,7 +121,7 @@ def rmse_bins_exploit(
 
 def moving_avg(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, dict | None]:
+) -> tuple[dict, str | None]:
     """Process MOVING-AVG model."""
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     save_tmp = []
@@ -162,7 +162,7 @@ def moving_avg(
 
 def process_fsrs_rs(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, dict | None]:
+) -> tuple[dict, str | None]:
     """Process FSRS-rs (Rust-based FSRS implementation)."""
     w_list = []
     testsets = []
@@ -258,7 +258,7 @@ def process_fsrs_rs(
 
 def fsrs_one_step(
     user_id: int, dataset: pd.DataFrame, config: Config
-) -> tuple[dict, dict | None]:
+) -> tuple[dict, str | None]:
     """Process FSRS-6-one-step model."""
     w_list = []
     testsets = []

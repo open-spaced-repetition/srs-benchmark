@@ -30,7 +30,7 @@ class RNNWrapper(nn.Module):
 
 class LSTM[NormalizationDims: IntVar](BaseModel):
     """
-    This model is trained with reptile_trainer.py, and was run with the flags
+    This model is trained with reptile/reptile_trainer.py (python -m reptile.reptile_trainer), and was run with the flags
     ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
     It uses:
     - same-day reviews as features

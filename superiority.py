@@ -10,6 +10,26 @@ from matplotlib.colors import LinearSegmentedColormap
 
 warnings.filterwarnings("ignore")
 
+
+def _sort_models_by_dominance(df, models):
+    """Order models so better algorithms come first, so every pairwise '>=50%' value lands
+    above the diagonal and every '<50%' below it -- no manual ordering. Ranks by Copeland
+    score (how many opponents each model beats in >=50% of collections, via the same
+    per-collection LogLoss comparison the table uses). Exact for transitive data; any
+    leftover violation means a non-transitive cycle in the data."""
+    cols = [df[f"{m}, LogLoss"].to_numpy() for m in models]
+    k = len(models)
+    win = np.array(
+        [
+            [float(np.mean(cols[i] <= cols[j])) if i != j else 0.0 for j in range(k)]
+            for i in range(k)
+        ]
+    )
+    copeland = (win >= 0.5).sum(axis=1)
+    order = sorted(range(k), key=lambda i: (copeland[i], win[i].sum()), reverse=True)
+    return [models[i] for i in order]
+
+
 if __name__ == "__main__":
     models = [
         "RWKV-P",
@@ -19,7 +39,7 @@ if __name__ == "__main__":
         "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
         "FSRS-7-short-secs-recency-equalize_test_with_non_secs",
         "FSRS-rs-short",
-        "FSRS-6-short",
+        "FSRS-6-short-recency",
         "MOVING-AVG",
         "FSRS-5-short",
         "FSRS-7-default-short-secs-equalize_test_with_non_secs",
@@ -33,8 +53,8 @@ if __name__ == "__main__":
         "FSRSv3",
         "ACT-R",
         "FSRSv2",
-        "FSRSv1",
         "HLR",
+        "FSRSv1",
         "HLR-short",
         "Ebisu-v2",
         "RMSE-BINS-EXPLOIT",
@@ -69,6 +89,7 @@ if __name__ == "__main__":
     df.to_csv(csv_name)
 
     df = pd.read_csv(csv_name)
+    models = _sort_models_by_dominance(df, models)
 
     n_collections = len(df)
     print(n_collections)
@@ -123,6 +144,7 @@ if __name__ == "__main__":
         )
 
     index_LogReg = models.index("LogisticRegression-recency")
+    index_FSRS_6_recency = models.index("FSRS-6-recency")
     index_FSRS_7_recency = models.index("FSRS-7-recency")
     index_FSRS_7_default = models.index("FSRS-7-default")
     index_v4 = models.index("FSRSv4")
@@ -131,6 +153,7 @@ if __name__ == "__main__":
     index_v1 = models.index("FSRSv1")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     models[index_LogReg] = "Logistic Regression\nrecency"
+    models[index_FSRS_6_recency] = "FSRS-6\nrecency"
     models[index_FSRS_7_recency] = "FSRS-7\nrecency"
     models[index_FSRS_7_default] = "FSRS-7\ndef. param."
     models[index_v4] = "FSRS v4"
@@ -138,6 +161,11 @@ if __name__ == "__main__":
     models[index_v2] = "FSRS v2"
     models[index_v1] = "FSRS v1"
     models[index_Ebisu_v2] = "Ebisu v2"
+
+    index_rwkv_p = models.index("RWKV-P")
+    index_rwkv = models.index("RWKV")
+    models[index_rwkv_p] = "RWKV-Instant"
+    models[index_rwkv] = "RWKV-Curve"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     ax.set_title(

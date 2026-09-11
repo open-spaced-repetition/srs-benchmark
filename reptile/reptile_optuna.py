@@ -5,10 +5,10 @@ import optuna  # type: ignore
 import pandas as pd
 import torch
 from multiprocess import Pool  # type: ignore
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 
 from config import Config, create_parser
-from reptile_trainer import (
+from reptile.reptile_trainer import (
     DEFAULT_FINETUNE_PARAMS,
     compute_df_loss,
     finetune,
@@ -18,7 +18,10 @@ from reptile_trainer import (
 optuna_nonce = random.randint(0, 100000000)
 
 parser = create_parser()
-args, _ = parser.parse_known_args()
+# parse_args(), NOT parse_known_args(): an unrecognized flag must be a hard error,
+# because output file names are derived from the flags (a silently dropped flag
+# would write to the wrong file).
+args = parser.parse_args()
 config = Config(args)
 
 ENSURE_RESET = False  # Trade speed but try to ensure that no data leakage is going on by reloading the model from storage.

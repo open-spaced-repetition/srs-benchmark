@@ -46,9 +46,10 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - FSRS-7: the newest version. Unlike all previous versions, which have been designed to work with integer interval lengths, FSRS-7 has been designed to work with fractional interval lengths. It is the only version that can give realistic predictions of probability of recall for same-day reviews. The biggest change is that the forgetting curve now has 8 optimizable parameters and uses a rather complex formula.
         - FSRS-7 default param.: FSRS-7 with default parameters, without per-user optimization.
         - FSRS-7 recency: FSRS-7 trained with reviews being weighted based on their recency, such that older reviews affect the loss function less and newer reviews affect it more.
-        - FSRS-7 sched. penalties: FSRS-7 with penalties that address 2 issues: extremely short intervals for same-day reviews at high (97-99%) desired retention and massive interval length jumps at low desired retention. They make scheduling based on FSRS-7 more reasonable (from the perspective of an average user) at the cost of making FSRS-7's predictive ability a little worse.
+        - FSRS-7 sched. penalties: FSRS-7 with penalties that address 2 issues: extremely short intervals for same-day reviews at high (97-99%) desired retention and massive interval length jumps at low desired retention. They make scheduling based on FSRS-7 more reasonable (from the perspective of an average user) at the cost of making FSRS-7's predictive ability a little worse. In Anki, FSRS-7 should be shipped with both recency weighting and scheduling penalties enabled.
         - FSRS-7 preset: FSRS-7 where different presets have different parameters. If some preset has too few reviews for optimization, user-specific parameters (optimized on all data from this user) are used.
         - FSRS-7 deck: similar to above, but with different parameters for each deck.
+        - FSRS-7 recency, 100 epochs: the same as FSRS-7 recency, but trained for 100 epochs instead of the default 9. Log Loss stops decreasing past ~15 epochs, so the extra optimization time buys almost nothing.
     - FSRS-rs: the Rust port of FSRS-6 with recency weighting. See also: https://github.com/open-spaced-repetition/fsrs-rs
     - HLR: the algorithm proposed by Duolingo. Its full name is Half-Life Regression. For further information, please refer to the [this paper](https://github.com/duolingo/halflife-regression).
     - Ebisu v2: [an algorithm that uses Bayesian statistics](https://fasiha.github.io/ebisu/) to update its estimate of memory half-life after every review.
@@ -63,8 +64,8 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
     - GRU: a type of recurrent neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. It uses a mixed power forgetting curve similar to FSRS-7. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). First, it is pre-trained on 100 users to obtain reasonable starting parameters. Then it is optimized on each user individually.
     - LSTM: a recurrent neural network with a more complex and sophisticated architecture than GRU. Also trained using Reptile.
       GRU and LSTM were first pretrained on 100 users and then further optimized on each user individually.
-    - RWKV: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture, which combines the properties of an RNN and a Transformer. The neural network takes in as input the entire review history, all cards included. <a id="features-note"></a>Along with the usual features, it has additional access to: duration of the review, sibling card information, deck and preset structure/hierarchy, day of the week. Unlike other algorithms in this benchmark, RWKV is not optimized on each user individually. Instead, it is trained on 5 thousand users and evaluated on another 5 thousand; this process is repeated twice to get full coverage of the dataset.
-        - RWKV-P: predicts the result of a review at the time just before the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. It may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
+    - RWKV-Curve: uses a modified version of the [RWKV](https://github.com/BlinkDL/RWKV-LM) architecture, which combines the properties of an RNN and a Transformer. The neural network takes in as input the entire review history, all cards included. <a id="features-note"></a>Along with interval lengths and grades, it has access to additional features, including but not limited to: duration of the review, number of new cards and reviews done today, sibling card information, deck and preset structure/hierarchy, day of the week/month/year. Unlike other algorithms in this benchmark, RWKV is not optimized on each user individually. Instead, it is trained on 5 thousand users and evaluated on another 5 thousand; this process is repeated twice to get full coverage of the dataset.
+        - RWKV-Instant: predicts the result of a review at the time just before the review. Does not have a forgetting curve in the traditional sense and predicts the probability of recall directly. It may output unintuitive predictions, for example, it may never predict 100% or predict that the probability of recall will increase over time.
 - Other:
     - Logistic Regression: performs a logistic regression based on 34 features computed from the card history.
     - AVG: an "algorithm" that outputs a constant equal to the user's average retention. Has no practical applications and is intended only to serve as a baseline. An algorithm that doesn't outperform AVG cannot be considered good.
@@ -96,38 +97,39 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 
 ### Without same-day reviews
 
-| Algorithm | Parameters | Log Loss↓ | RMSE (bins)↓ | AUC↑ | Input features |
+| Algorithm | Parameters | Log Loss↓ | RMSE(bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **RWKV-P** | 2762884 | **0.2773±0.0036** | 0.02502±0.00038 | **0.8329±0.0017** | [Yes](#features-note) |
-| RWKV | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0020 | [Yes](#features-note) |
-| LSTM | 8869 | 0.3332±0.0041 | 0.05378±0.00096 | 0.7329±0.0020 | FIL, G, SR, AT |
-| GRU | 503 | 0.3333±0.0041 | 0.0556±0.0010 | 0.7316±0.0021 | FIL, G, SR |
-| MOVING-AVG | 0 | 0.3369±0.0042 | 0.05915±0.00082 | 0.7001±0.0026 | --- |
+| **RWKV-Instant** | 2762884 | **0.2773±0.0036** | 0.02502±0.00038 | **0.8329±0.0018** | [Yes](#features-note) |
+| RWKV-Curve | 2762884 | 0.3193±0.0039 | 0.0540±0.0010 | 0.7683±0.0019 | [Yes](#features-note) |
+| GRU | 503 | 0.3328±0.0041 | 0.0549±0.0010 | 0.7324±0.0021 | FIL, G, SR |
+| LSTM | 8869 | 0.3332±0.0041 | 0.05378±0.00094 | 0.7329±0.0020 | FIL, G, SR, AT |
+| FSRS-7 recency, 100 epochs | 34 | 0.3363±0.0042 | 0.05764±0.00096 | 0.7243±0.0021 | FIL, G, SR |
+| MOVING-AVG | 0 | 0.3369±0.0042 | 0.05915±0.00082 | 0.7001±0.0025 | --- |
+| FSRS-7 recency | 34 | 0.3370±0.0042 | 0.0593±0.0010 | 0.7220±0.0021 | FIL, G, SR |
 | Logistic Regression | 34 | 0.3393±0.0042 | 0.0604±0.0010 | 0.7108±0.0023 | IL, FIL, G, SR |
-| FSRS-7 recency | 35 | 0.3414±0.0043 | 0.0627±0.0010 | 0.7097±0.0022 | FIL, G, SR |
-| FSRS-7 | 35 | 0.3437±0.0043 | 0.0655±0.0011 | 0.7069±0.0023 | FIL, G, SR |
-| FSRS-7 sched. penalties | 35 | 0.3438±0.0043 | 0.0663±0.0011 | 0.7065±0.0023 | FIL, G, SR |
-| FSRS-7 preset | 35 | 0.3438±0.0043 | 0.0650±0.0011 | 0.7079±0.0023 | FIL, G, SR |
-| FSRS-rs | 21 | 0.3443±0.0041 | 0.0635±0.0011 | 0.7074±0.0022 | IL, G, SR |
+| FSRS-7 sched. penalties | 34 | 0.3400±0.0042 | 0.0635±0.0011 | 0.7171±0.0022 | FIL, G, SR |
+| FSRS-7 | 34 | 0.3401±0.0043 | 0.0634±0.0011 | 0.7167±0.0022 | FIL, G, SR |
+| FSRS-7 preset | 34 | 0.3401±0.0042 | 0.0630±0.0011 | 0.7175±0.0022 | FIL, G, SR |
+| FSRS-rs | 21 | 0.3443±0.0042 | 0.0635±0.0010 | 0.7074±0.0022 | IL, G, SR |
 | FSRS-6 | 21 | 0.3460±0.0042 | 0.0653±0.0011 | 0.7034±0.0023 | IL, G, SR |
-| FSRS-7 deck | 35 | 0.3514±0.0044 | 0.0725±0.0013 | 0.7016±0.0022 | FIL, G, SR |
-| FSRS-5 | 19 | 0.3560±0.0045 | 0.0741±0.0013 | 0.7011±0.0023 | IL, G, SR |
-| FSRS-4.5 | 17 | 0.3624±0.0046 | 0.0764±0.0013 | 0.6893±0.0023 | IL, G |
-| FSRS-7 default param. | 0 | 0.3629±0.0044 | 0.0910±0.0014 | 0.6944±0.0024 | FIL, G, SR |
-| DASH-short | 9 | 0.3681±0.0045 | 0.0858±0.0014 | 0.6225±0.0029 | IL, G, SR|
-| DASH | 9 | 0.3682±0.0045 | 0.0836±0.0013 | 0.6312±0.0026 | IL, G |
+| FSRS-7 deck | 34 | 0.3489±0.0044 | 0.0719±0.0013 | 0.7104±0.0022 | FIL, G, SR |
+| FSRS-5 | 19 | 0.3561±0.0044 | 0.0742±0.0012 | 0.7010±0.0023 | IL, G, SR |
+| FSRS-7 default param. | 0 | 0.3620±0.0045 | 0.0910±0.0014 | 0.7029±0.0022 | FIL, G, SR |
+| FSRS-4.5 | 17 | 0.3625±0.0045 | 0.0764±0.0013 | 0.6891±0.0023 | IL, G |
+| DASH-short | 9 | 0.3681±0.0045 | 0.0858±0.0013 | 0.6225±0.0028 | IL, G, SR |
+| DASH | 9 | 0.3682±0.0045 | 0.0838±0.0013 | 0.6311±0.0026 | IL, G |
 | DASH[MCM] | 9 | 0.3688±0.0045 | 0.0861±0.0014 | 0.6343±0.0026 | IL, G |
 | FSRS v4 | 17 | 0.3726±0.0048 | 0.0838±0.0014 | 0.6853±0.0023 | IL, G |
-| DASH[ACT-R] | 5 | 0.3728±0.0047 | 0.0886±0.0016 | 0.6239±0.0027 | IL, G |
-| AVG | 0 | 0.3945±0.0051 | 0.1034±0.0016 | 0.4997±0.0026 | --- |
-| ACT-R | 5 | 0.4033±0.0054 | 0.1074±0.0017 | 0.5225±0.0025 | IL |
-| FSRS v3 | 13 | 0.4364±0.0068 | 0.1097±0.0019 | 0.6605±0.0023 | IL, G |
+| DASH[ACT-R] | 5 | 0.3728±0.0047 | 0.0886±0.0016 | 0.6239±0.0026 | IL, G |
+| AVG | 0 | 0.3945±0.0051 | 0.1034±0.0016 | 0.4997±0.0025 | --- |
+| ACT-R | 5 | 0.4033±0.0056 | 0.1074±0.0017 | 0.5225±0.0024 | IL |
+| FSRS v3 | 13 | 0.4364±0.0067 | 0.1097±0.0019 | 0.6605±0.0024 | IL, G |
 | FSRS v2 | 14 | 0.4532±0.0072 | 0.1095±0.0020 | 0.6512±0.0023 | IL, G |
-| HLR | 3 | 0.4694±0.0073 | 0.1275±0.0019 | 0.6369±0.0026 | IL, G |
-| FSRS v1 | 7 | 0.4913±0.0079 | 0.1316±0.0023 | 0.6295±0.0025 | IL, G |
-| HLR-short | 3 | 0.4929±0.0078 | 0.1397±0.0021 | 0.6115±0.0029 | IL, G, SR|
+| HLR | 3 | 0.4694±0.0074 | 0.1275±0.0019 | 0.6369±0.0026 | IL, G |
+| FSRS v1 | 7 | 0.4913±0.0080 | 0.1316±0.0022 | 0.6295±0.0025 | IL, G |
+| HLR-short | 3 | 0.4929±0.0078 | 0.1397±0.0021 | 0.6115±0.0028 | IL, G, SR |
 | Ebisu v2 | 0 | 0.4989±0.0078 | 0.1627±0.0022 | 0.6051±0.0025 | IL, G |
-| **RMSE-BINS-EXPLOIT** | 0 | 4.608±0.067 | **0.01350±0.00027** | 0.6548±0.0022 | IL, G |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.608±0.066 | **0.01350±0.00027** | 0.6548±0.0021 | IL, G |
 
 ### With same-day reviews
 
@@ -136,35 +138,37 @@ Total number of collections: 10,000.
 Total number of reviews for evaluation: 519,296,315.
 Same-day reviews are used for evaluation. Here the probability of recall is calculated for all reviews, hence, the number of reviews for evaluation is greater.
 
-| Model | Parameters | Log Loss↓ | RMSE(bins)↓ | AUC↑ | Input features |
+| Algorithm | Parameters | Log Loss↓ | RMSE(bins)↓ | AUC↑ | Input features |
 | --- | --- | --- | --- | --- | --- |
-| **RWKV-P** | 2762884 | **0.2660±0.0036** | 0.03212±0.00045 | **0.8450±0.0017** | [Yes](#features-note) |
-| RWKV | 2762884 | 0.2975±0.0037 | 0.05438±0.00081 | 0.7964±0.0017 | [Yes](#features-note) |
-| LSTM | 8869 | 0.3140±0.0038 | 0.05200±0.00077 | 0.7622±0.0018 | FIL, G, SR, AT |
-| GRU | 503 | 0.3146±0.0039 | 0.05387±0.00082 | 0.7599±0.0019 | FIL, G, SR |
+| **RWKV-Instant** | 2762884 | **0.2660±0.0036** | 0.03212±0.00044 | **0.8450±0.0017** | [Yes](#features-note) |
+| RWKV-Curve | 2762884 | 0.2974±0.0037 | 0.05438±0.00081 | 0.7964±0.0017 | [Yes](#features-note) |
+| LSTM | 8869 | 0.3140±0.0039 | 0.05200±0.00076 | 0.7622±0.0019 | FIL, G, SR, AT |
+| GRU | 503 | 0.3141±0.0039 | 0.05357±0.00084 | 0.7606±0.0019 | FIL, G, SR |
+| FSRS-7 recency, 100 epochs | 34 | 0.3177±0.0040 | 0.05605±0.00080 | 0.7533±0.0018 | FIL, G, SR |
+| FSRS-7 recency | 34 | 0.3178±0.0040 | 0.05715±0.00081 | 0.7522±0.0018 | FIL, G, SR |
+| FSRS-7 recency + sched. penalties | 34 | 0.3188±0.0040 | 0.05861±0.00080 | 0.7506±0.0018 | FIL, G, SR |
 | Logistic Regression | 34 | 0.3195±0.0040 | 0.05815±0.00082 | 0.7446±0.0020 | IL, FIL, G, SR |
-| FSRS-7 recency | 35 | 0.3236±0.0041 | 0.06339±0.00088 | 0.7394±0.0019 | FIL, G, SR |
-| FSRS-7 | 35 | 0.3255±0.0041 | 0.06617±0.00091 | 0.7366±0.0019 | FIL, G, SR |
-| FSRS-7 sched. penalties | 35 | 0.3259±0.0041 | 0.06675±0.00091 | 0.7362±0.0019 | FIL, G, SR |
-| FSRS-7 preset | 35 | 0.3261±0.0041 | 0.06572±0.00092 | 0.7361±0.0019 | FIL, G, SR |
-| MOVING-AVG | 0 | 0.3301±0.0044 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
-| FSRS-7 deck | 35 | 0.3329±0.0041 | 0.0730±0.0010 | 0.7274±0.0020 | FIL, G, SR |
-| FSRS-7 default param. | 0 | 0.3431±0.0040 | 0.0921±0.0011 | 0.7206±0.0020 | FIL, G, SR |
+| FSRS-7 | 34 | 0.3206±0.0040 | 0.06148±0.00085 | 0.7475±0.0018 | FIL, G, SR |
+| FSRS-7 preset | 34 | 0.3206±0.0040 | 0.06085±0.00085 | 0.7476±0.0019 | FIL, G, SR |
+| FSRS-7 sched. penalties | 34 | 0.3207±0.0040 | 0.06188±0.00084 | 0.7477±0.0018 | FIL, G, SR |
+| FSRS-7 deck | 34 | 0.3276±0.0041 | 0.0694±0.0010 | 0.7386±0.0019 | FIL, G, SR |
+| MOVING-AVG | 0 | 0.3301±0.0043 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
+| FSRS-7 default param. | 0 | 0.3399±0.0040 | 0.0895±0.0010 | 0.7283±0.0019 | FIL, G, SR |
 | DASH[MCM] | 9 | 0.3459±0.0042 | 0.0884±0.0011 | 0.6663±0.0025 | FIL, G, SR |
-| DASH | 9 | 0.3487±0.0041 | 0.0885±0.0011 | 0.6533±0.0027 | FIL, G, SR |
-| DASH[ACT-R] | 5 | 0.3763±0.0045 | 0.1161±0.0014 | 0.5576±0.0030 | FIL, G, SR |
-| FSRS-6 | 21 | 0.3813±0.0092 | 0.0870±0.0026 | 0.6831±0.0045 | FIL, G, SR |
+| DASH | 9 | 0.3487±0.0042 | 0.0885±0.0011 | 0.6533±0.0026 | FIL, G, SR |
+| DASH[ACT-R] | 5 | 0.3763±0.0045 | 0.1161±0.0015 | 0.5576±0.0031 | FIL, G, SR |
 | AVG | 0 | 0.3816±0.0048 | 0.1195±0.0017 | 0.5006±0.0024 | --- |
+| FSRS-6 | 21 | 0.3842±0.0051 | 0.0985±0.0014 | 0.6830±0.0022 | FIL, G, SR |
 | ACT-R | 5 | 0.3898±0.0049 | 0.1240±0.0017 | 0.5174±0.0028 | FIL, SR |
-| FSRS-4.5 | 17 | 0.4286±0.0060 | 0.1032±0.0014 | 0.6821±0.0023 | FIL, G, SR |
+| FSRS-4.5 | 17 | 0.4286±0.0060 | 0.1033±0.0014 | 0.6821±0.0023 | FIL, G, SR |
 | FSRS-5 | 19 | 0.4565±0.0069 | 0.1175±0.0017 | 0.6761±0.0023 | FIL, G, SR |
-| FSRS v4 | 17 | 0.4848±0.0077 | 0.1159±0.0017 | 0.6663±0.0024 | FIL, G, SR |
-| FSRS v3 | 13 | 0.647±0.012 | 0.1413±0.0021 | 0.6389±0.0025 | FIL, G, SR |
+| FSRS v4 | 17 | 0.4848±0.0075 | 0.1159±0.0017 | 0.6662±0.0024 | FIL, G, SR |
+| FSRS v3 | 13 | 0.647±0.012 | 0.1413±0.0021 | 0.6389±0.0026 | FIL, G, SR |
 | FSRS v2 | 14 | 0.663±0.012 | 0.1351±0.0019 | 0.6386±0.0023 | FIL, G, SR |
-| HLR | 3 | 0.705±0.014 | 0.1715±0.0024 | 0.6104±0.0028 | FIL, G, SR |
-| FSRS v1 | 7 | 0.744±0.015 | 0.1584±0.0023 | 0.6080±0.0026 | FIL, G, SR |
+| HLR | 3 | 0.705±0.014 | 0.1715±0.0025 | 0.6104±0.0028 | FIL, G, SR |
+| FSRS v1 | 7 | 0.744±0.015 | 0.1584±0.0023 | 0.6080±0.0027 | FIL, G, SR |
 | Ebisu v2 | 0 | 0.772±0.017 | 0.1846±0.0026 | 0.5947±0.0031 | FIL, G, SR |
-| **RMSE-BINS-EXPLOIT** | 0 | 4.129±0.059 | **0.01547±0.00026** | 0.6761±0.0021 | FIL, G, SR |
+| **RMSE-BINS-EXPLOIT** | 0 | 4.129±0.061 | **0.01547±0.00026** | 0.6761±0.0020 | FIL, G, SR |
 
 ### Superiority
 
@@ -329,13 +333,13 @@ Run `uv run script.py --help` for the full list. Common options include:
 To pretrain LSTM on multiple users, run:
 
 ```bash
-uv run reptile_trainer.py --algo LSTM
+uv run python -m reptile.reptile_trainer --algo LSTM
 ```
 
 To tune the LSTM Reptile finetuning hyperparameters, run:
 
 ```bash
-uv run reptile_optuna.py --algo LSTM
+uv run python -m reptile.reptile_optuna --algo LSTM
 ```
 
 `pretrain.py` is used for models that support direct pooled pretraining, such as `FSRS-6`, `RNN`, `Transformer`, and `NN-17`:

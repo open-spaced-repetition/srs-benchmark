@@ -1,4 +1,5 @@
 import json
+import re
 import traceback
 from functools import wraps
 from itertools import accumulate
@@ -39,9 +40,16 @@ _SRSB_TIMING = _os.environ.get("SRSB_TIMING") == "1"
 def catch_exceptions(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        _t0 = _time.perf_counter() if _SRSB_TIMING else None
+        _t0 = _time.perf_counter()
         try:
-            ret = (func(*args, **kwargs), None)
+            result = func(*args, **kwargs)
+            # Total per-user wall time in milliseconds, written into the result/.jsonl.
+            # Covers EVERYTHING process() does for this user: data load, feature
+            # pre-processing, training/SGD, prediction, and evaluation. Purely additive —
+            # it does not touch any computed metric, parameter, or RNG draw.
+            if isinstance(result, tuple) and result and isinstance(result[0], dict):
+                result[0]["time_ms"] = round((_time.perf_counter() - _t0) * 1000.0, 3)
+            ret = (result, None)
         except Exception:  # noqa: BLE001 -- decorator converts any user failure to data
             # Try to extract user_id from function arguments
             user_id = None
@@ -57,7 +65,7 @@ def catch_exceptions(func):
                 error_msg = f"User {user_id}:\n{error_msg}"
 
             ret = (None, error_msg)
-        if _t0 is not None:
+        if _SRSB_TIMING:
             print(
                 f"__USERTIME__ {_time.perf_counter() - _t0:.6f}",
                 file=_sys.stderr,
@@ -430,11 +438,19 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
         elif config.save_weights:
             save_model_state(w_list[-1], file_name, user_id)
     if config.save_raw_output:
-        raw = {
-            "user": int(user_id),
-            "p": [round(x, 4) for x in p],
-            "y": list(map(int, y)),
-        }
+        # Pre-serialize the raw line HERE (in the worker) rather than in the serial main
+        # collector: the p/y lists are huge, so json.dumps (~67ms/big-user) is moved off
+        # the single-threaded main loop into the parallel workers, and IPC then ships a
+        # ready string instead of pickling 100k-element lists. Byte-identical to dumping
+        # the dict in main (same json.dumps call). Main writes this string verbatim.
+        raw = json.dumps(
+            {
+                "user": int(user_id),
+                "p": [round(x, 4) for x in p],
+                "y": list(map(int, y)),
+            },
+            ensure_ascii=False,
+        )
     else:
         raw = None
     return stats, raw
@@ -471,10 +487,61 @@ def save_model_state(state: TrainingState, file_name: str, user_id: int) -> None
 
 
 def sort_jsonl(file):
-    with file.open("r", encoding="utf-8") as jsonl_file:
-        data = [json.loads(x) for x in jsonl_file]
+    with open(file, encoding="utf-8") as f:
+        # Skip blank / NUL-filled lines. An interrupted append (mid-write power loss or
+        # reboot) can leave a trailing line of NUL bytes or spaces; json.loads on it would
+        # crash the next resume at startup. Valid result lines are always non-empty JSON
+        # objects, so dropping empties never loses real data (and is a no-op for clean
+        # files -> bit-identical output).
+        data = [json.loads(line) for line in f if line.strip().strip("\x00")]
+    users = [x["user"] for x in data]
+    if users == sorted(users):
+        # Already sorted (e.g. resuming a completed config) -> skip the rewrite: avoids
+        # bumping the file's mtime on every restart, and the needless large-file I/O.
+        return data
     data.sort(key=lambda x: x["user"])
-    with file.open("w", encoding="utf-8", newline="\n") as jsonl_file:
+    # Write to a temp file then atomically replace, so a crash/kill mid-write can never
+    # truncate the real result file (the old in-place "w" open truncated it immediately,
+    # which lost a whole config's results when a restart killed the process mid-sort).
+    tmp = file.with_name(file.name + ".tmp")
+    with tmp.open("w", encoding="utf-8", newline="\n") as jsonl_file:
         for json_data in data:
             jsonl_file.write(json.dumps(json_data, ensure_ascii=False) + "\n")
+    tmp.replace(file)
     return data
+
+
+# Matches the leading `{"user": <id>` of a jsonl line so we can reorder whole lines by
+# user id without parsing the (potentially million-element) p/y arrays behind it.
+_USER_ID_RE = re.compile(rb'^\s*\{"user":\s*(\d+)')
+
+
+def sort_jsonl_by_user_lines(file):
+    """Sort a jsonl file by the integer "user" field, in place, WITHOUT parsing each
+    line's full JSON.
+
+    Reorders the original line *bytes* verbatim, so the output is byte-for-byte identical
+    to ``sort_jsonl`` (which round-trips every value through ``json.loads``/``json.dumps``)
+    but ~30x faster and far lighter on memory. The win matters for the multi-GB ``--raw``
+    files: ``json.loads`` there would materialize hundreds of millions of Python float
+    objects just to re-serialize them unchanged. ``"user"`` is always the first key
+    (``json.dumps`` preserves dict insertion order), so a cheap regex on the line prefix
+    yields the sort key. Any line that doesn't match keeps a stable position (key -1) and
+    is preserved as-is, matching ``sort_jsonl``'s "never drop a line" contract.
+    """
+    with open(file, "rb") as f:
+        lines = f.readlines()
+
+    def _user_key(line):
+        m = _USER_ID_RE.match(line)
+        return int(m.group(1)) if m else -1
+
+    keys = list(map(_user_key, lines))
+    if keys == sorted(keys):
+        return  # already sorted -> skip the (potentially multi-GB) rewrite
+    lines.sort(key=_user_key)
+    # Atomic write (temp + replace) so a kill mid-write can't truncate the result/raw file.
+    tmp = Path(str(file) + ".tmp")
+    with open(tmp, "wb") as f:
+        f.writelines(lines)
+    tmp.replace(file)

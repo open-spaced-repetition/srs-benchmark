@@ -15,7 +15,10 @@ from models.transformer import Transformer
 from script import Trainer
 
 parser = create_parser()
-args, _ = parser.parse_known_args()
+# parse_args(), NOT parse_known_args(): an unrecognized flag must be a hard error,
+# because output file names are derived from the flags (a silently dropped flag
+# would write to the wrong file).
+args = parser.parse_args()
 config = Config(args)
 
 

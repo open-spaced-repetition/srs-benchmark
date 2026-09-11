@@ -24,7 +24,7 @@ class GRU(BaseModel):
     - fractional intervals
     - its own version of --recency
 
-    Pretraining: python reptile_trainer_gru.py --algo GRU --short --secs --processes 1
+    Pretraining: python -m reptile.reptile_trainer_gru --algo GRU --short --secs --processes 1
     Per-user optimization: python script.py --algo GRU --short --secs --processes 3
     """
 

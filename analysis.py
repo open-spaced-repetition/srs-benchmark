@@ -18,7 +18,10 @@ class ChenRuleError(RuntimeError):
 
 
 parser = create_parser()
-args, _ = parser.parse_known_args()
+# parse_args(), NOT parse_known_args(): an unrecognized flag must be a hard error,
+# because output file names are derived from the flags (a silently dropped flag
+# would write to the wrong file).
+args = parser.parse_args()
 
 DEV_MODE = args.dev
 if DEV_MODE:
@@ -222,38 +225,43 @@ def best_mode(a, weights):
 
 
 if __name__ == "__main__":
-    model = "FSRS-rs"
+    model = "FSRS-7-short-secs-recency"
+    # FSRS-7 (dual-trace) has 34 params, not the fsrs_optimizer (FSRS-5/6) default set. Use
+    # the model's own init_w as the close-to-default reference so fallback (default-param)
+    # users are dropped from the distributions.
+    from models.fsrs_v7 import FSRS7
+
+    DEFAULT_PARAMETER = FSRS7.init_w
     with open(f"./result/{model}.jsonl", "r") as f:
         data = [json.loads(x) for x in f]
     weights_list = []
     sizes = []
     n_params = len(DEFAULT_PARAMETER)
     for result in data:
-        if isinstance(result["parameters"], dict):
-            for partition in result["parameters"]:
-                for i in range(n_params):
-                    if (
-                        abs(result["parameters"][partition][i] - DEFAULT_PARAMETER[i])
-                        <= 1e-4
-                    ):
-                        # remove users who have parameters that are close to the default
-                        break
-                else:
-                    weights_list.append(result["parameters"][partition])
-                    sizes.append(result["size"])
-        else:
-            for i in range(n_params):
-                if abs(result["parameters"][i] - DEFAULT_PARAMETER[i]) <= 1e-4:
-                    # remove users who have parameters that are close to the default
-                    break
-            else:
-                weights_list.append(result["parameters"])
-                sizes.append(result["size"])
+        params_field = result["parameters"]
+        # result["parameters"] is either {partition: [params]} or a bare [params] list.
+        param_vectors = (
+            list(params_field.values())
+            if isinstance(params_field, dict)
+            else [params_field]
+        )
+        for params in param_vectors:
+            # Drop ONLY true fallback users (the WHOLE default vector). The old filter
+            # excluded a user if ANY single param sat within 1e-4 of its default, which for
+            # FSRS-7 throws away ~half the trained users -- several init_w values are at the
+            # 0.0/1.0 clip bounds, so legitimately-trained params land there exactly.
+            if all(
+                abs(params[i] - DEFAULT_PARAMETER[i]) <= 1e-4 for i in range(n_params)
+            ):
+                continue
+            weights_list.append(params)
+            sizes.append(result["size"])
 
     weights = np.array(weights_list)
     # sizes = np.sqrt(np.array(sizes))
     print(weights.shape)
-    pathlib.Path("./plots").mkdir(parents=True, exist_ok=True)
+    out_dir = pathlib.Path(f"./plots/{model}")
+    out_dir.mkdir(parents=True, exist_ok=True)
     for i in range(n_params):
         # Calculate 2nd and 98th percentiles to limit the histogram range
         p2 = np.percentile(weights[:, i], 2)
@@ -292,6 +300,6 @@ if __name__ == "__main__":
         plt.xlabel("Parameter value")
         plt.ylabel("Frequency")
         plt.legend()
-        plt.title(f"w[{i}]")
-        plt.savefig(f"./plots/w[{i}].png")
+        plt.title(f"{model}\nw[{i}]")
+        plt.savefig(out_dir / f"w[{i}].png")
         plt.clf()

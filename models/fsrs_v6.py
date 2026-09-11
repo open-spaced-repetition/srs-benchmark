@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import ClassVar, Optional
 
 import torch
@@ -8,6 +9,10 @@ from torch import Tensor, nn
 
 from config import Config
 from models.fsrs_v5 import FSRS5, FSRS5ParameterClipper
+
+# log(0.9): the forgetting curve passes through R=0.9 at t=s. Precomputed so the
+# stabilized factor can be built in log-space (see FSRS6.forgetting_curve).
+_LOG_09 = math.log(0.9)
 
 
 class FSRS6ParameterClipper(FSRS5ParameterClipper):
@@ -125,7 +130,15 @@ class FSRS6(FSRS5):
         return output
 
     def forgetting_curve(self, t, s, decay=-init_w[20]):
-        factor = 0.9 ** (1 / decay) - 1
+        # factor = 0.9 ** (1 / decay) - 1, but built in log-space with the exponent
+        # clamped at 60 so the value AND its gradient stay finite if decay drifts toward
+        # 0 during training (mirrors FSRS-7's stabilized factor1). Mathematically identical
+        # to the direct pow over the valid decay range; the explicit exp/clamp path is
+        # better-conditioned for gradient-based training (also under torch.compile).
+        if torch.is_tensor(decay):
+            factor = (_LOG_09 * decay.pow(-1.0)).clamp(max=60.0).exp() - 1.0
+        else:
+            factor = math.exp(min(_LOG_09 / decay, 60.0)) - 1.0
         return (1 + factor * t / s) ** decay
 
     def stability_short_term[BatchSize: IntVar](

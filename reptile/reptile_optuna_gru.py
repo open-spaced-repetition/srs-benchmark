@@ -1,12 +1,12 @@
-# ── reptile_optuna.py ──────────────────────────────────────────────────────────
+# ── reptile_optuna_gru.py ──────────────────────────────────────────────────────────
 #
-# HOW TO APPLY OPTUNA RESULTS TO reptile_trainer.py
+# HOW TO APPLY OPTUNA RESULTS TO reptile_trainer_gru.py
 # ──────────────────────────────────────────────────
 # After study.optimize() finishes, study.best_params is a flat dict with
-# prefixed keys.  Copy values into reptile_trainer.py using this table:
+# prefixed keys.  Copy values into reptile_trainer_gru.py using this table:
 #
 # ┌──────────────────────────────────┬─────────────────────────────────────────┐
-# │ Optuna key (study.best_params)   │ reptile_trainer.py destination          │
+# │ Optuna key (study.best_params)   │ reptile_trainer_gru.py destination      │
 # ├──────────────────────────────────┼─────────────────────────────────────────┤
 # │ adapt_lr_start_raw               │ DEFAULT_TRAIN_ADAPT_PARAMS              │
 # │ adapt_lr_middle_raw              │   strip the "adapt_" prefix, keep the   │
@@ -46,7 +46,6 @@
 
 import copy
 import os
-import pickle
 import random
 from functools import partial
 from pathlib import Path
@@ -54,12 +53,12 @@ from pathlib import Path
 import optuna  # type: ignore
 import pandas as pd
 import torch
-from fsrs_optimizer import BatchDataset, BatchLoader
+from fsrs_optimizer import BatchDataset, BatchLoader  # type: ignore
 from multiprocess import Pool  # type: ignore
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.model_selection import TimeSeriesSplit  # type: ignore
 
 from config import Config, create_parser
-from reptile_trainer import (
+from reptile.reptile_trainer_gru import (
     BATCH_SIZE,
     DEFAULT_FINETUNE_PARAMS,
     DEFAULT_TRAIN_ADAPT_PARAMS,
@@ -81,7 +80,10 @@ from reptile_trainer import (
 optuna_nonce = random.randint(0, 100000000)
 
 parser = create_parser()
-args, _ = parser.parse_known_args()
+# parse_args(), NOT parse_known_args(): an unrecognized flag must be a hard error,
+# because output file names are derived from the flags (a silently dropped flag
+# would write to the wrong file).
+args = parser.parse_args()
 config = Config(args)
 
 FILE_NAME = config.get_evaluation_file_name()
@@ -145,15 +147,9 @@ def _find_resumable_checkpoint(trial_params: dict):
             ckpt = torch.load(candidate, weights_only=False)
             if ckpt.get("trial_params") == trial_params:
                 return candidate, ckpt
-        except (
-            EOFError,
-            OSError,
-            pickle.UnpicklingError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ) as error:
-            print(f"Could not read checkpoint {candidate.name}: {error}")
+        # A corrupt/unreadable checkpoint must not abort the resume scan;
+        # skipping it just means that trial restarts from scratch.
+        except Exception:  # noqa: BLE001, S112
             continue
     return None, None
 
@@ -163,7 +159,7 @@ def _find_resumable_checkpoint(trial_params: dict):
 
 def objective(trial, df_list, model, inner_opt_state):
     # ── train_adapt_params  (prefix "adapt_") ──────────────────────────────
-    # See the HOW TO APPLY table at the top for the reptile_trainer.py mapping.
+    # See the HOW TO APPLY table at the top for the reptile_trainer_gru.py mapping.
     adapt_lr_start_raw = trial.suggest_float("adapt_lr_start_raw", 1e-4, 2e-2, log=True)
     adapt_lr_middle_raw = trial.suggest_float(
         "adapt_lr_middle_raw", 1e-4, 2e-2, log=True
@@ -221,13 +217,13 @@ def objective(trial, df_list, model, inner_opt_state):
     }
 
     # ── outer optimizer hyperparameters  (prefix "outer_") ─────────────────
-    # → OUTER_ADAM_BETA1/BETA2/WEIGHT_DECAY in reptile_trainer.py (strip prefix).
+    # → OUTER_ADAM_BETA1/BETA2/WEIGHT_DECAY in reptile_trainer_gru.py (strip prefix).
     outer_adam_beta1 = trial.suggest_float("outer_adam_beta1", 0.8, 0.99)
     outer_adam_beta2 = trial.suggest_float("outer_adam_beta2", 0.9, 0.9999)
     outer_weight_decay = trial.suggest_float("outer_weight_decay", 1e-4, 1.0, log=True)
 
     # ── Phase 1: full reptile meta-training ────────────────────────────────
-    # Mirrors train() in reptile_trainer.py exactly: same OUTER_STEPS,
+    # Mirrors train() in reptile_trainer_gru.py exactly: same OUTER_STEPS,
     # same outer LR schedule, same inner LR warmup ramp.
     meta_model = copy.deepcopy(model)
     local_inner_opt_state = copy.deepcopy(inner_opt_state)
@@ -285,7 +281,7 @@ def objective(trial, df_list, model, inner_opt_state):
         for param in meta_model.parameters():
             param.grad = torch.zeros_like(param.data)
 
-        # task_id = outer_it % N mirrors train() in reptile_trainer.py exactly.
+        # task_id = outer_it % N mirrors train() in reptile_trainer_gru.py exactly.
         task_id = outer_it % len(df_list)
 
         # Build scaled_adapt_params BEFORE get_inner_opt so that weight_decay
@@ -349,7 +345,7 @@ def objective(trial, df_list, model, inner_opt_state):
     )
 
     # ── Phase 2: finetune evaluation ───────────────────────────────────────
-    # Mirrors evaluate() in reptile_trainer.py exactly.
+    # Mirrors evaluate() in reptile_trainer_gru.py exactly.
     # finetune() deepcopies meta_model internally so it is not mutated here.
     all_test_loss = 0
     all_test_n = 0
@@ -363,7 +359,7 @@ def objective(trial, df_list, model, inner_opt_state):
             else:
                 train_set = df.iloc[train_index]
                 test_set = df.iloc[test_index]
-                # Mirror evaluate() in reptile_trainer.py: filter same-day
+                # Mirror evaluate() in reptile_trainer_gru.py: filter same-day
                 # reviews from the test set when requested.
                 if config.no_test_same_day:
                     test_set = test_set[test_set["elapsed_days"] > 0].copy()
@@ -375,7 +371,7 @@ def objective(trial, df_list, model, inner_opt_state):
                 finetune_params=finetune_params,
             )
             # Switch to eval mode before computing test loss, mirroring the
-            # finetuned_model.eval() call in reptile_trainer.py's evaluate().
+            # finetuned_model.eval() call in reptile_trainer_gru.py's evaluate().
             # Without this the model stays in training mode (dropout active),
             # producing a stochastic loss that is inconsistent with actual
             # benchmark usage — the most likely cause of degraded results.
@@ -431,17 +427,26 @@ def main():
     num_users = 100
     users = list(range(2301, 2301 + num_users))
 
-    with Pool(processes=config.num_processes) as pool:
-        results = pool.map(process_user, users)
+    # multiprocess.Pool deadlocks on this Windows/CUDA setup (CUDA already initialised
+    # in the parent before spawn). With --processes 1 the Pool buys nothing, so load
+    # sequentially in-process; results are identical, only the load path differs.
+    if config.num_processes > 1:
+        with Pool(processes=config.num_processes) as pool:
+            results = pool.map(process_user, users)
+    else:
+        results = [process_user(user_id) for user_id in users]
 
     for user, result in results:
         df_dict[user] = result
     df_list = [df_dict[user_id] for user_id in users]
 
+    # Fixed (config-specific) study name + load_if_exists so a relaunch after a process
+    # crash resumes the same study from db.sqlite3 instead of starting over.
     study = optuna.create_study(
         storage="sqlite:///db.sqlite3",
-        study_name=f"gru-joint-{optuna_nonce}",
+        study_name=f"gru-joint-{FILE_NAME}",
         pruner=optuna.pruners.HyperbandPruner(),
+        load_if_exists=True,
     )
 
     # ── Re-enqueue interrupted trials ──────────────────────────────────────
@@ -449,6 +454,7 @@ def main():
     if CHECKPOINT_DIR.exists():
         for candidate in sorted(CHECKPOINT_DIR.glob("trial_*.pt")):
             try:
+                # pyrefly: ignore [missing-attribute]
                 ckpt = torch.load(candidate, weights_only=False)
                 params = ckpt.get("trial_params")
                 step = ckpt.get("outer_it", "?")
@@ -459,20 +465,13 @@ def main():
                     )
                     study.enqueue_trial(params)
                     already_enqueued_params.append(params)
-            except (
-                EOFError,
-                OSError,
-                pickle.UnpicklingError,
-                RuntimeError,
-                TypeError,
-                ValueError,
-            ) as e:
+            except Exception as e:  # noqa: BLE001 -- unreadable checkpoint is reported and skipped
                 print(f"Could not read checkpoint {candidate.name}: {e}")
 
     # ── Baseline trial ──────────────────────────────────────────────────────
-    # Encodes the current reptile_trainer.py defaults in the prefixed Optuna
+    # Encodes the imported trainer's current defaults in the prefixed Optuna
     # namespace.  Invert the mapping (see HOW TO APPLY at the top) to write
-    # best_params back to reptile_trainer.py after the study completes.
+    # best_params back to reptile_trainer_gru.py after the study completes.
     #
     # The adapt loop already covers adapt_weight_decay via the
     # DEFAULT_TRAIN_ADAPT_PARAMS["weight_decay"] key, so no separate line is
@@ -493,7 +492,8 @@ def main():
     baseline_trial["outer_adam_beta2"] = OUTER_ADAM_BETA2
     baseline_trial["outer_weight_decay"] = OUTER_WEIGHT_DECAY
 
-    if baseline_trial not in already_enqueued_params:
+    # Only enqueue the baseline on a fresh study; on resume it has already been run.
+    if not study.trials and baseline_trial not in already_enqueued_params:
         study.enqueue_trial(baseline_trial)
 
     print("Ready.")
@@ -501,7 +501,24 @@ def main():
         objective, df_list=df_list, model=model, inner_opt_state=inner_opt.state_dict()
     )
 
-    study.optimize(objective_wrapped, n_trials=100, show_progress_bar=True)
+    # Run only the remaining trials so a resume tops the study up to the target
+    # rather than running a fresh 100 each launch.
+    from optuna.trial import TrialState
+
+    # Capped at 40 (was 100): the first 11 trials never beat the enqueued baseline
+    # (trial 0), and each trial is a full 100k-step meta-training run at ~2.4 h, so the
+    # original target was ~9 days of GPU time. Raise this if the search starts improving.
+    n_target = 40
+    n_finished = sum(
+        t.state in (TrialState.COMPLETE, TrialState.PRUNED, TrialState.FAIL)
+        for t in study.trials
+    )
+    remaining = max(0, n_target - n_finished)
+    print(
+        f"Study '{study.study_name}': {n_finished} finished, "
+        f"running {remaining} more (target {n_target})."
+    )
+    study.optimize(objective_wrapped, n_trials=remaining, show_progress_bar=True)
     print(study.best_params)
     print(study.best_value)
 

@@ -11,6 +11,26 @@ from matplotlib.colors import LinearSegmentedColormap
 
 warnings.filterwarnings("ignore")
 
+
+def _sort_models_by_dominance(df, models):
+    """Order models so better algorithms come first, so every pairwise '>=50%' value lands
+    above the diagonal and every '<50%' below it -- no manual ordering. Ranks by Copeland
+    score (how many opponents each model beats in >=50% of collections, via the same
+    per-collection LogLoss comparison the table uses). Exact for transitive data; any
+    leftover violation means a non-transitive cycle in the data."""
+    cols = [df[f"{m}, LogLoss"].to_numpy() for m in models]
+    k = len(models)
+    win = np.array(
+        [
+            [float(np.mean(cols[i] <= cols[j])) if i != j else 0.0 for j in range(k)]
+            for i in range(k)
+        ]
+    )
+    copeland = (win >= 0.5).sum(axis=1)
+    order = sorted(range(k), key=lambda i: (copeland[i], win[i].sum()), reverse=True)
+    return [models[i] for i in order]
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--same-day", action="store_true")
@@ -21,11 +41,11 @@ if __name__ == "__main__":
             "RWKV-short-secs",
             "LSTM-short-secs-duration",
             "GRU-short-secs",
-            "LogisticRegression-short-secs-recency",
             "FSRS-7-short-secs-recency",
+            "LogisticRegression-short-secs-recency",
             "MOVING-AVG-short-secs",
             "DASH-short-secs",
-            "FSRS-6-short-secs",
+            "FSRS-6-short-secs-recency",
             "ACT-R-short-secs",
             "FSRS-4.5-short-secs",
             "FSRS-5-short-secs",
@@ -38,9 +58,9 @@ if __name__ == "__main__":
             "RWKV",
             "GRU-short-secs-equalize_test_with_non_secs",
             "LSTM-short-secs-duration-equalize_test_with_non_secs",
-            "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
             "FSRS-7-short-secs-recency-equalize_test_with_non_secs",
-            "FSRS-6-short",
+            "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
+            "FSRS-6-short-recency",
             "MOVING-AVG",
             "FSRS-5-short",
             "FSRS-4.5",
@@ -79,6 +99,7 @@ if __name__ == "__main__":
     df.to_csv(csv_name)
 
     df = pd.read_csv(csv_name)
+    models = _sort_models_by_dominance(df, models)
 
     n_collections = len(df)
     print(f"Number of collections: {n_collections}")
@@ -135,13 +156,18 @@ if __name__ == "__main__":
     index_lstm = models.index("LSTM")
     index_Ebisu_v2 = models.index("Ebisu-v2")
     index_FSRS_7_recency = models.index("FSRS-7-recency")
-    index_FSRS_6 = models.index("FSRS-6")
+    index_FSRS_6 = models.index("FSRS-6-recency")
     index_LogReg = models.index("LogisticRegression-recency")
     models[index_lstm] = "LSTM"
     models[index_Ebisu_v2] = "Ebisu v2"
     models[index_FSRS_7_recency] = "FSRS-7\nrecency"
-    models[index_FSRS_6] = "FSRS-6"
+    models[index_FSRS_6] = "FSRS-6\nrecency"
     models[index_LogReg] = "Logistic Regression\nrecency"
+
+    index_rwkv_p = models.index("RWKV-P")
+    index_rwkv = models.index("RWKV")
+    models[index_rwkv_p] = "RWKV-Instant"
+    models[index_rwkv] = "RWKV-Curve"
 
     fig, ax = plt.subplots(figsize=(16, 16), dpi=200)
     title_suffix = "With same-day reviews" if args.same_day else "No same-day reviews"

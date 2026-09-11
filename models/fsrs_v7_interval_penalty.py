@@ -1,55 +1,26 @@
 """
 fsrs7_interval_penalty.py
 ══════════════════════════════════════════════════════════════════════════════
-Differentiable interval-growth penalty for FSRS-7.
+Differentiable scheduling penalties for the finished dual-trace FSRS-7 (34 params).
 
-Penalty definition
-──────────────────
-  P(w) = max{ ivl[i+1]/ivl[i] : ivl[i] >= 1 day,  i = 0 … N-2 }
+These reworked penalties simulate a run of consecutive Good reviews and invert the
+NEW dual-trace forgetting curve R(t, s_long, s_short, d) to find the scheduled interval
+at a target desired-retention (DR). They reuse the model's own dual-trace recurrence
+(next_stability / short_component_recall / next_difficulty) for the state updates, and
+reimplement only the curve value R(t) and its derivative dR/dt analytically (needed for
+the Newton interval inversion). Both penalties are OFF by default (config.sched_penalties).
 
-  where ivl[0..N-1] are scheduled intervals for N consecutive Good reviews
-  at DR = 90 %, simulated from the default Good-initial stability w[2].
-  Returns 0 if every interval in that run is shorter than one day
-  (the sub-day learning phase is intentionally unpenalised).
+  penalty_1 — squared max interval-growth ratio for >= 1-day intervals at target_dr.
+  penalty_2 — mean short-interval penalty for sub-1-day intervals at the target_drs.
 
-Why Newton in log(t) space
-──────────────────────────
-  The FSRS-7 forgetting curve R(t,s) has no closed-form inverse.
-  Newton in plain t starts at t₀ = s where R ≈ 0.85 and takes a first step
-  of Δt ≈ (0.85−0.9)/|dR/dt| that overshoots by several orders of magnitude
-  because |dR/dt| is tiny at large t.
-  Working with u = log(t) reduces the Newton update to
-      u ← u − (R − target) / (∂R/∂t · t)
-  which is well-conditioned and converges in ≤ 8 iterations from u₀ = log(s).
-
-Why the implicit-differentiation (IFT / DEQ) lift
-──────────────────────────────────────────────────
-  Unrolling 12 Newton iterations through autograd would create a deep
-  computation graph, incur large memory overhead, and risk gradient
-  explosion through the Jacobian chain.
-
-  Instead:
-    Phase 1 – find t* using Python floats inside no_grad (zero graph size).
-    Phase 2 – one Newton step with grad from t*:
-
-        u_L = log(t*) − (R(t*, s, w) − target) / (∂R/∂t · t*)
-
-    Because R(t*, …) ≈ target, the step is nearly zero numerically, but
-    its gradient ∂u_L/∂w equals ∂log(t*)/∂w exactly (IFT), and
-    ∂u_L/∂s equals ∂log(t*)/∂s exactly, so the whole sequence
-    ivl[0] → ivl[1] → … → ivl[N-1] is fully differentiable through w
-    and through the stability recurrence that links consecutive intervals.
-
-Integration in batch_process
-─────────────────────────────
-    PENALTY_WEIGHT = 0.5
-
-    def batch_process(self, w, batch):
-        base_loss  = ...           # your existing prediction loss
-        ivl_penalty = fsrs7_interval_growth_penalty(w)
-        loss = base_loss + PENALTY_WEIGHT * ivl_penalty
-        loss.backward()
-        ...
+Why Newton in log(t) space and the implicit-differentiation (IFT) lift
+──────────────────────────────────────────────────────────────────────
+  R(t, ...) has no closed-form inverse. Newton in u = log(t) is well-conditioned
+  (u <- u - (R - target) / (dR/dt * t)). To keep the autograd graph shallow we find t*
+  with plain Python floats inside no_grad (Phase 1), then take ONE implicit-function
+  lift step with grad at the detached t* (Phase 2): the value barely moves but its
+  gradient equals d log(t*)/d w exactly, so the whole interval chain stays differentiable
+  through w and through the stability recurrence linking consecutive intervals.
 """
 
 from __future__ import annotations
@@ -57,7 +28,6 @@ from __future__ import annotations
 import math
 
 import torch
-from shape_extensions import IntVar
 
 # ── physical constants ────────────────────────────────────────────────────────
 _MIN_T = 1.0 / 86_400.0  # 1 second expressed in days
@@ -68,47 +38,63 @@ _INV_C = 1.0 / _SHORT_C  # = 144.0  (86 400 / 600)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Forgetting-curve kernel
+# Dual-trace forgetting-curve value + dt-derivative (raw mixture, for inversion)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _fc_R_and_dRdt[ParamCount: IntVar](
-    t: torch.Tensor[[]],
-    s: torch.Tensor[[]],
-    w: torch.Tensor[[ParamCount]],
-) -> tuple[torch.Tensor[[]], torch.Tensor[[]]]:
-    decay1 = -w[-8]
-    decay2 = -w[-7]
+_COMPILED_CACHE: dict = {}
 
-    # ── Guard: base values must be strictly positive for real-valued pow ──────
-    base1 = w[-6].clamp(min=1e-4)
-    base2 = w[-5].clamp(min=1e-4)
-    # ── Guard: weight magnitudes must be strictly positive so wt_sum ≠ 0 ─────
-    bw1 = w[-4].clamp(min=1e-4)
-    bw2 = w[-3].clamp(min=1e-4)
-    swp1 = w[-2]
-    swp2 = w[-1]
 
-    c1 = base1 ** (1.0 / decay1) - 1.0
-    c2 = base2 ** (1.0 / decay2) - 1.0
+def _maybe_compiled(fn, key, model):
+    """torch.compiled (cached) version of ``fn`` when the model was built with --compile
+    (config.use_compile), else eager ``fn``. Compiling the two pure-torch hot functions
+    fuses the per-review scalar ops -> ~7.6x faster fwd+bwd on CPU; penalty values are
+    bit-identical, gradient drift <=1e-4. Needs MSVC/vcvars, same as the step-compile."""
+    if not getattr(model.config, "use_compile", False):
+        return fn
+    c = _COMPILED_CACHE.get(key)
+    if c is None:
+        c = torch.compile(fn, dynamic=False)
+        _COMPILED_CACHE[key] = c
+    return c
 
-    tos = t / s
-    inner1 = (1.0 + c1 * tos).clamp(min=1e-9)
-    inner2 = (1.0 + c2 * tos).clamp(min=1e-9)
 
-    R1 = inner1**decay1
-    R2 = inner2**decay2
+def _fc_R_and_dRdt(
+    t: torch.Tensor,
+    s: torch.Tensor,
+    s_short: torch.Tensor,
+    d: torch.Tensor,
+    w: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Raw dual-trace mixture retention R(t) and dR/dt for fixed (s, s_short, d).
+    Mirrors FSRS7.forgetting_curve / short_component_recall (without the final
+    1e-5 rescale, which is negligible for the interval target)."""
+    # Short-term component r1 (decay S-modulated via s_decay1).
+    decay1_mag = (w[23] * s_short.pow(w[33] - 0.3)).clamp(0.01, 0.95)
+    decay1 = -decay1_mag
+    factor1 = (w[25].log() * decay1.pow(-1.0)).clamp(max=60.0).exp() - 1.0
+    a1 = factor1 / s_short
+    inner1 = (a1 * t + 1.0).clamp(min=1e-9)
+    r1 = inner1.pow(decay1)
 
-    wt1 = bw1 * s.pow(-swp1)
-    wt2 = bw2 * s.pow(swp2)
-    wt_sum = (wt1 + wt2).clamp(min=1e-9)  # ← guard denominator
+    # Long-term component r2 (difficulty on the horizontal time-scale).
+    decay2 = -w[24].clamp(0.01, 0.95)
+    factor2 = w[26].pow(decay2.pow(-1.0)) - 1.0
+    d_timescale = ((d - 5.0) * (w[32] - 0.3)).exp()
+    a2 = factor2 * d_timescale / s
+    inner2 = (a2 * t + 1.0).clamp(min=1e-9)
+    r2 = inner2.pow(decay2)
 
-    R = ((wt1 * R1 + wt2 * R2) / wt_sum).clamp(0.0, 1.0)  # ← hard clamp
+    # Mixture weights (independent of t).
+    weight1 = w[27] * s_short.pow(-w[29])
+    weight2 = w[28] * s.pow(w[30]) * ((d - 5.0) * (w[31] - 0.5)).exp()
+    wt_sum = (weight1 + weight2).clamp(min=1e-9)
 
-    dR1_dt = decay1 * inner1.pow(decay1 - 1.0) * (c1 / s)
-    dR2_dt = decay2 * inner2.pow(decay2 - 1.0) * (c2 / s)
-    dR_dt = ((wt1 * dR1_dt + wt2 * dR2_dt) / wt_sum).clamp(max=0.0)  # ← ≤ 0
+    R = ((weight1 * r1 + weight2 * r2) / wt_sum).clamp(0.0, 1.0)
 
+    dr1_dt = decay1 * inner1.pow(decay1 - 1.0) * a1
+    dr2_dt = decay2 * inner2.pow(decay2 - 1.0) * a2
+    dR_dt = ((weight1 * dr1_dt + weight2 * dr2_dt) / wt_sum).clamp(max=0.0)
     return R, dR_dt
 
 
@@ -117,171 +103,88 @@ def _fc_R_and_dRdt[ParamCount: IntVar](
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _interval_differentiable[ParamCount: IntVar](
-    s: torch.Tensor[[]],
-    w: torch.Tensor[[ParamCount]],
-    target: float = 0.9,
-    n_newton: int = 12,
-) -> torch.Tensor[[]]:
-    """
-    Return t*  s.t.  R(t*, s, w) = target,  differentiably w.r.t. w and s.
-
-    Phase 1 — root-finding with Python floats inside no_grad.
-        Newton in u = log(t) space starting from u₀ = log(s):
-
-            u ← u  −  (R(eᵘ, s) − target)  /  (∂R/∂t · eᵘ)
-
-        All arithmetic is plain Python / math, so no autograd graph is built.
-        12 iterations typically give |R − target| < 1e-10.
-
-    Phase 2 — implicit-differentiation lift (one step with grad).
-        Let t_d = detach(t*).  Compute
-
-            u_L = log(t_d)  −  (R(t_d, s, w) − target)  /  (detach(∂R/∂t · t_d))
-
-        The denominator is detached so that only the numerator residual
-        contributes to the gradient.  Since R(t_d, s, w) ≈ target the lift
-        barely moves the value, but by the implicit function theorem
-
-            ∂u_L/∂w = −∂R/∂w / (∂R/∂u) = ∂log(t*)/∂w    ✓
-            ∂u_L/∂s = −∂R/∂s / (∂R/∂u) = ∂log(t*)/∂s    ✓
-
-        where ∂R/∂w and ∂R/∂s already propagate through s's own dependence
-        on w from earlier stability updates, giving the correct total gradient.
-    """
-    # ── Phase 1: Newton in log(t) — pure Python scalars, no autograd ─────────
+def _interval_differentiable(
+    model,
+    s: torch.Tensor,
+    s_short: torch.Tensor,
+    d: torch.Tensor,
+    target: float,
+    n_newton: int,
+) -> torch.Tensor:
+    """Return t* s.t. R(t*, s, s_short, d) = target, differentiable w.r.t. w (and the
+    state, which itself depends on w through earlier stability updates)."""
+    w = model.w
+    # ── Phase 1: Newton in log(t) with plain Python floats (no autograd graph) ───
     # pyrefly: ignore [bad-argument-type]
     s_f = float(s.detach())
     # pyrefly: ignore [bad-argument-type]
-    d1 = float(-w[-8])
+    ss_f = float(s_short.detach())
     # pyrefly: ignore [bad-argument-type]
-    d2 = float(-w[-7])
-    # pyrefly: ignore [bad-argument-type]
-    b1 = float(w[-6])
-    # pyrefly: ignore [bad-argument-type]
-    b2 = float(w[-5])
-    # pyrefly: ignore [bad-argument-type]
-    bw1f = float(w[-4])
-    # pyrefly: ignore [bad-argument-type]
-    bw2f = float(w[-3])
-    # pyrefly: ignore [bad-argument-type]
-    sw1f = float(w[-2])
-    # pyrefly: ignore [bad-argument-type]
-    sw2f = float(w[-1])
+    d_f = float(d.detach())
+    w23, w24, w25, w26 = float(w[23]), float(w[24]), float(w[25]), float(w[26])
+    w27, w28, w29, w30 = float(w[27]), float(w[28]), float(w[29]), float(w[30])
+    w31, w32, w33 = float(w[31]), float(w[32]), float(w[33])
 
-    c1f = b1 ** (1.0 / d1) - 1.0
-    c2f = b2 ** (1.0 / d2) - 1.0
-    wt1f = bw1f * s_f ** (-sw1f)
-    wt2f = bw2f * s_f**sw2f
-    wtsf = wt1f + wt2f
+    decay1 = -min(max(w23 * ss_f ** (w33 - 0.3), 0.01), 0.95)
+    factor1 = math.exp(min(math.log(max(w25, 1e-9)) / decay1, 60.0)) - 1.0
+    a1 = factor1 / ss_f
+    decay2 = -min(max(w24, 0.01), 0.95)
+    factor2 = max(w26, 1e-9) ** (1.0 / decay2) - 1.0
+    d_timescale = math.exp((d_f - 5.0) * (w32 - 0.3))
+    a2 = factor2 * d_timescale / s_f
+    weight1 = w27 * ss_f ** (-w29)
+    weight2 = w28 * s_f**w30 * math.exp((d_f - 5.0) * (w31 - 0.5))
+    wtsf = weight1 + weight2
 
-    u_f = math.log(max(s_f, 1e-10))  # start at log(s) — R(s,s) ≈ 0.85 < 0.9
-
+    u_f = math.log(max(s_f, 1e-10))  # start at log(s)
     for _ in range(n_newton):
         u_f = max(math.log(_MIN_T), min(u_f, math.log(_MAX_T)))
         t_f = max(_MIN_T, min(math.exp(u_f), _MAX_T))
-        tos = t_f / s_f
-        i1 = max(1.0 + c1f * tos, 1e-9)
-        i2 = max(1.0 + c2f * tos, 1e-9)
-        R_f = (wt1f * i1**d1 + wt2f * i2**d2) / wtsf
-        dR1 = d1 * i1 ** (d1 - 1.0) * c1f / s_f
-        dR2 = d2 * i2 ** (d2 - 1.0) * c2f / s_f
-        dRdt_f = (wt1f * dR1 + wt2f * dR2) / wtsf
-        # df/du = dR/dt · t  (always < 0; guard against numerical zero)
+        i1 = max(a1 * t_f + 1.0, 1e-9)
+        i2 = max(a2 * t_f + 1.0, 1e-9)
+        R_f = (weight1 * i1**decay1 + weight2 * i2**decay2) / wtsf
+        dR1 = decay1 * i1 ** (decay1 - 1.0) * a1
+        dR2 = decay2 * i2 ** (decay2 - 1.0) * a2
+        dRdt_f = (weight1 * dR1 + weight2 * dR2) / wtsf
+        # df/du = dR/dt * t  (always < 0; guard against numerical zero)
         dfdu_f = min(dRdt_f * t_f, -1e-12)
         u_f -= (R_f - target) / dfdu_f
 
+    # Clamp u_f into the valid log-interval range BEFORE the exp (mirrors the in-loop
+    # guard above). The final Newton step is otherwise unclamped, so a flat-derivative
+    # step (dfdu_f floored at -1e-12 -> giant update) made math.exp overflow ("math range
+    # error"), which silently zeroed penalty_1 exactly on the exploding-interval cases the
+    # penalty targets. Clamping first yields t*=_MAX_T and a real penalty instead.
+    u_f = max(math.log(_MIN_T), min(u_f, math.log(_MAX_T)))
     t_star_f = max(_MIN_T, min(math.exp(u_f), _MAX_T))
-    # create a plain tensor on the same device/dtype as w, no grad
-    # pyrefly: ignore [missing-attribute]
     t_star = w.new_tensor(t_star_f)
 
-    # ── Phase 2: IFT lift — one step with grad ────────────────────────────────
+    # ── Phase 2: IFT lift — one step with grad at the detached t* ────────────────
     t_d = t_star.detach()
-    R_s, dRdt_s = _fc_R_and_dRdt(t_d, s, w)
+    R_s, dRdt_s = _maybe_compiled(_fc_R_and_dRdt, "fc", model)(t_d, s, s_short, d, w)
     residual = R_s - target
     dfdu_s = (dRdt_s * t_d).detach().clamp(max=-1e-9)
-    u_lifted = t_d.log() - residual / dfdu_s
-
-    # ── Clamp before exp() to prevent overflow/underflow ─────────────────────
-    u_lifted = u_lifted.clamp(
-        min=math.log(_MIN_T),
-        max=math.log(_MAX_T),
+    u_lifted = (t_d.log() - residual / dfdu_s).clamp(
+        min=math.log(_MIN_T), max=math.log(_MAX_T)
     )
     return u_lifted.exp()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# FSRS-7 state-update equations (PyTorch, autograd-compatible)
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-def _init_d[ParamCount: IntVar](
-    w: torch.Tensor[[ParamCount]], rating: int
-) -> torch.Tensor[[]]:
-    return (w[4] - torch.exp(w[5] * (rating - 1)) + 1.0).clamp(1.0, 10.0)
-
-
-def _next_d_good[ParamCount: IntVar](
-    w: torch.Tensor[[ParamCount]], d: torch.Tensor[[]]
-) -> torch.Tensor[[]]:
-    """
-    Difficulty update for a Good (rating = 3) review.
-    The rating-delta term is −w[6]·(3−3) = 0, so d only shifts via
-    the 1 % mean-reversion toward init_d(4).
-    """
-    new_d = 0.01 * _init_d(w, 4) + 0.99 * d
-    return new_d.clamp(1.0, 10.0)
-
-
-def _s_fail_long[ParamCount: IntVar](
-    w: torch.Tensor[[ParamCount]],
-    s: torch.Tensor[[]],
-    d: torch.Tensor[[]],
-    r: torch.Tensor[[]],
-) -> torch.Tensor[[]]:
-    raw = (
-        w[10]
-        * d.pow(-w[11])
-        * ((s + 1.0).pow(w[12]) - 1.0)
-        * torch.exp((1.0 - r) * w[13])
+def _next_state_good(model, s, s_short, d, t):
+    """Advance the dual-trace state by one Good (rating==3) review at interval t, reusing
+    the model's own recurrence so the simulation matches the trained model exactly."""
+    rating = torch.tensor(3.0, device=s.device)
+    retr = model.forgetting_curve(t, s, s_short, d)
+    new_s = model.next_stability(s, d, retr, rating, 7)
+    r1 = model.short_component_recall(t, s_short)
+    new_s_short = model.next_stability(s_short, d, r1, rating, 15)
+    new_d = model.next_difficulty(d, rating, retr)
+    s_min = model.config.s_min
+    return (
+        new_s.clamp(s_min, _MAX_T),
+        new_s_short.clamp(s_min, _MAX_T),
+        new_d,
     )
-    return torch.minimum(s, raw)
-
-
-def _s_fail_short[ParamCount: IntVar](
-    w: torch.Tensor[[ParamCount]],
-    s: torch.Tensor[[]],
-    d: torch.Tensor[[]],
-    r: torch.Tensor[[]],
-) -> torch.Tensor[[]]:
-    raw = (
-        w[19]
-        * d.pow(-w[20])
-        * ((s + 1.0).pow(w[21]) - 1.0)
-        * torch.exp((1.0 - r) * w[22])
-    )
-    return torch.minimum(s, raw)
-
-
-def _next_s_good(w, s, d, delta_t):
-    r = _fc_R_and_dRdt(delta_t, s, w)[0]
-
-    sf_l = _s_fail_long(w, s, d, r)
-    # clamp to prevent exp() overflow when (1-r)*w[9] is large
-    si_l = 1.0 + torch.exp(w[7] - 1.5) * (11.0 - d) * s.pow(-w[8]) * (
-        torch.exp(((1.0 - r) * w[9]).clamp(max=30.0)) - 1.0
-    )
-    s_lng = torch.maximum(sf_l, s * si_l)
-
-    sf_sh = _s_fail_short(w, s, d, r)
-    si_sh = 1.0 + torch.exp(w[16] - 1.5) * (11.0 - d) * s.pow(-w[17]) * (
-        torch.exp(((1.0 - r) * w[18]).clamp(max=30.0)) - 1.0
-    )
-    s_sht = torch.maximum(sf_sh, s * si_sh)
-
-    coef = (1.0 - w[26] * torch.exp(-w[25] * delta_t)).clamp(0.0, 1.0)  # ← guard
-    return (coef * s_lng + (1.0 - coef) * s_sht).clamp(0.0001, 36_500.0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -290,33 +193,24 @@ def _next_s_good(w, s, d, delta_t):
 
 
 def fsrs7_interval_growth_penalty(
-    w,
+    model,
     *,
     n_reviews=10,
     target_dr=0.90,
-    n_newton=4,
-    target_drs=None,
+    n_newton=7,
+    target_drs=(0.99,),
 ):
-    """
-    Returns (penalty_1, penalty_2).
+    """Returns (penalty_1, penalty_2) for the dual-trace FSRS-7 ``model``.
 
-    penalty_1 – squared max interval-growth ratio for ≥1 d intervals at target_dr.
-    penalty_2 – mean short-interval penalty for sub-1 d intervals at DR 95–99 %.
+    penalty_1 – squared max interval-growth ratio for >= 1 d intervals at target_dr.
+    penalty_2 – mean short-interval penalty for sub-1 d intervals at target_drs.
     """
-    if target_drs is None:
-        target_drs = [0.95, 0.96, 0.97, 0.98, 0.99]
+    w = model.w
     try:
         p1 = _fsrs7_interval_growth_penalty_impl(
-            w, n_reviews=n_reviews, target_dr=target_dr, n_newton=n_newton
+            model, n_reviews=n_reviews, target_dr=target_dr, n_newton=n_newton
         )
-    except (
-        IndexError,
-        OverflowError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-        ZeroDivisionError,
-    ) as e1:
+    except Exception as e1:  # noqa: BLE001 -- a penalty failure must not kill training
         print(f"Error when calculating penalty 1: {e1}")
         p1 = w.new_zeros(())
     if not torch.isfinite(p1):
@@ -324,16 +218,9 @@ def fsrs7_interval_growth_penalty(
 
     try:
         p2 = _fsrs7_short_interval_penalty_impl(
-            w, n_reviews=n_reviews, n_newton=n_newton, target_drs=target_drs
+            model, n_reviews=n_reviews, n_newton=n_newton, target_drs=target_drs
         )
-    except (
-        IndexError,
-        OverflowError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-        ZeroDivisionError,
-    ) as e2:
+    except Exception as e2:  # noqa: BLE001 -- a penalty failure must not kill training
         print(f"Error when calculating penalty 2: {e2}")
         p2 = w.new_zeros(())
     if not torch.isfinite(p2):
@@ -342,16 +229,25 @@ def fsrs7_interval_growth_penalty(
     return p1, p2
 
 
-def _fsrs7_interval_growth_penalty_impl(w, *, n_reviews, target_dr, n_newton):
-    """Original body of fsrs7_interval_growth_penalty goes here verbatim."""
-    s: torch.Tensor[[]] = w[2]
-    d: torch.Tensor[[]] = _init_d(w, 3)
-    intervals: list[torch.Tensor[[]]] = []
+def _initial_good_state(model):
+    """Initial dual-trace state for a card whose first review was Good (rating==3),
+    matching FSRS7.step's first-review init."""
+    w = model.w
+    s = w[2]  # good initial long-term stability
+    s_short = 0.8 * w[2]  # short-term trace starts at 0.8 * long-term
+    d = model.init_d(3).clamp(1.0, 10.0)
+    return s, s_short, d
+
+
+def _fsrs7_interval_growth_penalty_impl(model, *, n_reviews, target_dr, n_newton):
+    w = model.w
+    s, s_short, d = _initial_good_state(model)
+    intervals: list[torch.Tensor] = []
+    _next_state = _maybe_compiled(_next_state_good, "next", model)
     for _ in range(n_reviews):
-        t = _interval_differentiable(s, w, target=target_dr, n_newton=n_newton)
+        t = _interval_differentiable(model, s, s_short, d, target_dr, n_newton)
         intervals.append(t)
-        s = _next_s_good(w, s, d, t)
-        d = _next_d_good(w, d)
+        s, s_short, d = _next_state(model, s, s_short, d, t)
     ivls = torch.stack(intervals)
     ratios = ivls[1:] / ivls[:-1]
     mask = ivls[:-1].detach() >= _ONE_DAY
@@ -360,42 +256,29 @@ def _fsrs7_interval_growth_penalty_impl(w, *, n_reviews, target_dr, n_newton):
     return ratios[mask].max() ** 2
 
 
-def _fsrs7_short_interval_penalty_impl(w, *, n_reviews, n_newton, target_drs):
-    """
-    Penalty for reviews scheduled too close together in the short-term phase.
-
-    For each target DR in {0.95, 0.96, 0.97, 0.98, 0.99}, simulate n_reviews
-    consecutive Good reviews and collect only the sub-1d intervals.
-    Let x = mean of those intervals (days).  Penalty per DR:
-
-        max(1/x, 1/c) - 1/c,   c = 600/86400 d  (10 min)
-
-    Returns the mean across DR values that produced at least one sub-1d interval.
-    Returns zero if no sub-1d intervals are found at any DR.
-    """
-    penalties: list[torch.Tensor[[]]] = []
-
+def _fsrs7_short_interval_penalty_impl(model, *, n_reviews, n_newton, target_drs):
+    """For each target DR, simulate n_reviews consecutive Good reviews and collect only
+    the sub-1d intervals. Let x = mean of those intervals (days). Penalty per DR is
+    max(1/x, 1/c) - 1/c with c = 600/86400 d (10 min); the result is the mean across the
+    DR values that produced at least one sub-1d interval (0 if none)."""
+    w = model.w
+    penalties: list[torch.Tensor] = []
     for target_dr in target_drs:
-        s: torch.Tensor[[]] = w[2]
-        d: torch.Tensor[[]] = _init_d(w, 3)
-        intervals: list[torch.Tensor[[]]] = []
-
+        s, s_short, d = _initial_good_state(model)
+        intervals: list[torch.Tensor] = []
+        _next_state = _maybe_compiled(_next_state_good, "next", model)
         for _ in range(n_reviews):
-            t = _interval_differentiable(s, w, target=target_dr, n_newton=n_newton)
+            t = _interval_differentiable(model, s, s_short, d, target_dr, n_newton)
             intervals.append(t)
-            s = _next_s_good(w, s, d, t)
-            d = _next_d_good(w, d)
-
+            s, s_short, d = _next_state(model, s, s_short, d, t)
         ivls = torch.stack(intervals)
-        mask = ivls.detach() < _ONE_DAY  # detach so mask is a plain bool tensor
+        mask = ivls.detach() < _ONE_DAY
         if not mask.any():
             continue
-
         avg_t = ivls[mask].mean().clamp(min=_MIN_T)
         inv_x = 1.0 / avg_t
         penalties.append(inv_x.clamp(min=_INV_C) - _INV_C)
 
     if not penalties:
         return w.new_zeros(())
-
     return torch.stack(penalties).mean()

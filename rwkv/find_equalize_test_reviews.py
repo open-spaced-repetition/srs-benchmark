@@ -17,7 +17,10 @@ rwkv_config = parse_toml()
 lmdb_env = None
 
 parser = create_parser()
-args, _ = parser.parse_known_args()
+# parse_args(), NOT parse_known_args(): an unrecognized flag must be a hard error,
+# because output file names are derived from the flags (a silently dropped flag
+# would write to the wrong file).
+args = parser.parse_args()
 config = Config(args)
 config.model_name = rwkv_config.ALGO
 config.include_short_term = bool(rwkv_config.SHORT)

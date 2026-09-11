@@ -38,10 +38,15 @@ from utils import (
     get_model_state,
     save_evaluation_file,
     sort_jsonl,
+    sort_jsonl_by_user_lines,
 )
 
 parser = create_parser()
-args, _ = parser.parse_known_args()
+# parse_args(), NOT parse_known_args(): an unrecognized flag must be a hard error.
+# Silently dropping one is dangerous here because the result file name is derived from
+# the flags -- a silently dropped flag would make the run append to the result file of a
+# DIFFERENT configuration, which is very hard to notice afterwards.
+args = parser.parse_args()
 config = Config(args)
 
 if config.dev_mode:
@@ -53,6 +58,27 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # pyrefly: ignore [missing-attribute]
 torch.manual_seed(config.seed)
 tqdm.pandas()
+
+# FSRS versions whose forward is a per-step recurrence that torch.compile can fuse AND
+# whose results stay bit-close under compile. --compile only applies to these (other algos
+# ignore the flag). Verified on a 50-user sample (step-compile): avg|LogLoss eager-vs-compiled|
+# is 0..7.4e-6 for all of these (FSRS-7 the worst at 7.3e-6; 0 for v1/v3) -- well within the
+# accepted 1e-5.
+# NOTE on FSRS-6: with its ORIGINAL forgetting_curve it was compile-unstable -- its
+# trainable-decay factor amplified compile's tiny FP differences through training, pushing
+# avg|d| well past the 1e-5 bar (worst-user LogLoss swings ~1e-2). Building that factor in
+# log-space with a clamped exponent (see FSRS6.forgetting_curve) tames it: under step-compile
+# avg|d| is 8e-8 (max-user 5e-6) on 50 users, both --short --recency and --short, so it's included.
+_FSRS_COMPILE_OK = {
+    "FSRS-7",
+    "FSRS-6",
+    "FSRS-5",
+    "FSRS-4.5",
+    "FSRSv4",
+    "FSRSv3",
+    "FSRSv2",
+    "FSRSv1",
+}
 
 
 class Trainer:
@@ -69,6 +95,28 @@ class Trainer:
         max_seq_len: int = 64,
     ) -> None:
         self.model = model.to(device=config.device)
+        # --compile: torch.compile the recurrence. End-to-end ~1.0-3.4x faster on CPU,
+        # depending on model complexity (FSRS-7 ~3.35x; the simpler v1-v4.5 ~1.03-1.15x),
+        # measured on 50 users -- it fuses the dispatch-bound per-step elementwise ops. NOT
+        # bit-exact vs eager, but avg|LogLoss eager-vs-compiled| is <=7.4e-6 (FSRS-7 worst; 0
+        # for v1/v3), well within the accepted 1e-5. Needs MSVC/vcvars for Inductor's C++
+        # codegen. Verified bit-close for every FSRS version with a recurrence forward (v1-v7);
+        # the per-version speedup + avg|d| table is in compile_speedup_50users.md.
+        #
+        # Compile STEP, not FORWARD: forward is a Python `for X in inputs` loop over seq_len
+        # which Dynamo UNROLLS -> one graph per seq_len -> the default recompile_limit (8) is
+        # hit within minutes on the full run -> Dynamo falls back to EAGER (no speedup). step()
+        # has a fixed structure (no seq_len) -> one stable graph, reused for every length ->
+        # no thrashing. Measured: forward-compile = 8 graphs then eager; step-compile = 1 graph,
+        # ~6.9x on the isolated fwd+bwd. (Set SRSB_COMPILE_FORWARD to force the old forward
+        # path; default is step.)
+        if config.use_compile and config.model_name in _FSRS_COMPILE_OK:
+            if os.environ.get("SRSB_COMPILE_FORWARD"):
+                # pyrefly: ignore [missing-attribute]
+                self.model.forward = torch.compile(self.model.forward, dynamic=True)
+            else:
+                # pyrefly: ignore [missing-attribute]
+                self.model.step = torch.compile(self.model.step, dynamic=True)
         self.model.initialize_parameters(train_set)
 
         self.batch_size = getattr(self.model, "batch_size", batch_size)
@@ -119,11 +167,19 @@ class Trainer:
         best_w = get_model_state(self.model)  # initialize to current weights
         epoch_len = len(self.train_set.y_train)
 
+        # FSRS-7 keeps the parameters after the final epoch (no per-epoch eval-based
+        # checkpoint selection). All other models keep the best-eval-loss checkpoint.
+        # Skipping eval does not change the training trajectory: eval() iterates with
+        # shuffle=False (no generator draw) and never touches the optimizer/scheduler,
+        # so the BatchLoader RNG sequence and weight updates are identical either way.
+        keep_final_epoch = config.model_name == "FSRS-7"
+
         for k in range(self.n_epoch):
-            weighted_loss, w = self.eval()
-            if weighted_loss < best_loss:
-                best_loss = weighted_loss
-                best_w = w
+            if not keep_final_epoch:
+                weighted_loss, w = self.eval()
+                if weighted_loss < best_loss:
+                    best_loss = weighted_loss
+                    best_w = w
 
             for i, batch in enumerate(self.train_data_loader):
                 self.model.train()
@@ -145,6 +201,10 @@ class Trainer:
 
                 # Apply model-specific parameter constraints (clipper)
                 self.model.apply_parameter_clipper()
+
+        if keep_final_epoch:
+            # Keep the parameters as they are after the final epoch of training.
+            return get_model_state(self.model)
 
         weighted_loss, w = self.eval()
         if weighted_loss < best_loss:
@@ -228,14 +288,14 @@ def _configure_process_device(device_id: int | None) -> None:
     config.device = torch.device(f"cuda:{device_id}")
     if config.model_name == "LSTM":
         try:
-            import reptile_trainer
+            from reptile import reptile_trainer
 
             reptile_trainer.DEVICE = config.device
         except ImportError:
             pass
     elif config.model_name == "GRU":
         try:
-            import reptile_trainer_gru
+            from reptile import reptile_trainer_gru
 
             reptile_trainer_gru.DEVICE = config.device
         except ImportError:
@@ -274,8 +334,15 @@ def _is_deck_or_preset_partition_mode() -> bool:
 def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if config.use_recency_weighting:
-        x = np.linspace(0, 1, len(out))
-        out["weights"] = 0.25 + 0.75 * np.power(x, 3)
+        if config.model_name == "FSRS-7":
+            # Finished FSRS-7 recency weighting (Rust recency_weighted_fsrs_items):
+            # C0 + (1 - C0) * (idx/n)^EXP, idx 0-based, denominator n (NOT n-1).
+            n = max(len(out), 1)
+            x = np.arange(len(out)) / n
+            out["weights"] = 0.0667 + 0.9333 * np.power(x, 11.25)
+        else:
+            x = np.linspace(0, 1, len(out))
+            out["weights"] = 0.25 + 0.75 * np.power(x, 3)
     return out
 
 
@@ -290,7 +357,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         return get_model_state(model)
 
     if config.model_name == "LSTM":
-        from reptile_trainer import finetune, get_inner_opt
+        from reptile.reptile_trainer import finetune, get_inner_opt
 
         model = model.to(config.device)
         inner_opt = get_inner_opt(
@@ -309,7 +376,7 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
             torch.mps.empty_cache()
         return weights
     elif config.model_name == "GRU":
-        from reptile_trainer_gru import finetune, get_inner_opt
+        from reptile.reptile_trainer_gru import finetune, get_inner_opt
 
         model = model.to(config.device)
         inner_opt = get_inner_opt(
@@ -342,7 +409,10 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
 
 
 @catch_exceptions
-def process(user_id: int, device_id: int | None = None) -> tuple[dict, dict | None]:
+# `raw` is a pre-serialized JSON *string* (see the note in utils.evaluate): the heavy
+# json.dumps is done in the worker, not the serial collector, so what comes back is a
+# ready line rather than a dict.
+def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | None]:
     """Main processing function for all models."""
     plt.close("all")
     _configure_process_device(device_id)
@@ -370,7 +440,6 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, dict | No
     w_list = []
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
-
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         if not config.train_equals_test:
             train_set = dataset.iloc[train_index]
@@ -522,7 +591,7 @@ if __name__ == "__main__":
         processed_user = set()
 
     if config.save_raw_output and raw_file.exists():
-        sort_jsonl(raw_file)
+        sort_jsonl_by_user_lines(raw_file)
 
     for user_id in dataset.partitioning.dictionaries[0]:
         user_id_value = user_id.as_py()
@@ -579,10 +648,19 @@ if __name__ == "__main__":
             )
             for idx, user_id in enumerate(unprocessed_users)
         ]
+        n_users = len(futures)
+        # A Future keeps its worker's return value alive for good (`future.result()` only
+        # reads `_result`, it never clears it), so holding on to the full `futures` list
+        # would pin every user's payload in RAM until this block exits -- negligible for
+        # plain stats (~0.5 KB/user) but ~3.6 GB on a --raw run. as_completed() keeps its
+        # own set and drops each reference as it yields, so dropping our list is enough.
+        # Safe: the generator's frame still holds the list until its first next() copies it.
+        completed = as_completed(futures)
+        del futures
         for future in (
             pbar := tqdm(
-                as_completed(futures),
-                total=len(futures),
+                completed,
+                total=n_users,
                 smoothing=0.03,
                 # Disable the progress bar when output isn't a real terminal
                 # (e.g. captured/redirected) so the \r-driven bar doesn't flood logs.
@@ -598,8 +676,10 @@ if __name__ == "__main__":
                     with open(result_file, "a", encoding="utf-8", newline="\n") as f:
                         f.write(json.dumps(stats, ensure_ascii=False) + "\n")
                     if raw:
+                        # raw is already a JSON string (pre-serialized in the worker, see
+                        # utils.evaluate) -> write verbatim, no serial json.dumps here.
                         with open(raw_file, "a", encoding="utf-8", newline="\n") as f:
-                            f.write(json.dumps(raw, ensure_ascii=False) + "\n")
+                            f.write(raw + "\n")
                     pbar.set_description(f"Processed {stats['user']}")
             except Exception as e:  # noqa: BLE001 -- report failures from worker futures
                 tqdm.write(str(e))
@@ -613,4 +693,4 @@ if __name__ == "__main__":
 
     sort_jsonl(result_file)
     if config.save_raw_output:
-        sort_jsonl(raw_file)
+        sort_jsonl_by_user_lines(raw_file)

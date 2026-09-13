@@ -1,4 +1,4 @@
-"""SBD: a 7-parameter memory model.
+"""SBD (Stability, Brittleness, Difficulty): a 7-parameter memory model.
 
 Ported from andersschill/memory-model-benchmark-for-spaced-repetition (models/sbd.py).
 The recurrence below copies the original's operations line for line (same safe log/exp,
@@ -92,6 +92,7 @@ class SBD(BaseModel):
         log_rho = self._ladder()[2]
         log_age = _safe_log(t.clamp(min=0.0)) / root
         log_b = 2 * self.w[5] / root - grade_index * log_rho
+        # pyrefly: ignore [missing-attribute]
         log_a = torch.logaddexp(log_age, 0.5 * (log_b + log_s))
         log_base = F.softplus(log_a - log_s)
         return _safe_exp(-self._shape(n) * log_base).clamp(1e-6, 1 - 1e-6)
@@ -104,6 +105,7 @@ class SBD(BaseModel):
         s_pass = s * _safe_exp(-_safe_log(r) / self._shape(n))
         s_fail = s * _safe_exp(self.w[4].clamp(min=0.0) * _safe_log(1.0 - r))
         s_n = is_pass * s_pass + (1.0 - is_pass) * s_fail
+        # pyrefly: ignore [missing-attribute]
         log_s_n = torch.nan_to_num(_safe_log(s_n), nan=0.0).clamp(LOG_S_MIN, LOG_S_MAX)
         n_n = (n + ((3.0 - rating) / 2.0).clamp(min=0.0)).clamp(0.0, 50.0)
         return torch.stack([log_s_n, rating - 1, n_n], dim=-1)
@@ -136,6 +138,7 @@ class SBD(BaseModel):
             seq_lens - 1, torch.arange(real_batch_size, device=states.device)
         ]
         p = self._retr(delta_ts, final[:, 0], final[:, 1], final[:, 2])
+        # pyrefly: ignore [missing-attribute]
         p = torch.nan_to_num(p, nan=0.5).clamp(1e-6, 1 - 1e-6)
         return {"retentions": p, "stabilities": _safe_exp(final[:, 0])}
 
@@ -165,7 +168,7 @@ class SBD(BaseModel):
         denom = sum(float(b[4].sum()) for b in batches)
 
         def objective() -> Tensor:
-            total = self.w.new_zeros(())
+            total = 0.0  # becomes a tensor after the first batch, as in the original
             for sequences, delta_ts, labels, seq_lens, weights in batches:
                 p = self.batch_process(sequences, delta_ts, seq_lens, seq_lens.shape[0])
                 p = p["retentions"]
@@ -196,14 +199,14 @@ class SBD(BaseModel):
 
         self.train()
         with torch.no_grad():
-            start = float(objective())
+            start = objective().item()
         try:
             optimizer.step(closure)
         except RuntimeError:
             final = float("nan")
         else:
             with torch.no_grad():
-                final = float(objective())
+                final = objective().item()
         if not math.isfinite(final) or final > start:
             with torch.no_grad():
                 self.w.copy_(anchor)

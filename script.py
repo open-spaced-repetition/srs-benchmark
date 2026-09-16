@@ -637,6 +637,18 @@ if __name__ == "__main__":
     # wall time of the parallel compute block (per-user work + scheduling, incl. LPT).
     # stderr-only; never touches outputs -> bit-for-bit correctness-neutral.
     _srsb_t0 = time.perf_counter() if os.environ.get("SRSB_TIMING") == "1" else None
+
+    # CPU-only algorithms never use the GPU (config.py puts only the neural models on
+    # CUDA), but torch.compile probes the GPU during setup, so with --compile every worker
+    # creates a CUDA context and holds VRAM for nothing. Hide the GPU from the workers.
+    # This must be set here, in the parent: spawned workers re-import this module and call
+    # torch.cuda.is_available() in Config() before any worker-side code runs, and CUDA
+    # reads this variable only once, when it initialises. Outputs are unaffected -- the
+    # device is "cpu" either way.
+    # pyrefly: ignore [missing-attribute]
+    if config.device.type == "cpu":
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
     with ProcessPoolExecutor(max_workers=config.num_processes) as executor:
         futures = [
             executor.submit(

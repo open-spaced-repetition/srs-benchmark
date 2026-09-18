@@ -334,7 +334,8 @@ def _is_deck_or_preset_partition_mode() -> bool:
 def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     if config.use_recency_weighting:
-        if config.model_name == "FSRS-7":
+        # SBD's original uses the identical formula (recency_floor 0.0667, power 11.25)
+        if config.model_name in ("FSRS-7", "SBD"):
             # Finished FSRS-7 recency weighting (Rust recency_weighted_fsrs_items):
             # C0 + (1 - C0) * (idx/n)^EXP, idx 0-based, denominator n (NOT n-1).
             n = max(len(out), 1)
@@ -396,6 +397,10 @@ def _fit_trainable_weights(train_df: pd.DataFrame) -> Any:
         return weights
     elif config.model_name == "LogisticRegression":
         return cast(Any, model).optimize(train_df)
+    elif config.model_name == "SBD":
+        # SBD trains as in its original implementation: full-batch L-BFGS from its
+        # pretrained defaults with an L2 pull toward them (models/sbd.py), not Adam.
+        return cast(Any, model).fit(train_df)
 
     trainer = Trainer(
         model=model,

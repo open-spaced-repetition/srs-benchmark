@@ -42,6 +42,7 @@ if __name__ == "__main__":
             "LSTM-short-secs-duration",
             "GRU-short-secs",
             "FSRS-7-short-secs-recency",
+            "SBD-short-secs-recency",
             "LogisticRegression-short-secs-recency",
             "MOVING-AVG-short-secs",
             "DASH-short-secs",
@@ -59,6 +60,7 @@ if __name__ == "__main__":
             "GRU-short-secs-equalize_test_with_non_secs",
             "LSTM-short-secs-duration-equalize_test_with_non_secs",
             "FSRS-7-short-secs-recency-equalize_test_with_non_secs",
+            "SBD-short-secs-recency-equalize_test_with_non_secs",
             "LogisticRegression-short-secs-recency-equalize_test_with_non_secs",
             "FSRS-6-short-recency",
             "MOVING-AVG",
@@ -163,6 +165,7 @@ if __name__ == "__main__":
     models[index_FSRS_7_recency] = "FSRS-7\nrecency"
     models[index_FSRS_6] = "FSRS-6\nrecency"
     models[index_LogReg] = "Logistic Regression\nrecency"
+    models[models.index("SBD-recency")] = "SBD"
 
     index_rwkv_p = models.index("RWKV-P")
     index_rwkv = models.index("RWKV")

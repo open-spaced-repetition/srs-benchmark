@@ -59,6 +59,7 @@ Log Loss and RMSE (bins) measure calibration: how well predicted probabilities o
 - Alternative models of memory:
     - DASH: the algorithm proposed in [this paper](https://scholar.colorado.edu/concern/graduate_thesis_or_dissertations/zp38wc97m). The name stands for Difficulty, Ability, and Study History. In our benchmark, we only use the Ability and Study History because the Difficulty part is not applicable to our dataset. We also added two other variants of this algorithm: DASH[MCM] and DASH[ACT-R]. For further information, please refer to [this paper](https://www.politesi.polimi.it/retrieve/b39227dd-0963-40f2-a44b-624f205cb224/2022_4_Randazzo_01.pdf).
     - ACT-R: the algorithm proposed in [this paper](http://act-r.psy.cmu.edu/wordpress/wp-content/themes/ACT-R/workshops/2003/proceedings/46.pdf). It includes an activation-based system of declarative memory. It explains the spacing effect by the activation of memory traces.
+    - SBD (Stability, Brittleness, Difficulty): a 7-parameter algorithm designed to be interpretable and parsimonious. Unlike other algorithms in this benchmark, it's optimized using L-BFGS, not Adam. More details can be found in [the corresponding paper](https://doi.org/10.5281/zenodo.22727105).
 
 - Neural networks:
     - GRU: a type of recurrent neural network that's often used for making predictions based on a sequence of data. It's a classic in the field of machine learning for time-related tasks. It uses a mixed power forgetting curve similar to FSRS-7. It is trained using the [Reptile algorithm](https://openai.com/index/reptile/). First, it is pre-trained on 100 users to obtain reasonable starting parameters. Then it is optimized on each user individually.
@@ -110,6 +111,7 @@ For the sake of brevity, the following abbreviations are used in the "Input feat
 | FSRS-7 sched. penalties | 34 | 0.3400±0.0042 | 0.0635±0.0011 | 0.7171±0.0022 | FIL, G, SR |
 | FSRS-7 | 34 | 0.3401±0.0043 | 0.0634±0.0011 | 0.7167±0.0022 | FIL, G, SR |
 | FSRS-7 preset | 34 | 0.3401±0.0042 | 0.0630±0.0011 | 0.7175±0.0022 | FIL, G, SR |
+| SBD | 7 | 0.3410±0.0042 | 0.06018±0.00097 | 0.7152±0.0021 | FIL, G, SR |
 | FSRS-rs | 21 | 0.3443±0.0042 | 0.0635±0.0010 | 0.7074±0.0022 | IL, G, SR |
 | FSRS-6 | 21 | 0.3460±0.0042 | 0.0653±0.0011 | 0.7034±0.0023 | IL, G, SR |
 | FSRS-7 deck | 34 | 0.3489±0.0044 | 0.0719±0.0013 | 0.7104±0.0022 | FIL, G, SR |
@@ -151,6 +153,7 @@ Same-day reviews are used for evaluation. Here the probability of recall is calc
 | FSRS-7 | 34 | 0.3206±0.0040 | 0.06148±0.00085 | 0.7475±0.0018 | FIL, G, SR |
 | FSRS-7 preset | 34 | 0.3206±0.0040 | 0.06085±0.00085 | 0.7476±0.0019 | FIL, G, SR |
 | FSRS-7 sched. penalties | 34 | 0.3207±0.0040 | 0.06188±0.00084 | 0.7477±0.0018 | FIL, G, SR |
+| SBD | 7 | 0.3218±0.0040 | 0.05862±0.00083 | 0.7445±0.0018 | FIL, G, SR |
 | FSRS-7 deck | 34 | 0.3276±0.0041 | 0.0694±0.0010 | 0.7386±0.0019 | FIL, G, SR |
 | MOVING-AVG | 0 | 0.3301±0.0043 | 0.0789±0.0010 | 0.7077±0.0024 | --- |
 | FSRS-7 default param. | 0 | 0.3399±0.0040 | 0.0895±0.0010 | 0.7283±0.0019 | FIL, G, SR |

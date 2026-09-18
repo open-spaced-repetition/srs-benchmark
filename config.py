@@ -40,6 +40,7 @@ ModelName = Literal[
     "MOVING-AVG",
     "90%",
     "LogisticRegression",
+    "SBD",
 ]
 
 

@@ -37,6 +37,7 @@ FEATURE_ENGINEER_REGISTRY: dict[ModelName, type[BaseFeatureEngineer]] = {
     "SM2-trainable": FSRSFeatureEngineer,
     "Anki": FSRSFeatureEngineer,
     "90%": FSRSFeatureEngineer,
+    "SBD": FSRSFeatureEngineer,
     # Specialized models
     "LogisticRegression": LogisticRegressionEngineer,
     "GRU": LSTMFeatureEngineer,

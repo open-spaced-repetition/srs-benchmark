@@ -318,22 +318,22 @@ def get_rwkv_data(data_path, user_id, equalize_review_ths=None):
 
 
 @dataclass
-class ModuleData[SeqLen: IntVar]:
-    split_len: np.ndarray
-    split_B: np.ndarray
+class ModuleData[SeqLen: IntVar, SplitCount: IntVar]:
+    split_len: np.ndarray[[SplitCount], np.dtype[np.int32]]
+    split_B: np.ndarray[[SplitCount], np.dtype[np.int32]]
     from_perm: torch.Tensor[[SeqLen]]
     to_perm: torch.Tensor[[SeqLen]]  # the inverse of from_perm
 
 
 @dataclass
-class RWKVSample[SeqLen: IntVar, CardFeatureCount: IntVar]:
+class RWKVSample[SeqLen: IntVar, CardFeatureCount: IntVar, SplitCount: IntVar]:
     user_id: int
     start_th: int
     end_th: int
     length: int
     card_features: torch.Tensor[[SeqLen, CardFeatureCount]]
     ids: dict[str, torch.Tensor[[SeqLen]]]
-    modules: dict[str, ModuleData[SeqLen]]
+    modules: dict[str, ModuleData[SeqLen, SplitCount]]
     global_labels: torch.Tensor[[SeqLen, 7]]
     review_ths: torch.Tensor[[SeqLen]]
     label_review_ths: torch.Tensor[[SeqLen]]

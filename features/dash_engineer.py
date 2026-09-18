@@ -33,7 +33,7 @@ class DashFeatureEngineer(BaseFeatureEngineer):
 
     def _dash_tw_features(
         self, r_history: list, t_history: list, enable_decay: bool = False
-    ) -> np.ndarray:
+    ) -> np.ndarray[[8], np.dtype[np.float64]]:
         """
         Create DASH time window features
 
@@ -45,7 +45,10 @@ class DashFeatureEngineer(BaseFeatureEngineer):
         Returns:
             Feature vector of length 8
         """
-        features = np.zeros(8)
+        features = cast(
+            "np.ndarray[[8], np.dtype[np.float64]]",
+            np.zeros(8),
+        )
         r_history_binary = np.array(r_history) > 1  # Convert to binary success/failure
         tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426])  # Decay constants
         time_windows = np.array([1, 7, 30, np.inf])  # Time windows in days

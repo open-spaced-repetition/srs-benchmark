@@ -195,6 +195,11 @@ if __name__ == "__main__":
                 "FIL, G, SR",
             ),
             ("FSRS-7-short-secs-recency-equalize_test_with_non_secs", 34, "FIL, G, SR"),
+            (
+                "SBD-short-secs-recency-equalize_test_with_non_secs",
+                7,
+                "FIL, G, SR",
+            ),
             ("FSRS-7-short-secs-equalize_test_with_non_secs", 34, "FIL, G, SR"),
             (
                 "FSRS-7-sched_penalties-short-secs-equalize_test_with_non_secs",
@@ -257,6 +262,7 @@ if __name__ == "__main__":
             ("LogisticRegression-short-secs-recency", 34, "IL, FIL, G, SR"),
             ("FSRS-7-short-secs-recency-100epochs", 34, "FIL, G, SR"),
             ("FSRS-7-short-secs-recency", 34, "FIL, G, SR"),
+            ("SBD-short-secs-recency", 7, "FIL, G, SR"),
             ("FSRS-7-sched_penalties-short-secs-recency", 34, "FIL, G, SR"),
             ("FSRS-7-short-secs", 34, "FIL, G, SR"),
             ("FSRS-7-sched_penalties-short-secs", 34, "FIL, G, SR"),
@@ -303,6 +309,8 @@ if __name__ == "__main__":
     # basename, which is kept as-is for loading result/<name>.jsonl. E.g. the two RWKV
     # readout modes: "RWKV" = forgetting-curve prediction, "RWKV-P" = immediate prediction.
     display_name_overrides = {
+        "SBD-short-secs-recency-equalize_test_with_non_secs": "SBD",
+        "SBD-short-secs-recency": "SBD",
         "RWKV": "RWKV-Curve",
         "RWKV-short-secs": "RWKV-Curve",
         "RWKV-P": "RWKV-Instant",

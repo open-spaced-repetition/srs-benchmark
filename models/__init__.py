@@ -20,6 +20,7 @@ from .logistic_regression import LogisticRegression
 from .lstm import LSTM
 from .nn_17 import NN_17
 from .rnn import RNN
+from .sbd import SBD
 from .sm2_trainable import SM2
 
 # Import Protocol for type checking
@@ -43,6 +44,7 @@ __all__ = [
     "LSTM",
     "NN_17",
     "RNN",
+    "SBD",
     "SM2",
     "Anki",
     "ConstantModel",

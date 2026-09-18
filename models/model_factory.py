@@ -25,6 +25,7 @@ MODEL_REGISTRY: dict[ModelName, Any] = {
     "RNN": RNN,
     "GRU": GRU,
     "LogisticRegression": LogisticRegression,
+    "SBD": SBD,
     "LSTM": LSTM,
     "Transformer": Transformer,
     "NN-17": NN_17,

@@ -27,7 +27,7 @@ jobs:
 
       - name: tyck
         run: |
-          uv add pyrefly==1.4.0.dev3 --dev
+          uv add pyrefly==1.4.0.dev4 --dev
           uv run pyrefly check
 
       # Update output format to enable automatic inline annotations.

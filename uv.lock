@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "(python_full_version >= '3.14' and sys_platform == 'linux') or (python_full_version >= '3.14' and sys_platform == 'win32')",
@@ -1446,24 +1446,40 @@ wheels = [
 ]
 
 [[package]]
-name = "pyrefly-shape-extensions"
-version = "1.2.0"
+name = "pyrefly-numpy-stubs"
+version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/56/5a/ef911e82768bf08568c8559fdb8602dd55e681de5fdec1af9d6e5e04085c/pyrefly_shape_extensions-1.2.0.tar.gz", hash = "sha256:45d5dc674e46d1b93b308bff34a9dc12c3b3d0ecd89cd78ca1831cf0b202df1a", size = 5586, upload-time = "2026-08-01T02:00:02.002Z" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pyrefly-shape-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0c/7d/f68a420d3a11ad74f8786f85224052146bc15f6ff67c627b99f62a38c2f3/pyrefly_numpy_stubs-1.4.0.tar.gz", hash = "sha256:b9238bcf8027a6e300febf1b421e6fab518f214695c88b1595c42cc37fa39f6b", size = 16290, upload-time = "2026-10-15T16:35:15.849Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/3e/be7e66763aa5f1762191a5c0d0d1966b4c9ef99e035e8e77547f0ebba8c8/pyrefly_shape_extensions-1.2.0-py3-none-any.whl", hash = "sha256:29f0a122cec918d3fa19cb189a8c062b7bcfa65933ca5d500ddae321e9c3c5d9", size = 7550, upload-time = "2026-08-01T01:59:59.463Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/11/53f5b24560b04aa2407d8c1b8b286d65ce55268666b83d4663a44fde18d3/pyrefly_numpy_stubs-1.4.0-py3-none-any.whl", hash = "sha256:a0c9ab467f1885cc5e17ea2994965c4c2bbd8af8a24443a09e5a2394cd8ab1ce", size = 18735, upload-time = "2026-10-15T16:35:09.184Z" },
+]
+
+[[package]]
+name = "pyrefly-shape-extensions"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/51/d2845fc038b550404326ed2144d8deef6d13240db51e09d19762a472cf40/pyrefly_shape_extensions-1.4.0.tar.gz", hash = "sha256:5c3d96b04cd55c23a19265fce35ed69de623d69bfaeb2dc17ff15d2d160a637d", size = 14731, upload-time = "2026-10-15T16:35:16.819Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/ad/42b2761c56f7e4cb671d6daa301a1dbe7d49c442be1c2cd76c181d9198fc/pyrefly_shape_extensions-1.4.0-py3-none-any.whl", hash = "sha256:ced2aeeadc21e076bfdb3a223faee696a04cc013a8dc2f644a234f19b0e0bea3", size = 17557, upload-time = "2026-10-15T16:35:10.554Z" },
 ]
 
 [[package]]
 name = "pyrefly-torch-stubs"
-version = "1.2.0"
+version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyrefly-shape-extensions" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32'" },
+    { name = "torch", version = "2.13.0+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" }, marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/b6/40642ace125e6baf85317e42218b1a27daa09190692c0d9ec68801788c75/pyrefly_torch_stubs-1.2.0.tar.gz", hash = "sha256:2a1c3ab09570a54d778427198dc9916b767ebbee1c9868a63056471b9de92727", size = 32694, upload-time = "2026-08-01T02:00:03.125Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/84/2e26a7d24644ec8b6c7ee40d96acd53c3db334444fe4f0c595dc680fdfb0/pyrefly_torch_stubs-1.4.0.tar.gz", hash = "sha256:e595ffe201d26edc13889ff5481abae31ada0fe344554cad24e264bbfd5e50bf", size = 68493, upload-time = "2026-10-15T16:35:17.894Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/d8/9598931eab565eac2766519b1d6204cb40514607c576eee13c080e4687d9/pyrefly_torch_stubs-1.2.0-py3-none-any.whl", hash = "sha256:091a8618b5b982a258b55105f40a3040183e57e69a4d21014c21ba4688a728d7", size = 40719, upload-time = "2026-08-01T02:00:00.812Z" },
+    { url = "https://files.pythonhosted.org/packages/04/93/ddef006313480225721d9714317e45adcc8c4b3940476fb84b2d125e2a2a/pyrefly_torch_stubs-1.4.0-py3-none-any.whl", hash = "sha256:6cdf05f2265cea671ea40d614e2e94028cc30cdb699ab4419c14c78402db688b", size = 77628, upload-time = "2026-10-15T16:35:11.91Z" },
 ]
 
 [[package]]
@@ -1784,6 +1800,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pandas-stubs" },
+    { name = "pyrefly-numpy-stubs" },
     { name = "pyrefly-torch-stubs" },
     { name = "pytest" },
     { name = "ruff" },
@@ -1819,7 +1836,8 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "pandas-stubs", specifier = ">=3.0.0.260204" },
-    { name = "pyrefly-torch-stubs", specifier = ">=1.2.0" },
+    { name = "pyrefly-numpy-stubs", specifier = "==1.4.0" },
+    { name = "pyrefly-torch-stubs", specifier = "==1.4.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.16.1" },
     { name = "scipy-stubs", specifier = ">=1.17.1.5" },

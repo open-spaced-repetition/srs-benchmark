@@ -67,8 +67,7 @@ class FSRS6(FSRS5):
         0.0658,
         0.1542,
     ]
-    # pyrefly: ignore [bad-override-mutable-attribute]
-    default_params_stddev_tensor = torch.tensor(
+    default_params_stddev_tensor: ClassVar[Tensor[[int]]] = torch.tensor(
         [
             6.43,
             9.66,

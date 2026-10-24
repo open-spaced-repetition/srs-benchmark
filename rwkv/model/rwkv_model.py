@@ -332,9 +332,9 @@ class RWKV7TimeMixer(ModuleType):
         )
 
         rkvdag_8BTC = torch.lerp(
-            # pyrefly: ignore [bad-argument-type]
             x_BTC.unsqueeze(0),
             x_shift_BTC.unsqueeze(0),
+            # pyrefly: ignore [bad-argument-type]
             self.rkvdag_lerp,
         )
         r_BTC, k_BTC, v_BTC, d_BTC, a_BTC, g_BTC, k_scale_BTC, v_scale_BTC = (

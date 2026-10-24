@@ -28,7 +28,7 @@ class RNNWrapper(nn.Module):
         return outputs
 
 
-class LSTM[NormalizationDims: IntVar](BaseModel):
+class LSTM(BaseModel):
     """
     This model is trained with reptile/reptile_trainer.py (python -m reptile.reptile_trainer), and was run with the flags
     ['--short', '--secs', '--equalize_test_with_non_secs' '--processes 2']
@@ -47,15 +47,16 @@ class LSTM[NormalizationDims: IntVar](BaseModel):
     The effect on the resulting metrics is minor, but future work should be done to remove this influence.
     """
 
-    input_mean: Tensor[[]] | Tensor[[NormalizationDims]]
-    input_std: Tensor[[]] | Tensor[[NormalizationDims]]
+    # The duration feature selects the normalization width at runtime.
+    input_mean: Tensor[[]] | Tensor[[int]]
+    input_std: Tensor[[]] | Tensor[[int]]
 
     def __init__(
         self,
         config: Config,
         state_dict=None,
-        input_mean: Tensor[[]] | Tensor[[NormalizationDims]] | None = None,
-        input_std: Tensor[[]] | Tensor[[NormalizationDims]] | None = None,
+        input_mean: Tensor[[]] | Tensor[[int]] | None = None,
+        input_std: Tensor[[]] | Tensor[[int]] | None = None,
     ):
         super().__init__(config)
         if input_mean is None:
@@ -142,7 +143,11 @@ class LSTM[NormalizationDims: IntVar](BaseModel):
             except FileNotFoundError:
                 pass
 
-    def set_normalization_params(self, mean_i: Tensor, std_i: Tensor):
+    def set_normalization_params(
+        self,
+        mean_i: Tensor[[]] | Tensor[[int]],
+        std_i: Tensor[[]] | Tensor[[int]],
+    ) -> None:
         self.register_buffer("input_mean", mean_i)
         self.register_buffer("input_std", std_i)
 
@@ -167,7 +172,6 @@ class LSTM[NormalizationDims: IntVar](BaseModel):
         else:
             x_main = x_delay
 
-        # pyrefly: ignore [unsupported-operation]
         x_main = (x_main - self.input_mean) / self.input_std
 
         x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))

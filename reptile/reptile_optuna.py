@@ -96,6 +96,7 @@ def objective(trial, df_list, model, inner_opt_state):
             )
             with torch.no_grad():
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
+                # pyrefly: ignore [missing-attribute]
                 all_test_loss += test_split_loss.item()
                 all_test_n += len(test_set)
 

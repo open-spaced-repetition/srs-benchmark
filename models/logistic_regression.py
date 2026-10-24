@@ -90,9 +90,14 @@ def create_features(df: pd.DataFrame):
     # --- cumsum counts (group-aware) ---
     df["_same_day"] = same_day
     df["_non_same_day"] = 1 - same_day
+    # NumPy and pandas stub compatibility: https://github.com/facebook/pyrefly/issues/5356
+    # pyrefly: ignore [unsupported-operation]
     df["_sd_fail"] = same_day * not_first * fail
+    # pyrefly: ignore [unsupported-operation]
     df["_nsd_fail"] = (1 - same_day) * not_first * fail
+    # pyrefly: ignore [unsupported-operation]
     df["_sd_pass"] = same_day * not_first * success
+    # pyrefly: ignore [unsupported-operation]
     df["_nsd_pass"] = (1 - same_day) * not_first * success
     df["_pass"] = success
 
@@ -132,7 +137,9 @@ def create_features(df: pd.DataFrame):
             rating_onehot[:, 0],
             rating_onehot[:, 1],
             rating_onehot[:, 2],
+            # pyrefly: ignore [unsupported-operation]
             is_hard * is_first,
+            # pyrefly: ignore [unsupported-operation]
             better_than_hard * is_first,
             np.log1p(num_same_day_fail),
             np.log1p(num_nsd_pass * (1 - label_is_same_day)),

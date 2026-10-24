@@ -202,6 +202,8 @@ def cross_comparison(revlogs, algoA, algoB, graph=False):
         ax.set_xlabel("Predicted R")
         ax.set_ylabel("B-W Metric")
         ax.set_xlim(0, 1)
+        # NumPy arange overloads: https://github.com/facebook/pyrefly/issues/5355
+        # pyrefly: ignore [bad-argument-count]
         ax.set_xticks(np.arange(0, 1.1, 0.1))
         fig.show()
     return universal_metric_list
@@ -421,11 +423,17 @@ def evaluate(y, p, df, file_name, user_id, config: Config, w_list=None):
             "RMSE": round(rmse_raw, 6),
             "LogLoss": round(logloss, 6),
             "RMSE(bins)": round(rmse_bins, 6),
+            # pyrefly: ignore [no-matching-overload]
             "smECE": round(smECE, 6),
             "AUC": auc,
+            # pyrefly: ignore [no-matching-overload]
             "precision@90": round(precision_90, 6),
+            # pyrefly: ignore [no-matching-overload]
             "recall@90": round(recall_90, 6),
+            # NumPy scalar reduction results: https://github.com/facebook/pyrefly/issues/5358
+            # pyrefly: ignore [no-matching-overload]
             "ICI": round(ici, 6),
+            # pyrefly: ignore [no-matching-overload]
             "MBE": round(mbe, 6),
         },
         "user": int(user_id),

@@ -167,6 +167,7 @@ class LSTM[NormalizationDims: IntVar](BaseModel):
         else:
             x_main = x_delay
 
+        # pyrefly: ignore [unsupported-operation]
         x_main = (x_main - self.input_mean) / self.input_std
 
         x_rating = torch.maximum(x_rating, torch.ones_like(x_rating))

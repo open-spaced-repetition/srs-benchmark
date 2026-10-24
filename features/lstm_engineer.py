@@ -83,6 +83,8 @@ class LSTMFeatureEngineer(BaseFeatureEngineer):
                 accumulate(
                     rows,
                     lambda x, y: torch.cat((x, y.unsqueeze(0))),
+                    # torch.empty requires_grad: https://github.com/facebook/pyrefly/issues/5359
+                    # pyrefly: ignore [no-matching-overload]
                     initial=torch.empty(
                         (0, len(features)), dtype=torch.float32, requires_grad=False
                     ),

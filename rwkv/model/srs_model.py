@@ -458,6 +458,8 @@ class SrsRWKV(ModuleType):
             if not is_excluded(name):
                 if dtype == torch.bfloat16:
                     module = module.to(dtype)
+                # torch.half dtype alias: https://github.com/facebook/pyrefly/issues/5361
+                # pyrefly: ignore [missing-attribute]
                 elif dtype == torch.half:
                     raise ValueError("not tested.")
                 elif dtype == torch.float32:

@@ -234,6 +234,7 @@ def objective(trial, df_list, model, inner_opt_state):
             df.copy().sample(frac=1, random_state=2030),
             BATCH_SIZE,
             max_seq_len=MAX_SEQ_LEN,
+            # pyrefly: ignore [bad-argument-type]
             device=DEVICE,
         )
         task_batchloaders.append(BatchLoader(task_dataset, shuffle=True))
@@ -269,9 +270,12 @@ def objective(trial, df_list, model, inner_opt_state):
         start_outer_it = ckpt["outer_it"] + 1
         print(
             f"Trial {trial.number}: resumed from step {start_outer_it - 1}"
+            # pyrefly: ignore [missing-attribute]
             f" ({old_ckpt_path.name})"
         )
+        # pyrefly: ignore [missing-attribute]
         if old_ckpt_path.name != f"trial_{trial.number}.pt":
+            # pyrefly: ignore [missing-attribute]
             old_ckpt_path.unlink(missing_ok=True)
 
     ckpt_path = CHECKPOINT_DIR / f"trial_{trial.number}.pt"
@@ -378,6 +382,7 @@ def objective(trial, df_list, model, inner_opt_state):
             finetuned_model.eval()
             with torch.no_grad():
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
+                # pyrefly: ignore [missing-attribute]
                 all_test_loss += test_split_loss.item()
                 all_test_n += len(test_set)
 
@@ -503,6 +508,7 @@ def main():
 
     # Run only the remaining trials so a resume tops the study up to the target
     # rather than running a fresh 100 each launch.
+    # pyrefly: ignore [missing-import]
     from optuna.trial import TrialState
 
     # Capped at 40 (was 100): the first 11 trials never beat the enqueued baseline

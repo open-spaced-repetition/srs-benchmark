@@ -87,6 +87,8 @@ def process(user_id):
             row = df.iloc[i]
             review_th = row["review_th"]
             test_label_review_th.append(review_th)
+            # NumPy iteration over unknown shapes: https://github.com/facebook/pyrefly/pull/5290
+            # pyrefly: ignore [bad-index]
             test_label_rmse_bins.append(bins_ind[bins[i]])
 
     assert sorted(test_label_review_th) == test_label_review_th

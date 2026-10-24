@@ -64,7 +64,7 @@ class FSRS5(FSRS4dot5):
         0.6621,
     ]
     gamma: float = 1
-    default_params_stddev_tensor = torch.tensor(
+    default_params_stddev_tensor: ClassVar[Tensor[[int]]] = torch.tensor(
         [
             6.61,
             9.52,

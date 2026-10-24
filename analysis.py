@@ -172,7 +172,11 @@ def HRM(v):
 
         min_index = np.argmax(v == Vmin)
         v_back = v[::-1]
+        # NumPy scalar protocols: https://github.com/facebook/pyrefly/pull/5292
+        # pyrefly: ignore [unsupported-operation]
         max_index = len(v) - np.argmax(v_back == Vmax) - 1
+        # NumPy scalar protocols: https://github.com/facebook/pyrefly/pull/5292
+        # pyrefly: ignore [unsupported-operation]
         N_prime_prime = max_index - min_index + 1
 
         v = v[min_index : max_index + 1]
@@ -284,6 +288,8 @@ if __name__ == "__main__":
             label=f"Median: {median:.2f}",
         )
         plt.axvline(
+            # NumPy scalar reduction results: https://github.com/facebook/pyrefly/issues/5358
+            # pyrefly: ignore [bad-argument-type]
             mean,
             color="red",
             linestyle="dashed",
@@ -291,6 +297,7 @@ if __name__ == "__main__":
             label=f"Mean: {mean:.2f}",
         )
         plt.axvline(
+            # pyrefly: ignore [bad-argument-type]
             mode,
             color="purple",
             linestyle="dashed",

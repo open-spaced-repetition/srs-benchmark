@@ -78,5 +78,6 @@ class DASH(BaseModel):
 
     def benchmark_state(self):
         return (
+            # pyrefly: ignore [missing-attribute]
             self.fc.weight.data.view(-1).tolist() + self.fc.bias.data.view(-1).tolist()
         )

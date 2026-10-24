@@ -54,6 +54,8 @@ def _maybe_compiled(fn, key, model):
         return fn
     c = _COMPILED_CACHE.get(key)
     if c is None:
+        # torch.compile stub: https://github.com/facebook/pyrefly/issues/5354
+        # pyrefly: ignore [missing-attribute]
         c = torch.compile(fn, dynamic=False)
         _COMPILED_CACHE[key] = c
     return c

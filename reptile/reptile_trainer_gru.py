@@ -166,6 +166,7 @@ def compute_df_loss(model, df):
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
+        # pyrefly: ignore [bad-argument-type]
         device=DEVICE,
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
@@ -430,6 +431,7 @@ def evaluate(
             with torch.no_grad():
                 finetuned_model.eval()
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
+                # pyrefly: ignore [missing-attribute]
                 test_loss += test_split_loss.item()
                 test_n += len(test_set)
 
@@ -454,6 +456,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             df.copy().sample(frac=1, random_state=2030),
             BATCH_SIZE,
             max_seq_len=MAX_SEQ_LEN,
+            # pyrefly: ignore [bad-argument-type]
             device=DEVICE,
         )
         task_batchloaders.append(BatchLoader(task_dataset, shuffle=True))
@@ -562,6 +565,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             metrics_log["outer_lr"] = outer_lr
             metrics_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
             metrics_log["recent_outer_loss"] = recent_losses_total / recent_losses_n
+            # pyrefly: ignore [unsupported-operation]
             metrics_log["train_exponential_average"] = outer_loss_running
             recent_losses_total = 0.0
             recent_losses_n = 0
@@ -570,6 +574,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             outer_lr = scheduler.get_last_lr()[0]
             metrics_log["outer_lr"] = outer_lr
             metrics_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
+            # pyrefly: ignore [unsupported-operation]
             metrics_log["train_exponential_average"] = outer_loss_running
             evaluate(
                 train_df_list[: min(len(train_df_list), 5)],
@@ -592,6 +597,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             print("Checkpoint saved.")
 
     # Ensure the saved state reflects the final accumulated inner-opt state.
+    # pyrefly: ignore [unbound-name]
     inner_opt.load_state_dict(inner_opt_state)
 
 

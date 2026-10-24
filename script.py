@@ -190,6 +190,7 @@ class Trainer:
                     * result["weights"]
                 ).sum()
                 if "penalty" in result:
+                    # pyrefly: ignore [unsupported-operation]
                     loss += result["penalty"] / epoch_len
                 loss.backward()
 
@@ -240,8 +241,10 @@ class Trainer:
                         .item()
                     )
                     if "penalty" in result:
+                        # pyrefly: ignore [bad-argument-type]
                         loss += (result["penalty"] / epoch_len).detach().item()
                     total += batch[3].shape[0]
+                # pyrefly: ignore [bad-argument-type]
                 losses.append(loss / total)
             self.train_data_loader.shuffle = True
             self.avg_train_losses.append(losses[0])
@@ -689,6 +692,7 @@ if __name__ == "__main__":
                 if error:
                     tqdm.write(str(error))
                 else:
+                    # pyrefly: ignore [not-iterable]
                     stats, raw = result
                     with open(result_file, "a", encoding="utf-8", newline="\n") as f:
                         f.write(json.dumps(stats, ensure_ascii=False) + "\n")

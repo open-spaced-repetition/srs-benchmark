@@ -158,6 +158,8 @@ def main():
             "ties": ties,
             "losses": len(users) - wins - ties,
             "mean_logloss_difference": float(delta.mean()),
+            # NumPy scalar conversion: https://github.com/facebook/pyrefly/issues/5350
+            # pyrefly: ignore [bad-argument-type]
             "wilcoxon_p": float(test.pvalue),
         }
         sections.extend(

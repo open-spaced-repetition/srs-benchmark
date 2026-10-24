@@ -407,7 +407,7 @@ def build_snapshots(
         snapshots.append(
             Snapshot(
                 time=current_time,
-                rating=int(rating),
+                rating=rating,
                 elapsed=float(delta),
                 state=state,
             )
@@ -433,7 +433,7 @@ def build_dash_snapshots(
         else:
             current_time += delta
             history_elapses.append(delta)
-        history_ratings.append(int(rating))
+        history_ratings.append(rating)
         state = {
             "type": "dash",
             "ratings": history_ratings.copy(),
@@ -443,7 +443,7 @@ def build_dash_snapshots(
         snapshots.append(
             Snapshot(
                 time=current_time,
-                rating=int(rating),
+                rating=rating,
                 elapsed=delta,
                 state=state,
             )
@@ -474,7 +474,7 @@ def build_hlr_snapshots(
         snapshots.append(
             Snapshot(
                 time=current_time,
-                rating=int(rating),
+                rating=rating,
                 elapsed=delta,
                 state=stability,
             )
@@ -503,7 +503,7 @@ def build_actr_snapshots(
         snapshots.append(
             Snapshot(
                 time=current_time,
-                rating=int(rating),
+                rating=rating,
                 elapsed=delta,
                 state={"type": "actr", "times": abs_times.copy()},
             )

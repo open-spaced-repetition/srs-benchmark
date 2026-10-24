@@ -139,6 +139,8 @@ class RWKV7ChannelMixer(ModuleType):
             dim=1,
             index=time_shift_select_BT.unsqueeze(-1).expand(-1, -1, self.d_model),
         )
+        # torch.lerp tensor weights: https://github.com/facebook/pyrefly/issues/5360
+        # pyrefly: ignore [bad-argument-type]
         k_BTK = self.W_k(torch.lerp(x_BTC, x_shift_BTC, self.lerp_k))
         o_BTC = self.W_v(torch.square(F.relu(k_BTK)))
         return in_BTC + self.dropout(o_BTC)
@@ -170,8 +172,10 @@ class LoraSimple(ModuleType):
             ortho_init(self.B_and_lamb.weight, scale=0.1)
             if name == "v":
                 # Bias with ones to let the first layer's value flow directly
+                # pyrefly: ignore [bad-argument-type]
                 torch.nn.init.ones_(self.B_and_lamb.bias)
             else:
+                # pyrefly: ignore [bad-argument-type]
                 torch.nn.init.zeros_(self.B_and_lamb.bias)
 
     @FunctionType
@@ -328,7 +332,10 @@ class RWKV7TimeMixer(ModuleType):
         )
 
         rkvdag_8BTC = torch.lerp(
-            x_BTC.unsqueeze(0), x_shift_BTC.unsqueeze(0), self.rkvdag_lerp
+            x_BTC.unsqueeze(0),
+            x_shift_BTC.unsqueeze(0),
+            # pyrefly: ignore [bad-argument-type]
+            self.rkvdag_lerp,
         )
         r_BTC, k_BTC, v_BTC, d_BTC, a_BTC, g_BTC, k_scale_BTC, v_scale_BTC = (
             rkvdag_8BTC.unbind(dim=0)
@@ -343,6 +350,7 @@ class RWKV7TimeMixer(ModuleType):
             v0_BTC = v_BTC
         else:
             v_lerp_BTC = F.sigmoid(self.v_lora_simple(v_BTC))
+            # pyrefly: ignore [bad-argument-type]
             v_BTC = torch.lerp(self.W_v(v_BTC), v0_BTC, v_lerp_BTC)
 
         a_BTC = F.sigmoid(self.a_lora_simple(a_BTC))

@@ -458,6 +458,8 @@ class SrsRWKV(ModuleType):
             if not is_excluded(name):
                 if dtype == torch.bfloat16:
                     module = module.to(dtype)
+                # torch.half dtype alias: https://github.com/facebook/pyrefly/issues/5361
+                # pyrefly: ignore [missing-attribute]
                 elif dtype == torch.half:
                     raise ValueError("not tested.")
                 elif dtype == torch.float32:
@@ -550,7 +552,9 @@ def greedy_splits(
         freqs = {}
         for data in data_list:
             module_data = data.modules[submodule]
-            for l, b in zip(module_data.split_len, module_data.split_B):
+            for l_raw, b_raw in zip(module_data.split_len, module_data.split_B):
+                l = int(l_raw)
+                b = int(b_raw)
                 if l not in freqs:
                     freqs[l] = 0
                 freqs[l] += b

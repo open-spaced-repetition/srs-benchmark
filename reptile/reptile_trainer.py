@@ -161,6 +161,7 @@ def compute_df_loss(model, df):
         BATCH_SIZE,
         sort_by_length=False,
         max_seq_len=MAX_SEQ_LEN,
+        # pyrefly: ignore [bad-argument-type]
         device=DEVICE,
     )
     df_loader = BatchLoader(df_batchdataset, shuffle=False)
@@ -395,6 +396,7 @@ def evaluate(
             with torch.no_grad():
                 finetuned_model.eval()
                 test_split_loss = compute_df_loss(finetuned_model, test_set)
+                # pyrefly: ignore [missing-attribute]
                 test_loss += test_split_loss.item()
                 test_n += len(test_set)
 
@@ -419,6 +421,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             df.copy().sample(frac=1, random_state=2030),
             BATCH_SIZE,
             max_seq_len=MAX_SEQ_LEN,
+            # pyrefly: ignore [bad-argument-type]
             device=DEVICE,
         )
         task_batchloaders.append(
@@ -520,11 +523,13 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             wandb_log["outer_lr"] = outer_lr
             wandb_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
             wandb_log["recent_outer_loss"] = recent_losses_total / recent_losses_n
+            # pyrefly: ignore [unsupported-operation]
             wandb_log["train_exponential_average"] = outer_loss_running
             recent_losses_total = 0.0
             recent_losses_n = 0
 
         if outer_it > 0 and outer_it % LOG_STEPS == 0:
+            # pyrefly: ignore [unbound-name]
             wandb_log["outer_lr"] = outer_lr
             wandb_log["inner_lr"] = train_adapt_params["lr_middle_raw"]
             assert outer_loss_running
@@ -553,6 +558,7 @@ def train(model, inner_opt_state, train_df_list, test_df_list):
             wandb.log(wandb_log, step=outer_it)
 
     # Set the correct state before exiting to ensure that the right version is saved
+    # pyrefly: ignore [unbound-name]
     inner_opt.load_state_dict(inner_opt_state)
 
 

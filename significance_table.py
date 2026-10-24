@@ -48,6 +48,8 @@ def wilcoxon_effect_size(x, y):
     mu = n * (n + 1) / 4
     sigma = np.sqrt(n * (n + 1) * (2 * n + 1) / 24)
 
+    # NumPy scalar operations: https://github.com/facebook/pyrefly/issues/5353
+    # pyrefly: ignore [unsupported-operation]
     z = (W - mu) / sigma
 
     r = z / np.sqrt(n)
@@ -171,6 +173,7 @@ if __name__ == "__main__":
                 p_value = result["p_value"]
                 wilcox[i, j] = result["r"]
 
+                # pyrefly: ignore [unsupported-operation]
                 if p_value > 0.01:
                     # color for insignificant p-values
                     color_wilcox[i, j] = 3

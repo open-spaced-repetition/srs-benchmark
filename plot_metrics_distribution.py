@@ -63,6 +63,7 @@ def plot_metric_distribution(
     weighted_quantiles = (
         np.cumsum(filtered_sizes[sorter]) - 0.5 * filtered_sizes[sorter]
     ) / np.sum(filtered_sizes)
+    # pyrefly: ignore[bad-argument-type]
     median = float(np.interp(0.5, weighted_quantiles, filtered_values[sorter]))
 
     # Calculate weighted standard deviation

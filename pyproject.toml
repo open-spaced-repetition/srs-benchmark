@@ -54,17 +54,3 @@ dev = [
     "types-psutil>=7.2.2.20260518",
     "types-tqdm>=4.70.0.20260827",
 ]
-
-[tool.mypy]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-    "torch",
-    "torch.*",
-    "matplotlib",
-    "matplotlib.*",
-    "wandb",
-    "wandb.*"
-]
-ignore_missing_imports = true

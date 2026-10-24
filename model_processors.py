@@ -29,6 +29,7 @@ def process_untrainable(
     testsets = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     for _, test_index in tscv.split(dataset):
+        # pyrefly: ignore[bad-index]
         test_set = dataset.iloc[test_index].copy()
         testsets.append(test_set)
 
@@ -69,8 +70,10 @@ def baseline(
     avg_ps = []
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     for train_index, test_index in tscv.split(dataset):
+        # pyrefly: ignore[bad-index]
         test_set = dataset.iloc[test_index].copy()
         testsets.append(test_set)
+        # pyrefly: ignore[bad-index]
         train_set = dataset.iloc[train_index].copy()
         avg_ps.append(train_set["y"].mean())
 
@@ -97,6 +100,7 @@ def rmse_bins_exploit(
     first_test_index = int(1e9)
     for _, test_index in tscv.split(dataset):
         first_test_index = min(first_test_index, test_index.min())
+        # pyrefly: ignore[bad-index]
         test_set = dataset.iloc[test_index].copy()
         save_tmp.append(test_set)
 
@@ -130,6 +134,7 @@ def moving_avg(
     first_test_index = int(1e9)
     for _, test_index in tscv.split(dataset):
         first_test_index = min(first_test_index, test_index.min())
+        # pyrefly: ignore[bad-index]
         test_set = dataset.iloc[test_index].copy()
         save_tmp.append(test_set)
 
@@ -172,7 +177,9 @@ def process_fsrs_rs(
 
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         if not config.train_equals_test:
+            # pyrefly: ignore[bad-index]
             train_set = dataset.iloc[train_index]
+            # pyrefly: ignore[bad-index]
             test_set = dataset.iloc[test_index]
             if config.equalize_test_with_non_secs:
                 # Ignores the train_index and test_index
@@ -185,6 +192,7 @@ def process_fsrs_rs(
         else:
             train_set = dataset.copy()
             test_set = dataset[
+                # pyrefly: ignore[bad-index]
                 dataset["review_th"] >= dataset.iloc[test_index]["review_th"].min()
             ].copy()
         if config.no_test_same_day:
@@ -265,7 +273,9 @@ def fsrs_one_step(
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
     for split_i, (train_index, test_index) in enumerate(tscv.split(dataset)):
         if not config.train_equals_test:
+            # pyrefly: ignore[bad-index]
             train_set = dataset.iloc[train_index]
+            # pyrefly: ignore[bad-index]
             test_set = dataset.iloc[test_index]
             if config.equalize_test_with_non_secs:
                 # Ignores the train_index and test_index
@@ -278,6 +288,7 @@ def fsrs_one_step(
         else:
             train_set = dataset.copy()
             test_set = dataset[
+                # pyrefly: ignore[bad-index]
                 dataset["review_th"] >= dataset.iloc[test_index]["review_th"].min()
             ].copy()
         if config.no_test_same_day:

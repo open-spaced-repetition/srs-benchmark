@@ -142,7 +142,7 @@ class LSTM[NormalizationDims: IntVar](BaseModel):
             except FileNotFoundError:
                 pass
 
-    def set_normalization_params(self, mean_i, std_i):
+    def set_normalization_params(self, mean_i: Tensor, std_i: Tensor):
         self.register_buffer("input_mean", mean_i)
         self.register_buffer("input_std", std_i)
 

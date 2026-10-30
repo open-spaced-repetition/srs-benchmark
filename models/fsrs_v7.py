@@ -69,6 +69,7 @@ class FSRS7(FSRS6):
     Without same-day reviews:
     FSRS-7 = python script.py --algo FSRS-7 --short --secs --equalize_test_with_non_secs --processes 15
     FSRS-7 sched. penalties = python script.py --algo FSRS-7 --sched_penalties --short --secs --equalize_test_with_non_secs --processes 15
+    FSRS-7-Instant = python script.py --algo FSRS-7 --instant --short --secs --equalize_test_with_non_secs --processes 15 (models/fsrs_v7_instant.py)
     FSRS-7 recency = python script.py --algo FSRS-7 --recency --short --secs --equalize_test_with_non_secs --processes 15
     FSRS-7 default param. = python script.py --algo FSRS-7 --default --short --secs --equalize_test_with_non_secs --processes 15
     FSRS-7 deck = python script.py --algo FSRS-7 --partitions deck --short --secs --equalize_test_with_non_secs --processes 15

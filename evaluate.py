@@ -216,6 +216,11 @@ if __name__ == "__main__":
                 34,
                 "FIL, G, SR",
             ),
+            (
+                "FSRS-7-instant-short-secs-equalize_test_with_non_secs",
+                34,
+                "FIL, G, SR",
+            ),
             ("FSRS-7-short-secs-equalize_test_with_non_secs-preset", 34, "FIL, G, SR"),
             ("FSRS-7-short-secs-equalize_test_with_non_secs-deck", 34, "FIL, G, SR"),
             # (pruned: not shown in the README tables; uncomment to restore)
@@ -276,6 +281,7 @@ if __name__ == "__main__":
             ("FSRS-7-sched_penalties-short-secs-recency", 34, "FIL, G, SR"),
             ("FSRS-7-short-secs", 34, "FIL, G, SR"),
             ("FSRS-7-sched_penalties-short-secs", 34, "FIL, G, SR"),
+            ("FSRS-7-instant-short-secs", 34, "FIL, G, SR"),
             ("FSRS-7-short-secs-preset", 34, "FIL, G, SR"),
             ("MOVING-AVG-short-secs", 0, "---"),
             ("FSRS-7-short-secs-deck", 34, "FIL, G, SR"),
@@ -339,6 +345,8 @@ if __name__ == "__main__":
         "FSRS-7-sched_penalties-short-secs-equalize_test_with_non_secs": "FSRS-7 sched. penalties",
         "FSRS-7-sched_penalties-short-secs": "FSRS-7 sched. penalties",
         "FSRS-7-sched_penalties-short-secs-recency": "FSRS-7 recency + sched. penalties",
+        "FSRS-7-instant-short-secs-equalize_test_with_non_secs": "FSRS-7-Instant",
+        "FSRS-7-instant-short-secs": "FSRS-7-Instant",
         "FSRS-7-short-secs-equalize_test_with_non_secs-preset": "FSRS-7 preset",
         "FSRS-7-short-secs-preset": "FSRS-7 preset",
         "FSRS-7-short-secs-equalize_test_with_non_secs-deck": "FSRS-7 deck",

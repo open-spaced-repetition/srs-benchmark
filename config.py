@@ -89,7 +89,7 @@ def create_parser():
         "--instant",
         default=False,
         action="store_true",
-        help="FSRS-7-Instant: re-fit the FSRS-7 parameters online after every review (models/fsrs_v7_instant.py). Predictions use everything up to just before the review. (default: False)",
+        help="FSRS7-Instant: re-fit the FSRS-7 parameters online after every review (models/fsrs_v7_instant.py). Predictions use everything up to just before the review. (default: False)",
     )
     parser.add_argument(
         "--compile",

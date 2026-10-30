@@ -1,4 +1,4 @@
-"""Unit tests for FSRS-7-Instant (models/fsrs_v7_instant.py).
+"""Unit tests for FSRS7-Instant (models/fsrs_v7_instant.py).
 
 The float64 scalar recurrence and its hand-written backward pass must agree with torch
 autograd on models/fsrs_v7.FSRS7 (run in float64) for the prediction and all 34

@@ -1,5 +1,5 @@
 """
-FSRS-7-Instant: FSRS-7 whose parameters are re-fitted online after every review.
+FSRS7-Instant: FSRS-7 whose parameters are re-fitted online after every review.
 
     python script.py --algo FSRS-7 --instant --short --secs --equalize_test_with_non_secs
 

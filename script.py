@@ -544,7 +544,7 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
     model: Any = None
 
     if config.instant:
-        # FSRS-7-Instant: the same per-fold FSRS-7 fits, then an online replay of the
+        # FSRS7-Instant: the same per-fold FSRS-7 fits, then an online replay of the
         # review stream from each fold's fit (models/fsrs_v7_instant.py).
         assert config.model_name == "FSRS-7" and config.partitions == "none"
         assert all(len(w) == 1 for w in w_list)

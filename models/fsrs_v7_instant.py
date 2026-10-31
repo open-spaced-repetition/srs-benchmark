@@ -434,7 +434,9 @@ def instant_predict(
     """
     fold_start = [int(t["review_th"].min()) for t in testsets]
     rows = dataset[dataset["review_th"] >= fold_start[0]].sort_values("review_th")
-    folds = np.searchsorted(fold_start, rows["review_th"].to_numpy(), side="right") - 1
+    folds = (
+        np.searchsorted(fold_start, rows["review_th"].to_numpy(), side="right") - 1
+    ).tolist()
     p_of = {}
     user_bias, again_weight = 0.0, 0.0
     online: FSRS7Instant | None = None

@@ -17,13 +17,10 @@ class LogisticRegressionEngineer(BaseFeatureEngineer):
         return df
 
     def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        n = len(df)
-        if n == 0:
-            df["feature_rating"] = np.empty(0, dtype=np.float64)
-            return df
+        # Previous rating of the same card (0 for the first review)
         is_start, _ = _card_start_indices(df["card_id"].to_numpy())
         ratings = df["rating"].to_numpy()
-        feat_r = np.zeros(n, dtype=np.float64)
+        feat_r = np.zeros(len(df), dtype=np.float64)
         feat_r[1:] = np.where(is_start[1:], 0.0, ratings[:-1])
         df["feature_rating"] = feat_r
         return df

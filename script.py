@@ -351,6 +351,16 @@ def _discover_user_ids(revlogs_dir: Path) -> list[int]:
     return [uid.as_py() for uid in dataset.partitioning.dictionaries[0]]
 
 
+def _split_by_partition(df: pd.DataFrame):
+    """Yield ``(partition, rows)``; a single partition reuses ``df`` without masking."""
+    partitions = df["partition"].unique()
+    if len(partitions) == 1:
+        yield partitions[0], df
+        return
+    for partition in partitions:
+        yield partition, df[df["partition"] == partition]
+
+
 def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy(deep=False)
     if config.use_recency_weighting:
@@ -510,15 +520,8 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
 
         partition_weights = {}
 
-        unique_train_partitions = train_set["partition"].unique()
-        for partition in unique_train_partitions:
+        for partition, train_partition in _split_by_partition(train_set):
             try:
-                train_partition = (
-                    train_set
-                    if len(unique_train_partitions) == 1
-                    else train_set[train_set["partition"] == partition]
-                )
-
                 if not config.train_equals_test:
                     assert (
                         train_partition["review_th"].max() < test_set["review_th"].min()
@@ -565,13 +568,9 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
     model: Any = None
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
-        unique_test_partitions = testset["partition"].unique()
-        for partition in unique_test_partitions:
-            partition_testset = (
-                testset.copy(deep=False)
-                if len(unique_test_partitions) == 1
-                else testset[testset["partition"] == partition].copy(deep=False)
-            )
+        for partition, partition_rows in _split_by_partition(testset):
+            # Shallow copy: the "p"/"s"/"d" columns added below must not leak into testset
+            partition_testset = partition_rows.copy(deep=False)
             weights = w.get(partition, None)
             if config.model_name == "LogisticRegression":
                 model = create_model(config, weights)

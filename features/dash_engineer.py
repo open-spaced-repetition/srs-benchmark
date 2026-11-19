@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from .base import BaseFeatureEngineer, _card_run_bounds, _card_start_indices
+from .base import BaseFeatureEngineer, _card_run_bounds, _positions_in_card
 
 _TAU_W = np.array([0.2434, 1.9739, 16.0090, 129.8426], dtype=np.float64)
 _TIME_WINDOWS = np.array([1.0, 7.0, 30.0, np.inf], dtype=np.float64)
@@ -16,12 +16,8 @@ def _compute_dash_tw_all(df: pd.DataFrame, enable_decay: bool) -> list[torch.Ten
     if n == 0:
         return []
 
-    _, start_idx = _card_start_indices(df["card_id"].to_numpy())
-    pos_in_card = np.arange(n).astype(np.int64) - start_idx
+    pos_in_card = _positions_in_card(df["card_id"].to_numpy())
     max_lag = int(pos_in_card.max())
-    if max_lag == 0:
-        return list(torch.zeros((n, 8), dtype=torch.float32).unbind(0))
-
     t_vals = df["delta_t"].to_numpy(dtype=np.float64)
     r_bin = (df["rating"].to_numpy() > 1).astype(np.float64)
 
@@ -42,16 +38,15 @@ def _compute_dash_tw_all(df: pd.DataFrame, enable_decay: bool) -> list[torch.Ten
         cum_t = cum_t + t_vals[active - (lag - 1)]
         rb = r_bin[active - lag]
 
-        if enable_decay:
-            # valid: (M, 4), decay: (M, 4)
-            valid = cum_t[:, None] <= _TIME_WINDOWS
-            decay = np.where(valid, np.exp(-cum_t[:, None] / _TAU_W), 0.0)
-            feats[active, 0::2] += decay
-            feats[active, 1::2] += decay * rb[:, None]
-        else:
-            valid_f = (cum_t[:, None] <= _TIME_WINDOWS).astype(np.float64)
-            feats[active, 0::2] += valid_f
-            feats[active, 1::2] += valid_f * rb[:, None]
+        # (M, 4) per-window weight: exponential decay for MCM, else 1 inside the window
+        valid = cum_t[:, None] <= _TIME_WINDOWS
+        weight = (
+            np.where(valid, np.exp(-cum_t[:, None] / _TAU_W), 0.0)
+            if enable_decay
+            else valid.astype(np.float64)
+        )
+        feats[active, 0::2] += weight
+        feats[active, 1::2] += weight * rb[:, None]
 
     full = torch.from_numpy(feats.astype(np.float32))
     return list(full.unbind(0))

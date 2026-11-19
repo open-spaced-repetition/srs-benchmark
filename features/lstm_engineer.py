@@ -2,13 +2,13 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
-import torch
 
 from .base import (
     BaseFeatureEngineer,
-    _card_run_bounds,
     _card_start_indices,
     _clip_non_negative,
+    _float32_matrix,
+    _prefix_views,
 )
 
 
@@ -86,22 +86,6 @@ class LSTMFeatureEngineer(BaseFeatureEngineer):
         Create tensor features for LSTM model
         Features include: [delta_t, optional duration, rating]
         """
-        features = self.config.get_lstm_tensor_feature_names()
-        n = len(df)
-        if n == 0:
-            cast(Any, df)["tensor"] = []
-            return df
-
-        arr = np.empty((n, len(features)), dtype=np.float32)
-        for col_idx, feat in enumerate(features):
-            arr[:, col_idx] = df[feat].to_numpy(dtype=np.float32)
-        full = torch.from_numpy(arr)
-
-        starts, ends = _card_run_bounds(df["card_id"].to_numpy())
-        cast(Any, df)["tensor"] = [
-            full[s : s + j]
-            for s, e in zip(starts.tolist(), ends.tolist())
-            for j in range(e - s)
-        ]
-
+        full = _float32_matrix(df, self.config.get_lstm_tensor_feature_names())
+        cast(Any, df)["tensor"] = _prefix_views(full, df["card_id"].to_numpy())
         return df

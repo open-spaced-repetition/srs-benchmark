@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
+import torch
 
 from config import Config
 
@@ -20,13 +21,18 @@ def _clip_non_negative(arr: np.ndarray) -> np.ndarray:
 def _card_start_indices(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return ``(is_start, start_idx)`` for a 1D ``card_ids`` array sorted by card."""
     n = len(card_ids)
-    is_start = np.empty(n, dtype=bool)
-    is_start[0] = True
+    is_start = np.ones(n, dtype=bool)
     is_start[1:] = card_ids[1:] != card_ids[:-1]
     start_idx = np.maximum.accumulate(
-        np.where(is_start, np.arange(n).astype(np.int64), 0)
+        np.where(is_start, np.arange(n, dtype=np.int64), 0)
     )
     return is_start, start_idx
+
+
+def _positions_in_card(card_ids: np.ndarray) -> np.ndarray:
+    """0-based position of each row within its contiguous ``card_id`` run."""
+    _, start_idx = _card_start_indices(card_ids)
+    return np.arange(len(card_ids), dtype=np.int64) - start_idx
 
 
 def _card_run_bounds(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -36,13 +42,8 @@ def _card_run_bounds(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         empty = np.empty(0, dtype=np.int64)
         return empty, empty
     changes = np.flatnonzero(card_ids[1:] != card_ids[:-1]) + 1
-    m = len(changes) + 1
-    starts = np.empty(m, dtype=np.int64)
-    ends = np.empty(m, dtype=np.int64)
-    starts[0] = 0
-    starts[1:] = changes
-    ends[:-1] = changes
-    ends[-1] = n
+    starts = np.concatenate(([0], changes)).astype(np.int64)
+    ends = np.concatenate((changes, [n])).astype(np.int64)
     return starts, ends
 
 
@@ -53,41 +54,72 @@ def _segmented_cumsum(vals: np.ndarray, start_idx: np.ndarray) -> np.ndarray:
     return cs - offset
 
 
+def _float32_matrix(df: pd.DataFrame, columns: list[str]) -> torch.Tensor:
+    """C-contiguous ``[len(df), len(columns)]`` float32 tensor built column by column."""
+    arr = np.empty((len(df), len(columns)), dtype=np.float32)
+    for col_idx, col in enumerate(columns):
+        arr[:, col_idx] = df[col].to_numpy(dtype=np.float32)
+    return torch.from_numpy(arr)
+
+
+def _prefix_views(
+    full: torch.Tensor, card_ids: np.ndarray, empty: torch.Tensor | None = None
+) -> list[torch.Tensor]:
+    """Zero-copy history views: the row at ``s + j`` of a card run gets ``full[s : s + j]``.
+
+    If ``empty`` is given it replaces the zero-length view of each card's first review.
+    """
+    starts, ends = _card_run_bounds(card_ids)
+    bounds = zip(starts.tolist(), ends.tolist())
+    # Flat list comprehensions: noticeably faster than extend(generator) per card
+    if empty is None:
+        return [full[s : s + j] for s, e in bounds for j in range(e - s)]
+    return [full[s : s + j] if j else empty for s, e in bounds for j in range(e - s)]
+
+
+def _prefix_pair_tuples(
+    card_ids: np.ndarray, first: np.ndarray, second: np.ndarray
+) -> list[tuple]:
+    """Per-row tuple of ``(first, second)`` pairs from earlier reviews of the same card.
+
+    Elements stay NumPy scalars, matching iteration over the original Series.
+    """
+    pairs = list(zip(list(first), list(second)))
+    starts, ends = _card_run_bounds(card_ids)
+    return [
+        card_pairs[:j]
+        for s, e in zip(starts.tolist(), ends.tolist())
+        for card_pairs in (tuple(pairs[s : e - 1]),)
+        for j in range(e - s)
+    ]
+
+
 def _prefix_history_strings(card_ids: np.ndarray, values: np.ndarray) -> list[str]:
     """Build comma-separated prefix strings (excluding current row) per contiguous card."""
-    n = len(values)
-    if n == 0:
-        return []
-    strs = [str(v) for v in values.tolist()]
-    out = [""] * n
+    out: list[str] = []
     acc = ""
-    prev_cid = card_ids[0]
-    for idx in range(n):
-        cid = card_ids[idx]
-        if idx == 0 or cid != prev_cid:
-            out[idx] = ""
-            acc = strs[idx]
+    prev_cid = None
+    for cid, s in zip(card_ids.tolist(), map(str, values.tolist())):
+        if cid != prev_cid:
+            out.append("")
+            acc = s
             prev_cid = cid
         else:
-            out[idx] = acc
-            acc = f"{acc},{strs[idx]}"
+            out.append(acc)
+            acc = f"{acc},{s}"
     return out
 
 
-def _compute_last_rating_fast(
+def _compute_last_rating(
     is_start: np.ndarray, t_non_secs: np.ndarray, ratings: np.ndarray
 ) -> np.ndarray:
-    """Vectorized equivalent of previous-rating lookup across contiguous cards."""
-    n = len(ratings)
-    if n == 0:
-        return np.empty(0, dtype=ratings.dtype)
-    idx_arr = np.arange(n).astype(np.int64)
+    """Rating of the latest earlier review of the same card whose own interval was
+    positive, falling back to the card's first review."""
+    idx_arr = np.arange(len(ratings), dtype=np.int64)
     latest_valid = np.maximum.accumulate(
         np.where(is_start | (t_non_secs > 0), idx_arr, 0)
     )
-    src = np.empty(n, dtype=np.int64)
-    src[0] = 0
-    src[1:] = np.where(is_start[1:], idx_arr[1:], latest_valid[:-1])
+    src = np.where(is_start, idx_arr, np.roll(latest_valid, 1))
     return ratings[src]
 
 
@@ -148,8 +180,7 @@ class BaseFeatureEngineer(ABC):
         Common preprocessing steps shared by all models
         """
         # Add review sequence number
-        n_raw = df.shape[0]
-        df["review_th"] = np.arange(n_raw).astype(np.int64) + 1
+        df["review_th"] = np.arange(1, len(df) + 1, dtype=np.int64)
         if self.config.save_evaluation_file and "day_offset" in df.columns:
             df["nth_today"] = df.groupby("day_offset").cumcount() + 1
         df.sort_values(by=["card_id", "review_th"], inplace=True)
@@ -169,15 +200,11 @@ class BaseFeatureEngineer(ABC):
             df["rating"] = np.where((r_arr == 2) | (r_arr == 4), 3, r_arr)
 
         # Calculate review count on contiguous card runs
-        if len(df) > 0:
-            _, start_idx = _card_start_indices(df["card_id"].to_numpy())
-            i_vals = np.arange(len(df)).astype(np.int64) - start_idx + 1
-            df["i"] = i_vals
-            max_i = self.config.max_seq_len * 2
-            if (i_vals > max_i).any():
-                df = df[i_vals <= max_i].copy()
-        else:
-            df["i"] = np.empty(0, dtype=np.int64)
+        i_vals = _positions_in_card(df["card_id"].to_numpy()) + 1
+        df["i"] = i_vals
+        max_i = self.config.max_seq_len * 2
+        if (i_vals > max_i).any():
+            df = df[i_vals <= max_i].copy()
 
         # Process time intervals
         df = self._process_time_intervals(df)
@@ -187,11 +214,7 @@ class BaseFeatureEngineer(ABC):
             ed_vals = df["elapsed_days"].to_numpy()
             if (ed_vals == 0).any():
                 df = df[ed_vals != 0].copy()
-            if len(df) > 0:
-                _, start_idx = _card_start_indices(df["card_id"].to_numpy())
-                df["i"] = np.arange(len(df)).astype(np.int64) - start_idx + 1
-            else:
-                df["i"] = np.empty(0, dtype=np.int64)
+            df["i"] = _positions_in_card(df["card_id"].to_numpy()) + 1
 
         return df
 
@@ -236,42 +259,37 @@ class BaseFeatureEngineer(ABC):
         """
         Compute time and rating history records on demand
         """
-        need_r = self.config.needs_r_history()
-        need_t = self.config.needs_t_history()
-        need_eval = self.config.save_evaluation_file
+        config = self.config
+        card_ids = df["card_id"].to_numpy()
+        t_non_secs = df["delta_t"].to_numpy()
+        ratings = df["rating"].to_numpy()
+        secs_equalized = (
+            config.use_secs_intervals and config.equalize_test_with_non_secs
+        )
 
-        if need_r or need_t or need_eval:
-            card_ids = df["card_id"].to_numpy()
-            t_non_secs = df["delta_t"].to_numpy()
-            ratings = df["rating"].to_numpy()
+        if config.save_evaluation_file:
+            is_start, _ = _card_start_indices(card_ids)
+            df["last_rating"] = (
+                _compute_last_rating(is_start, t_non_secs, ratings) if len(df) else []
+            )
 
-            if need_eval:
-                if len(df) > 0:
-                    is_start, _ = _card_start_indices(card_ids)
-                    df["last_rating"] = _compute_last_rating_fast(
-                        is_start, t_non_secs, ratings
-                    )
-                else:
-                    df["last_rating"] = []
+        if config.needs_r_history():
+            df["r_history"] = _prefix_history_strings(card_ids, ratings)
 
-            if need_r:
-                df["r_history"] = _prefix_history_strings(card_ids, ratings)
+        if config.needs_t_history():
+            # --secs uses second-level intervals, unless test is equalized with non-secs
+            t_hist_vals = (
+                df["delta_t_secs"].to_numpy()
+                if config.use_secs_intervals and not secs_equalized
+                else t_non_secs
+            )
+            df["t_history"] = _prefix_history_strings(card_ids, t_hist_vals)
+            if secs_equalized and config.save_evaluation_file:
+                df["t_history_secs"] = _prefix_history_strings(
+                    card_ids, df["delta_t_secs"].to_numpy()
+                )
 
-            if need_t:
-                if self.config.use_secs_intervals:
-                    t_secs = df["delta_t_secs"].to_numpy()
-                    if self.config.equalize_test_with_non_secs:
-                        df["t_history"] = _prefix_history_strings(card_ids, t_non_secs)
-                        if need_eval:
-                            df["t_history_secs"] = _prefix_history_strings(
-                                card_ids, t_secs
-                            )
-                    else:
-                        df["t_history"] = _prefix_history_strings(card_ids, t_secs)
-                else:
-                    df["t_history"] = _prefix_history_strings(card_ids, t_non_secs)
-
-        if self.config.use_secs_intervals:
+        if config.use_secs_intervals:
             df["delta_t"] = df["delta_t_secs"]
 
         return df
@@ -333,13 +351,11 @@ class BaseFeatureEngineer(ABC):
             keep_short = (delta_t_vals != 0) | (df["i"].to_numpy() == 1)
             if not keep_short.all():
                 df = df[keep_short].copy()
-                if len(df) > 0:
-                    _, start_idx = _card_start_indices(df["card_id"].to_numpy())
+                _, start_idx = _card_start_indices(df["card_id"].to_numpy())
 
         # Recalculate review sequence number
-        if len(df) > 0:
-            gt0 = (df["elapsed_days"].to_numpy() > 0).astype(np.int64)
-            df["i"] = _segmented_cumsum(gt0, start_idx) + 1
+        gt0 = (df["elapsed_days"].to_numpy() > 0).astype(np.int64)
+        df["i"] = _segmented_cumsum(gt0, start_idx) + 1
 
         # Handle outliers and non-continuous rows (only for non-seconds intervals)
         if not self.config.use_secs_intervals:

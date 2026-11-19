@@ -1,10 +1,13 @@
 from typing import Any, cast
 
-import numpy as np
 import pandas as pd
-import torch
 
-from .base import BaseFeatureEngineer, _card_run_bounds
+from .base import (
+    BaseFeatureEngineer,
+    _float32_matrix,
+    _prefix_pair_tuples,
+    _prefix_views,
+)
 
 
 class FSRSOneStepFeatureEngineer(BaseFeatureEngineer):
@@ -18,34 +21,10 @@ class FSRSOneStepFeatureEngineer(BaseFeatureEngineer):
         Create tensor features for FSRS-style models
         These models use (time_history, rating_history) tensors
         """
-        n = len(df)
-        if n == 0:
-            cast(Any, df)["tensor"] = []
-            cast(Any, df)["inputs"] = []
-            return df
-
-        dt_np = df["delta_t"].to_numpy()
-        r_np = df["rating"].to_numpy()
-
-        arr = np.empty((n, 2), dtype=np.float32)
-        arr[:, 0] = dt_np.astype(np.float32)
-        arr[:, 1] = r_np.astype(np.float32)
-        full = torch.from_numpy(arr)
-
-        pairs = list(zip(list(dt_np), list(r_np)))
-        starts, ends = _card_run_bounds(df["card_id"].to_numpy())
-        starts_l = starts.tolist()
-        ends_l = ends.tolist()
-
-        tensors: list = []
-        inputs: list = []
-        for s, e in zip(starts_l, ends_l):
-            m = e - s
-            card_pairs = tuple(pairs[s : e - 1])
-            tensors.extend(full[s : s + j] for j in range(m))
-            inputs.extend(card_pairs[:j] for j in range(m))
-
-        cast(Any, df)["tensor"] = tensors
-        cast(Any, df)["inputs"] = inputs
-
+        card_ids = df["card_id"].to_numpy()
+        full = _float32_matrix(df, ["delta_t", "rating"])
+        cast(Any, df)["tensor"] = _prefix_views(full, card_ids)
+        cast(Any, df)["inputs"] = _prefix_pair_tuples(
+            card_ids, df["delta_t"].to_numpy(), df["rating"].to_numpy()
+        )
         return df

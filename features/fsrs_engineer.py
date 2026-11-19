@@ -1,10 +1,8 @@
 from typing import Any, cast
 
-import numpy as np
 import pandas as pd
-import torch
 
-from .base import BaseFeatureEngineer, _card_run_bounds
+from .base import BaseFeatureEngineer, _float32_matrix, _prefix_views
 
 
 class FSRSFeatureEngineer(BaseFeatureEngineer):
@@ -18,23 +16,8 @@ class FSRSFeatureEngineer(BaseFeatureEngineer):
         Create tensor features for FSRS-style models
         These models use (time_history, rating_history) tensors
         """
-        n = len(df)
-        if n == 0:
-            cast(Any, df)["tensor"] = []
-            return df
-
-        # Build ONE user-wide contiguous [N, 2] float32 tensor from (delta_t, rating),
-        # then slice zero-copy prefix views per card.
-        arr = np.empty((n, 2), dtype=np.float32)
-        arr[:, 0] = df["delta_t"].to_numpy(dtype=np.float32)
-        arr[:, 1] = df["rating"].to_numpy(dtype=np.float32)
-        full = torch.from_numpy(arr)
-
-        starts, ends = _card_run_bounds(df["card_id"].to_numpy())
-        cast(Any, df)["tensor"] = [
-            full[s : s + j]
-            for s, e in zip(starts.tolist(), ends.tolist())
-            for j in range(e - s)
-        ]
-
+        # One user-wide [N, 2] float32 tensor of (delta_t, rating); each review gets a
+        # zero-copy view of its card's earlier rows.
+        full = _float32_matrix(df, ["delta_t", "rating"])
+        cast(Any, df)["tensor"] = _prefix_views(full, df["card_id"].to_numpy())
         return df

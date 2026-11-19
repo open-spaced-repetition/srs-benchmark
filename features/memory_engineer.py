@@ -2,7 +2,7 @@ from typing import Any, cast
 
 import pandas as pd
 
-from .base import BaseFeatureEngineer, _card_run_bounds
+from .base import BaseFeatureEngineer, _prefix_pair_tuples
 
 
 class SM2FeatureEngineer(BaseFeatureEngineer):
@@ -30,17 +30,9 @@ class EbisuFeatureEngineer(BaseFeatureEngineer):
         """
         Create Ebisu features: sequence of (time_interval, rating) tuples
         """
-        n = len(df)
-        if n == 0:
-            cast(Any, df)["sequence"] = []
-            return df
-
-        pairs = list(zip(list(df["delta_t"].to_numpy()), list(df["rating"].to_numpy())))
-        starts, ends = _card_run_bounds(df["card_id"].to_numpy())
-        sequences: list = []
-        for s, e in zip(starts.tolist(), ends.tolist()):
-            card_pairs = tuple(pairs[s : e - 1])
-            sequences.extend(card_pairs[:j] for j in range(e - s))
-
-        cast(Any, df)["sequence"] = sequences
+        cast(Any, df)["sequence"] = _prefix_pair_tuples(
+            df["card_id"].to_numpy(),
+            df["delta_t"].to_numpy(),
+            df["rating"].to_numpy(),
+        )
         return df

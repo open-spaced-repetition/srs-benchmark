@@ -9,6 +9,7 @@ import torch
 from tqdm import tqdm
 
 from config import Config, create_parser
+from data_loader import read_revlogs
 from features import create_features
 from models.base import BaseModel
 from models.fsrs_v6 import FSRS6
@@ -29,22 +30,7 @@ config = Config(args)
 
 
 def process_user(user_id):
-    if config.save_evaluation_file:
-        dataset = pd.read_parquet(
-            config.data_path / "revlogs" / f"{user_id=}",
-        )
-    else:
-        revlog_cols = ["card_id", "rating", "elapsed_days"]
-        if config.use_secs_intervals:
-            revlog_cols.append("elapsed_seconds")
-        if config.lstm_use_duration and config.model_name in ("LSTM", "GRU"):
-            revlog_cols.append("duration")
-        dataset = pd.read_parquet(
-            config.data_path / "revlogs" / f"{user_id=}",
-            columns=revlog_cols,
-        )
-    dataset = create_features(dataset, config=config)
-    return user_id, dataset
+    return user_id, create_features(read_revlogs(config, user_id), config=config)
 
 
 def _process_user_ipc(user_id: int):

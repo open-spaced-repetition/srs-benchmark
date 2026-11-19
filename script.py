@@ -28,6 +28,7 @@ from model_processors import (
     process_untrainable,
     rmse_bins_exploit,
 )
+from models.fsrs_v7_instant import instant_predict
 from models.model_factory import create_model
 from models.trainable import TrainableModel
 from utils import (
@@ -541,6 +542,19 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
     y = []
     save_tmp = []
     model: Any = None
+
+    if config.instant:
+        # FSRS7-Instant: the same per-fold FSRS-7 fits, then an online replay of the
+        # review stream from each fold's fit (models/fsrs_v7_instant.py).
+        assert config.model_name == "FSRS-7" and config.partitions == "none"
+        assert all(len(w) == 1 for w in w_list)
+        save_tmp = instant_predict(
+            dataset, [next(iter(w.values())) for w in w_list], testsets, config
+        )
+        for partition_testset in save_tmp:
+            p.extend(partition_testset["p"].tolist())
+            y.extend(partition_testset["y"].tolist())
+        testsets = []  # predictions done: skip the batch prediction below
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
         for partition in testset["partition"].unique():

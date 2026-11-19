@@ -86,6 +86,12 @@ def create_parser():
         help="Enable FSRS-7 scheduling penalties (penalty 1 & 2). L2 penalty is always on. (default: False)",
     )
     parser.add_argument(
+        "--instant",
+        default=False,
+        action="store_true",
+        help="FSRS7-Instant: re-fit the FSRS-7 parameters online after every review (models/fsrs_v7_instant.py). Predictions use everything up to just before the review. (default: False)",
+    )
+    parser.add_argument(
         "--compile",
         action="store_true",
         help="torch.compile the FSRS per-step recurrence (CPU; needs MSVC/vcvars on PATH). ~1.0-3.4x faster training (FSRS-7 ~3.35x); NOT bit-exact vs eager (avg LogLoss drift <=7.4e-6, within the accepted 1e-5). Applies to FSRS v1-v7 (other algos ignore it).",
@@ -220,6 +226,7 @@ class Config:
         self.two_buttons: bool = args.two_buttons
         self.only_S0: bool = args.S0
         self.sched_penalties: bool = args.sched_penalties  # only for FSRS-7
+        self.instant: bool = args.instant  # only for FSRS-7
         self.use_compile: bool = (
             args.compile
         )  # torch.compile FSRS-7 forward (FSRS-7 only)
@@ -282,6 +289,8 @@ class Config:
             _file_name_parts.append("-S0")
         if self.sched_penalties:
             _file_name_parts.append("-sched_penalties")
+        if self.instant:
+            _file_name_parts.append("-instant")
         if self.two_buttons:
             # Suffix is '-binary' for backward compatibility with existing analysis scripts.
             _file_name_parts.append("-binary")

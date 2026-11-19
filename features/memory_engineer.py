@@ -2,7 +2,7 @@ from typing import Any, cast
 
 import pandas as pd
 
-from .base import BaseFeatureEngineer
+from .base import BaseFeatureEngineer, _prefix_pair_tuples
 
 
 class SM2FeatureEngineer(BaseFeatureEngineer):
@@ -30,13 +30,9 @@ class EbisuFeatureEngineer(BaseFeatureEngineer):
         """
         Create Ebisu features: sequence of (time_interval, rating) tuples
         """
-        t_history_list, r_history_list = self.get_history_lists(df)
-
-        # Create tuple sequences for Ebisu
-        cast(Any, df)["sequence"] = [
-            tuple(zip(t_item[:-1], r_item[:-1]))
-            for t_sublist, r_sublist in zip(t_history_list, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-
+        cast(Any, df)["sequence"] = _prefix_pair_tuples(
+            df["card_id"].to_numpy(),
+            df["delta_t"].to_numpy(),
+            df["rating"].to_numpy(),
+        )
         return df

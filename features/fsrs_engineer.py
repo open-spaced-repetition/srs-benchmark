@@ -1,9 +1,8 @@
 from typing import Any, cast
 
 import pandas as pd
-import torch
 
-from .base import BaseFeatureEngineer
+from .base import BaseFeatureEngineer, _float32_matrix, _prefix_views
 
 
 class FSRSFeatureEngineer(BaseFeatureEngineer):
@@ -17,20 +16,8 @@ class FSRSFeatureEngineer(BaseFeatureEngineer):
         Create tensor features for FSRS-style models
         These models use (time_history, rating_history) tensors
         """
-        t_history_list, r_history_list = self.get_history_lists(df)
-
-        # Create tensor features with shape (sequence_length, 2): each row is
-        # [time_interval, rating] for that step. Build ONE [k, 2] float32 tensor per card
-        # from its full (t, r) sequence, then take prefix views: review j's tensor is the
-        # first j rows. Bit-identical to torch.tensor((t_item[:-1], r_item[:-1])) per
-        # review (same float32 from the same values), but avoids one torch.tensor() call
-        # per review and shrinks the intermediate column from O(k^2) to O(k) per card.
-        tensors: list = []
-        for t_sublist, r_sublist in zip(t_history_list, r_history_list):
-            full = torch.tensor(
-                (t_sublist[-1], r_sublist[-1]), dtype=torch.float32
-            ).transpose(0, 1)
-            tensors.extend(full[:j] for j in range(len(t_sublist)))
-        cast(Any, df)["tensor"] = tensors
-
+        # One user-wide [N, 2] float32 tensor of (delta_t, rating); each review gets a
+        # zero-copy view of its card's earlier rows.
+        full = _float32_matrix(df, ["delta_t", "rating"])
+        cast(Any, df)["tensor"] = _prefix_views(full, df["card_id"].to_numpy())
         return df

@@ -145,7 +145,7 @@ class Trainer:
 
     def build_dataset(self, train_set: pd.DataFrame, test_set: pd.DataFrame | None):
         self.train_set = BatchDataset(
-            train_set.copy(),
+            train_set.copy(deep=False),
             self.batch_size,
             max_seq_len=self.max_seq_len,
         )
@@ -156,7 +156,7 @@ class Trainer:
             self.test_data_loader = None
         else:
             self.test_set = BatchDataset(
-                test_set.copy(),
+                test_set.copy(deep=False),
                 batch_size=self.batch_size,
                 max_seq_len=self.max_seq_len,
             )
@@ -334,8 +334,35 @@ def _is_deck_or_preset_partition_mode() -> bool:
     return False
 
 
+def _discover_user_ids(revlogs_dir: Path) -> list[int]:
+    """Discover integer user_ids from Hive ``user_id=<id>`` directories via ``os.scandir``."""
+    if revlogs_dir.is_dir():
+        user_ids: list[int] = []
+        for entry in os.scandir(revlogs_dir):
+            if entry.is_dir() and entry.name.startswith("user_id="):
+                try:
+                    user_ids.append(int(entry.name.split("=", 1)[1]))
+                except ValueError:
+                    pass
+        if user_ids:
+            user_ids.sort()
+            return user_ids
+    dataset = pq.ParquetDataset(revlogs_dir)
+    return [uid.as_py() for uid in dataset.partitioning.dictionaries[0]]
+
+
+def _split_by_partition(df: pd.DataFrame):
+    """Yield ``(partition, rows)``; a single partition reuses ``df`` without masking."""
+    partitions = df["partition"].unique()
+    if len(partitions) == 1:
+        yield partitions[0], df
+        return
+    for partition in partitions:
+        yield partition, df[df["partition"] == partition]
+
+
 def _apply_recency_weighting(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
+    out = df.copy(deep=False)
     if config.use_recency_weighting:
         # SBD's original uses the identical formula (recency_floor 0.0667, power 11.25)
         if config.model_name in ("FSRS-7", "SBD"):
@@ -458,15 +485,15 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
                 test_set = dataset[dataset[f"{split_i}_test"]]
                 train_index, test_index = (None, None)
         else:
-            train_set = dataset.copy()
+            train_set = dataset.copy(deep=False)
             test_set = dataset[
                 dataset["review_th"] >= dataset.iloc[test_index]["review_th"].min()
-            ].copy()
+            ].copy(deep=False)
 
         if config.no_test_same_day:
-            test_set = test_set[test_set["elapsed_days"] > 0].copy()
+            test_set = test_set[test_set["elapsed_days"] > 0]
         if config.no_train_same_day:
-            train_set = train_set[train_set["elapsed_days"] > 0].copy()
+            train_set = train_set[train_set["elapsed_days"] > 0]
 
         testsets.append(test_set)
 
@@ -493,10 +520,8 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
 
         partition_weights = {}
 
-        for partition in train_set["partition"].unique():
+        for partition, train_partition in _split_by_partition(train_set):
             try:
-                train_partition = train_set[train_set["partition"] == partition].copy()
-
                 if not config.train_equals_test:
                     assert (
                         train_partition["review_th"].max() < test_set["review_th"].min()
@@ -543,8 +568,9 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
     model: Any = None
 
     for i, (w, testset) in enumerate(zip(w_list, testsets)):
-        for partition in testset["partition"].unique():
-            partition_testset = testset[testset["partition"] == partition].copy()
+        for partition, partition_rows in _split_by_partition(testset):
+            # Shallow copy: the "p"/"s"/"d" columns added below must not leak into testset
+            partition_testset = partition_rows.copy(deep=False)
             weights = w.get(partition, None)
             if config.model_name == "LogisticRegression":
                 model = create_model(config, weights)
@@ -584,7 +610,7 @@ def process(user_id: int, device_id: int | None = None) -> tuple[dict, str | Non
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     unprocessed_users = []
-    dataset = pq.ParquetDataset(config.data_path / "revlogs")
+    all_user_ids = _discover_user_ids(config.data_path / "revlogs")
     Path(f"evaluation/{config.get_evaluation_file_name()}").mkdir(
         parents=True, exist_ok=True
     )
@@ -601,8 +627,7 @@ if __name__ == "__main__":
     if config.save_raw_output and raw_file.exists():
         sort_jsonl_by_user_lines(raw_file)
 
-    for user_id in dataset.partitioning.dictionaries[0]:
-        user_id_value = user_id.as_py()
+    for user_id_value in all_user_ids:
         # Add the filter here
         if config.max_user_id is not None and user_id_value > config.max_user_id:
             continue

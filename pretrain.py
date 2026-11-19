@@ -1,10 +1,15 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing as mp
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
 
 from config import Config, create_parser
+from data_loader import read_revlogs
 from features import create_features
 from models.base import BaseModel
 from models.fsrs_v6 import FSRS6
@@ -12,7 +17,9 @@ from models.nn_17 import NN_17
 from models.rnn import RNN
 from models.trainable import TrainableModel
 from models.transformer import Transformer
-from script import Trainer
+
+# Avoid holding one open FD per shared tensor storage across hundreds of users
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 parser = create_parser()
 # parse_args(), NOT parse_known_args(): an unrecognized flag must be a hard error,
@@ -23,14 +30,94 @@ config = Config(args)
 
 
 def process_user(user_id):
-    dataset = pd.read_parquet(
-        config.data_path / "revlogs" / f"{user_id=}",
+    return user_id, create_features(read_revlogs(config, user_id), config=config)
+
+
+def _process_user_ipc(user_id: int):
+    """Worker wrapper that packs shared-storage 2D slice tensors into a single NumPy buffer
+    to avoid pickling tens of thousands of individual Tensor views or allocating /dev/shm segments.
+    """
+    uid, dataset = process_user(user_id)
+    if "tensor" not in dataset.columns or len(dataset) == 0:
+        return uid, dataset, None
+
+    tensors: list[torch.Tensor] = dataset["tensor"].tolist()
+    non_empty = [t for t in tensors if t.shape[0] > 0]
+    if not non_empty or tensors[0].ndim != 2:
+        return uid, dataset, None
+
+    t0 = non_empty[0]
+    cols = t0.shape[1]
+    storage = t0.untyped_storage()
+    base_ptr = storage.data_ptr()
+    elem_size = t0.element_size()
+    if cols == 0 or storage.nbytes() % (cols * elem_size) != 0:
+        return uid, dataset, None
+
+    for t in non_empty:
+        if (
+            t.ndim != 2
+            or t.shape[1] != cols
+            or t.dtype != t0.dtype
+            or t.untyped_storage().data_ptr() != base_ptr
+            or t.stride() != (cols, 1)
+            or t.storage_offset() % cols != 0
+        ):
+            return uid, dataset, None
+
+    total_rows = storage.nbytes() // (cols * elem_size)
+    backing_np = (
+        cast(Any, torch.empty(0, dtype=t0.dtype))
+        .set_(storage, 0, (total_rows, cols))
+        .numpy()
     )
-    dataset = create_features(dataset, config=config)
-    return user_id, dataset
+    starts = np.fromiter(
+        (t.storage_offset() // cols if t.shape[0] > 0 else 0 for t in tensors),
+        dtype=np.int32,
+        count=len(tensors),
+    )
+    lens = np.fromiter(
+        (t.shape[0] for t in tensors), dtype=np.int32, count=len(tensors)
+    )
+    empty_dtype = tensors[0].dtype
+    for t in tensors:
+        if t.shape[0] == 0:
+            empty_dtype = t.dtype
+            break
+
+    tensor_col_idx = int(cast(Any, dataset.columns.get_loc("tensor")))
+    df_without_tensor = dataset.drop(columns=["tensor"])
+    return (
+        uid,
+        df_without_tensor,
+        (backing_np, starts, lens, cols, empty_dtype, tensor_col_idx),
+    )
+
+
+def _unpack_user_ipc(df_part: pd.DataFrame, packed: tuple | None) -> pd.DataFrame:
+    if packed is None:
+        return df_part
+    backing_np, starts, lens, cols, empty_dtype, tensor_col_idx = packed
+    full = torch.from_numpy(backing_np)
+    empty_t = torch.empty((0, cols), dtype=empty_dtype)
+    df_part.insert(
+        tensor_col_idx,
+        "tensor",
+        [
+            full[s : s + ln] if ln > 0 else empty_t
+            for s, ln in zip(starts.tolist(), lens.tolist())
+        ],
+    )
+    return df_part
 
 
 if __name__ == "__main__":
+    from script import Trainer
+
+    # pyrefly: ignore [missing-attribute]
+    if config.device.type == "cpu":
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
     model: TrainableModel
     n_epoch = 32
     lr = 4e-2
@@ -66,17 +153,20 @@ if __name__ == "__main__":
 
     df_dict = {}
 
-    with ThreadPoolExecutor() as executor:
+    with ProcessPoolExecutor(
+        max_workers=config.num_processes,
+        mp_context=mp.get_context("spawn"),
+    ) as executor:
         futures = [
             executor.submit(
-                process_user,
+                _process_user_ipc,
                 user_id,
             )
             for user_id in pretrain_users
         ]
         for future in tqdm(as_completed(futures), total=len(futures)):
-            user_id, dataset = future.result()
-            df_dict[user_id] = dataset
+            user_id, df_part, packed = future.result()
+            df_dict[user_id] = _unpack_user_ipc(df_part, packed)
 
     df_list = [df_dict[user_id] for user_id in pretrain_users]
     df = pd.concat(df_list, axis=0)

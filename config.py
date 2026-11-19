@@ -224,6 +224,7 @@ class Config:
             args.compile
         )  # torch.compile FSRS-7 forward (FSRS-7 only)
         self.save_evaluation_file: bool = args.file
+        self.include_history_strings: bool = False
         self.generate_plots: bool = args.plot
         self.save_weights: bool = args.weights
         self.partitions: str = args.partitions
@@ -345,6 +346,22 @@ class Config:
             features.append("duration")
         features.append("rating")
         return features
+
+    def needs_r_history(self) -> bool:
+        """Whether downstream model/output requires the r_history string column."""
+        return (
+            self.save_evaluation_file
+            or self.include_history_strings
+            or self.model_name in ("SM2", "FSRS-rs", "RMSE-BINS-EXPLOIT")
+        )
+
+    def needs_t_history(self) -> bool:
+        """Whether downstream model/output requires the t_history string column."""
+        return (
+            self.save_evaluation_file
+            or self.include_history_strings
+            or self.model_name in ("FSRS-rs", "RMSE-BINS-EXPLOIT")
+        )
 
     def __repr__(self) -> str:
         """Provides a string representation of the configuration."""

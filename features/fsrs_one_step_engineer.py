@@ -1,9 +1,13 @@
 from typing import Any, cast
 
 import pandas as pd
-import torch
 
-from .base import BaseFeatureEngineer
+from .base import (
+    BaseFeatureEngineer,
+    _float32_matrix,
+    _prefix_pair_tuples,
+    _prefix_views,
+)
 
 
 class FSRSOneStepFeatureEngineer(BaseFeatureEngineer):
@@ -17,21 +21,10 @@ class FSRSOneStepFeatureEngineer(BaseFeatureEngineer):
         Create tensor features for FSRS-style models
         These models use (time_history, rating_history) tensors
         """
-        t_history_list, r_history_list = self.get_history_lists(df)
-
-        # Create tensor features with shape (sequence_length, 2)
-        # Each row contains [time_interval, rating] for that step
-        cast(Any, df)["tensor"] = [
-            torch.tensor((t_item[:-1], r_item[:-1]), dtype=torch.float32).transpose(
-                0, 1
-            )
-            for t_sublist, r_sublist in zip(t_history_list, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-        cast(Any, df)["inputs"] = [
-            tuple(zip(t_item[:-1], r_item[:-1]))
-            for t_sublist, r_sublist in zip(t_history_list, r_history_list)
-            for t_item, r_item in zip(t_sublist, r_sublist)
-        ]
-
+        card_ids = df["card_id"].to_numpy()
+        full = _float32_matrix(df, ["delta_t", "rating"])
+        cast(Any, df)["tensor"] = _prefix_views(full, card_ids)
+        cast(Any, df)["inputs"] = _prefix_pair_tuples(
+            card_ids, df["delta_t"].to_numpy(), df["rating"].to_numpy()
+        )
         return df

@@ -62,54 +62,56 @@ def _create_features_with_equalized_test(
     Returns:
         Processed dataframe with split indicators
     """
-    # Create non-seconds features
-    config_non_secs = copy.deepcopy(config)
+    # Shallow copies are safe because only scalar attributes are rebound below. Never
+    # mutate shared mutable attributes (e.g. raw_args, cuda_device_ids) in place on a
+    # copy: the change would leak into the caller's config. Attributes derived in
+    # Config.__init__ from use_secs_intervals (s_min, base_file_name) are not recomputed.
+
+    # Lightweight alignment pass for non-seconds (skips history strings & model tensors)
+    config_non_secs = copy.copy(config)
     config_non_secs.use_secs_intervals = False
     engineer_non_secs = create_feature_engineer(config_non_secs)
-    df_non_secs = engineer_non_secs.create_features(df.copy())
+    df_non_secs = engineer_non_secs.create_alignment_features(df)
 
-    # Create seconds features
-    config_secs = copy.deepcopy(config)
+    # Create full seconds features
+    config_secs = copy.copy(config)
     config_secs.use_secs_intervals = True
     engineer_secs = create_feature_engineer(config_secs)
-    df_secs = engineer_secs.create_features(df.copy())
+    df_secs = engineer_secs.create_features(df)
 
-    # Set lapses for RMSE (bins)
+    # Set lapses for RMSE (bins) via index alignment
     df_secs["rmse_bins_lapse"] = df_non_secs["rmse_bins_lapse"]
 
-    # Find intersection of processed data
-    df_intersect = df_secs[df_secs["review_th"].isin(df_non_secs["review_th"])]
-
     # Validate that required fields match between non-seconds and seconds versions
-    assert len(df_intersect) == len(df_non_secs), (
+    secs_review_th = df_secs["review_th"].to_numpy(dtype=np.int64)
+    non_secs_review_th = df_non_secs["review_th"].to_numpy(dtype=np.int64)
+    max_th = int(secs_review_th.max()) if len(secs_review_th) > 0 else 0
+
+    in_non_secs = np.zeros(max_th + 1, dtype=bool)
+    in_non_secs[non_secs_review_th[non_secs_review_th <= max_th]] = True
+    intersect_mask = in_non_secs[secs_review_th]
+
+    assert int(intersect_mask.sum()) == len(df_non_secs), (
         "Length mismatch between seconds and non-seconds data"
     )
-    assert np.equal(df_intersect["i"], df_non_secs["i"]).all(), "Review count mismatch"
-    assert (
-        "t_history" not in df_intersect
-        or np.equal(df_intersect["t_history"], df_non_secs["t_history"]).all()
-    ), "Time history mismatch"
-    assert (
-        "r_history" not in df_intersect
-        or np.equal(df_intersect["r_history"], df_non_secs["r_history"]).all()
-    ), "Rating history mismatch"
+    assert np.equal(
+        df_secs["i"].to_numpy()[intersect_mask], df_non_secs["i"].to_numpy()
+    ).all(), "Review count mismatch"
 
     # Create train/test split indicators for time series cross-validation
     tscv = TimeSeriesSplit(n_splits=config.n_splits)
+    in_test = np.zeros(max_th + 1, dtype=bool)
     for split_i, (_, non_secs_test_index) in enumerate(tscv.split(df_non_secs)):
-        non_secs_test_set = df_non_secs.iloc[non_secs_test_index]
+        test_ths = non_secs_review_th[non_secs_test_index]
+        min_test_th = test_ths.min()
 
         # For train set: only allow reviews before the smallest review_th in test set
-        allowed_train = df_secs[
-            df_secs["review_th"] < non_secs_test_set["review_th"].min()
-        ]
-        df_secs[f"{split_i}_train"] = df_secs["review_th"].isin(
-            allowed_train["review_th"]
-        )
+        df_secs[f"{split_i}_train"] = secs_review_th < min_test_th
 
         # For test set: only allow reviews that exist in non_secs_test_set
-        df_secs[f"{split_i}_test"] = df_secs["review_th"].isin(
-            non_secs_test_set["review_th"]
-        )
+        valid_test_ths = test_ths[test_ths <= max_th]
+        in_test[valid_test_ths] = True
+        df_secs[f"{split_i}_test"] = in_test[secs_review_th]
+        in_test[valid_test_ths] = False
 
     return df_secs

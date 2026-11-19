@@ -1,8 +1,9 @@
+import numpy as np
 import pandas as pd
 
 from models import logistic_regression
 
-from .base import BaseFeatureEngineer
+from .base import BaseFeatureEngineer, _card_start_indices
 
 
 class LogisticRegressionEngineer(BaseFeatureEngineer):
@@ -16,7 +17,12 @@ class LogisticRegressionEngineer(BaseFeatureEngineer):
         return df
 
     def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        df["feature_rating"] = df.groupby("card_id")["rating"].shift(1).fillna(0)
+        # Previous rating of the same card (0 for the first review)
+        is_start, _ = _card_start_indices(df["card_id"].to_numpy())
+        ratings = df["rating"].to_numpy()
+        feat_r = np.zeros(len(df), dtype=np.float64)
+        feat_r[1:] = np.where(is_start[1:], 0.0, ratings[:-1])
+        df["feature_rating"] = feat_r
         return df
 
     def _compute_histories(self, df: pd.DataFrame) -> pd.DataFrame:

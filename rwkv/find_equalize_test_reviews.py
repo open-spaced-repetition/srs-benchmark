@@ -25,6 +25,7 @@ config = Config(args)
 config.model_name = rwkv_config.ALGO
 config.include_short_term = bool(rwkv_config.SHORT)
 config.use_secs_intervals = bool(rwkv_config.SECS)
+config.include_history_strings = True
 
 
 def _open_lmdb_env():

@@ -51,99 +51,138 @@ def create_features(df: pd.DataFrame):
     33. [first_rating > 1] * log(1 + cumulative same-day count)
     34. [first_rating > 1] * log(1 + cumulative non-same-day count)
     """
-    df = df.copy()
-    g = df.groupby("card_id", sort=False)
+    n = len(df)
+    cols = [f"feat_{i}" for i in range(34)]
+    if n == 0:
+        return pd.DataFrame(
+            np.empty((0, 34), dtype=np.float32), index=df.index, columns=cols
+        )
 
-    df["feat_elapsed_real"] = g["delta_t_secs"].shift(1).fillna(0)
-    df["feat_elapsed_int"] = g["delta_t_int"].shift(1).fillna(0)
-    r = df["feature_rating"]
+    idx_arr = np.arange(n).astype(np.int64)
+    card_ids = df["card_id"].to_numpy()
+    order = np.argsort(card_ids, kind="stable")
+    inv_order = np.empty(n, dtype=np.int64)
+    inv_order[order] = idx_arr
+
+    card_s = card_ids[order]
+    is_start = np.empty(n, dtype=bool)
+    is_start[0] = True
+    is_start[1:] = card_s[1:] != card_s[:-1]
+    start_idx = np.maximum.accumulate(np.where(is_start, idx_arr, 0))
+
+    dt_secs_raw = df["delta_t_secs"].fillna(0).to_numpy(dtype=np.float64)
+    dt_int_raw = df["delta_t_int"].fillna(0).to_numpy(dtype=np.float64)
+    r_raw = df["feature_rating"].to_numpy(dtype=np.float64)
+
+    dt_secs_s = dt_secs_raw[order]
+    dt_int_s = dt_int_raw[order]
+    r_s = r_raw[order]
+
+    feat_elapsed_real_s = np.zeros(n, dtype=np.float64)
+    feat_elapsed_real_s[1:] = np.where(is_start[1:], 0.0, dt_secs_s[:-1])
+
+    feat_elapsed_int_s = np.zeros(n, dtype=np.float64)
+    feat_elapsed_int_s[1:] = np.where(is_start[1:], 0.0, dt_int_s[:-1])
+
+    same_day_s = (feat_elapsed_int_s == 0).astype(np.float32)
+    non_same_day_s = 1.0 - same_day_s
+    success_s = (r_s > 1).astype(np.float32)
+    fail_s = (r_s == 1).astype(np.float32)
+    is_first_s = is_start.astype(np.float32)
+    not_first_s = 1.0 - is_first_s
+    first_r_s = r_s[start_idx].astype(np.float32)
+
+    def _seg_cumsum_i64(arr_01: np.ndarray) -> np.ndarray:
+        cs = np.cumsum(arr_01.astype(np.int64), dtype=np.int64)
+        offset = np.where(start_idx > 0, cs[start_idx - 1], 0)
+        return (cs - offset).astype(np.float32)
+
+    num_same_day_fail_s = _seg_cumsum_i64(same_day_s * not_first_s * fail_s)
+    num_nsd_fail_s = _seg_cumsum_i64(non_same_day_s * not_first_s * fail_s)
+    num_same_day_pass_s = _seg_cumsum_i64(same_day_s * not_first_s * success_s)
+    num_nsd_pass_s = _seg_cumsum_i64(non_same_day_s * not_first_s * success_s)
+    num_pass_s = _seg_cumsum_i64(success_s)
+    num_same_day_s = _seg_cumsum_i64(same_day_s)
+    num_non_same_day_s = _seg_cumsum_i64(non_same_day_s)
+
+    # Per-card cumulative sum in float64 before float32 cast (avoids cross-card cancellation)
+    changes = np.flatnonzero(is_start[1:]) + 1
+    c_starts = np.empty(len(changes) + 1, dtype=np.int64)
+    c_ends = np.empty(len(changes) + 1, dtype=np.int64)
+    c_starts[0] = 0
+    c_starts[1:] = changes
+    c_ends[:-1] = changes
+    c_ends[-1] = n
+    times_f64 = np.empty(n, dtype=np.float64)
+    for cs_i, ce_i in zip(c_starts.tolist(), c_ends.tolist()):
+        np.cumsum(feat_elapsed_real_s[cs_i:ce_i], out=times_f64[cs_i:ce_i])
+    times_s = times_f64.astype(np.float32)
+
+    # Since times_s >= 0 is monotonically non-decreasing within each card and is_start
+    # always sets fl_mask_s True, group cummax(where(fl_mask, times, 0)) equals times at latest fl_mask.
+    fl_mask_s = is_start | (success_s == 0)
+    last_fl_idx = np.maximum.accumulate(np.where(fl_mask_s, idx_arr, 0))
+    running_max_flt_s = times_s[last_fl_idx]
+    time_since_first_or_lapse_s = times_s - running_max_flt_s
+
+    # Restore original review_th order
+    r = r_raw
+    feat_elapsed_real = feat_elapsed_real_s[inv_order].astype(np.float32)
+    is_first = is_first_s[inv_order]
+    first_r = first_r_s[inv_order]
+    num_same_day_fail = num_same_day_fail_s[inv_order]
+    num_nsd_fail = num_nsd_fail_s[inv_order]
+    num_same_day_pass = num_same_day_pass_s[inv_order]
+    num_nsd_pass = num_nsd_pass_s[inv_order]
+    has_passed = (num_pass_s[inv_order] > 0).astype(np.float32)
+    num_same_day = num_same_day_s[inv_order]
+    num_non_same_day = num_non_same_day_s[inv_order]
+    times = times_s[inv_order]
+    time_since_first_or_lapse = time_since_first_or_lapse_s[inv_order]
 
     # --- scalars ---
-    same_day = (df["feat_elapsed_int"] == 0).astype(np.float32)
-    success = (r > 1).astype(np.float32)
-    fail = (r == 1).astype(np.float32)
     is_hard = (r == 2).astype(np.float32)
     better_than_hard = (r > 2).astype(np.float32)
-    label_int = df["delta_t_int"].fillna(0)
-    label_real = df["delta_t_secs"].fillna(0)
-    label_is_same_day = (label_int == 0).astype(np.float32)
-
-    # --- is_first_review: first row in each group ---
-    is_first = np.zeros(len(df), dtype=np.float32)
-    is_first[g.cumcount() == 0] = 1.0
-    not_first = 1.0 - is_first
+    label_is_same_day = (dt_int_raw == 0).astype(np.float32)
 
     # --- one-hot for current rating (classes 0,1,2 = ratings 2,3,4) ---
+    row_arange = np.arange(n)
     r_clipped = np.clip(r.astype(np.int32) - 2, 0, 2)
-    rating_onehot = np.zeros((len(df), 3), dtype=np.float32)
-    rating_onehot[np.arange(len(df)), r_clipped] = 1.0
-    rating_onehot *= (r > 1).astype(np.float32)[:, None]  # type: ignore
+    rating_onehot = np.zeros((n, 3), dtype=np.float32)
+    rating_onehot[row_arange, r_clipped] = 1.0
+    rating_onehot *= (r > 1).astype(np.float32)[:, None]
 
     # --- first_rating per group ---
-    df["_r"] = r
-    first_r = g["_r"].transform("first").astype(np.float32)
     first_r_clipped = np.clip(first_r.astype(np.int32) - 2, 0, 2)
-    first_rating_onehot = np.zeros((len(df), 3), dtype=np.float32)
-    first_rating_onehot[np.arange(len(df)), first_r_clipped] = 1.0
-    first_rating_onehot *= (first_r > 1).astype(np.float32)[:, None]  # type: ignore
-
-    # --- cumsum counts (group-aware) ---
-    df["_same_day"] = same_day
-    df["_non_same_day"] = 1 - same_day
-    # NumPy and pandas stub compatibility: https://github.com/facebook/pyrefly/issues/5356
-    # pyrefly: ignore [unsupported-operation]
-    df["_sd_fail"] = same_day * not_first * fail
-    # pyrefly: ignore [unsupported-operation]
-    df["_nsd_fail"] = (1 - same_day) * not_first * fail
-    # pyrefly: ignore [unsupported-operation]
-    df["_sd_pass"] = same_day * not_first * success
-    # pyrefly: ignore [unsupported-operation]
-    df["_nsd_pass"] = (1 - same_day) * not_first * success
-    df["_pass"] = success
-
-    num_same_day_fail = g["_sd_fail"].cumsum()
-    num_nsd_fail = g["_nsd_fail"].cumsum()
-    num_same_day_pass = g["_sd_pass"].cumsum()
-    num_nsd_pass = g["_nsd_pass"].cumsum()
-    num_pass = g["_pass"].cumsum()
-    num_same_day = g["_same_day"].cumsum()
-    num_non_same_day = g["_non_same_day"].cumsum()
-    has_passed = (num_pass > 0).astype(np.float32)
-
-    # --- time / time_since_first_or_lapse ---
-    df["_elapsed_real"] = df["feat_elapsed_real"]
-    times = g["_elapsed_real"].cumsum().astype(np.float32)
-
-    # first_or_lapse_time: equals `times` at first review or on a fail, else 0
-    fl_mask = (is_first.astype(bool)) | (success == 0)
-    first_or_lapse_time = np.where(fl_mask, times, 0.0)
-    df["_flt"] = first_or_lapse_time
-    # cummax per group
-    running_max_flt = g["_flt"].cummax().astype(np.float32)
-    time_since_first_or_lapse = times - running_max_flt
+    first_rating_onehot = np.zeros((n, 3), dtype=np.float32)
+    first_rating_onehot[row_arange, first_r_clipped] = 1.0
+    first_rating_onehot *= (first_r > 1).astype(np.float32)[:, None]
 
     # --- transformed scalars ---
-    t_elapsed_real = transform_elapsed_days_real_np(
-        df["feat_elapsed_real"].astype(np.float32)
-    )
-    t_label_real = transform_elapsed_days_real_np(label_real.astype(np.float32))
+    t_elapsed_real = transform_elapsed_days_real_np(feat_elapsed_real)
+    t_label_real = transform_elapsed_days_real_np(dt_secs_raw.astype(np.float32))
     t_time_since_lapse = transform_elapsed_days_real_np(time_since_first_or_lapse)
     t_times = transform_elapsed_days_real_np(times)
+    first_r_gt1 = (first_r > 1).astype(np.float32)
 
     # --- deg_1 block ---
+    ones = np.ones(n, dtype=np.float32)
+    not_label_sd = 1.0 - label_is_same_day
+    log_sd_fail = np.log1p(num_same_day_fail)
+    log_nsd_pass_nsd = np.log1p(num_nsd_pass * not_label_sd)
+    log_nsd_fail = np.log1p(num_nsd_fail)
+
     deg1 = np.stack(
         [
-            np.ones(len(df), dtype=np.float32),  # bias
+            ones,  # bias
             rating_onehot[:, 0],
             rating_onehot[:, 1],
             rating_onehot[:, 2],
-            # pyrefly: ignore [unsupported-operation]
             is_hard * is_first,
-            # pyrefly: ignore [unsupported-operation]
             better_than_hard * is_first,
-            np.log1p(num_same_day_fail),
-            np.log1p(num_nsd_pass * (1 - label_is_same_day)),
-            np.log1p(num_nsd_fail * (1 - label_is_same_day)),
+            log_sd_fail,
+            log_nsd_pass_nsd,
+            np.log1p(num_nsd_fail * not_label_sd),
             np.log1p(num_same_day_pass),
         ],
         axis=1,
@@ -152,7 +191,7 @@ def create_features(df: pd.DataFrame):
     # --- deg_0 block ---
     deg0 = np.stack(
         [
-            np.ones(len(df), dtype=np.float32),
+            ones,
             rating_onehot[:, 0],
             rating_onehot[:, 1],
             rating_onehot[:, 2],
@@ -162,20 +201,20 @@ def create_features(df: pd.DataFrame):
             first_rating_onehot[:, 0] * is_first,
             first_rating_onehot[:, 1] * is_first,
             first_rating_onehot[:, 2] * is_first,
-            np.log1p(num_same_day_fail),
-            np.log1p(num_nsd_pass * (1 - label_is_same_day)),
+            log_sd_fail,
+            log_nsd_pass_nsd,
             t_elapsed_real,
-            np.log1p(num_nsd_fail),
+            log_nsd_fail,
             np.log1p(num_nsd_pass),
             np.log1p(num_same_day_pass * label_is_same_day),
             has_passed,
             t_time_since_lapse,
             label_is_same_day,
             t_times,
-            (first_r > 1) * np.log1p(num_same_day_fail),
-            (first_r > 1) * np.log1p(num_nsd_fail),
-            (first_r > 1) * np.log1p(num_same_day),
-            (first_r > 1) * np.log1p(num_non_same_day),
+            first_r_gt1 * log_sd_fail,
+            first_r_gt1 * log_nsd_fail,
+            first_r_gt1 * np.log1p(num_same_day),
+            first_r_gt1 * np.log1p(num_non_same_day),
         ],
         axis=1,
     )
@@ -184,28 +223,7 @@ def create_features(df: pd.DataFrame):
     v = t_label_real[:, None]
     y = np.concatenate([deg1 * v, deg0], axis=1)
 
-    cols = [f"feat_{i}" for i in range(y.shape[1])]
-    result = pd.DataFrame(y, index=df.index, columns=cols)
-
-    # cleanup temp cols
-    df.drop(
-        columns=[
-            "_r",
-            "_same_day",
-            "_non_same_day",
-            "_sd_fail",
-            "_nsd_fail",
-            "_sd_pass",
-            "_nsd_pass",
-            "_pass",
-            "_elapsed_real",
-            "_flt",
-            "feat_elapsed_real",
-            "feat_elapsed_int",
-        ],
-        inplace=True,
-    )
-    return result
+    return pd.DataFrame(y, index=df.index, columns=cols)
 
 
 class LogisticRegression(BaseModel):

@@ -3,15 +3,21 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 import torch
+from shape_extensions import IntVar
 
 from config import Config
+
+# Shape variables: N = reviews of one user (sorted by card_id, review_th),
+# K = feature columns. Arrays whose length is the number of card runs use `int`.
+type _Int64Array[N: IntVar] = np.ndarray[[N], np.dtype[np.int64]]
+type _BoolArray[N: IntVar] = np.ndarray[[N], np.dtype[np.bool_]]
 
 _FIRST_RATING_STR_LUT = np.array(["", "1", "2", "3", "4"], dtype=object)
 # 0-d float64 array: promotes like an np.float64 scalar (NEP 50) in np.maximum
 _ZERO_F64 = np.zeros((), dtype=np.float64)
 
 
-def _clip_non_negative(arr: np.ndarray) -> np.ndarray:
+def _clip_non_negative[N: IntVar](arr: np.ndarray[[N]]) -> np.ndarray[[N]]:
     """Clip to >= 0 while matching pandas ``Series.map(lambda x: max(0, x))`` dtypes."""
     if np.issubdtype(arr.dtype, np.integer):
         return np.maximum(np.int64(0), arr)
@@ -20,10 +26,12 @@ def _clip_non_negative(arr: np.ndarray) -> np.ndarray:
     return np.maximum(0, arr)
 
 
-def _card_start_indices(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _card_start_indices[N: IntVar](
+    card_ids: np.ndarray[[N]],
+) -> tuple[_BoolArray[N], _Int64Array[N]]:
     """Return ``(is_start, start_idx)`` for a 1D ``card_ids`` array sorted by card."""
-    n = len(card_ids)
-    is_start = np.ones(n, dtype=bool)
+    n = card_ids.shape[0]
+    is_start = np.ones(n, dtype=np.bool_)
     is_start[1:] = card_ids[1:] != card_ids[:-1]
     start_idx = np.maximum.accumulate(
         np.where(is_start, np.arange(n).astype(np.int64), 0)
@@ -31,13 +39,15 @@ def _card_start_indices(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return is_start, start_idx
 
 
-def _positions_in_card(card_ids: np.ndarray) -> np.ndarray:
+def _positions_in_card[N: IntVar](card_ids: np.ndarray[[N]]) -> _Int64Array[N]:
     """0-based position of each row within its contiguous ``card_id`` run."""
     _, start_idx = _card_start_indices(card_ids)
-    return np.arange(len(card_ids)).astype(np.int64) - start_idx
+    return np.arange(card_ids.shape[0]).astype(np.int64) - start_idx
 
 
-def _card_run_bounds(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _card_run_bounds[N: IntVar](
+    card_ids: np.ndarray[[N]],
+) -> tuple[_Int64Array[int], _Int64Array[int]]:
     """Return ``(starts, ends)`` slice bounds for contiguous ``card_id`` blocks."""
     n = len(card_ids)
     if n == 0:
@@ -49,14 +59,16 @@ def _card_run_bounds(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return starts, ends
 
 
-def _segmented_cumsum(vals: np.ndarray, start_idx: np.ndarray) -> np.ndarray:
+def _segmented_cumsum[N: IntVar](
+    vals: np.ndarray[[N]], start_idx: _Int64Array[N]
+) -> _Int64Array[N]:
     """Segmented integer cumulative sum over contiguous runs defined by ``start_idx``."""
     cs = np.cumsum(vals, dtype=np.int64)
     offset = np.where(start_idx > 0, cs[start_idx - 1], 0)
     return cs - offset
 
 
-def _float32_matrix(df: pd.DataFrame, columns: list[str]) -> torch.Tensor:
+def _float32_matrix(df: pd.DataFrame, columns: list[str]) -> torch.Tensor[[int, int]]:
     """C-contiguous ``[len(df), len(columns)]`` float32 tensor built column by column."""
     arr = np.empty((len(df), len(columns)), dtype=np.float32)
     for col_idx, col in enumerate(columns):
@@ -64,9 +76,11 @@ def _float32_matrix(df: pd.DataFrame, columns: list[str]) -> torch.Tensor:
     return torch.from_numpy(arr)
 
 
-def _prefix_views(
-    full: torch.Tensor, card_ids: np.ndarray, empty: torch.Tensor | None = None
-) -> list[torch.Tensor]:
+def _prefix_views[N: IntVar, K: IntVar](
+    full: torch.Tensor[[N, K]],
+    card_ids: np.ndarray[[N]],
+    empty: torch.Tensor[[0, K]] | None = None,
+) -> list[torch.Tensor[[int, K]]]:
     """Zero-copy history views: the row at ``s + j`` of a card run gets ``full[s : s + j]``.
 
     If ``empty`` is given it replaces the zero-length view of each card's first review.
@@ -79,8 +93,8 @@ def _prefix_views(
     return [full[s : s + j] if j else empty for s, e in bounds for j in range(e - s)]
 
 
-def _prefix_pair_tuples(
-    card_ids: np.ndarray, first: np.ndarray, second: np.ndarray
+def _prefix_pair_tuples[N: IntVar](
+    card_ids: np.ndarray[[N]], first: np.ndarray[[N]], second: np.ndarray[[N]]
 ) -> list[tuple]:
     """Per-row tuple of ``(first, second)`` pairs from earlier reviews of the same card.
 
@@ -96,7 +110,9 @@ def _prefix_pair_tuples(
     ]
 
 
-def _prefix_history_strings(card_ids: np.ndarray, values: np.ndarray) -> list[str]:
+def _prefix_history_strings[N: IntVar](
+    card_ids: np.ndarray[[N]], values: np.ndarray[[N]]
+) -> list[str]:
     """Build comma-separated prefix strings (excluding current row) per contiguous card."""
     out: list[str] = []
     acc = ""
@@ -112,12 +128,12 @@ def _prefix_history_strings(card_ids: np.ndarray, values: np.ndarray) -> list[st
     return out
 
 
-def _compute_last_rating(
-    is_start: np.ndarray, t_non_secs: np.ndarray, ratings: np.ndarray
-) -> np.ndarray:
+def _compute_last_rating[N: IntVar](
+    is_start: _BoolArray[N], t_non_secs: np.ndarray[[N]], ratings: np.ndarray[[N]]
+) -> np.ndarray[[N]]:
     """Rating of the latest earlier review of the same card whose own interval was
     positive, falling back to the card's first review."""
-    idx_arr = np.arange(len(ratings)).astype(np.int64)
+    idx_arr = np.arange(ratings.shape[0]).astype(np.int64)
     latest_valid = np.maximum.accumulate(
         np.where(is_start | (t_non_secs > 0), idx_arr, 0)
     )

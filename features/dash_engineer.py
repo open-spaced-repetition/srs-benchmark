@@ -10,7 +10,9 @@ _TAU_W = np.array([0.2434, 1.9739, 16.0090, 129.8426], dtype=np.float64)
 _TIME_WINDOWS = np.array([1.0, 7.0, 30.0, np.inf], dtype=np.float64)
 
 
-def _compute_dash_tw_all(df: pd.DataFrame, enable_decay: bool) -> list[torch.Tensor]:
+def _compute_dash_tw_all(
+    df: pd.DataFrame, enable_decay: bool
+) -> list[torch.Tensor[[8]]]:
     """Vectorized lag-accumulation across all cards for DASH and DASH[MCM]."""
     n = len(df)
     if n == 0:
@@ -22,7 +24,9 @@ def _compute_dash_tw_all(df: pd.DataFrame, enable_decay: bool) -> list[torch.Ten
     r_bin = (df["rating"].to_numpy() > 1).astype(np.float64)
 
     # Accumulate in float64 to match original np.zeros(8, dtype=float64), then cast to float32
-    feats = np.zeros((n, 8), dtype=np.float64)
+    feats: np.ndarray[[int, 8], np.dtype[np.float64]] = np.zeros(
+        (n, 8), dtype=np.float64
+    )
     active = np.flatnonzero(pos_in_card >= 1)
     cum_t = np.zeros(len(active), dtype=np.float64)
 
@@ -48,7 +52,7 @@ def _compute_dash_tw_all(df: pd.DataFrame, enable_decay: bool) -> list[torch.Ten
         feats[active, 0::2] += weight
         feats[active, 1::2] += weight * rb[:, None]
 
-    full = torch.from_numpy(feats.astype(np.float32))
+    full: torch.Tensor[[int, 8]] = torch.from_numpy(feats.astype(np.float32))
     return list(full.unbind(0))
 
 
@@ -97,7 +101,7 @@ class DashACTRFeatureEngineer(BaseFeatureEngineer):
 
         r_bin_f32 = torch.from_numpy((df["rating"].to_numpy() > 1).astype(np.float32))
         t_f32 = torch.from_numpy(df["delta_t"].to_numpy(dtype=np.float32, copy=True))
-        empty_0_2 = torch.empty((0, 2), dtype=torch.float32)
+        empty_0_2: torch.Tensor[[0, 2]] = torch.empty((0, 2), dtype=torch.float32)
 
         starts, ends = _card_run_bounds(df["card_id"].to_numpy())
         starts_l = starts.tolist()
@@ -111,7 +115,8 @@ class DashACTRFeatureEngineer(BaseFeatureEngineer):
         row_starts = [idx * (idx + 1) // 2 for idx in range(max_m)]
         row_ends = [row_starts[idx] + idx + 1 for idx in range(max_m)]
 
-        tensors: list[torch.Tensor] = []
+        # The review at position idx + 1 of a card gets an [idx + 1, 2] tensor
+        tensors: list[torch.Tensor[[int, 2]]] = []
         for s, e in zip(starts_l, ends_l):
             tensors.append(empty_0_2)
             m = e - s - 1

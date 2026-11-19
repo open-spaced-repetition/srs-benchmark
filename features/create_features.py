@@ -62,6 +62,11 @@ def _create_features_with_equalized_test(
     Returns:
         Processed dataframe with split indicators
     """
+    # Shallow copies are safe because only scalar attributes are rebound below. Never
+    # mutate shared mutable attributes (e.g. raw_args, cuda_device_ids) in place on a
+    # copy: the change would leak into the caller's config. Attributes derived in
+    # Config.__init__ from use_secs_intervals (s_min, base_file_name) are not recomputed.
+
     # Lightweight alignment pass for non-seconds (skips history strings & model tensors)
     config_non_secs = copy.copy(config)
     config_non_secs.use_secs_intervals = False

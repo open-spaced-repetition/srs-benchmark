@@ -727,7 +727,15 @@ def test_logistic_regression_features() -> None:
     day = 0
     for step in range(120):
         ivl = -1 if step == 0 else int(rng.choice([0, 1, 5, 30, 180]))
-        sec = -1 if step == 0 else (int(rng.integers(10, 1800)) if ivl == 0 else ivl * 86400 + int(rng.integers(0, 7200)))
+        sec = (
+            -1
+            if step == 0
+            else (
+                int(rng.integers(10, 1800))
+                if ivl == 0
+                else ivl * 86400 + int(rng.integers(0, 7200))
+            )
+        )
         day += max(0, ivl)
         long_rows.append(
             {
@@ -775,7 +783,14 @@ def test_logistic_regression_features() -> None:
         ["--algo", "FSRS-6"],
         ["--algo", "FSRS-6", "--file"],
         ["--algo", "FSRS-7", "--short", "--secs"],
-        ["--algo", "FSRS-7", "--short", "--secs", "--equalize_test_with_non_secs", "--file"],
+        [
+            "--algo",
+            "FSRS-7",
+            "--short",
+            "--secs",
+            "--equalize_test_with_non_secs",
+            "--file",
+        ],
         ["--algo", "LSTM", "--short", "--secs", "--duration", "--file"],
         ["--algo", "DASH", "--short", "--secs"],
         ["--algo", "DASH[MCM]", "--short", "--secs"],

@@ -1,8 +1,8 @@
 """Comprehensive unit tests for data preprocessing and feature engineering.
 
-Verifies 100% bit-exact equivalence (values, dtypes, indices, tensor shapes/dtypes,
-and on-demand column rules) across all model feature engineers, CLI flags, and
-UserDataLoader / partition discovery / pretraining IPC helpers.
+Verifies structural/discrete equivalence (values, dtypes, indices, tensor shapes/dtypes,
+and on-demand column rules) and checks float outputs across all model feature engineers,
+CLI flags, narrow integer fixtures, and UserDataLoader / partition discovery / pretraining IPC helpers.
 """
 
 import sys
@@ -21,9 +21,43 @@ from sklearn.model_selection import TimeSeriesSplit
 from config import Config, create_parser
 from data_loader import InsufficientUserDataError, UserDataLoader
 from features import create_features
-from features.dash_engineer import DashACTRFeatureEngineer, DashFeatureEngineer
-from features.neural_engineer import NN17FeatureEngineer
 from utils import cum_concat, get_bin
+
+
+def _reference_dash_tw_features(
+    r_history: list, t_history: list, enable_decay: bool = False
+) -> np.ndarray:
+    features = np.zeros(8, dtype=np.float64)
+    r_history_binary = np.array(r_history) > 1
+    tau_w = np.array([0.2434, 1.9739, 16.0090, 129.8426])
+    time_windows = np.array([1, 7, 30, np.inf])
+    cumulative_times = np.cumsum(t_history[::-1])[::-1]
+
+    for j, time_window in enumerate(time_windows):
+        if enable_decay:
+            decay_factors = np.exp(-cumulative_times / tau_w[j])
+        else:
+            decay_factors = np.ones_like(cumulative_times)
+        valid_indices = cumulative_times <= time_window
+        features[j * 2] += np.sum(decay_factors[valid_indices])
+        features[j * 2 + 1] += np.sum(
+            r_history_binary[valid_indices] * decay_factors[valid_indices]
+        )
+    return features
+
+
+def _reference_dash_actr_features(r_history: list, t_history: list) -> torch.Tensor:
+    r_history_tensor = torch.tensor(np.array(r_history) > 1, dtype=torch.float32)
+    sp_history = torch.tensor(t_history, dtype=torch.float32)
+    cumsum = torch.cumsum(sp_history, dim=0)
+    return torch.stack([r_history_tensor, sp_history - cumsum + cumsum[-1:]], dim=1)
+
+
+def _reference_r_history_to_l_history(r_history: list) -> list[int]:
+    l_history = [0 for _ in range(len(r_history) + 1)]
+    for i, r in enumerate(r_history):
+        l_history[i + 1] = l_history[i] + (r == 1)
+    return l_history[:-1]
 
 
 def _make_config(*cli_args: str, data_path: Path | None = None) -> Config:
@@ -262,9 +296,11 @@ def _reference_base_pipeline(df_in: pd.DataFrame, config: Config) -> pd.DataFram
     df["i"] = df.groupby("card_id").cumcount() + 1
     df = df[df["i"] <= config.max_seq_len * 2].copy()
 
-    df["delta_t"] = df["elapsed_days"].map(lambda x: max(0, x))
+    df["delta_t"] = df["elapsed_days"]
     if config.use_secs_intervals:
-        df["delta_t_secs"] = df["elapsed_seconds"].map(lambda x: max(0.0, x / 86400))
+        df["delta_t_secs"] = df["elapsed_seconds"] / 86400
+        df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
+    df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
     df["delta_t_int"] = df["elapsed_days"].map(lambda x: max(0, x))
 
     if not config.include_short_term:
@@ -359,20 +395,18 @@ def _reference_base_pipeline(df_in: pd.DataFrame, config: Config) -> pd.DataFram
             )
         ]
     elif mname in ("DASH", "DASH[MCM]"):
-        eng = DashFeatureEngineer(config)
         decay = mname == "DASH[MCM]"
         cast(Any, df)["tensor"] = [
             torch.tensor(
-                eng._dash_tw_features(r_i[:-1], t_i[1:], enable_decay=decay),
+                _reference_dash_tw_features(r_i[:-1], t_i[1:], enable_decay=decay),
                 dtype=torch.float32,
             )
             for t_sub, r_sub in zip(t_active, r_list)
             for t_i, r_i in zip(t_sub, r_sub)
         ]
     elif mname == "DASH[ACT-R]":
-        eng_actr = DashACTRFeatureEngineer(config)
         cast(Any, df)["tensor"] = [
-            eng_actr._dash_actr_features(r_i[:-1], t_i[1:])
+            _reference_dash_actr_features(r_i[:-1], t_i[1:])
             for t_sub, r_sub in zip(t_active, r_list)
             for t_i, r_i in zip(t_sub, r_sub)
         ]
@@ -395,10 +429,9 @@ def _reference_base_pipeline(df_in: pd.DataFrame, config: Config) -> pd.DataFram
             for t_i in t_sub
         ]
     elif mname == "NN-17":
-        nn_eng = NN17FeatureEngineer(config)
         cast(Any, df)["tensor"] = [
             torch.tensor(
-                (t_i[:-1], r_i[:-1], nn_eng._r_history_to_l_history(r_i[:-1]))
+                (t_i[:-1], r_i[:-1], _reference_r_history_to_l_history(r_i[:-1]))
             ).T
             for t_sub, r_sub in zip(t_active, r_list)
             for t_i, r_i in zip(t_sub, r_sub)
@@ -688,9 +721,30 @@ def _reference_logreg_features(df_in: pd.DataFrame) -> pd.DataFrame:
 
 def test_logistic_regression_features() -> None:
     raw_df = _build_synthetic_revlogs()
+    # Add a long-history card (up to 120 reviews) with varied elapsed_seconds to stress cumsum ordering
+    rng = np.random.default_rng(7)
+    long_rows: list[dict[str, int]] = []
+    day = 0
+    for step in range(120):
+        ivl = -1 if step == 0 else int(rng.choice([0, 1, 5, 30, 180]))
+        sec = -1 if step == 0 else (int(rng.integers(10, 1800)) if ivl == 0 else ivl * 86400 + int(rng.integers(0, 7200)))
+        day += max(0, ivl)
+        long_rows.append(
+            {
+                "card_id": 200,
+                "day_offset": day,
+                "rating": int(rng.choice([1, 2, 3, 4])),
+                "state": 0 if step == 0 else 2,
+                "duration": 3000,
+                "elapsed_days": ivl,
+                "elapsed_seconds": sec,
+            }
+        )
+    long_df = pd.concat([raw_df, pd.DataFrame(long_rows)], ignore_index=True)
+
     # Without --secs, LogisticRegressionEngineer skips feat_0..feat_33 (used for equalize split pass)
     cfg_non_secs = _make_config("--algo", "LogisticRegression")
-    df_non_secs = create_features(raw_df, config=cfg_non_secs)
+    df_non_secs = create_features(long_df, config=cfg_non_secs)
     assert [c for c in df_non_secs.columns if c.startswith("feat_")] == []
 
     for cli_args in [
@@ -704,18 +758,160 @@ def test_logistic_regression_features() -> None:
         ],
     ]:
         cfg = _make_config(*cli_args)
-        df_lr = create_features(raw_df, config=cfg)
+        df_lr = create_features(long_df, config=cfg)
         feat_cols = [c for c in df_lr.columns if c.startswith("feat_")]
         assert len(feat_cols) == 34
         feat_mat = df_lr[feat_cols].to_numpy()
+        assert feat_mat.dtype == np.float32
         assert np.isfinite(feat_mat).all()
         ref_feats = _reference_logreg_features(df_lr.drop(columns=feat_cols))
         assert df_lr[feat_cols].equals(ref_feats)
 
 
+@pytest.mark.parametrize("es_dtype", [np.int32, np.float32])
+@pytest.mark.parametrize(
+    "cli_args",
+    [
+        ["--algo", "FSRS-6"],
+        ["--algo", "FSRS-6", "--file"],
+        ["--algo", "FSRS-7", "--short", "--secs"],
+        ["--algo", "FSRS-7", "--short", "--secs", "--equalize_test_with_non_secs", "--file"],
+        ["--algo", "LSTM", "--short", "--secs", "--duration", "--file"],
+        ["--algo", "DASH", "--short", "--secs"],
+        ["--algo", "DASH[MCM]", "--short", "--secs"],
+        ["--algo", "DASH[ACT-R]", "--short", "--secs"],
+        ["--algo", "ACT-R"],
+        ["--algo", "NN-17"],
+    ],
+)
+def test_narrow_integer_and_float32_dtypes_against_reference(
+    cli_args: list[str], es_dtype: type
+) -> None:
+    raw_df = _build_synthetic_revlogs(sort_index_by_card=True)
+    narrow_df = raw_df.assign(
+        card_id=raw_df["card_id"].astype(np.int32),
+        day_offset=raw_df["day_offset"].astype(np.int16),
+        rating=raw_df["rating"].astype(np.int16),
+        state=raw_df["state"].astype(np.int8),
+        duration=raw_df["duration"].astype(np.int32),
+        elapsed_days=raw_df["elapsed_days"].astype(np.int16),
+        elapsed_seconds=raw_df["elapsed_seconds"].astype(es_dtype),
+    )
+    cfg = _make_config(*cli_args)
+    df_opt = create_features(narrow_df, config=cfg)
+    df_ref = _reference_create_features(narrow_df, config=cfg)
+    _assert_frames_bit_exact(df_opt, df_ref, full_columns=("--file" in cli_args))
+
+
+def test_dash_actr_triangular_storage() -> None:
+    raw_df = _build_synthetic_revlogs(sort_index_by_card=True)
+    cfg = _make_config("--algo", "DASH[ACT-R]", "--short", "--secs")
+    df_opt = create_features(raw_df, config=cfg)
+    df_ref = _reference_create_features(raw_df, config=cfg)
+    _assert_frames_bit_exact(df_opt, df_ref)
+
+    pre_df = raw_df[raw_df["rating"].isin([1, 2, 3, 4])]
+    pre_card_counts = (
+        pre_df.groupby("card_id").size().clip(upper=cfg.max_seq_len * 2).to_dict()
+    )
+
+    # Verify views per card do not retain a square m*m*2 backing storage.
+    # Packed buffer is built before _common_postprocessing filters delta_t == 0 rows,
+    # so m equals (pre-postprocessing rows for the card) - 1.
+    for cid, grp in df_opt.groupby("card_id", sort=False):
+        tensors = grp["tensor"].tolist()
+        non_empty = [t for t in tensors if t.shape[0] > 0]
+        if not non_empty:
+            continue
+        m = pre_card_counts[cid] - 1
+        expected_tri_bytes = (m * (m + 1) // 2) * 2 * 4
+        ptrs = {t.untyped_storage().data_ptr() for t in non_empty}
+        assert len(ptrs) == 1
+        assert non_empty[0].untyped_storage().nbytes() == expected_tri_bytes
+
+
+def test_empty_and_all_filtered_against_reference() -> None:
+    raw_df = _build_synthetic_revlogs(sort_index_by_card=True)
+    narrow_empty = raw_df.iloc[:0].assign(
+        card_id=raw_df["card_id"].iloc[:0].astype(np.int32),
+        day_offset=raw_df["day_offset"].iloc[:0].astype(np.int16),
+        rating=raw_df["rating"].iloc[:0].astype(np.int16),
+        state=raw_df["state"].iloc[:0].astype(np.int8),
+        duration=raw_df["duration"].iloc[:0].astype(np.int32),
+        elapsed_days=raw_df["elapsed_days"].iloc[:0].astype(np.int16),
+        elapsed_seconds=raw_df["elapsed_seconds"].iloc[:0].astype(np.int32),
+    )
+    all_invalid = pd.DataFrame(
+        {
+            "card_id": np.array([1, 2], dtype=np.int32),
+            "day_offset": np.array([0, 1], dtype=np.int16),
+            "rating": np.array([5, 0], dtype=np.int16),
+            "state": np.array([0, 0], dtype=np.int8),
+            "duration": np.array([1000, 2000], dtype=np.int32),
+            "elapsed_days": np.array([-1, -1], dtype=np.int16),
+            "elapsed_seconds": np.array([-1, -1], dtype=np.int32),
+        }
+    )
+
+    cfg_secs = _make_config("--algo", "FSRS-7", "--short", "--secs", "--file")
+    cfg_non_secs = _make_config("--algo", "FSRS-6")
+    for case_df in (narrow_empty, all_invalid):
+        df_opt = create_features(case_df, config=cfg_secs)
+        df_ref = _reference_create_features(case_df, config=cfg_secs)
+        _assert_frames_bit_exact(df_opt, df_ref, full_columns=True)
+        with pytest.raises(ValueError, match="No data after handling outliers"):
+            create_features(case_df, config=cfg_non_secs)
+
+
+def _reference_load_user_data(
+    data_path: Path, user_id: int, config: Config
+) -> pd.DataFrame:
+    """Independent parent UserDataLoader oracle (full merge + fillna(-1))."""
+    df_revlogs = pd.read_parquet(data_path / "revlogs" / f"{user_id=}")
+    dataset = _reference_create_features(df_revlogs, config)
+    if dataset.shape[0] < 6:
+        raise InsufficientUserDataError(f"{user_id} does not have enough data.")
+
+    if config.partitions != "none":
+        cards_path = data_path / "cards" / f"user_id={user_id}"
+        if cards_path.exists():
+            df_cards = pd.read_parquet(cards_path)
+            if "user_id" in df_cards.columns:
+                df_cards = df_cards.drop(columns=["user_id"])
+        else:
+            df_cards = pd.read_parquet(
+                data_path / "cards", filters=[("user_id", "=", user_id)]
+            ).drop(columns=["user_id"])
+
+        decks_path = data_path / "decks" / f"user_id={user_id}"
+        if decks_path.exists():
+            df_decks = pd.read_parquet(decks_path)
+            if "user_id" in df_decks.columns:
+                df_decks = df_decks.drop(columns=["user_id"])
+        else:
+            df_decks = pd.read_parquet(
+                data_path / "decks", filters=[("user_id", "=", user_id)]
+            ).drop(columns=["user_id"])
+
+        dataset = dataset.merge(df_cards, on="card_id", how="left").merge(
+            df_decks, on="deck_id", how="left"
+        )
+        for col in dataset.columns:
+            if dataset[col].isna().any():
+                dataset[col] = dataset[col].fillna(-1)
+        if config.partitions == "preset":
+            dataset["partition"] = dataset["preset_id"].astype(int)
+        elif config.partitions == "deck":
+            dataset["partition"] = dataset["deck_id"].astype(int)
+    else:
+        dataset["partition"] = 0
+
+    return dataset
+
+
 def test_user_data_loader_partitions_and_missing_cards(tmp_path: Path) -> None:
     raw_df = _build_synthetic_revlogs()
-    # User 1: normal cards + decks (leaving card 103 unmapped to test -1 fallback)
+    # User 1: normal cards + decks, leaving card 103 unmapped and card 102 mapped to missing deck 99
     u1_rev = tmp_path / "revlogs" / "user_id=1"
     u1_cards = tmp_path / "cards" / "user_id=1"
     u1_decks = tmp_path / "decks" / "user_id=1"
@@ -728,7 +924,7 @@ def test_user_data_loader_partitions_and_missing_cards(tmp_path: Path) -> None:
         {
             "card_id": list(range(1, 103)),
             "note_id": [100 + c for c in range(1, 103)],
-            "deck_id": [(c % 3) + 10 for c in range(1, 103)],
+            "deck_id": [99 if c == 102 else (c % 3) + 10 for c in range(1, 103)],
         }
     ).to_parquet(u1_cards / "data.parquet", index=False)
     pd.DataFrame(
@@ -754,37 +950,54 @@ def test_user_data_loader_partitions_and_missing_cards(tmp_path: Path) -> None:
     u3_rev.mkdir(parents=True)
     raw_df.iloc[:4].to_parquet(u3_rev / "data.parquet")
 
-    for part_mode in ("deck", "preset"):
-        cfg_fast = _make_config(
-            "--algo",
-            "FSRS-7",
-            "--short",
-            "--secs",
-            "--equalize_test_with_non_secs",
-            "--partitions",
-            part_mode,
-            data_path=tmp_path,
-        )
-        cfg_file = _make_config(
-            "--algo",
-            "FSRS-7",
-            "--short",
-            "--secs",
-            "--equalize_test_with_non_secs",
-            "--partitions",
-            part_mode,
-            "--file",
-            data_path=tmp_path,
-        )
-        df_fast_u1 = UserDataLoader(cfg_fast).load_user_data(1)
-        df_file_u1 = UserDataLoader(cfg_file).load_user_data(1)
-        _assert_frames_bit_exact(df_fast_u1, df_file_u1, full_columns=False)
-        assert (df_fast_u1.loc[df_fast_u1["card_id"] == 103, "partition"] == -1).all()
+    for part_mode in ("none", "deck", "preset"):
+        for extra_flags in (
+            ["--short", "--secs", "--equalize_test_with_non_secs"],
+            [],
+        ):
+            cfg_fast = _make_config(
+                "--algo",
+                "FSRS-7",
+                *extra_flags,
+                "--partitions",
+                part_mode,
+                data_path=tmp_path,
+            )
+            cfg_file = _make_config(
+                "--algo",
+                "FSRS-7",
+                *extra_flags,
+                "--partitions",
+                part_mode,
+                "--file",
+                data_path=tmp_path,
+            )
+            df_ref_u1 = _reference_load_user_data(tmp_path, 1, cfg_file)
+            df_fast_u1 = UserDataLoader(cfg_fast).load_user_data(1)
+            df_file_u1 = UserDataLoader(cfg_file).load_user_data(1)
+            _assert_frames_bit_exact(df_file_u1, df_ref_u1, full_columns=True)
+            _assert_frames_bit_exact(df_fast_u1, df_ref_u1, full_columns=False)
 
-        df_fast_u2 = UserDataLoader(cfg_fast).load_user_data(2)
-        df_file_u2 = UserDataLoader(cfg_file).load_user_data(2)
-        _assert_frames_bit_exact(df_fast_u2, df_file_u2, full_columns=False)
-        assert (df_fast_u2["partition"] == -1).all()
+            if part_mode != "none":
+                assert (
+                    df_fast_u1.loc[df_fast_u1["card_id"] == 103, "partition"] == -1
+                ).all()
+            if part_mode == "preset":
+                assert (
+                    df_fast_u1.loc[df_fast_u1["card_id"] == 102, "partition"] == -1
+                ).all()
+            elif part_mode == "deck":
+                assert (
+                    df_fast_u1.loc[df_fast_u1["card_id"] == 102, "partition"] == 99
+                ).all()
+
+            df_ref_u2 = _reference_load_user_data(tmp_path, 2, cfg_file)
+            df_fast_u2 = UserDataLoader(cfg_fast).load_user_data(2)
+            df_file_u2 = UserDataLoader(cfg_file).load_user_data(2)
+            _assert_frames_bit_exact(df_file_u2, df_ref_u2, full_columns=True)
+            _assert_frames_bit_exact(df_fast_u2, df_ref_u2, full_columns=False)
+            expected_u2_part = 0 if part_mode == "none" else -1
+            assert (df_fast_u2["partition"] == expected_u2_part).all()
 
     cfg_u3 = _make_config("--algo", "FSRS-7", "--short", "--secs", data_path=tmp_path)
     with pytest.raises(InsufficientUserDataError):

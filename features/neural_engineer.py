@@ -59,7 +59,7 @@ class ACTRFeatureEngineer(BaseFeatureEngineer):
             cast(Any, df)["tensor"] = []
             return df
 
-        # _cumulative_lists_by_card yields numpy scalars: np.float64 promotes to torch.float64, np.int64 to torch.int64
+        # Parent Series iteration yields numpy scalars: np.float64 promotes to torch.float64, np.int64 to torch.int64
         target_dtype = (
             np.float64 if pd.api.types.is_float_dtype(df["delta_t"]) else np.int64
         )
@@ -118,20 +118,3 @@ class NN17FeatureEngineer(BaseFeatureEngineer):
 
         cast(Any, df)["tensor"] = tensors
         return df
-
-    def _r_history_to_l_history(self, r_history: list) -> list[int]:
-        """
-        Convert rating history to lapse history (cumulative failure count)
-
-        Args:
-            r_history: List of ratings
-
-        Returns:
-            List of cumulative lapse counts
-        """
-        l_history = [0 for _ in range(len(r_history) + 1)]
-        for i, r in enumerate(r_history):
-            l_history[i + 1] = l_history[i] + (
-                r == 1
-            )  # Increment if rating is 1 (failure)
-        return l_history[:-1]

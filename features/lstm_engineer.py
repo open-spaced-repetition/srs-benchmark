@@ -4,7 +4,12 @@ import numpy as np
 import pandas as pd
 import torch
 
-from .base import BaseFeatureEngineer, _card_run_bounds, _card_start_indices
+from .base import (
+    BaseFeatureEngineer,
+    _card_run_bounds,
+    _card_start_indices,
+    _clip_non_negative,
+)
 
 
 class LSTMFeatureEngineer(BaseFeatureEngineer):
@@ -72,7 +77,7 @@ class LSTMFeatureEngineer(BaseFeatureEngineer):
             df["cum_reviews_today"] = df.groupby("day_offset").cumcount()
 
         # Time in days for forgetting curve
-        df["delta_t_days"] = np.maximum(0, df["elapsed_days"].to_numpy())
+        df["delta_t_days"] = _clip_non_negative(df["elapsed_days"].to_numpy())
 
         return df
 

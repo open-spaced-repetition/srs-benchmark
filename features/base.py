@@ -4,13 +4,17 @@ import numpy as np
 import pandas as pd
 
 from config import Config
-from utils import cum_concat
-
-# Per-card cumulative history. Nested three deep: outer = cards, middle = reviews within a
-# card, inner = the cumulative prefix of (numpy) interval/rating values up to that review.
-HistoryLists = list[list[list[float]]]
 
 _FIRST_RATING_STR_LUT = np.array(["", "1", "2", "3", "4"], dtype=object)
+
+
+def _clip_non_negative(arr: np.ndarray) -> np.ndarray:
+    """Clip to >= 0 while matching pandas ``Series.map(lambda x: max(0, x))`` dtypes."""
+    if np.issubdtype(arr.dtype, np.integer):
+        return np.maximum(np.int64(0), arr)
+    if np.issubdtype(arr.dtype, np.floating):
+        return np.maximum(np.float64(0.0), arr)
+    return np.maximum(0, arr)
 
 
 def _card_start_indices(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -73,7 +77,7 @@ def _prefix_history_strings(card_ids: np.ndarray, values: np.ndarray) -> list[st
 def _compute_last_rating_fast(
     is_start: np.ndarray, t_non_secs: np.ndarray, ratings: np.ndarray
 ) -> np.ndarray:
-    """Vectorized equivalent of ``BaseFeatureEngineer._compute_last_rating``."""
+    """Vectorized equivalent of previous-rating lookup across contiguous cards."""
     n = len(ratings)
     if n == 0:
         return np.empty(0, dtype=ratings.dtype)
@@ -85,33 +89,6 @@ def _compute_last_rating_fast(
     src[0] = 0
     src[1:] = np.where(is_start[1:], idx_arr[1:], latest_valid[:-1])
     return ratings[src]
-
-
-def _cumulative_lists_by_card(df: pd.DataFrame, col: str) -> HistoryLists:
-    """Per-card list of cumulative-prefix lists for ``col``, in df row order.
-
-    Bit-identical replacement for::
-
-        df.groupby("card_id", group_keys=False)[col].apply(
-            lambda x: cum_concat([[i] for i in x]))
-
-    but without the pandas per-group ``apply`` overhead (the dominant create_features
-    cost). Requires df sorted by ``card_id`` (guaranteed by _common_preprocessing, which
-    is exactly what the groupby-apply assignment also relies on). Values are kept as numpy
-    scalars (matching Series iteration), so ``str()`` and ``torch.tensor()`` downstream
-    produce identical results.
-    """
-    card_ids = df["card_id"].values
-    vals = list(df[col].values)
-    out: HistoryLists = []
-    n = len(vals)
-    start = 0
-    for i in range(1, n + 1):
-        if i == n or card_ids[i] != card_ids[start]:  # type: ignore
-            block = vals[start:i]
-            out.append([block[: j + 1] for j in range(len(block))])
-            start = i
-    return out
 
 
 class BaseFeatureEngineer(ABC):
@@ -128,9 +105,6 @@ class BaseFeatureEngineer(ABC):
             config: Configuration object containing model parameters
         """
         self.config = config
-        # Lazily populated if a caller invokes get_history_lists().
-        self._cached_t_history_list: HistoryLists | None = None
-        self._cached_r_history_list: HistoryLists | None = None
 
     def create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -225,28 +199,43 @@ class BaseFeatureEngineer(ABC):
         """
         Process time interval related fields
         """
+        if len(df) == 0:
+            if (
+                "delta_t" not in df.columns
+                and "elapsed_days" in df.columns
+                and (
+                    "elapsed_seconds" in df.columns
+                    or not self.config.use_secs_intervals
+                )
+            ):
+                df["delta_t"] = df["elapsed_days"]
+                if self.config.use_secs_intervals:
+                    df["delta_t_secs"] = df["elapsed_seconds"] / 86400
+                    df["delta_t_secs"] = df["delta_t_secs"].map(lambda x: max(0, x))
+            df["delta_t"] = df["delta_t"].map(lambda x: max(0, x))
+            df["delta_t_int"] = df["elapsed_days"].map(lambda x: max(0, x))
+            return df
+
         if (
             "delta_t" not in df.columns
             and "elapsed_days" in df.columns
             and ("elapsed_seconds" in df.columns or not self.config.use_secs_intervals)
         ):
-            df["delta_t"] = np.maximum(0, df["elapsed_days"].to_numpy())
+            df["delta_t"] = _clip_non_negative(df["elapsed_days"].to_numpy())
             if self.config.use_secs_intervals:
                 df["delta_t_secs"] = np.maximum(
-                    0.0, df["elapsed_seconds"].to_numpy() / 86400
+                    np.float64(0.0),
+                    df["elapsed_seconds"].to_numpy() / 86400,
                 )
         else:
-            df["delta_t"] = np.maximum(0, df["delta_t"].to_numpy())
-        df["delta_t_int"] = np.maximum(0, df["elapsed_days"].to_numpy())
+            df["delta_t"] = _clip_non_negative(df["delta_t"].to_numpy())
+        df["delta_t_int"] = _clip_non_negative(df["elapsed_days"].to_numpy())
         return df
 
     def _compute_histories(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Compute time and rating history records on demand
         """
-        self._cached_r_history_list = None
-        self._cached_t_history_list = None
-
         need_r = self.config.needs_r_history()
         need_t = self.config.needs_t_history()
         need_eval = self.config.save_evaluation_file
@@ -263,7 +252,7 @@ class BaseFeatureEngineer(ABC):
                         is_start, t_non_secs, ratings
                     )
                 else:
-                    df["last_rating"] = np.empty(0, dtype=np.int64)
+                    df["last_rating"] = []
 
             if need_r:
                 df["r_history"] = _prefix_history_strings(card_ids, ratings)
@@ -287,62 +276,6 @@ class BaseFeatureEngineer(ABC):
 
         return df
 
-    def _compute_last_rating(
-        self, t_history_list: HistoryLists, r_history_list: HistoryLists
-    ) -> list[int]:
-        """
-        Calculate the previous rating for each review
-        """
-        last_rating = []
-        for t_sublist, r_sublist in zip(t_history_list, r_history_list):
-            for t_history, r_history in zip(t_sublist, r_sublist):
-                flag = True
-                for t, r in zip(reversed(t_history[:-1]), reversed(r_history[:-1])):
-                    if t > 0:
-                        last_rating.append(r)
-                        flag = False
-                        break
-                if flag:
-                    last_rating.append(r_history[0])
-        return last_rating
-
-    def _set_time_histories(
-        self,
-        df: pd.DataFrame,
-        t_history_non_secs_list: HistoryLists,
-        t_history_secs_list: HistoryLists | None = None,
-    ) -> pd.DataFrame:
-        """
-        Set time history string fields
-        """
-        if t_history_secs_list is not None:
-            if self.config.equalize_test_with_non_secs:
-                df["t_history"] = [
-                    ",".join(map(str, item[:-1]))
-                    for sublist in t_history_non_secs_list
-                    for item in sublist
-                ]
-                df["t_history_secs"] = [
-                    ",".join(map(str, item[:-1]))
-                    for sublist in t_history_secs_list
-                    for item in sublist
-                ]
-            else:
-                df["t_history"] = [
-                    ",".join(map(str, item[:-1]))
-                    for sublist in t_history_secs_list
-                    for item in sublist
-                ]
-            df["delta_t"] = df["delta_t_secs"]
-        else:
-            df["t_history"] = [
-                ",".join(map(str, item[:-1]))
-                for sublist in t_history_non_secs_list
-                for item in sublist
-            ]
-
-        return df
-
     @abstractmethod
     def _model_specific_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -360,14 +293,23 @@ class BaseFeatureEngineer(ABC):
         Common postprocessing steps shared by all models
         """
         if len(df) == 0:
-            df["first_rating"] = pd.Series(dtype=str)
-            df["y"] = np.empty(0, dtype=np.int64)
-            df["rmse_bins_lapse"] = np.empty(0, dtype=np.int64)
+            df["first_rating"] = (
+                df.groupby("card_id")["rating"].transform("first").astype(str)
+            )
+            df["y"] = df["rating"].map(lambda x: {1: 0, 2: 1, 3: 1, 4: 1}[x])
+            df["is_lapse"] = (
+                (df["rating"] == 1) & (df["delta_t"].astype(str) != "0")
+            ).astype(int)
+            df["rmse_bins_lapse"] = (
+                df.groupby("card_id")["is_lapse"].transform("cumsum") - df["is_lapse"]
+            )
+            df.drop(columns=["is_lapse"], inplace=True)
+            df["i"] = df["elapsed_days"].gt(0).groupby(df["card_id"]).cumsum().add(1)
             if not self.config.use_secs_intervals:
                 raise ValueError(
                     "No data after handling outliers and non-continuous rows"
                 )
-            return df
+            return df[df["delta_t"] > 0].sort_values(by=["review_th"])
 
         card_ids = df["card_id"].to_numpy()
         ratings = df["rating"].to_numpy()
@@ -459,35 +401,6 @@ class BaseFeatureEngineer(ABC):
             else:
                 any_i2_kept = True
 
-        # Handle any unexpected first_rating values outside {"1","2","3","4"} defensively
-        other_mask = ~np.isin(first_ratings_i2, ("1", "2", "3", "4"))
-        if other_mask.any():
-            for fr in np.unique(first_ratings_i2[other_mask]):
-                fr_mask = first_ratings_i2 == fr
-                dt_sub = delta_t_i2[fr_mask]
-                uniq_dt, counts = np.unique(dt_sub, return_counts=True)
-                order = np.lexsort((-uniq_dt, counts))
-                total = len(dt_sub)
-                threshold = max(total * 0.05, 20.0)
-                max_dt = 365 if fr == "4" else 100
-                removed_dts = []
-                has_been_removed = 0
-                for c, dt_val in zip(counts[order].tolist(), uniq_dt[order].tolist()):
-                    if has_been_removed + c >= threshold:
-                        if c < 6 or dt_val > max_dt:
-                            removed_dts.append(dt_val)
-                            has_been_removed += c
-                    else:
-                        removed_dts.append(dt_val)
-                        has_been_removed += c
-                if removed_dts:
-                    sub_keep = ~np.isin(dt_sub, removed_dts)
-                    keep_row[i2_pos[fr_mask]] = sub_keep
-                    if sub_keep.any():
-                        any_i2_kept = True
-                else:
-                    any_i2_kept = True
-
         if not any_i2_kept:
             return pd.DataFrame()
 
@@ -520,71 +433,6 @@ class BaseFeatureEngineer(ABC):
         return df.groupby("card_id", as_index=False, group_keys=False)[
             df.columns
         ].apply(remove_non_continuous_rows)
-
-    def get_time_history_list(self, df: pd.DataFrame) -> pd.Series:
-        """
-        Get time history list for feature engineering
-
-        Args:
-            df: Input dataframe
-
-        Returns:
-            Time history list as pandas Series
-        """
-        if self.config.use_secs_intervals:
-            t_history_list = df.groupby("card_id", group_keys=False)[
-                (
-                    "delta_t_secs"
-                    if not self.config.equalize_test_with_non_secs
-                    else "delta_t"
-                )
-            ].apply(lambda x: cum_concat([[i] for i in x]))
-        else:
-            t_history_list = df.groupby("card_id", group_keys=False)["delta_t"].apply(
-                lambda x: cum_concat([[i] for i in x])
-            )
-        return t_history_list
-
-    def get_rating_history_list(self, df: pd.DataFrame) -> pd.Series:
-        """
-        Get rating history list for feature engineering
-
-        Args:
-            df: Input dataframe
-
-        Returns:
-            Rating history list as pandas Series
-        """
-        r_history_list = df.groupby("card_id", group_keys=False)["rating"].apply(
-            lambda x: cum_concat([[i] for i in x])
-        )
-        return r_history_list
-
-    def get_nth_today_history_list(self, df: pd.DataFrame) -> pd.Series:
-        """
-        Get nth today history list for feature engineering
-        """
-        n_history_list = df.groupby("card_id", group_keys=False)["nth_today"].apply(
-            lambda x: cum_concat([[i] for i in x])
-        )
-        return n_history_list
-
-    def get_history_lists(self, df: pd.DataFrame):
-        """
-        Get history record lists for feature engineering
-
-        Returns:
-            Tuple of (time_history_list, rating_history_list)
-        """
-        if self._cached_t_history_list is None or self._cached_r_history_list is None:
-            t_col = (
-                "delta_t_secs"
-                if self.config.use_secs_intervals and "delta_t_secs" in df.columns
-                else "delta_t"
-            )
-            self._cached_t_history_list = _cumulative_lists_by_card(df, t_col)
-            self._cached_r_history_list = _cumulative_lists_by_card(df, "rating")
-        return self._cached_t_history_list, self._cached_r_history_list
 
     def _model_specific_postprocessing(self, df: pd.DataFrame) -> pd.DataFrame:
         """

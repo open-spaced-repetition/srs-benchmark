@@ -105,7 +105,7 @@ def create_features(df: pd.DataFrame):
     num_same_day_s = _seg_cumsum_i64(same_day_s)
     num_non_same_day_s = _seg_cumsum_i64(non_same_day_s)
 
-    # Exact per-card cumulative sum of feat_elapsed_real_s
+    # Per-card cumulative sum in float64 before float32 cast (avoids cross-card cancellation)
     changes = np.flatnonzero(is_start[1:]) + 1
     c_starts = np.empty(len(changes) + 1, dtype=np.int64)
     c_ends = np.empty(len(changes) + 1, dtype=np.int64)

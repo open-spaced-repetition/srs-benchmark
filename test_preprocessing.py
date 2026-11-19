@@ -731,9 +731,9 @@ def test_logistic_regression_features() -> None:
             -1
             if step == 0
             else (
-                int(rng.integers(10, 1800))
+                int(cast(Any, rng.integers(10, 1800)))
                 if ivl == 0
-                else ivl * 86400 + int(rng.integers(0, 7200))
+                else ivl * 86400 + int(cast(Any, rng.integers(0, 7200)))
             )
         )
         day += max(0, ivl)

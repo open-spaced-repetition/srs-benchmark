@@ -7,6 +7,8 @@ import torch
 from config import Config
 
 _FIRST_RATING_STR_LUT = np.array(["", "1", "2", "3", "4"], dtype=object)
+# 0-d float64 array: promotes like an np.float64 scalar (NEP 50) in np.maximum
+_ZERO_F64 = np.zeros((), dtype=np.float64)
 
 
 def _clip_non_negative(arr: np.ndarray) -> np.ndarray:
@@ -14,7 +16,7 @@ def _clip_non_negative(arr: np.ndarray) -> np.ndarray:
     if np.issubdtype(arr.dtype, np.integer):
         return np.maximum(np.int64(0), arr)
     if np.issubdtype(arr.dtype, np.floating):
-        return np.maximum(np.float64(0.0), arr)
+        return np.maximum(_ZERO_F64, arr)
     return np.maximum(0, arr)
 
 
@@ -24,7 +26,7 @@ def _card_start_indices(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     is_start = np.ones(n, dtype=bool)
     is_start[1:] = card_ids[1:] != card_ids[:-1]
     start_idx = np.maximum.accumulate(
-        np.where(is_start, np.arange(n, dtype=np.int64), 0)
+        np.where(is_start, np.arange(n).astype(np.int64), 0)
     )
     return is_start, start_idx
 
@@ -32,7 +34,7 @@ def _card_start_indices(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 def _positions_in_card(card_ids: np.ndarray) -> np.ndarray:
     """0-based position of each row within its contiguous ``card_id`` run."""
     _, start_idx = _card_start_indices(card_ids)
-    return np.arange(len(card_ids), dtype=np.int64) - start_idx
+    return np.arange(len(card_ids)).astype(np.int64) - start_idx
 
 
 def _card_run_bounds(card_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -115,7 +117,7 @@ def _compute_last_rating(
 ) -> np.ndarray:
     """Rating of the latest earlier review of the same card whose own interval was
     positive, falling back to the card's first review."""
-    idx_arr = np.arange(len(ratings), dtype=np.int64)
+    idx_arr = np.arange(len(ratings)).astype(np.int64)
     latest_valid = np.maximum.accumulate(
         np.where(is_start | (t_non_secs > 0), idx_arr, 0)
     )
@@ -180,7 +182,7 @@ class BaseFeatureEngineer(ABC):
         Common preprocessing steps shared by all models
         """
         # Add review sequence number
-        df["review_th"] = np.arange(1, len(df) + 1, dtype=np.int64)
+        df["review_th"] = np.arange(len(df)).astype(np.int64) + 1
         if self.config.save_evaluation_file and "day_offset" in df.columns:
             df["nth_today"] = df.groupby("day_offset").cumcount() + 1
         df.sort_values(by=["card_id", "review_th"], inplace=True)
@@ -247,7 +249,7 @@ class BaseFeatureEngineer(ABC):
             df["delta_t"] = _clip_non_negative(df["elapsed_days"].to_numpy())
             if self.config.use_secs_intervals:
                 df["delta_t_secs"] = np.maximum(
-                    np.float64(0.0),
+                    _ZERO_F64,
                     df["elapsed_seconds"].to_numpy() / 86400,
                 )
         else:
